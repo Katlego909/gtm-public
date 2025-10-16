@@ -1,22 +1,50 @@
-{% load static tailwind_tags %}
+{% comment %} {% load static tailwind_tags %} {% endcomment %}
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Funti3r GTM Validator</title>
-  {% comment %} <script src="https://cdn.tailwindcss.com"></script> {% endcomment %}
 
-  {% tailwind_css %}
+  <!-- ✅ Tailwind CDN -->
+  {% comment %} <script src="https://cdn.tailwindcss.com"></script> {% endcomment %}
+  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+
+  <!-- ✅ Google Fonts: Inter + DM Sans -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <!-- ✅ Global font styles -->
+  <style>
+    :root {
+      --font-body: 'Inter', sans-serif;
+      --font-heading: 'DM Sans', sans-serif;
+    }
+
+    body {
+      font-family: var(--font-body);
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    h1, h2, h3, h4, h5, h6 {
+      font-family: var(--font-heading);
+      letter-spacing: -0.02em;
+    }
+  </style>
+
+  {% comment %} {% tailwind_css %} {% endcomment %}
 </head>
 <body class="bg-gray-50 text-gray-900">
   <nav class="bg-white border-b sticky top-0 z-10">
     <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-      <div class="font-semibold">Funti3r GTM Validator</div>
-      <a href="{% url 'gtm:history' %}" class="text-sm text-gray-600 hover:text-gray-900">History</a>
-      <a href="{% url 'gtm:landing' %}" class="text-sm text-gray-600 hover:text-gray-900">Home</a>
+      <div class="font-semibold text-lg tracking-tight">Funti3r GTM Validator</div>
+      <div class="flex items-center gap-4">
+        <a href="{% url 'gtm:history' %}" class="text-sm text-gray-600 hover:text-gray-900 transition">History</a>
+        <a href="{% url 'gtm:landing' %}" class="text-sm text-gray-600 hover:text-gray-900 transition">Home</a>
+      </div>
     </div>
   </nav>
+
   <main class="max-w-5xl mx-auto px-4 py-8">
     {% block content %}{% endblock %}
   </main>

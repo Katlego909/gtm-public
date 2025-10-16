@@ -1,5 +1,7 @@
 from django.db import models
 import uuid
+from django.contrib.postgres.fields import ArrayField 
+from django.core.serializers.json import DjangoJSONEncoder
 
 class Category(models.Model):
     name = models.CharField(max_length=50, unique=True)
@@ -68,3 +70,30 @@ class ToolRecommendation(models.Model):
 
     def __str__(self):
         return f"{self.keyword} ({self.category.name})"   
+
+
+# Analytics
+
+class ResultSnapshot(models.Model):
+    session = models.OneToOneField(
+        "AssessmentSession", on_delete=models.CASCADE, related_name="snapshot"
+    )
+    overall = models.FloatField()
+    band = models.ForeignKey(
+        "RecommendationBand", on_delete=models.SET_NULL, null=True, blank=True
+    )
+    band_stage = models.CharField(max_length=40, blank=True)   # denormalized for quick filters
+    band_headline = models.CharField(max_length=200, blank=True)
+
+    # e.g. [{"category":"Demand","avg":3.24},{"category":"Conversion","avg":3.79}, ...]
+    category_breakdown = models.JSONField(encoder=DjangoJSONEncoder)
+
+    # store what was plotted (useful for PDFs/exports)
+    radar_labels = models.JSONField(encoder=DjangoJSONEncoder, default=list)
+    radar_values = models.JSONField(encoder=DjangoJSONEncoder, default=list)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Snapshot for {self.session.uuid} – {self.overall}/100"

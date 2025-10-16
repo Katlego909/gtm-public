@@ -121,40 +121,40 @@ class Command(BaseCommand):
         # ---------------------------
         bands = [
             (0, 39, "Foundations", "Establish GTM basics",
-             """**Action Plan:**
+             """Action Plan:
 - Define ICP and buyer roles.
 - Clarify your value proposition & homepage hero message.
 - Launch one always-on demand motion.
 
-**Recommended Tools:**
+Recommended Tools:
 - HubSpot CRM or Pipedrive — ICP & lead tracking.
 - Apollo.io — Lead sourcing and outbound sequences.
 - Webflow or Framer — Landing page testing."""
              ),
             (40, 54, "Process & SLAs", "Stabilize conversion process",
-             """**Action Plan:**
+             """Action Plan:
 - Set lead response SLAs to improve conversion consistency.
 - Add lightweight qualification and routing.
 - Document the full process (discovery → proposal → close).
 
-**Recommended Tools:**
+Recommended Tools:
 - Calendly or Chili Piper — Automate booking & response SLAs.
 - HubSpot Service Hub — Workflow-based response tracking.
 - Notion or ClickUp — Process documentation."""
              ),
             (55, 69, "Optimisation", "Tighten the funnel",
-             """**Action Plan:**
+             """Action Plan:
 - Create a weekly growth board (MQL → SQL → Win).
 - Run landing page A/B tests and track engagement.
 - Improve attribution and analytics setup.
 
-**Recommended Tools:**
+Recommended Tools:
 - Google Analytics 4, Hotjar — Conversion tracking.
 - Unbounce, VWO — Landing page A/B testing.
 - Dreamdata or HubSpot Attribution — Source mapping."""
              ),
             (70, 84, "Scale", "Layer advanced motions",
-             """**Action Plan:**
+             """Action Plan:
 - Pilot webinars or ABM campaigns to scale reach.
 - Partner with complementary brands.
 - Launch SDR/outbound playbooks with guardrails.
@@ -165,12 +165,12 @@ class Command(BaseCommand):
 - Mutiny or Clearbit — Personalized website targeting."""
              ),
             (85, 100, "Moats", "Build durable advantage",
-             """**Action Plan:**
+             """Action Plan:
 - Build a brand moat with community and events.
 - Publish benchmarks, studies, and insights.
 - Partner across your ecosystem for compounded growth.
 
-**Recommended Tools:**
+Recommended Tools:
 - Circle or Slack — Community platforms.
 - Notion or Beehiiv — Content & newsletter automation.
 - Zapier or Make — Workflow integrations at scale."""

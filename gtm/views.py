@@ -17,7 +17,6 @@ from django.views.decorators.http import require_POST
 from django.shortcuts import redirect
 from django.utils.safestring import mark_safe
 
-
 LEGEND = {
     1: "No / Not in place",
     2: "Ad-hoc / Rarely",
