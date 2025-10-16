@@ -1,0 +1,24 @@
+{% load static tailwind_tags %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Funti3r GTM Validator</title>
+  {% comment %} <script src="https://cdn.tailwindcss.com"></script> {% endcomment %}
+
+  {% tailwind_css %}
+</head>
+<body class="bg-gray-50 text-gray-900">
+  <nav class="bg-white border-b sticky top-0 z-10">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="font-semibold">Funti3r GTM Validator</div>
+      <a href="{% url 'gtm:history' %}" class="text-sm text-gray-600 hover:text-gray-900">History</a>
+      <a href="{% url 'gtm:landing' %}" class="text-sm text-gray-600 hover:text-gray-900">Home</a>
+    </div>
+  </nav>
+  <main class="max-w-5xl mx-auto px-4 py-8">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

@@ -1,0 +1,36 @@
+{% extends "gtm/base.html" %}
+{% block content %}
+<h1 class="text-2xl font-semibold mb-4">Your Assessments (this browser)</h1>
+
+{% if rows %}
+  <div class="bg-white rounded-2xl shadow divide-y">
+    {% for r in rows %}
+      <div class="p-5 flex items-center justify-between">
+        <div>
+          <div class="font-medium">
+            {{ r.session.company_name|default:"Untitled company" }}
+            <span class="text-gray-500 text-sm"> • {{ r.session.created_at|date:"Y-m-d H:i" }}</span>
+          </div>
+          <div class="text-sm text-gray-600">
+            {% if r.overall %}
+              Score: <b>{{ r.overall }}</b>/100
+              {% if r.band %} • Stage: <b>{{ r.band.stage }}</b>{% endif %}
+            {% else %}
+              Incomplete assessment
+            {% endif %}
+          </div>
+        </div>
+        <div class="flex gap-2">
+          {% if r.session.is_completed %}
+            <a href="{% url 'gtm:results' r.session.uuid %}" class="px-3 py-2 rounded border">Open Report</a>
+          {% else %}
+            <a href="{% url 'gtm:resume' r.session.uuid %}" class="px-3 py-2 rounded bg-black text-white">Resume</a>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="text-gray-600">No assessments yet. <a href="{% url 'gtm:start' %}" class="underline">Start one</a>.</p>
+{% endif %}
+{% endblock %}

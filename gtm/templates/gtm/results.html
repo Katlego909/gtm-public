@@ -1,0 +1,163 @@
+{% extends "gtm/base.html" %}
+{% block content %}
+<div class="grid md:grid-cols-2 gap-6">
+  <div class="bg-white rounded-2xl shadow p-8">
+    <h2 class="text-xl font-semibold mb-2">GTM Score</h2>
+    <div class="text-3xl font-bold">{{ overall }}/100</div>
+    {% if band %}
+      <div class="mt-2 inline-block text-xs px-3 py-1 rounded-full bg-gray-900 text-white">{{ band.stage }}</div>
+      <p class="text-gray-600 mt-4">{{ band.headline }}</p>
+    {% endif %}
+    <canvas id="radar" class="mt-6"></canvas>
+  </div>
+
+  <div class="bg-white rounded-2xl shadow p-8">
+    <h2 class="text-xl font-semibold mb-4">Category Breakdown</h2>
+    <div class="space-y-4">
+      {% for c in cat_scores %}
+        <div>
+          <div class="flex justify-between text-sm mb-1">
+            <span>{{ c.category.name }}</span><span>{{ c.avg|floatformat:2 }}/5</span>
+          </div>
+          <div class="w-full bg-gray-200 rounded h-2">
+            <div class="bg-black h-2 rounded" style="width: {{ c.avg|floatformat:2|floatformat }}/"></div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{% if band %}
+  <div class="bg-white rounded-2xl shadow p-8 mt-6">
+    <h3 class="text-lg font-semibold mb-4">Recommended Next Moves</h3>
+    <div class="prose max-w-none prose-ul:my-1 prose-li:my-0 prose-p:my-2">
+      {{ band_actions_html|safe }}
+    </div>
+  </div>
+{% endif %}
+
+{# ---------------- TOOL RECOMMENDATIONS ---------------- #}
+{% if recommendations %}
+<div class="bg-white rounded-2xl shadow p-8 mt-6">
+  <h3 class="text-lg font-semibold mb-3">Recommended Tools</h3>
+  <p class="text-gray-600 text-sm mb-4">Based on your weakest GTM areas, here are tools that can help strengthen your workflow.</p>
+
+  <div class="grid md:grid-cols-2 gap-6">
+    {% for r in recommendations %}
+      <div class="border rounded-lg p-4 hover:shadow transition">
+        <h4 class="font-semibold mb-1">{{ r.keyword|capfirst  }}</h4>
+        <p class="text-sm text-gray-600 mb-2">{{ r.description }}</p>
+        <ul class="text-sm list-disc ml-4 mb-3">
+          {% for t in r.tool_list %}
+            <li>{{ t }}</li>
+          {% endfor %}
+        </ul>
+        {% if r.url %}
+          <a href="{{ r.url }}" target="_blank" class="inline-block text-sm px-3 py-1 bg-black text-white rounded hover:bg-gray-800 transition">Explore</a>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+{# ------------------------------------------------------ #}
+
+<div class="grid md:grid-cols-3 gap-6 mt-6">
+  <div class="bg-white rounded-2xl shadow p-6">
+    <h4 class="font-semibold mb-3">Top Strengths</h4>
+    <ul class="space-y-3">
+      {% for c in strengths_categories %}
+        <li class="border rounded-lg p-3">
+          <div class="flex items-center justify-between">
+            <div class="font-medium">{{ c.category.name }}</div>
+            <div class="text-sm text-gray-600">{{ c.avg|floatformat:2 }}/5</div>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">Signal: performing above other areas — keep the cadence.</p>
+        </li>
+      {% empty %}
+        <li class="text-gray-500 text-sm">No clear strengths yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="bg-white rounded-2xl shadow p-6">
+    <h4 class="font-semibold mb-3">Top Focus Areas</h4>
+    <ul class="space-y-3">
+      {% for c in focus_categories %}
+        <li class="border rounded-lg p-3">
+          <div class="flex items-center justify-between">
+            <div class="font-medium">{{ c.category.name }}</div>
+            <div class="text-sm text-gray-600">{{ c.avg|floatformat:2 }}/5</div>
+          </div>
+          <p class="text-xs text-gray-500 mt-1">Why this matters: lifting this area has the highest impact on GTM readiness due to category weight.</p>
+          <div class="mt-2 flex gap-2">
+            <a href="{% url 'gtm:assessment_step' session.uuid c.step %}" class="px-3 py-1.5 rounded border text-sm">Review answers</a>
+            <a href="{% url 'gtm:playbook' session.uuid %}#actions" class="px-3 py-1.5 rounded bg-black text-white text-sm">See actions</a>
+          </div>
+        </li>
+      {% empty %}
+        <li class="text-gray-500 text-sm">No focus items detected.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="bg-white rounded-2xl shadow p-6">
+    <h4 class="font-semibold mb-3">Weakest Questions</h4>
+    <ul class="space-y-3">
+      {% for q in weakest_questions %}
+        <li class="border rounded-lg p-3">
+          <div class="flex items-center justify-between">
+            <div class="font-medium">{{ q.question.category.name }} • {{ q.question.id_code }}</div>
+            <div class="text-sm text-gray-600">{{ q.score }}/5</div>
+          </div>
+          <p class="text-sm mt-1">{{ q.question.text }}</p>
+          {% if q.note %}
+            <p class="text-xs text-gray-500 mt-1">Diagnostic: {{ q.note }}</p>
+          {% endif %}
+          <div class="mt-2 flex gap-2">
+            <a href="{% url 'gtm:assessment_step' session.uuid q.step %}" class="px-3 py-1.5 rounded border text-sm">Fix this item</a>
+            <button type="button" data-check="{{ q.question.text }}" class="copy-action px-3 py-1.5 rounded text-sm">Copy to checklist</button>
+          </div>
+        </li>
+      {% empty %}
+        <li class="text-gray-500 text-sm">No answered questions yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+
+<div class="mt-6 flex gap-3">
+  <a href="{% url 'gtm:playbook' session.uuid %}" class="px-4 py-2 rounded bg-black text-white">View Playbook</a>
+  <a href="{% url 'gtm:download' session.uuid %}" class="px-4 py-2 rounded border">Download Report (PDF)</a>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const labels = {{ labels|safe }};
+  const values = {{ values|safe }};
+  new Chart(document.getElementById('radar'), {
+    type: 'radar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: 'Category avg (1–5)',
+        data: values,
+        fill: true,
+      }]
+    },
+    options: { responsive: true, scales: { r: { min: 0, max: 5 } } }
+  });
+</script>
+
+<script>
+  document.querySelectorAll('.copy-action').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const text = "- " + btn.getAttribute('data-check');
+      navigator.clipboard.writeText(text);
+      btn.textContent = "Copied ✓";
+      setTimeout(()=>btn.textContent="Copy to checklist", 1200);
+    });
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "gtm/base.html" %}
+{% block content %}
+<form method="post" class="bg-white rounded-2xl shadow p-8 space-y-4">
+  {% csrf_token %}
+  <div>
+    <label class="block text-sm font-medium">Company Name</label>
+    <input name="company_name" class="mt-1 w-full border rounded px-3 py-2" placeholder="Optional">
+  </div>
+  <div>
+    <label class="block text-sm font-medium">Industry</label>
+    <input name="industry" class="mt-1 w-full border rounded px-3 py-2" placeholder="Optional">
+  </div>
+  <button class="bg-black text-white px-5 py-3 rounded-lg">Begin</button>
+</form>
+{% endblock %}

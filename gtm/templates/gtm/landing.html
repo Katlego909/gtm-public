@@ -1,0 +1,8 @@
+{% extends "gtm/base.html" %}
+{% block content %}
+<div class="bg-white rounded-2xl shadow p-8">
+  <h1 class="text-2xl font-semibold mb-2">How ready is your business to scale?</h1>
+  <p class="text-gray-600 mb-6">Take the 10-minute Go-to-Market health check and get a tailored playbook.</p>
+  <a href="{% url 'gtm:start' %}" class="inline-block bg-black text-white px-5 py-3 rounded-lg">Start Assessment</a>
+</div>
+{% endblock %}

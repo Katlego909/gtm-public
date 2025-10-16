@@ -1,0 +1,131 @@
+{% extends "gtm/base.html" %}
+{% block content %}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-2xl font-semibold">Your GTM Playbook</h1>
+  <div class="flex gap-2">
+    <a href="{% url 'gtm:download' session.uuid %}" class="px-4 py-2 rounded bg-black text-white">Download PDF</a>
+    <a href="{% url 'gtm:results' session.uuid %}" class="px-4 py-2 rounded border">Back to Dashboard</a>
+  </div>
+</div>
+
+<div class="grid md:grid-cols-3 gap-6">
+  <div class="md:col-span-2 bg-white rounded-2xl shadow p-8">
+    <div class="flex items-center gap-3 mb-2">
+      <div class="text-3xl font-bold">{{ overall }}</div>
+      <div class="text-gray-600">/100</div>
+      {% if band %}<span class="ml-3 text-xs bg-gray-900 text-white px-3 py-1 rounded-full">{{ band.stage }}</span>{% endif %}
+    </div>
+    {% if band %}
+      <p class="text-gray-600 mb-6">{{ band.headline }}</p>
+    {% endif %}
+
+    <h3 class="font-semibold mb-2">Focus Areas (weakest first)</h3>
+    <ol class="list-decimal ml-5 space-y-1 mb-6">
+      {% for c in cat_sorted %}
+        <li>{{ c.category.name }} — {{ c.avg|floatformat:2 }}/5</li>
+      {% endfor %}
+    </ol>
+
+    {% if band %}
+      <h3 id="actions" class="font-semibold mb-2">Recommended Next Moves</h3>
+      <div class="prose max-w-none">
+        {{ band.actions_markdown|linebreaks }}
+      </div>
+    {% endif %}
+
+    {# --- Action tracker (new) --- #}
+    <div class="bg-gray-50 border rounded-xl p-6 mt-6">
+      <h4 class="font-semibold mb-3">Your GTM Task List</h4>
+
+      <form method="post" action="{% url 'gtm:action_add' session.uuid %}" class="flex gap-2 mb-4">
+        {% csrf_token %}
+        <input name="note" class="flex-1 border rounded px-3 py-2" placeholder="Add a task (e.g., Set 4-hour lead SLA)" required>
+        <button class="px-4 py-2 rounded bg-black text-white">Add</button>
+      </form>
+
+      {% if session.actions.all %}
+        <ul class="space-y-2">
+          {% for a in session.actions.all|dictsortreversed:"created_at" %}
+          <li class="bg-white border rounded-lg p-3">
+            <div class="flex items-center justify-between">
+              <div class="min-w-0">
+                <span class="text-sm {% if a.status == 'done' %}line-through text-gray-400{% endif %}">
+                  {{ a.note }}
+                </span>
+                {% if a.question %}<span class="ml-2 text-xs text-gray-500">({{ a.question.id_code }})</span>{% endif %}
+                {% if a.owner %}<span class="ml-2 text-xs text-gray-500">• Owner: {{ a.owner }}</span>{% endif %}
+                {% if a.due_date %}<span class="ml-2 text-xs text-gray-500">• Due: {{ a.due_date }}</span>{% endif %}
+              </div>
+          
+              <div class="flex gap-2 shrink-0">
+                {# mark done/todo (keep existing) #}
+                <form method="post" action="{% url 'gtm:action_toggle' a.id %}">
+                  {% csrf_token %}
+                  <button class="text-sm px-3 py-1 rounded border">
+                    {% if a.status == 'done' %}Mark todo{% else %}Mark done{% endif %}
+                  </button>
+                </form>
+          
+                {# delete #}
+                <form method="post" action="{% url 'gtm:action_delete' a.id %}" onsubmit="return confirm('Delete this task?');">
+                  {% csrf_token %}
+                  <button class="text-sm px-3 py-1 rounded border">Delete</button>
+                </form>
+          
+                {# toggle edit panel (pure HTML <details/summary>) #}
+                <details class="relative">
+                  <summary class="list-none text-sm px-3 py-1 rounded border cursor-pointer select-none">Edit</summary>
+                  <div class="absolute right-0 mt-2 w-80 bg-white border rounded-lg shadow-lg p-4 z-10">
+                    <form method="post" action="{% url 'gtm:action_update' a.id %}" class="space-y-2">
+                      {% csrf_token %}
+                      <div>
+                        <label class="block text-xs text-gray-600 mb-1">Task</label>
+                        <input name="note" value="{{ a.note }}" class="w-full border rounded px-3 py-2 text-sm" required>
+                      </div>
+                      <div class="grid grid-cols-2 gap-2">
+                        <div>
+                          <label class="block text-xs text-gray-600 mb-1">Owner</label>
+                          <input name="owner" value="{{ a.owner }}" class="w-full border rounded px-3 py-2 text-sm">
+                        </div>
+                        <div>
+                          <label class="block text-xs text-gray-600 mb-1">Due date</label>
+                          <input type="date" name="due_date" value="{{ a.due_date|date:'Y-m-d' }}" class="w-full border rounded px-3 py-2 text-sm">
+                        </div>
+                      </div>
+                      <div>
+                        <label class="block text-xs text-gray-600 mb-1">Status</label>
+                        <select name="status" class="w-full border rounded px-3 py-2 text-sm">
+                          <option value="todo" {% if a.status == 'todo' %}selected{% endif %}>To do</option>
+                          <option value="doing" {% if a.status == 'doing' %}selected{% endif %}>In progress</option>
+                          <option value="done" {% if a.status == 'done' %}selected{% endif %}>Done</option>
+                        </select>
+                      </div>
+                      <div class="flex justify-end gap-2 pt-2">
+                        <button class="px-3 py-1.5 rounded bg-black text-white text-sm">Save</button>
+                      </div>
+                    </form>
+                  </div>
+                </details>
+              </div>
+            </div>
+          </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="text-sm text-gray-600">No tasks yet — add your first one above.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <aside class="bg-white rounded-2xl shadow p-6">
+    <h4 class="font-semibold mb-3">Snapshot</h4>
+    <ul class="space-y-2 text-sm">
+      <li><b>Company:</b> {{ session.company_name|default:"—" }}</li>
+      <li><b>Industry:</b> {{ session.industry|default:"—" }}</li>
+      <li><b>Session:</b> {{ session.uuid }}</li>
+      <li><b>Date:</b> {{ session.created_at|date:"Y-m-d H:i" }}</li>
+    </ul>
+    <a href="{% url 'gtm:download' session.uuid %}" class="mt-6 block text-center px-4 py-2 rounded bg-black text-white">Download PDF</a>
+  </aside>
+</div>
+{% endblock %}
