@@ -140,6 +140,9 @@ class ResultSnapshot(models.Model):
     utm_medium     = models.CharField(max_length=80,  blank=True, default="")
     utm_campaign   = models.CharField(max_length=120, blank=True, default="")
     referrer       = models.CharField(max_length=200, blank=True, default="")
+    
+    report_sent = models.BooleanField(default=False)
+
 
     def __str__(self):
         return f"Snapshot for {self.session.uuid} – {self.overall}/100"

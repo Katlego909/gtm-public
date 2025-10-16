@@ -1,0 +1,128 @@
+{% extends "emails/base_email.html" %}
+{% block title %}GTM Assessment Report • {{ snap.company_name|default:session.company_name|default:"Untitled" }}{% endblock %}
+
+{% block content %}
+
+<h1 style="margin:0 0 8px;font-size:22px;line-height:1.2;">GTM Assessment Report</h1>
+<p style="margin:0 0 16px;color:#6b7280;">
+  {{ snap.company_name|default:session.company_name|default:"Untitled company" }}
+  {% if snap.industry or session.industry %} — {{ snap.industry|default:session.industry }}{% endif %}
+</p>
+
+<!-- Score + Stage -->
+<div class="stack" style="display:flex;align-items:center;gap:12px;margin:8px 0 16px;">
+  <div class="score" style="font-size:34px;font-weight:800;letter-spacing:-0.02em;">
+    {{ overall|floatformat:0 }}/100
+  </div>
+  {% if band %}
+    <span class="pill" style="display:inline-block;font-size:12px;border:1px solid #e5e7eb;border-radius:9999px;padding:6px 10px;">
+      {{ band.stage }}
+    </span>
+  {% endif %}
+</div>
+{% if band and band.headline %}
+  <p style="margin:0 0 16px;color:#374151;">{{ band.headline }}</p>
+{% endif %}
+
+<hr class="divider" style="border:none;border-top:1px solid #eef0f4;margin:16px 0;">
+
+<!-- Category table -->
+<h3 style="margin:0 0 8px;font-size:16px;">Category Breakdown</h3>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+  <tbody>
+    {% for c in categories %}
+      <tr>
+        <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;">{{ c.category }}</td>
+        <td align="right" style="padding:8px 0;border-bottom:1px solid #f3f4f6;"><strong>{{ c.avg|floatformat:2 }}</strong></td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<!-- Company details (with professional layout + fallbacks) -->
+<h3 style="margin:16px 0 8px;font-size:16px;">Company Details</h3>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+  <tbody>
+
+    <!-- Website -->
+    <tr>
+      <td style="padding:6px 0;color:#6b7280;">Website</td>
+      <td align="right" style="padding:6px 0;">
+        {% with url=snap.website|default:session.website %}
+          {% if url %}
+            <a href="{{ url }}" style="color:#3b82f6;text-decoration:none;">{{ url }}</a>
+          {% else %} — {% endif %}
+        {% endwith %}
+      </td>
+    </tr>
+
+    <!-- Contact -->
+    <tr>
+      <td style="padding:6px 0;color:#6b7280;">Contact</td>
+      <td align="right" style="padding:6px 0;">
+        {% with name=snap.contact_name|default:session.contact_name role=snap.contact_role|default:session.contact_role email=snap.contact_email|default:session.contact_email phone=snap.phone|default:session.phone %}
+          {% if name %}{{ name }}{% else %}—{% endif %}
+          {% if role %} ({{ role }}){% endif %}
+          {% if email %} • <a href="mailto:{{ email }}" style="color:#3b82f6;text-decoration:none;">{{ email }}</a>{% endif %}
+          {% if phone %} • {{ phone }}{% endif %}
+        {% endwith %}
+      </td>
+    </tr>
+
+    <!-- Location / Size -->
+    <tr>
+      <td style="padding:6px 0;color:#6b7280;">Location / Size</td>
+      <td align="right" style="padding:6px 0;">
+        {% with country=snap.country|default:session.country company_size=snap.company_size|default:session.company_size %}
+          {{ country|default:"—" }} • {{ company_size|default:"—" }}
+        {% endwith %}
+      </td>
+    </tr>
+
+    <!-- Revenue / CRM -->
+    <tr>
+      <td style="padding:6px 0;color:#6b7280;">Revenue / CRM</td>
+      <td align="right" style="padding:6px 0;">
+        {% with revenue=snap.revenue_range|default:session.revenue_range crm=snap.crm|default:session.crm %}
+          {{ revenue|default:"—" }} • {{ crm|default:"—" }}
+        {% endwith %}
+      </td>
+    </tr>
+
+    <!-- Attribution (optional line, renders only if any exists) -->
+    {% with us=snap.utm_source|default:session.utm_source um=snap.utm_medium|default:session.utm_medium uc=snap.utm_campaign|default:session.utm_campaign ref=snap.referrer|default:session.referrer %}
+      {% if us or um or uc or ref %}
+      <tr>
+        <td style="padding:6px 0;color:#6b7280;">Attribution</td>
+        <td align="right" style="padding:6px 0;">
+          {% if us %}{{ us }}{% endif %}
+          {% if um %} / {{ um }}{% endif %}
+          {% if uc %} / {{ uc }}{% endif %}
+          {% if ref %} • {{ ref }}{% endif %}
+        </td>
+      </tr>
+      {% endif %}
+    {% endwith %}
+
+  </tbody>
+</table>
+
+<!-- Buttons -->
+<div style="margin:20px 0;">
+  <a class="btn"
+     href="{{ public_report_url }}"
+     style="display:inline-block;background:#111827;color:#ffffff;text-decoration:none;border-radius:10px;padding:10px 14px;font-weight:600;margin-right:8px;">
+     View Report
+  </a>
+  <a class="btn"
+     href="{{ admin_snapshot_url }}"
+     style="display:inline-block;background:#3b82f6;color:#ffffff;text-decoration:none;border-radius:10px;padding:10px 14px;font-weight:600;">
+     Open in Admin
+  </a>
+</div>
+
+<p class="muted" style="margin:16px 0 0;font-size:12px;color:#9ca3af;">
+  Report ID: {{ session.uuid }} • Generated {{ snap.created_at }}
+</p>
+
+{% endblock %}

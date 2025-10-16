@@ -96,11 +96,9 @@ def _first_incomplete_step(session: AssessmentSession) -> int:
     return max(1, len(steps)) 
 
 def _save_snapshot(session, cat_scores, overall, band, labels, values):
-    # pull firmographics from the session
-    s = session
     with transaction.atomic():
         snap, _ = ResultSnapshot.objects.update_or_create(
-            session=s,
+            session=session,
             defaults={
                 "overall": round(overall, 1),
                 "band": band,
@@ -113,22 +111,22 @@ def _save_snapshot(session, cat_scores, overall, band, labels, values):
                 "radar_labels": labels,
                 "radar_values": values,
 
-                # denormalized firmographics (optional but recommended)
-                "company_name": s.company_name,
-                "industry": s.industry,
-                "website": getattr(s, "website", ""),
-                "contact_name": getattr(s, "contact_name", ""),
-                "contact_email": getattr(s, "contact_email", ""),
-                "contact_role": getattr(s, "contact_role", ""),
-                "phone": getattr(s, "phone", ""),
-                "company_size": getattr(s, "company_size", ""),
-                "revenue_range": getattr(s, "revenue_range", ""),
-                "country": getattr(s, "country", ""),
-                "crm": getattr(s, "crm", ""),
-                "utm_source": getattr(s, "utm_source", ""),
-                "utm_medium": getattr(s, "utm_medium", ""),
-                "utm_campaign": getattr(s, "utm_campaign", ""),
-                "referrer": getattr(s, "referrer", ""),
+                # ✅ firmographics copied from the session
+                "company_name": session.company_name or "",
+                "industry": session.industry or "",
+                "website": getattr(session, "website", "") or "",
+                "contact_name": getattr(session, "contact_name", "") or "",
+                "contact_email": getattr(session, "contact_email", "") or "",
+                "contact_role": getattr(session, "contact_role", "") or "",
+                "phone": getattr(session, "phone", "") or "",
+                "company_size": getattr(session, "company_size", "") or "",
+                "revenue_range": getattr(session, "revenue_range", "") or "",
+                "country": getattr(session, "country", "") or "",
+                "crm": getattr(session, "crm", "") or "",
+                "utm_source": getattr(session, "utm_source", "") or "",
+                "utm_medium": getattr(session, "utm_medium", "") or "",
+                "utm_campaign": getattr(session, "utm_campaign", "") or "",
+                "referrer": getattr(session, "referrer", "") or "",
             }
         )
     return snap
@@ -400,7 +398,7 @@ def results(request, session_id):
         },
     )
     
-    _save_snapshot(session, cat_scores, overall, band, labels, values)
+    snap = _save_snapshot(session, cat_scores, overall, band, labels, values)
 
     return render(request, "gtm/results.html", {
         "session": session,

@@ -2,10 +2,25 @@
 from django.contrib import admin
 from django.urls import reverse
 from django.utils.html import format_html
+from django.contrib import messages
+from .utils_email import send_snapshot_report_email
 from .models import AssessmentSession, ResultSnapshot, RecommendationBand, Category, Question, Response, ActionItem, ToolRecommendation
+
+@admin.action(description="Resend report email")
+def resend_report(modeladmin, request, queryset):
+    sent = 0
+    for snap in queryset:
+        send_snapshot_report_email(snap)
+        snap.report_sent = True
+        snap.save(update_fields=["report_sent"])
+        sent += 1
+    messages.success(request, f"Resent {sent} report(s).")
 
 @admin.register(ResultSnapshot)
 class ResultSnapshotAdmin(admin.ModelAdmin):
+    
+    actions = [resend_report]
+    
     # List view
     list_display = (
         "company_name",
@@ -72,6 +87,7 @@ class ResultSnapshotAdmin(admin.ModelAdmin):
     )
 
     readonly_fields = ("created_at", "updated_at")
+   
 
     def session_short(self, obj):
         app_label = obj.session._meta.app_label

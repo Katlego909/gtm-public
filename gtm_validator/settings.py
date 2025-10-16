@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -139,3 +140,27 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# --- Gmail SMTP (use an App Password) ---
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+EMAIL_HOST = "smtp.gmail.com"
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'bizschedulerapp@gmail.com'
+EMAIL_HOST_PASSWORD = 'rcqummqfklwqdaeu'
+DEFAULT_FROM_EMAIL = f"Funti3r GTM <{EMAIL_HOST_USER}>"
+SERVER_EMAIL = EMAIL_HOST_USER
+EMAIL_SUBJECT_PREFIX = "[Funti3r GTM]"
+
+
+
+# Internal routing for reports (you receive a copy even if client email is missing)
+GTM_REPORT_INTERNAL_TO = ["gtm-reports@funti3r.xyz"]  # change
+
+# Optional: redirect *all* outbound mail in staging/sandbox
+# set EMAIL_REDIRECT_TO="you@domain.com" in env to capture everything
+EMAIL_REDIRECT_TO = os.getenv("EMAIL_REDIRECT_TO", "").strip()
+
+# Optional dev switch
+if os.getenv("EMAIL_CONSOLE", "").lower() == "true":
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
