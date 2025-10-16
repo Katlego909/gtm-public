@@ -17,15 +17,45 @@ class Question(models.Model):
     def __str__(self): return f"{self.id_code} – {self.text[:60]}"
 
 class AssessmentSession(models.Model):
-    """A single run of the health check."""
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    company_name = models.CharField(max_length=120, blank=True)
-    industry = models.CharField(max_length=120, blank=True)
-    current_step = models.PositiveIntegerField(default=1)
+    owner_client_id = models.CharField(max_length=64, db_index=True)
+
+    # Existing
+    company_name = models.CharField(max_length=120, blank=True, default="")
+    industry = models.CharField(max_length=120, blank=True, default="")
+
+    # 🔹 New firmographic + contact fields
+    website = models.URLField(blank=True, default="")
+    contact_name = models.CharField(max_length=120, blank=True, default="")
+    contact_email = models.EmailField(blank=True, default="")
+    contact_role = models.CharField(max_length=120, blank=True, default="")
+    phone = models.CharField(max_length=40, blank=True, default="")
+
+    company_size = models.CharField(  # e.g. “1–10”, “11–50”, etc.
+        max_length=20, blank=True, default=""
+    )
+    revenue_range = models.CharField(  # e.g. “<$1M”, “$1–10M”, “$10–50M”, “>$50M”
+        max_length=20, blank=True, default=""
+    )
+    country = models.CharField(max_length=80, blank=True, default="")
+    crm = models.CharField(max_length=80, blank=True, default="")  # HubSpot, SFDC, etc.
+
+    # Acquisition / attribution
+    utm_source = models.CharField(max_length=80, blank=True, default="")
+    utm_medium = models.CharField(max_length=80, blank=True, default="")
+    utm_campaign = models.CharField(max_length=120, blank=True, default="")
+    referrer = models.CharField(max_length=200, blank=True, default="")
+
+    # Misc
+    notes = models.TextField(blank=True, default="")
+
     is_completed = models.BooleanField(default=False)
-    
-    owner_client_id = models.CharField(max_length=64, db_index=True, blank=True, default="")
+    current_step = models.IntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        label = self.company_name or "Untitled company"
+        return f"{label} • {self.uuid}"
 
 class Response(models.Model):
     session = models.ForeignKey(AssessmentSession, on_delete=models.CASCADE, related_name="responses")
@@ -94,6 +124,22 @@ class ResultSnapshot(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    
+    company_name   = models.CharField(max_length=120, blank=True, default="")
+    industry       = models.CharField(max_length=120, blank=True, default="")
+    website        = models.URLField(blank=True, default="")
+    contact_name   = models.CharField(max_length=120, blank=True, default="")
+    contact_email  = models.EmailField(blank=True, default="")
+    contact_role   = models.CharField(max_length=120, blank=True, default="")
+    phone          = models.CharField(max_length=40,  blank=True, default="")
+    company_size   = models.CharField(max_length=20,  blank=True, default="")
+    revenue_range  = models.CharField(max_length=20,  blank=True, default="")
+    country        = models.CharField(max_length=80,  blank=True, default="")
+    crm            = models.CharField(max_length=80,  blank=True, default="")
+    utm_source     = models.CharField(max_length=80,  blank=True, default="")
+    utm_medium     = models.CharField(max_length=80,  blank=True, default="")
+    utm_campaign   = models.CharField(max_length=120, blank=True, default="")
+    referrer       = models.CharField(max_length=200, blank=True, default="")
 
     def __str__(self):
         return f"Snapshot for {self.session.uuid} – {self.overall}/100"

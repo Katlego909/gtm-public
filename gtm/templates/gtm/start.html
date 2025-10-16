@@ -1,15 +1,80 @@
 {% extends "gtm/base.html" %}
 {% block content %}
+
 <form method="post" class="bg-white rounded-2xl shadow p-8 space-y-4">
   {% csrf_token %}
+
+  <!-- Company basics -->
   <div>
     <label class="block text-sm font-medium">Company Name</label>
-    <input name="company_name" class="mt-1 w-full border rounded px-3 py-2" placeholder="Optional">
+    <input name="company_name" class="mt-1 w-full border rounded px-3 py-2" placeholder="Acme Inc.">
   </div>
+
+  <div class="grid md:grid-cols-2 gap-4">
+    <div>
+      <label class="block text-sm font-medium">Industry</label>
+      <input name="industry" class="mt-1 w-full border rounded px-3 py-2" placeholder="SaaS, Fintech, etc.">
+    </div>
+    <div>
+      <label class="block text-sm font-medium">Website</label>
+      <input name="website" class="mt-1 w-full border rounded px-3 py-2" placeholder="https://…">
+    </div>
+  </div>
+
+  <!-- Contact -->
+  <div class="grid md:grid-cols-3 gap-4">
+    <div>
+      <label class="block text-sm font-medium">Contact Name</label>
+      <input name="contact_name" class="mt-1 w-full border rounded px-3 py-2">
+    </div>
+    <div>
+      <label class="block text-sm font-medium">Work Email</label>
+      <input type="email" name="contact_email" class="mt-1 w-full border rounded px-3 py-2">
+    </div>
+    <div>
+      <label class="block text-sm font-medium">Role / Title</label>
+      <input name="contact_role" class="mt-1 w-full border rounded px-3 py-2" placeholder="Head of Growth">
+    </div>
+  </div>
+
+  <div class="grid md:grid-cols-3 gap-4">
+    <div>
+      <label class="block text-sm font-medium">Phone</label>
+      <input name="phone" class="mt-1 w-full border rounded px-3 py-2">
+    </div>
+    <div>
+      <label class="block text-sm font-medium">Company Size</label>
+      <input name="company_size" class="mt-1 w-full border rounded px-3 py-2" placeholder="1–10, 11–50, …">
+    </div>
+    <div>
+      <label class="block text-sm font-medium">Revenue Range</label>
+      <input name="revenue_range" class="mt-1 w-full border rounded px-3 py-2" placeholder="<$1M, $1–10M, …">
+    </div>
+  </div>
+
+  <div class="grid md:grid-cols-2 gap-4">
+    <div>
+      <label class="block text-sm font-medium">Country</label>
+      <input name="country" class="mt-1 w-full border rounded px-3 py-2">
+    </div>
+    <div>
+      <label class="block text-sm font-medium">CRM</label>
+      <input name="crm" class="mt-1 w-full border rounded px-3 py-2" placeholder="HubSpot, Salesforce, …">
+    </div>
+  </div>
+
   <div>
-    <label class="block text-sm font-medium">Industry</label>
-    <input name="industry" class="mt-1 w-full border rounded px-3 py-2" placeholder="Optional">
+    <label class="block text-sm font-medium">Notes (optional)</label>
+    <textarea name="notes" rows="3" class="mt-1 w-full border rounded px-3 py-2" placeholder="Anything helpful about goals, timing, constraints…"></textarea>
   </div>
+
+  <!-- Hidden UTM fields (optional; populate from querystring) -->
+  <input type="hidden" name="utm_source" value="{{ request.GET.utm_source }}">
+  <input type="hidden" name="utm_medium" value="{{ request.GET.utm_medium }}">
+  <input type="hidden" name="utm_campaign" value="{{ request.GET.utm_campaign }}">
+
   <button class="bg-black text-white px-5 py-3 rounded-lg">Begin</button>
+  <p class="text-xs text-gray-500 mt-2">By continuing you agree to our privacy policy.</p>
 </form>
+
 {% endblock %}

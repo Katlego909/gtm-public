@@ -5,7 +5,7 @@ from django.forms import Form, IntegerField
 from django.forms.widgets import NumberInput
 from django.db.models import Sum, F
 from datetime import datetime
-from .models import AssessmentSession, Question, Response, Category, RecommendationBand, ActionItem, ToolRecommendation
+from .models import AssessmentSession, Question, Response, Category, RecommendationBand, ActionItem, ToolRecommendation, ResultSnapshot
 from django.utils.safestring import mark_safe
 import math
 from django.http import HttpResponse
@@ -16,6 +16,7 @@ from django.utils.html import strip_tags
 from django.views.decorators.http import require_POST
 from django.shortcuts import redirect
 from django.utils.safestring import mark_safe
+from django.db import transaction
 
 LEGEND = {
     1: "No / Not in place",
@@ -93,6 +94,44 @@ def _first_incomplete_step(session: AssessmentSession) -> int:
         if answered < len(qs):
             return idx
     return max(1, len(steps)) 
+
+def _save_snapshot(session, cat_scores, overall, band, labels, values):
+    # pull firmographics from the session
+    s = session
+    with transaction.atomic():
+        snap, _ = ResultSnapshot.objects.update_or_create(
+            session=s,
+            defaults={
+                "overall": round(overall, 1),
+                "band": band,
+                "band_stage": (band.stage if band else ""),
+                "band_headline": (band.headline if band else ""),
+                "category_breakdown": [
+                    {"category": c["category"].name, "avg": round(c["avg"], 2)}
+                    for c in cat_scores
+                ],
+                "radar_labels": labels,
+                "radar_values": values,
+
+                # denormalized firmographics (optional but recommended)
+                "company_name": s.company_name,
+                "industry": s.industry,
+                "website": getattr(s, "website", ""),
+                "contact_name": getattr(s, "contact_name", ""),
+                "contact_email": getattr(s, "contact_email", ""),
+                "contact_role": getattr(s, "contact_role", ""),
+                "phone": getattr(s, "phone", ""),
+                "company_size": getattr(s, "company_size", ""),
+                "revenue_range": getattr(s, "revenue_range", ""),
+                "country": getattr(s, "country", ""),
+                "crm": getattr(s, "crm", ""),
+                "utm_source": getattr(s, "utm_source", ""),
+                "utm_medium": getattr(s, "utm_medium", ""),
+                "utm_campaign": getattr(s, "utm_campaign", ""),
+                "referrer": getattr(s, "referrer", ""),
+            }
+        )
+    return snap
         
 # ---------- Views ----------
 
@@ -101,13 +140,48 @@ def landing(request):
 
 def start_assessment(request):
     if request.method == "POST":
-        company = request.POST.get("company_name", "")
+        company  = request.POST.get("company_name", "")
         industry = request.POST.get("industry", "")
+
+        # 🔹 new fields (optional)
+        website       = request.POST.get("website", "")
+        contact_name  = request.POST.get("contact_name", "")
+        contact_email = request.POST.get("contact_email", "")
+        contact_role  = request.POST.get("contact_role", "")
+        phone         = request.POST.get("phone", "")
+        company_size  = request.POST.get("company_size", "")
+        revenue_range = request.POST.get("revenue_range", "")
+        country       = request.POST.get("country", "")
+        crm           = request.POST.get("crm", "")
+        notes         = request.POST.get("notes", "")
+
+        # acquisition (helpful if you add hidden inputs from querystring)
+        utm_source   = request.POST.get("utm_source", "")
+        utm_medium   = request.POST.get("utm_medium", "")
+        utm_campaign = request.POST.get("utm_campaign", "")
+        referrer     = request.META.get("HTTP_REFERER", "")
+
         session = AssessmentSession.objects.create(
-            company_name=company, industry=industry,
-            owner_client_id=_client_id(request)
+            company_name=company,
+            industry=industry,
+            website=website,
+            contact_name=contact_name,
+            contact_email=contact_email,
+            contact_role=contact_role,
+            phone=phone,
+            company_size=company_size,
+            revenue_range=revenue_range,
+            country=country,
+            crm=crm,
+            notes=notes,
+            utm_source=utm_source,
+            utm_medium=utm_medium,
+            utm_campaign=utm_campaign,
+            referrer=referrer,
+            owner_client_id=_client_id(request),
         )
         return redirect("gtm:resume", session_id=session.uuid)
+
     return render(request, "gtm/start.html")
 
 def resume_assessment(request, session_id):
@@ -227,6 +301,10 @@ def _band_for_score(score: float):
     return RecommendationBand.objects.filter(min_score__lte=score, max_score__gte=score).first()
 
 def results(request, session_id):
+    from django.utils.safestring import mark_safe  # local import in case it's not at top
+    from django.shortcuts import get_object_or_404, render
+    from .models import AssessmentSession, Question, Response, Category, ToolRecommendation, ResultSnapshot
+
     session = get_object_or_404(AssessmentSession, pk=session_id)
     cat_scores, overall = _compute_scores(session)
     band = _band_for_score(overall)
@@ -265,8 +343,6 @@ def results(request, session_id):
     # -----------------------------
     # 🧩 Tool Recommendations Logic
     # -----------------------------
-    from .models import ToolRecommendation
-
     recommendations = []
     for w in weakest_questions:
         q_text = (w["question"].text or "").lower()
@@ -302,6 +378,30 @@ def results(request, session_id):
             band_actions_html = band.actions_markdown.replace("\n", "<br>")
         band_actions_html = mark_safe(band_actions_html)
 
+    # -----------------------------
+    # 📊 Persist analytics snapshot (upsert)
+    # -----------------------------
+    # Prepare a serializable category breakdown (name + avg only)
+    cat_breakdown_payload = [
+        {"category": c["category"].name, "avg": round(c["avg"], 3)}
+        for c in cat_scores
+    ]
+
+    ResultSnapshot.objects.update_or_create(
+        session=session,
+        defaults={
+            "overall": round(overall, 3),
+            "band": band,
+            "band_stage": getattr(band, "stage", "") if band else "",
+            "band_headline": getattr(band, "headline", "") if band else "",
+            "category_breakdown": cat_breakdown_payload,
+            "radar_labels": labels,
+            "radar_values": values,
+        },
+    )
+    
+    _save_snapshot(session, cat_scores, overall, band, labels, values)
+
     return render(request, "gtm/results.html", {
         "session": session,
         "overall": round(overall, 1),
@@ -315,6 +415,7 @@ def results(request, session_id):
         "weakest_questions": weakest_questions,
         "recommendations": recommendations,
     })
+
 
 
 def playbook(request, session_id):

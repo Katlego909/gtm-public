@@ -1,6 +1,9 @@
 {% extends "gtm/base.html" %}
 {% block content %}
 
+<!-- =======================
+     HEADER ACTIONS
+     ======================= -->
 <div class="flex items-center justify-between mb-4">
   <h1 class="text-2xl font-semibold">Your GTM Playbook</h1>
   <div class="flex gap-2">
@@ -9,17 +12,29 @@
   </div>
 </div>
 
+<!-- =======================
+     MAIN GRID LAYOUT
+     ======================= -->
 <div class="grid md:grid-cols-3 gap-6">
+
+  <!-- =======================
+       LEFT: MAIN CONTENT
+       ======================= -->
   <div class="md:col-span-2 bg-white rounded-2xl shadow p-8">
+    <!-- Score + Band -->
     <div class="flex items-center gap-3 mb-2">
       <div class="text-3xl font-bold">{{ overall }}</div>
       <div class="text-gray-600">/100</div>
-      {% if band %}<span class="ml-3 text-xs bg-gray-900 text-white px-3 py-1 rounded-full">{{ band.stage }}</span>{% endif %}
+      {% if band %}
+        <span class="ml-3 text-xs bg-gray-900 text-white px-3 py-1 rounded-full">{{ band.stage }}</span>
+      {% endif %}
     </div>
+
     {% if band %}
       <p class="text-gray-600 mb-6">{{ band.headline }}</p>
     {% endif %}
 
+    <!-- Focus Areas -->
     <h3 class="font-semibold mb-2">Focus Areas (weakest first)</h3>
     <ol class="list-decimal ml-5 space-y-1 mb-6">
       {% for c in cat_sorted %}
@@ -27,6 +42,7 @@
       {% endfor %}
     </ol>
 
+    <!-- Recommended Next Moves -->
     {% if band %}
       <h3 id="actions" class="font-semibold mb-2">Recommended Next Moves</h3>
       <div class="prose max-w-none">
@@ -34,16 +50,20 @@
       </div>
     {% endif %}
 
-    {# --- Action tracker (new) --- #}
+    <!-- =======================
+         ACTION TRACKER
+         ======================= -->
     <div class="bg-gray-50 border rounded-xl p-6 mt-6">
       <h4 class="font-semibold mb-3">Your GTM Task List</h4>
 
+      <!-- Add new task -->
       <form method="post" action="{% url 'gtm:action_add' session.uuid %}" class="flex gap-2 mb-4">
         {% csrf_token %}
         <input name="note" class="flex-1 border rounded px-3 py-2" placeholder="Add a task (e.g., Set 4-hour lead SLA)" required>
         <button class="px-4 py-2 rounded bg-black text-white">Add</button>
       </form>
 
+      <!-- Task List -->
       {% if session.actions.all %}
         <ul class="space-y-2">
           {% for a in session.actions.all|dictsortreversed:"created_at" %}
@@ -57,23 +77,23 @@
                 {% if a.owner %}<span class="ml-2 text-xs text-gray-500">• Owner: {{ a.owner }}</span>{% endif %}
                 {% if a.due_date %}<span class="ml-2 text-xs text-gray-500">• Due: {{ a.due_date }}</span>{% endif %}
               </div>
-          
+
               <div class="flex gap-2 shrink-0">
-                {# mark done/todo (keep existing) #}
+                <!-- Toggle done/todo -->
                 <form method="post" action="{% url 'gtm:action_toggle' a.id %}">
                   {% csrf_token %}
                   <button class="text-sm px-3 py-1 rounded border">
                     {% if a.status == 'done' %}Mark todo{% else %}Mark done{% endif %}
                   </button>
                 </form>
-          
-                {# delete #}
+
+                <!-- Delete -->
                 <form method="post" action="{% url 'gtm:action_delete' a.id %}" onsubmit="return confirm('Delete this task?');">
                   {% csrf_token %}
                   <button class="text-sm px-3 py-1 rounded border">Delete</button>
                 </form>
-          
-                {# toggle edit panel (pure HTML <details/summary>) #}
+
+                <!-- Edit -->
                 <details class="relative">
                   <summary class="list-none text-sm px-3 py-1 rounded border cursor-pointer select-none">Edit</summary>
                   <div class="absolute right-0 mt-2 w-80 bg-white border rounded-lg shadow-lg p-4 z-10">
@@ -118,15 +138,45 @@
     </div>
   </div>
 
+  <!-- =======================
+       RIGHT: SNAPSHOT PANEL
+       ======================= -->
   <aside class="bg-white rounded-2xl shadow p-6">
-    <h4 class="font-semibold mb-3">Snapshot</h4>
+    <h4 class="font-semibold mb-3">Company Snapshot</h4>
+
     <ul class="space-y-2 text-sm">
       <li><b>Company:</b> {{ session.company_name|default:"—" }}</li>
       <li><b>Industry:</b> {{ session.industry|default:"—" }}</li>
-      <li><b>Session:</b> {{ session.uuid }}</li>
-      <li><b>Date:</b> {{ session.created_at|date:"Y-m-d H:i" }}</li>
+      <li><b>Website:</b> 
+        {% if session.website %}
+          <a href="{{ session.website }}" target="_blank" class="text-blue-600 hover:underline">{{ session.website }}</a>
+        {% else %}—{% endif %}
+      </li>
+      <li><b>Contact:</b> {{ session.contact_name|default:"—" }}</li>
+      <li><b>Email:</b> 
+        {% if session.contact_email %}
+          <a href="mailto:{{ session.contact_email }}" class="text-blue-600 hover:underline">{{ session.contact_email }}</a>
+        {% else %}—{% endif %}
+      </li>
+      <li><b>Role:</b> {{ session.contact_role|default:"—" }}</li>
+      <li><b>Phone:</b> {{ session.phone|default:"—" }}</li>
+      <li><b>Company Size:</b> {{ session.company_size|default:"—" }}</li>
+      <li><b>Revenue Range:</b> {{ session.revenue_range|default:"—" }}</li>
+      <li><b>Country:</b> {{ session.country|default:"—" }}</li>
+      <li><b>CRM:</b> {{ session.crm|default:"—" }}</li>
+      <li><b>UTM Source:</b> {{ session.utm_source|default:"—" }}</li>
+      <li><b>UTM Medium:</b> {{ session.utm_medium|default:"—" }}</li>
+      <li><b>UTM Campaign:</b> {{ session.utm_campaign|default:"—" }}</li>
+      <li><b>Referrer:</b> {{ session.referrer|default:"—" }}</li>
+      <li><b>Notes:</b> {{ session.notes|default:"—" }}</li>
+      <li><b>Session ID:</b> {{ session.uuid }}</li>
+      <li><b>Created:</b> {{ session.created_at|date:"Y-m-d H:i" }}</li>
     </ul>
-    <a href="{% url 'gtm:download' session.uuid %}" class="mt-6 block text-center px-4 py-2 rounded bg-black text-white">Download PDF</a>
+
+    <a href="{% url 'gtm:download' session.uuid %}" class="mt-6 block text-center px-4 py-2 rounded bg-black text-white">
+      Download PDF
+    </a>
   </aside>
 </div>
+
 {% endblock %}
