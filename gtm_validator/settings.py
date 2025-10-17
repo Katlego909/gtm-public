@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 
 from pathlib import Path
 import os
+from dotenv import load_dotenv
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -146,12 +148,11 @@ EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'bizschedulerapp@gmail.com'
-EMAIL_HOST_PASSWORD = 'rcqummqfklwqdaeu'
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = f"Funti3r GTM <{EMAIL_HOST_USER}>"
 SERVER_EMAIL = EMAIL_HOST_USER
 EMAIL_SUBJECT_PREFIX = "[Funti3r GTM]"
-
 
 
 # Internal routing for reports (you receive a copy even if client email is missing)
@@ -164,3 +165,12 @@ EMAIL_REDIRECT_TO = os.getenv("EMAIL_REDIRECT_TO", "").strip()
 # Optional dev switch
 if os.getenv("EMAIL_CONSOLE", "").lower() == "true":
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+    
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
+
+
+
+
+
+    

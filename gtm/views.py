@@ -18,6 +18,11 @@ from django.shortcuts import redirect
 from django.utils.safestring import mark_safe
 from django.db import transaction
 
+from .ai_services import generate_playbook_with_gemini
+
+
+
+
 LEGEND = {
     1: "No / Not in place",
     2: "Ad-hoc / Rarely",
@@ -299,28 +304,19 @@ def _band_for_score(score: float):
     return RecommendationBand.objects.filter(min_score__lte=score, max_score__gte=score).first()
 
 def results(request, session_id):
-    from django.utils.safestring import mark_safe  # local import in case it's not at top
-    from django.shortcuts import get_object_or_404, render
-    from .models import AssessmentSession, Question, Response, Category, ToolRecommendation, ResultSnapshot
-
     session = get_object_or_404(AssessmentSession, pk=session_id)
     cat_scores, overall = _compute_scores(session)
     band = _band_for_score(overall)
 
-    # Step map (category id -> step index)
     step_map = {cat.id: idx + 1 for idx, cat in enumerate(Category.objects.all().order_by("id"))}
-
-    # Categories
     strengths_categories = sorted(cat_scores, key=lambda x: x["avg"], reverse=True)[:3]
     focus_categories = sorted(cat_scores, key=lambda x: x["avg"])[:3]
 
-    # Attach step to each category item
     for it in strengths_categories:
         it["step"] = step_map.get(it["category"].id)
     for it in focus_categories:
         it["step"] = step_map.get(it["category"].id)
 
-    # Weakest questions (attach step)
     all_rows = []
     for q in Question.objects.all():
         r = Response.objects.filter(session=session, question=q).first()
@@ -334,7 +330,6 @@ def results(request, session_id):
             })
     weakest_questions = sorted(all_rows, key=lambda x: x["weighted"])[:3]
 
-    # Radar chart data
     labels = [c["category"].name for c in cat_scores]
     values = [round(c["avg"], 2) for c in cat_scores]
 
@@ -351,7 +346,6 @@ def results(request, session_id):
             if kw and (kw in q_text or kw in q_note):
                 recommendations.append(m)
 
-    # Remove duplicates (by id) and keep a small, tidy list
     seen = set()
     uniq = []
     for r in recommendations:
@@ -361,25 +355,37 @@ def results(request, session_id):
     recommendations = uniq[:6]
 
     # -----------------------------
-    # ✅ Render band actions as Markdown (nice bullets/headings)
+    # ✅ Render band actions (vertical bullet formatting)
     # -----------------------------
     band_actions_html = ""
     if band and getattr(band, "actions_markdown", ""):
+        actions_md = band.actions_markdown
+
+        # Format enhancements
+        actions_md = actions_md.replace("Action Plan:", "**Action Plan**")
+        actions_md = actions_md.replace("Recommended Tools:", "**Recommended Tools**")
+
+        # Convert dash bullets to proper Markdown list lines
+        import re
+        actions_md = re.sub(r"\n-\s*", "\n\n• ", actions_md)  # force blank line before bullets
+
+        # Cleanup extra spacing
+        actions_md = re.sub(r"\n{3,}", "\n\n", actions_md).strip()
+
         try:
-            import markdown as md  # pip install markdown
+            import markdown as md
             band_actions_html = md.markdown(
-                band.actions_markdown,
+                actions_md,
                 extensions=["extra", "sane_lists"]
             )
         except Exception:
-            # graceful fallback if markdown not installed
-            band_actions_html = band.actions_markdown.replace("\n", "<br>")
+            band_actions_html = actions_md.replace("\n", "<br>")
+
         band_actions_html = mark_safe(band_actions_html)
 
     # -----------------------------
-    # 📊 Persist analytics snapshot (upsert)
+    # 📊 Save snapshot
     # -----------------------------
-    # Prepare a serializable category breakdown (name + avg only)
     cat_breakdown_payload = [
         {"category": c["category"].name, "avg": round(c["avg"], 3)}
         for c in cat_scores
@@ -397,14 +403,14 @@ def results(request, session_id):
             "radar_values": values,
         },
     )
-    
-    snap = _save_snapshot(session, cat_scores, overall, band, labels, values)
+
+    _save_snapshot(session, cat_scores, overall, band, labels, values)
 
     return render(request, "gtm/results.html", {
         "session": session,
         "overall": round(overall, 1),
         "band": band,
-        "band_actions_html": band_actions_html,  # <-- use this in template
+        "band_actions_html": band_actions_html,
         "cat_scores": cat_scores,
         "labels": labels,
         "values": values,
@@ -420,9 +426,36 @@ def playbook(request, session_id):
     session = get_object_or_404(AssessmentSession, pk=session_id)
     cat_scores, overall = _compute_scores(session)
     band = _band_for_score(overall)
-
-    # sort categories by weakest first to highlight focus areas
     cat_sorted = sorted(cat_scores, key=lambda x: x["avg"])
+    
+    band_actions_html = ""
+    if band and getattr(band, "actions_markdown", ""):
+        import re
+        actions_md = band.actions_markdown
+        actions_md = actions_md.replace("Action Plan:", "**Action Plan**")
+        actions_md = actions_md.replace("Recommended Tools:", "**Recommended Tools**")
+        actions_md = re.sub(r"\n-\s*", "\n\n• ", actions_md)     # vertical bullets
+        actions_md = re.sub(r"\n{3,}", "\n\n", actions_md).strip()
+        try:
+            import markdown as md
+            band_actions_html = md.markdown(actions_md, extensions=["extra", "sane_lists"])
+        except Exception:
+            band_actions_html = actions_md.replace("\n", "<br>")
+        band_actions_html = mark_safe(band_actions_html)
+
+    # 🔽 NEW: render AI markdown to HTML (nice bullets/headers)
+    ai_playbook_html = ""
+    try:
+        snap = getattr(session, "snapshot", None)
+        if snap and getattr(snap, "ai_playbook", ""):
+            import markdown as md  # pip install markdown
+            ai_playbook_html = md.markdown(
+                snap.ai_playbook,
+                extensions=["extra", "sane_lists", "tables", "toc"]
+            )
+    except Exception:
+        # graceful fallback
+        ai_playbook_html = (snap.ai_playbook or "").replace("\n", "<br>") if snap else ""
 
     return render(request, "gtm/playbook.html", {
         "session": session,
@@ -430,6 +463,8 @@ def playbook(request, session_id):
         "band": band,
         "cat_scores": cat_scores,
         "cat_sorted": cat_sorted,
+        "band_actions_html": band_actions_html,
+        "ai_playbook_html": mark_safe(ai_playbook_html),  
     })
 
 def download_report_pdf(request, session_id):

@@ -17,7 +17,7 @@
   <style>
     :root {
       --font-body: 'Inter', sans-serif;
-      --font-heading: 'DM Sans', sans-serif;
+      --font-heading: 'Inter', sans-serif;
     }
 
     body {
@@ -36,16 +36,16 @@
 </head>
 <body class="bg-gray-50 text-gray-900">
   <nav class="bg-white border-b sticky top-0 z-10">
-    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
       <div class="font-semibold text-lg tracking-tight">Funti3r GTM Validator</div>
       <div class="flex items-center gap-4">
-        <a href="{% url 'gtm:history' %}" class="text-sm text-gray-600 hover:text-gray-900 transition">History</a>
         <a href="{% url 'gtm:landing' %}" class="text-sm text-gray-600 hover:text-gray-900 transition">Home</a>
+        <a href="{% url 'gtm:history' %}" class="text-sm text-gray-600 hover:text-gray-900 transition">History</a>
       </div>
     </div>
   </nav>
 
-  <main class="max-w-5xl mx-auto px-4 py-8">
+  <main class="max-w-6xl mx-auto px-4 py-8">
     {% block content %}{% endblock %}
   </main>
 </body>

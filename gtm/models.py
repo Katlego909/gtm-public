@@ -142,6 +142,8 @@ class ResultSnapshot(models.Model):
     referrer       = models.CharField(max_length=200, blank=True, default="")
     
     report_sent = models.BooleanField(default=False)
+    
+    ai_playbook = models.TextField(blank=True, default="")
 
 
     def __str__(self):

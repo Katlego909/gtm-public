@@ -15,12 +15,12 @@
 <!-- =======================
      MAIN GRID LAYOUT
      ======================= -->
-<div class="grid md:grid-cols-3 gap-6">
+<div class="grid lg:grid-cols-3 gap-6">
 
   <!-- =======================
        LEFT: MAIN CONTENT
        ======================= -->
-  <div class="md:col-span-2 bg-white rounded-2xl shadow p-8">
+  <div class="lg:col-span-2 bg-white rounded-2xl shadow p-8">
     <!-- Score + Band -->
     <div class="flex items-center gap-3 mb-2">
       <div class="text-3xl font-bold">{{ overall }}</div>
@@ -45,8 +45,21 @@
     <!-- Recommended Next Moves -->
     {% if band %}
       <h3 id="actions" class="font-semibold mb-2">Recommended Next Moves</h3>
-      <div class="prose max-w-none">
-        {{ band.actions_markdown|linebreaks }}
+      <div class="prose max-w-none prose-ul:my-1 prose-li:my-0 prose-p:my-2">
+        {{ band_actions_html|safe }}
+      </div>
+    {% endif %}
+
+    {% if ai_playbook_html %}
+      <!-- AI Playbook: sticky header + scrollable content for long text -->
+      <div id="ai-playbook" class="bg-white rounded-2xl shadow mt-6">
+        <div class="px-8 pt-6 pb-4 flex items-center justify-between sticky top-0 bg-white/90 backdrop-blur border-b rounded-t-2xl">
+          <h3 class="text-lg font-semibold">AI-Generated GTM Playbook</h3>
+          <a href="#actions" class="text-sm text-gray-600 hover:text-gray-900 underline">Jump to Steps</a>
+        </div>
+        <article class="prose prose-slate max-w-none px-8 py-6 leading-relaxed overflow-y-auto max-h-[75vh]">
+          {{ ai_playbook_html|safe }}
+        </article>
       </div>
     {% endif %}
 
@@ -141,7 +154,7 @@
   <!-- =======================
        RIGHT: SNAPSHOT PANEL
        ======================= -->
-  <aside class="bg-white rounded-2xl shadow p-6">
+  <aside class="bg-white rounded-2xl shadow p-6 lg:sticky lg:top-24 h-max">
     <h4 class="font-semibold mb-3">Company Snapshot</h4>
 
     <ul class="space-y-2 text-sm">
@@ -149,7 +162,7 @@
       <li><b>Industry:</b> {{ session.industry|default:"—" }}</li>
       <li><b>Website:</b> 
         {% if session.website %}
-          <a href="{{ session.website }}" target="_blank" class="text-blue-600 hover:underline">{{ session.website }}</a>
+          <a href="{{ session.website }}" target="_blank" class="text-blue-600 hover:underline break-all">{{ session.website }}</a>
         {% else %}—{% endif %}
       </li>
       <li><b>Contact:</b> {{ session.contact_name|default:"—" }}</li>
