@@ -1,3 +1,4 @@
+from .utils_logging import log_error
 from io import BytesIO
 from django.shortcuts import render, redirect, get_object_or_404
 from django.db.models import Count
@@ -7,7 +8,9 @@ from django.db.models import Sum, F
 from datetime import datetime
 from .models import AssessmentSession, Question, Response, Category, RecommendationBand, ActionItem, ToolRecommendation, ResultSnapshot
 from django.utils.safestring import mark_safe
+import markdown as md
 import math
+import re
 from django.http import HttpResponse
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
@@ -19,9 +22,6 @@ from django.utils.safestring import mark_safe
 from django.db import transaction
 
 from .ai_services import generate_playbook_with_gemini
-
-
-
 
 LEGEND = {
     1: "No / Not in place",
@@ -360,51 +360,36 @@ def results(request, session_id):
     band_actions_html = ""
     if band and getattr(band, "actions_markdown", ""):
         actions_md = band.actions_markdown
-
-        # Format enhancements
         actions_md = actions_md.replace("Action Plan:", "**Action Plan**")
         actions_md = actions_md.replace("Recommended Tools:", "**Recommended Tools**")
 
-        # Convert dash bullets to proper Markdown list lines
         import re
-        actions_md = re.sub(r"\n-\s*", "\n\n• ", actions_md)  # force blank line before bullets
-
-        # Cleanup extra spacing
+        actions_md = re.sub(r"\n-\s*", "\n\n• ", actions_md)   # force blank line before bullets
         actions_md = re.sub(r"\n{3,}", "\n\n", actions_md).strip()
 
         try:
-            import markdown as md
-            band_actions_html = md.markdown(
-                actions_md,
-                extensions=["extra", "sane_lists"]
-            )
+            band_actions_html = md.markdown(actions_md, extensions=["extra", "sane_lists"])
         except Exception:
             band_actions_html = actions_md.replace("\n", "<br>")
-
         band_actions_html = mark_safe(band_actions_html)
 
     # -----------------------------
-    # 📊 Save snapshot
+    # 📊 Save snapshot (single source of truth)
     # -----------------------------
-    cat_breakdown_payload = [
-        {"category": c["category"].name, "avg": round(c["avg"], 3)}
-        for c in cat_scores
-    ]
+    # Let _save_snapshot handle update_or_create and return the instance
+    snap = _save_snapshot(session, cat_scores, overall, band, labels, values)
 
-    ResultSnapshot.objects.update_or_create(
-        session=session,
-        defaults={
-            "overall": round(overall, 3),
-            "band": band,
-            "band_stage": getattr(band, "stage", "") if band else "",
-            "band_headline": getattr(band, "headline", "") if band else "",
-            "category_breakdown": cat_breakdown_payload,
-            "radar_labels": labels,
-            "radar_values": values,
-        },
-    )
-
-    _save_snapshot(session, cat_scores, overall, band, labels, values)
+    # -----------------------------
+    # 🤖 Populate AI playbook once
+    # -----------------------------
+    if snap and not (snap.ai_playbook or "").strip():
+        try:
+            ai_md = generate_playbook_with_gemini(snap)
+            if ai_md and ai_md.strip():
+                snap.ai_playbook = ai_md.strip()
+                snap.save(update_fields=["ai_playbook"])
+        except Exception as e:
+            log_error("AI Playbook Generation", e, {"session_id": str(session.uuid)})
 
     return render(request, "gtm/results.html", {
         "session": session,
@@ -420,43 +405,61 @@ def results(request, session_id):
         "recommendations": recommendations,
     })
 
-
-
 def playbook(request, session_id):
     session = get_object_or_404(AssessmentSession, pk=session_id)
     cat_scores, overall = _compute_scores(session)
     band = _band_for_score(overall)
     cat_sorted = sorted(cat_scores, key=lambda x: x["avg"])
-    
+
+    # -----------------------------
+    # 🧩 Format Recommended Next Moves
+    # -----------------------------
     band_actions_html = ""
     if band and getattr(band, "actions_markdown", ""):
-        import re
-        actions_md = band.actions_markdown
-        actions_md = actions_md.replace("Action Plan:", "**Action Plan**")
-        actions_md = actions_md.replace("Recommended Tools:", "**Recommended Tools**")
-        actions_md = re.sub(r"\n-\s*", "\n\n• ", actions_md)     # vertical bullets
-        actions_md = re.sub(r"\n{3,}", "\n\n", actions_md).strip()
         try:
-            import markdown as md
+            actions_md = band.actions_markdown
+            actions_md = actions_md.replace("Action Plan:", "**Action Plan**")
+            actions_md = actions_md.replace("Recommended Tools:", "**Recommended Tools**")
+            actions_md = re.sub(r"\n-\s*", "\n\n• ", actions_md)  # vertical bullets
+            actions_md = re.sub(r"\n{3,}", "\n\n", actions_md).strip()
             band_actions_html = md.markdown(actions_md, extensions=["extra", "sane_lists"])
-        except Exception:
-            band_actions_html = actions_md.replace("\n", "<br>")
+        except Exception as e:
+            log_error("Markdown rendering (band.actions_markdown)", e, {"session_id": str(session.uuid)})
+            band_actions_html = (band.actions_markdown or "").replace("\n", "<br>")
         band_actions_html = mark_safe(band_actions_html)
 
-    # 🔽 NEW: render AI markdown to HTML (nice bullets/headers)
+    # -----------------------------
+    # 🤖 AI Playbook Rendering (+ optional lazy-generate)
+    # -----------------------------
+    # Ensure we actually have a snapshot even if user skips Results page
+    snap = getattr(session, "snapshot", None) or ResultSnapshot.objects.filter(session=session).first()
+
+    # (Optional) Lazy-generate once if empty
+    if snap and not (snap.ai_playbook or "").strip():
+        try:
+            ai_md_src = generate_playbook_with_gemini(snap)
+            if ai_md_src and ai_md_src.strip():
+                snap.ai_playbook = ai_md_src.strip()
+                snap.save(update_fields=["ai_playbook"])
+        except Exception as e:
+            log_error("AI Playbook (lazy) Generation", e, {"session_id": str(session.uuid)})
+
     ai_playbook_html = ""
     try:
-        snap = getattr(session, "snapshot", None)
         if snap and getattr(snap, "ai_playbook", ""):
-            import markdown as md  # pip install markdown
             ai_playbook_html = md.markdown(
                 snap.ai_playbook,
-                extensions=["extra", "sane_lists", "tables", "toc"]
+                extensions=["extra", "sane_lists", "toc"]  # 'extra' already includes tables
             )
-    except Exception:
-        # graceful fallback
-        ai_playbook_html = (snap.ai_playbook or "").replace("\n", "<br>") if snap else ""
+        else:
+            ai_playbook_html = ""
+    except Exception as e:
+        log_error("AI Playbook rendering", e, {"session_id": str(session.uuid)})
+        ai_playbook_html = "<p class='text-red-600'>⚠️ Could not render AI playbook content. Check logs.</p>"
 
+    # -----------------------------
+    # Render Template
+    # -----------------------------
     return render(request, "gtm/playbook.html", {
         "session": session,
         "overall": round(overall, 1),
@@ -464,7 +467,7 @@ def playbook(request, session_id):
         "cat_scores": cat_scores,
         "cat_sorted": cat_sorted,
         "band_actions_html": band_actions_html,
-        "ai_playbook_html": mark_safe(ai_playbook_html),  
+        "ai_playbook_html": mark_safe(ai_playbook_html),
     })
 
 def download_report_pdf(request, session_id):

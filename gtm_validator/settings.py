@@ -168,7 +168,33 @@ if os.getenv("EMAIL_CONSOLE", "").lower() == "true":
     
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {"format": "%(asctime)s [%(levelname)s] %(message)s"},
+    },
+    "handlers": {
+        "file": {
+            "level": "ERROR",
+            "class": "logging.FileHandler",
+            "filename": "gtm_errors.log",  # stored at project root
+            "formatter": "verbose",
+        },
+        "console": {
+            "level": "ERROR",
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+    },
+    "loggers": {
+        "gtm": {
+            "handlers": ["file", "console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
 
 
 
