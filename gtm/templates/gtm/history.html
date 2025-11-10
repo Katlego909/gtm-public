@@ -1,36 +1,71 @@
 {% extends "gtm/base.html" %}
 {% block content %}
-<h1 class="text-2xl font-semibold mb-4">Your Assessments (this browser)</h1>
+
+<h1 class="text-3xl font-bold text-gray-800 mb-6">Your Assessments (this browser)</h1>
+
+{% if messages %}
+  <div class="mb-6 space-y-3">
+    {% for message in messages %}
+      {% if message.tags == "error" %}
+        <div class="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded-lg font-medium">
+          {{ message }}
+        </div>
+      {% elif message.tags == "warning" %}
+        <div class="bg-yellow-50 border border-yellow-400 text-yellow-700 px-4 py-3 rounded-lg font-medium">
+          {{ message }}
+        </div>
+      {% elif message.tags == "info" %}
+        <div class="bg-indigo-50 border border-indigo-400 text-indigo-700 px-4 py-3 rounded-lg font-medium">
+          {{ message }}
+        </div>
+      {% else %}
+        <div class="bg-green-50 border border-green-400 text-green-700 px-4 py-3 rounded-lg font-medium">
+          {{ message }}
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+{% endif %}
+
 
 {% if rows %}
-  <div class="bg-white rounded-2xl shadow divide-y">
+  <div class="bg-white rounded-3xl shadow-xl divide-y divide-gray-200 border border-gray-100">
     {% for r in rows %}
-      <div class="p-5 flex items-center justify-between">
+      <div class="p-6 flex items-center justify-between hover:bg-gray-50 transition">
         <div>
-          <div class="font-medium">
+          {# Company Name and Date #}
+          <div class="text-lg font-medium text-gray-800 break-words">
             {{ r.session.company_name|default:"Untitled company" }}
             <span class="text-gray-500 text-sm"> • {{ r.session.created_at|date:"Y-m-d H:i" }}</span>
           </div>
-          <div class="text-sm text-gray-600">
+          
+          {# Score and Stage #}
+          <div class="text-sm text-gray-600 mt-1">
             {% if r.overall %}
-              Score: <b>{{ r.overall }}</b>/100
-              {% if r.band %} • Stage: <b>{{ r.band.stage }}</b>{% endif %}
+              Score: <b class="text-indigo-700">{{ r.overall }}</b>/100
+              {% if r.band %} • Stage: <b class="text-indigo-700">{{ r.band.stage }}</b>{% endif %}
             {% else %}
               Incomplete assessment
             {% endif %}
           </div>
         </div>
-        <div class="flex gap-2">
+        
+        {# Action Buttons #}
+        <div class="flex gap-3 shrink-0">
           {% if r.session.is_completed %}
-            <a href="{% url 'gtm:results' r.session.uuid %}" class="px-3 py-2 rounded border">Open Report</a>
+            {# Completed: Open Report (Styled Bordered) #}
+            <a href="{% url 'gtm:results' r.session.uuid %}" class="px-4 py-2 rounded-lg border text-indigo-600 hover:bg-indigo-50 transition font-medium">Open Report</a>
           {% else %}
-            <a href="{% url 'gtm:resume' r.session.uuid %}" class="px-3 py-2 rounded bg-black text-white">Resume</a>
+            {# Incomplete: Resume (Styled Primary Indigo) #}
+            <a href="{% url 'gtm:resume' r.session.uuid %}" class="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition font-medium">Resume</a>
           {% endif %}
         </div>
       </div>
     {% endfor %}
   </div>
 {% else %}
-  <p class="text-gray-600">No assessments yet. <a href="{% url 'gtm:start' %}" class="underline">Start one</a>.</p>
+  <p class="text-gray-600 mt-6 p-4 bg-white rounded-xl shadow border border-gray-100">
+    No assessments yet. <a href="{% url 'gtm:start' %}" class="text-indigo-600 underline hover:text-indigo-700">Start one</a>.
+  </p>
 {% endif %}
 {% endblock %}

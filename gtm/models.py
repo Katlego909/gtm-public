@@ -1,5 +1,6 @@
 from django.db import models
 import uuid
+from django.conf import settings
 from django.contrib.postgres.fields import ArrayField 
 from django.core.serializers.json import DjangoJSONEncoder
 
@@ -19,6 +20,13 @@ class Question(models.Model):
 class AssessmentSession(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     owner_client_id = models.CharField(max_length=64, db_index=True)
+    
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name="gtm_sessions"
+    )
 
     # Existing
     company_name = models.CharField(max_length=120, blank=True, default="")
@@ -61,6 +69,8 @@ class Response(models.Model):
     session = models.ForeignKey(AssessmentSession, on_delete=models.CASCADE, related_name="responses")
     question = models.ForeignKey(Question, on_delete=models.CASCADE)
     score = models.PositiveSmallIntegerField()  # 1..5
+    
+    ai_insight = models.TextField(blank=True, default="")
 
     class Meta:
         unique_together = ("session", "question")

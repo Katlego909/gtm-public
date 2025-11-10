@@ -6,6 +6,9 @@ from django.forms import Form, IntegerField
 from django.forms.widgets import NumberInput
 from django.db.models import Sum, F
 from datetime import datetime
+from django.utils import timezone
+from datetime import timedelta
+from django.contrib import messages
 from .models import AssessmentSession, Question, Response, Category, RecommendationBand, ActionItem, ToolRecommendation, ResultSnapshot
 from django.utils.safestring import mark_safe
 import markdown as md
@@ -20,8 +23,12 @@ from django.views.decorators.http import require_POST
 from django.shortcuts import redirect
 from django.utils.safestring import mark_safe
 from django.db import transaction
+from django.contrib.auth.decorators import login_required
 
-from .ai_services import generate_playbook_with_gemini
+from django.shortcuts import get_object_or_404
+from .utils_pdf import render_gtm_report_pdf_response
+
+from .ai_services import generate_playbook_with_gemini, generate_diagnostic_insight
 
 LEGEND = {
     1: "No / Not in place",
@@ -32,6 +39,7 @@ LEGEND = {
 }
 
 # ---------- helpers ----------
+
 def _steps():
     return [list(cat.questions.all().order_by("id"))
             for cat in Category.objects.all().order_by("id")]
@@ -48,23 +56,48 @@ def _first_incomplete_step(session):
             return idx
     return max(1, len(steps))  # all answered → last step
 
-def _compute_scores(session):
+def _compute_scores(session: AssessmentSession):
+    # 1. Fetch all category weights and map to ID for overall calculation
+    all_cats = Category.objects.all().order_by("id")
+    total_w = sum(c.weight for c in all_cats) or 1.0
+    cat_weight_map = {c.id: c.weight for c in all_cats}
+    cat_name_map = {c.id: c.name for c in all_cats}
+
+    # 2. Use a single efficient query to get category-level weighted scores
+    #    (Groups responses by category and calculates the weighted average per group)
+    category_results = (
+        Response.objects
+        .filter(session=session)
+        .values('question__category_id')
+        .annotate(
+            total_weighted_score=Sum(F('score') * F('question__weight')),
+            total_weight=Sum('question__weight')
+        )
+        .order_by('question__category_id')
+    )
+
     cat_scores = []
-    cats = Category.objects.all()
-    total_w = sum(c.weight for c in cats) or 1.0
     overall = 0.0
-    for cat in cats:
-        qs = cat.questions.all()
-        rows = Response.objects.filter(session=session, question__in=qs)\
-               .values_list("score", "question__weight")
-        if rows:
-            num = sum(s * w for s, w in rows)
-            den = sum(w for _, w in rows) or 1.0
-            avg = num / den
-        else:
-            avg = 0.0
-        overall += (avg / 5.0) * (cat.weight / total_w) * 100.0
-        cat_scores.append({"category": cat, "avg": avg})
+    
+    # Pre-populate with all categories (in case some have no responses)
+    scores_by_id = {c.id: {"category": c, "avg": 0.0} for c in all_cats}
+
+    for row in category_results:
+        cat_id = row['question__category_id']
+        num = row['total_weighted_score']
+        den = row['total_weight']
+        avg = num / den if den else 0.0
+        
+        # Update the structure with the calculated average
+        scores_by_id[cat_id].update({"avg": avg})
+        
+        # Calculate overall contribution
+        weight = cat_weight_map.get(cat_id, 0)
+        overall += (avg / 5.0) * (weight / total_w) * 100.0
+        
+    # Convert the map back to a list of scores
+    cat_scores = list(scores_by_id.values())
+
     return cat_scores, overall
 
 def _band_for_score(score):
@@ -116,7 +149,7 @@ def _save_snapshot(session, cat_scores, overall, band, labels, values):
                 "radar_labels": labels,
                 "radar_values": values,
 
-                # ✅ firmographics copied from the session
+                # firmographics copied from the session
                 "company_name": session.company_name or "",
                 "industry": session.industry or "",
                 "website": getattr(session, "website", "") or "",
@@ -141,7 +174,49 @@ def _save_snapshot(session, cat_scores, overall, band, labels, values):
 def landing(request):
     return render(request, "gtm/landing.html")
 
+@login_required
 def start_assessment(request):
+    # Identify the anonymous "user" via your gtm_client cookie
+    cid = _client_id(request)  # already defined in your file
+
+    # 0) Redirect to the most recent incomplete assessment instead of creating duplicates
+    existing_incomplete = AssessmentSession.objects.filter(
+        owner_client_id=cid, is_completed=False
+    ).order_by("-created_at").first()
+    if existing_incomplete:
+        messages.info(request, "You have an unfinished assessment. Resuming it now.")
+        return redirect("gtm:resume", session_id=existing_incomplete.uuid)
+
+    # 1) Daily cap (per browser/client)
+    MAX_ASSESSMENTS_PER_DAY = 1
+    today = timezone.now().date()
+    daily_count = AssessmentSession.objects.filter(
+        owner_client_id=cid,
+        created_at__date=today
+    ).count()
+    if daily_count >= MAX_ASSESSMENTS_PER_DAY:
+        messages.error(
+            request,
+            "Daily limit reached. Please try again tomorrow or contact us for extended access."
+        )
+        return redirect("gtm:history")
+
+    # 2) Cooldown (time between new assessments)
+    MIN_SECONDS_BETWEEN_ASSESSMENTS = 5 * 60  # 5 minutes
+    last_session = AssessmentSession.objects.filter(
+        owner_client_id=cid
+    ).order_by("-created_at").first()
+    if last_session:
+        seconds_since_last = (timezone.now() - last_session.created_at).total_seconds()
+        if seconds_since_last < MIN_SECONDS_BETWEEN_ASSESSMENTS:
+            wait_left = int(MIN_SECONDS_BETWEEN_ASSESSMENTS - seconds_since_last)
+            minutes_left = max(1, wait_left // 60)
+            messages.warning(
+                request,
+                f"Please wait about {minutes_left} minute(s) before starting another assessment."
+            )
+            return redirect("gtm:history")
+
     if request.method == "POST":
         company  = request.POST.get("company_name", "")
         industry = request.POST.get("industry", "")
@@ -181,11 +256,13 @@ def start_assessment(request):
             utm_medium=utm_medium,
             utm_campaign=utm_campaign,
             referrer=referrer,
+            user=request.user if request.user.is_authenticated else None,
             owner_client_id=_client_id(request),
         )
         return redirect("gtm:resume", session_id=session.uuid)
 
     return render(request, "gtm/start.html")
+
 
 def resume_assessment(request, session_id):
     session = get_object_or_404(AssessmentSession, pk=session_id)
@@ -250,14 +327,47 @@ def assessment_step(request, session_id, step: int):
             # save/update answers for this step
             for q in questions:
                 score = form.cleaned_data[q.id_code]
-                Response.objects.update_or_create(
+                
+                # Use update_or_create to get the Response instance
+                response_instance, created = Response.objects.update_or_create(
                     session=session, question=q, defaults={"score": score}
                 )
+                
+                # We need to compute scores and update the snapshot *after* the responses
+                # for this step are saved, ensuring the AI call has access to the most
+                # current 'band_stage' via the snapshot.
+                
+                # ----------------------------------------------------
+                # 🆕 CRITICAL FIX: Ensure Snapshot is Fresh and Exists
+                # ----------------------------------------------------
+                cat_scores, overall = _compute_scores(session)
+                band = _band_for_score(overall)
+                
+                # Re-calculate radar data (as required by _save_snapshot)
+                labels = [c["category"].name for c in cat_scores]
+                values = [round(c["avg"], 2) for c in cat_scores]
+                
+                # Save the snapshot now so 'session.snapshot' is current
+                # The _save_snapshot function already handles update_or_create.
+                _save_snapshot(session, cat_scores, overall, band, labels, values)
+                # ----------------------------------------------------
+                
+                # 🆕 NEW CALL: Generate diagnostic for low scores (1 or 2)
+                # The session.snapshot is now guaranteed to exist and be current.
+                if response_instance.score <= 2:
+                    try:
+                        # We don't need the return value, just the side effect of saving to DB
+                        # The AI function relies on session.snapshot.band_stage
+                        generate_diagnostic_insight(response_instance)
+                    except Exception as e:
+                        log_error("Diagnostic Insight Generation", e, {"qid": q.id_code})
 
             # update progress + completion flag (data-driven)
             next_step = step + 1
             session.current_step = min(next_step, total_steps)
             session.is_completed = _is_session_complete(session)
+            # The firmographics were already saved in _save_snapshot, so we only need
+            # to save the step/completion flags.
             session.save(update_fields=["current_step", "is_completed"])
 
             if next_step > total_steps:
@@ -303,6 +413,8 @@ def _compute_scores(session: AssessmentSession):
 def _band_for_score(score: float):
     return RecommendationBand.objects.filter(min_score__lte=score, max_score__gte=score).first()
 
+
+
 def results(request, session_id):
     session = get_object_or_404(AssessmentSession, pk=session_id)
     cat_scores, overall = _compute_scores(session)
@@ -327,6 +439,8 @@ def results(request, session_id):
                 "weighted": r.score * q.weight,
                 "note": q.diagnostic_note or "",
                 "step": step_map.get(q.category_id),
+                # 🆕 NEW: Include the AI insight from the Response object
+                "ai_insight": r.ai_insight or "",
             })
     weakest_questions = sorted(all_rows, key=lambda x: x["weighted"])[:3]
 
@@ -405,6 +519,7 @@ def results(request, session_id):
         "recommendations": recommendations,
     })
 
+# Playbook
 def playbook(request, session_id):
     session = get_object_or_404(AssessmentSession, pk=session_id)
     cat_scores, overall = _compute_scores(session)
@@ -447,8 +562,25 @@ def playbook(request, session_id):
     ai_playbook_html = ""
     try:
         if snap and getattr(snap, "ai_playbook", ""):
+            # ✅ Normalize Gemini’s mixed formatting BEFORE Markdown
+            src = snap.ai_playbook.replace("\r\n", "\n").strip()
+
+            # 1️⃣ Convert inline " * " separators into proper bullet lines
+            src = re.sub(r"\s\*\s+", "\n- ", src)
+
+            # 2️⃣ Make "Week X:" style lines into Markdown headings for consistency
+            src = re.sub(r"(?m)^(Week\s+\d+:[^\n]*)$", r"### \1", src)
+
+            # 3️⃣ Add blank lines before list, numbered, and heading items for proper block rendering
+            src = re.sub(r"(?m)(?<!\n)\n(?=(?:- |\d+\. |#{1,6}\s))", "\n\n", src)
+
+            # 4️⃣ Clean up extra spaces/newlines
+            src = re.sub(r"[ \t]+\n", "\n", src)
+            src = re.sub(r"\n{3,}", "\n\n", src)
+
+            # ✅ Render clean Markdown
             ai_playbook_html = md.markdown(
-                snap.ai_playbook,
+                src,
                 extensions=["extra", "sane_lists", "toc"]  # 'extra' already includes tables
             )
         else:
@@ -470,68 +602,49 @@ def playbook(request, session_id):
         "ai_playbook_html": mark_safe(ai_playbook_html),
     })
 
+
 def download_report_pdf(request, session_id):
     session = get_object_or_404(AssessmentSession, pk=session_id)
     cat_scores, overall = _compute_scores(session)
     band = _band_for_score(overall)
-
-    # Basic PDF (no external deps beyond reportlab)
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
-
-    y = height - 2*cm
-    def line(text, size=12, dy=14):
-        nonlocal y
-        c.setFont("Helvetica-Bold" if size>=14 else "Helvetica", size)
-        c.drawString(2*cm, y, text[:110])
-        y -= dy
-
-    line("Funti3r GTM Validator – Health Report", 16, 20)
-    line(f"Company: {session.company_name or '-'}")
-    line(f"Industry: {session.industry or '-'}")
-    line(f"Date: {session.created_at.strftime('%Y-%m-%d %H:%M')}")
-    y -= 8
-
-    line(f"Overall Score: {round(overall,1)} / 100", 14, 18)
-    if band:
-        line(f"Stage: {band.stage}")
-        line(f"Summary: {band.headline}")
-
-    y -= 10
-    line("Category Averages (1–5):", 13, 16)
-    for cscore in cat_scores:
-        line(f" - {cscore['category'].name}: {round(cscore['avg'],2)}")
-
-    # Recommendations
-    y -= 10
-    line("Recommended Next Moves:", 13, 16)
-    if band:
-        # actions_markdown → plain text, split lines
-        actions = strip_tags(band.actions_markdown).splitlines()
-        for row in actions:
-            if y < 2*cm:
-                c.showPage(); y = height - 2*cm
-            line(f" • {row}", 11, 13)
-
-    c.showPage()
-    c.save()
-    pdf = buffer.getvalue()
-    buffer.close()
-
-    resp = HttpResponse(content_type="application/pdf")
-    resp["Content-Disposition"] = f'attachment; filename="gtm_report_{session.uuid}.pdf"'
-    resp.write(pdf)
-    return resp
+    return render_gtm_report_pdf_response(session=session, cat_scores=cat_scores, overall=overall, band=band)
 
 def history(request):
-    cid = _client_id(request)
-    qs = AssessmentSession.objects.filter(owner_client_id=cid).order_by("-created_at")
+    
+    if request.user.is_authenticated:
+        qs = AssessmentSession.objects.filter(user=request.user)
+    else:
+        cid = _client_id(request)
+        # 🚨 IMPROVEMENT: Fetch snapshot and band info in one go
+        qs = AssessmentSession.objects.filter(owner_client_id=cid).order_by("-created_at")
+        
+    # Use select_related to minimize queries
+    qs = qs.select_related('snapshot__band')
+    
     rows = []
     for s in qs:
-        cat_scores, overall = _compute_scores(s) if s.is_completed else ([], None)
-        band = _band_for_score(overall) if overall is not None else None
+        # 🚨 IMPROVEMENT: Use snapshot data if available (for completed sessions)
+        snap = getattr(s, 'snapshot', None)
+        if snap:
+            overall = snap.overall
+            band = snap.band
+        elif s.is_completed:
+            # Fallback for completed sessions without a snapshot (rare)
+            cat_scores, overall = _compute_scores(s)
+            band = _band_for_score(overall)
+        else:
+            overall = None
+            band = None
+            
         rows.append({"session": s, "overall": (round(overall,1) if overall is not None else None), "band": band})
+        
+    # Remove the old loop that called _compute_scores(s) if you use the above logic.
+    # The original loop in history was:
+    # for s in qs:
+    #     cat_scores, overall = _compute_scores(s) if s.is_completed else ([], None)
+    #     band = _band_for_score(overall) if overall is not None else None
+    #     rows.append({"session": s, "overall": (round(overall,1) if overall is not None else None), "band": band})
+
     return render(request, "gtm/history.html", {"rows": rows})
 
 
@@ -540,12 +653,21 @@ def _client_id(request):
 
 @require_POST
 def action_add(request, session_id):
+    
     session = get_object_or_404(AssessmentSession, pk=session_id)
-    # basic guard: same client owns this session
-    if session.owner_client_id != _client_id(request):
+    
+    # 🚨 IMPROVEMENT: Enforce strict ownership check 
+    if request.user.is_authenticated:
+        if session.user != request.user:
+            messages.error(request, "Access denied.")
+            return redirect("gtm:results", session_id=session.uuid)
+    # Fallback for anonymous users
+    elif session.owner_client_id != _client_id(request):
+        messages.error(request, "Access denied.")
         return redirect("gtm:results", session_id=session.uuid)
 
     note = request.POST.get("note","").strip()
+    
     question_id = request.POST.get("question_id")
     if note:
         ActionItem.objects.create(
@@ -556,11 +678,20 @@ def action_add(request, session_id):
     return redirect("gtm:playbook", session_id=session.uuid)
 
 @require_POST
+@require_POST
 def action_toggle(request, action_id):
     a = get_object_or_404(ActionItem, pk=action_id)
-    # basic guard
-    if a.session.owner_client_id != _client_id(request):
+    
+    # 🚨 IMPROVEMENT: Enforce strict ownership check
+    if request.user.is_authenticated:
+        if a.session.user != request.user:
+            messages.error(request, "Access denied.")
+            return redirect("gtm:results", session_id=a.session.uuid)
+    # Fallback for anonymous users
+    elif a.session.owner_client_id != _client_id(request):
+        messages.error(request, "Access denied.")
         return redirect("gtm:results", session_id=a.session.uuid)
+        
     a.status = "done" if a.status != "done" else "todo"
     a.save(update_fields=["status"])
     return redirect("gtm:playbook", session_id=a.session.uuid)

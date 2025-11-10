@@ -80,13 +80,18 @@ class ResultSnapshotAdmin(admin.ModelAdmin):
             "classes": ("collapse",),
             "fields": ("category_breakdown", "radar_labels", "radar_values"),
         }),
+        # ✅ NEW SECTION
+        ("AI Output", {
+            "classes": ("collapse",),  # optional — remove if you want always visible
+            "fields": ("ai_playbook",),
+        }),
         ("Timestamps", {
             "classes": ("collapse",),
             "fields": ("created_at", "updated_at"),
         }),
     )
 
-    readonly_fields = ("created_at", "updated_at")
+    readonly_fields = ("created_at", "updated_at", "ai_playbook")
    
 
     def session_short(self, obj):

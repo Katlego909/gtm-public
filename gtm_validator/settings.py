@@ -49,6 +49,11 @@ INSTALLED_APPS = [
     'tailwind',
     'theme',
     'django_browser_reload',
+    
+    # allauth
+    'allauth',
+    'allauth.account',
+    
 ]
 
 TAILWIND_APP_NAME = 'theme'
@@ -69,6 +74,8 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_browser_reload.middleware.BrowserReloadMiddleware",
+    
+    "allauth.account.middleware.AccountMiddleware",
 ]
 
 ROOT_URLCONF = "gtm_validator.urls"
@@ -167,6 +174,16 @@ if os.getenv("EMAIL_CONSOLE", "").lower() == "true":
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
     
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
+AUTHENTICATION_BACKENDS = [
+
+    # Needed to login by username in Django admin, regardless of `allauth`
+    'django.contrib.auth.backends.ModelBackend',
+
+    # `allauth` specific authentication methods, such as login by email
+    'allauth.account.auth_backends.AuthenticationBackend',
+
+]
 
 LOGGING = {
     "version": 1,

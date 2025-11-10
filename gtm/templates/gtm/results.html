@@ -1,265 +1,192 @@
 {% extends "gtm/base.html" %}
 {% block content %}
 
-<!-- =========================================================
-     GRID: Top summary cards (Score + Radar) and Category bars
-     ========================================================= -->
-<div class="grid md:grid-cols-2 gap-6">
+<h1 class="text-3xl font-bold text-gray-800 mb-6">GTM Assessment Report: {{ session.company_name|default:"Untitled" }}</h1>
 
-  <!-- =========================
-       CARD: GTM Score + Radar
-       ========================= -->
-  <div class="bg-white rounded-2xl shadow p-8">
-    <div class="flex items-center justify-between">
-      <div>
-        <h2 class="text-xl font-semibold mb-2">GTM Score</h2>
-        <div class="text-3xl font-bold">{{ overall }}/100</div>
-        {% if band %}
-          <div class="mt-2 inline-block text-xs px-3 py-1 rounded-full bg-black text-white">
-            {{ band.stage }}
-          </div>
-          <p class="text-gray-600 mt-4">{{ band.headline }}</p>
-        {% endif %}
-      </div>
+<div class="grid lg:grid-cols-3 gap-6 mb-8">
 
-      <!-- ✅ Circular progress indicator -->
-      <div class="relative w-20 h-20">
-        <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
-          <!-- background circle -->
-          <path
-            class="text-gray-200"
-            stroke="currentColor"
-            stroke-width="3"
-            fill="none"
-            d="M18 2.0845
-               a 15.9155 15.9155 0 0 1 0 31.831
-               a 15.9155 15.9155 0 0 1 0 -31.831" />
-          <!-- progress circle -->
-          <path
-            stroke="#3B82F6"
-            stroke-width="4"
-            stroke-linecap="round"
-            fill="none"
-            stroke-dasharray="{{ overall|floatformat:0 }}, 100"
-            d="M18 2.0845
-               a 15.9155 15.9155 0 0 1 0 31.831
-               a 15.9155 15.9155 0 0 1 0 -31.831" />
-        </svg>
-        <div class="absolute inset-0 flex items-center justify-center text-sm font-medium text-gray-800">
-          {{ overall|floatformat:0 }}%
+    <div class="lg:col-span-2 bg-white rounded-3xl shadow-xl p-8 border border-gray-100">
+        
+        <div class="flex items-center justify-between border-b pb-6 mb-6">
+            <div>
+                {% if band %}
+                    <span class="text-xs font-semibold px-4 py-1 rounded-full bg-indigo-600 text-white shadow-md uppercase tracking-wider">
+                        {{ band.stage }}
+                    </span>
+                {% endif %}
+                <h2 class="text-xl font-medium text-gray-500 mt-2">Overall GTM Score</h2>
+            </div>
+            
+            <div class="relative w-28 h-28 shrink-0">
+                <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
+                    <path class="text-gray-200" stroke="currentColor" stroke-width="3" fill="none"
+                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    <path stroke="#4F46E5" stroke-width="4" stroke-linecap="round" fill="none"
+                          stroke-dasharray="{{ overall|floatformat:0 }}, 100"
+                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+                <div class="absolute inset-0 flex flex-col items-center justify-center">
+                    <span class="text-4xl font-extrabold text-gray-900 leading-none">{{ overall|floatformat:0 }}</span>
+                    <span class="text-sm text-gray-500">/100</span>
+                </div>
+            </div>
         </div>
-      </div>
+
+        <h3 class="text-2xl font-semibold mb-2">{{ band.headline|default:"Your GTM journey is underway." }}</h3>
+        <p class="text-gray-600 mb-6">{{ band.headline|default:"Review the breakdown below to identify your next best steps." }}</p>
+
+        <div class="relative w-full" style="height: 350px; max-width: 100%;">
+            <canvas id="radar" class="w-full h-full"></canvas>
+        </div>
     </div>
 
-    <!-- keep your radar chart below -->
-    <canvas id="radar" class="mt-6"></canvas>
-  </div>
-
-  <!-- =========================
-       CARD: Category Breakdown
-       ========================= -->
-  <div class="bg-white rounded-2xl shadow p-8">
-    <h2 class="text-xl font-semibold mb-4">Category Breakdown</h2>
-    <div class="space-y-4">
-      {% for c in cat_scores %}
-        <div>
-          <div class="flex justify-between text-sm mb-1">
-            <span>{{ c.category.name }}</span>
-            <span>{{ c.avg|floatformat:2 }}/5</span>
-          </div>
-          <div class="w-full bg-gray-200 rounded h-2 overflow-hidden">
-            <div class="bg-black h-2 rounded" style="width: calc({{ c.avg|floatformat:2 }} / 5 * 100%);"></div>
-          </div>
+    <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100">
+        <h2 class="text-xl font-semibold mb-6">Performance Breakdown</h2>
+        <div class="space-y-6">
+            {% for c in cat_scores %}
+                {# Assuming c.is_focus (boolean) is passed from the view logic (e.g., c.avg < 3.0) #}
+                {% with is_focus=c.is_focus %}
+                <div>
+                    <div class="flex justify-between text-base font-medium mb-1">
+                        <span class="{% if is_focus %}text-red-600{% endif %} break-words">{{ c.category.name }}</span>
+                        <span class="{% if is_focus %}text-red-600{% endif %}">{{ c.avg|floatformat:2 }}/5</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                        <div class="h-3 rounded-full transition-all duration-500 
+                            {% if is_focus %}bg-red-500{% else %}bg-indigo-500{% endif %}" 
+                            style="width: calc({{ c.avg|floatformat:2 }} / 5 * 100%);">
+                        </div>
+                    </div>
+                </div>
+                {% endwith %}
+            {% endfor %}
         </div>
-      {% endfor %}
     </div>
-  </div>
-
 </div>
 
-<!-- ===========================================
-     SECTION: Recommended Next Moves (Markdown)
-     =========================================== -->
+
 {% if band %}
-  <div class="bg-white rounded-2xl shadow p-8 mt-6">
-    <h3 class="text-lg font-semibold mb-4">Recommended Next Moves</h3>
-    <div class="prose max-w-none prose-ul:my-1 prose-li:my-0 prose-p:my-2">
-      {{ band_actions_html|safe }}
-    </div>
-  </div>
-{% endif %}
-
-<!-- ===========================================
-     SECTION: CTA – strategy call / email intent
-     (kept front-end only; no backend routes)
-     =========================================== -->
-<div class="bg-white rounded-2xl shadow p-6 mt-6">
-  <div class="flex items-start justify-between gap-6">
-    <div>
-      <div class="flex items-center gap-2 mb-2">
-        {% if band %}
-          <span class="text-xs px-2 py-1 rounded-full bg-gray-900 text-white">{{ band.stage }}</span>
-        {% endif %}
-        <span class="text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-700">
-          Score: {{ overall|floatformat:1 }}/100
-        </span>
-      </div>
-
-      <h3 class="text-lg font-semibold">Need help implementing your next steps?</h3>
-      <p class="text-gray-600 mt-1">
-        We’ll turn these recommendations into a 30-day GTM action plan tailored to your business.
-      </p>
-
-      <ul class="mt-3 text-sm text-gray-700 list-disc pl-5 space-y-1">
-        <li>Prioritized roadmap for your <b>weakest categories</b></li>
-        <li>Plug-and-play templates (tests, cadences, playbooks)</li>
-        <li>Tooling setup help (analytics, A/B testing, attribution)</li>
-      </ul>
-
-      <div class="mt-4 flex flex-wrap items-center gap-3">
-        <!-- Primary: external booking link (safe, no Django route needed) -->
-        <a href="https://calendly.com/your-org/gtm-strategy-call"
-           target="_blank"
-           class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-black text-white hover:bg-gray-800 transition">
-          Book a 20-min Strategy Call →
-        </a>
-
-        <!-- Secondary: mailto with prefilled subject/body (no backend) -->
-        <a href="mailto:hello@yourdomain.com?subject=GTM%20Plan%20Request%20(%20Score%20{{ overall|floatformat:1 }}%20)&body=Hi%20Funti3r%20team,%0A%0APlease%20help%20me%20turn%20my%20GTM%20results%20into%20a%2030-day%20plan.%0A%0ACompany:%20{{ session.company_name|default:'-' }}%0AIndustry:%20{{ session.industry|default:'-' }}%0AScore:%20{{ overall|floatformat:1 }}%0ASession%20ID:%20{{ session.uuid }}%0A%0AThanks!"
-           class="inline-flex items-center gap-2 px-3 py-2 text-sm rounded-lg border hover:bg-gray-50 transition">
-          Email me the 30-day plan
-        </a>
-      </div>
-    </div>
-
-    <!-- Visual cue (score ring) -->
-    <div class="hidden sm:flex items-center justify-center">
-      <div class="relative w-24 h-24">
-        <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
-          <path stroke="#E5E7EB" stroke-width="4" fill="none"
-                d="M18 2.0845 a15.9155 15.9155 0 0 1 0 31.831 a15.9155 15.9155 0 0 1 0 -31.831"/>
-          <path stroke="#3B82F6" stroke-width="3" stroke-linecap="round" fill="none"
-                stroke-dasharray="{{ overall|floatformat:0 }}, 100"
-                d="M18 2.0845 a15.9155 15.9155 0 0 1 0 31.831 a15.9155 15.9155 0 0 1 0 -31.831"/>
-        </svg>
-        <div class="absolute inset-0 flex items-center justify-center text-sm font-medium text-gray-800">
-          {{ overall|floatformat:0 }}%
+<div class="mt-8 bg-indigo-700 rounded-3xl p-8 shadow-2xl text-white">
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div>
+            <span class="text-sm font-semibold mb-1 block opacity-80">RECOMMENDED NEXT STAGE</span>
+            <h3 class="text-3xl font-extrabold mb-1">Move to the {{ band.stage }}</h3>
+            <p class="text-indigo-100 text-md max-w-2xl">
+                Ready for the plan? Click below to access your full AI-generated 30-day playbook with weekly action items and success metrics.
+            </p>
         </div>
-      </div>
+        
+        <div class="flex flex-wrap gap-3 shrink-0">
+            <a href="{% url 'gtm:playbook' session.uuid %}" class="px-6 py-3 rounded-xl bg-white text-indigo-700 font-bold shadow-lg hover:bg-gray-100 transition">
+                View 30-Day Playbook →
+            </a>
+            <a href="{% url 'gtm:download' session.uuid %}" class="px-6 py-3 rounded-xl border border-indigo-300 text-white hover:bg-indigo-600 transition">
+                Download PDF
+            </a>
+        </div>
     </div>
-  </div>
-</div>
-
-<!-- ===========================================
-     SECTION: Recommended Tools (auto suggestions)
-     =========================================== -->
-{% if recommendations %}
-<div class="bg-white rounded-2xl shadow p-8 mt-6">
-  <h3 class="text-lg font-semibold mb-3">Recommended Tools</h3>
-  <p class="text-gray-600 text-sm mb-4">Based on your weakest GTM areas, here are tools that can help strengthen your workflow.</p>
-
-  <div class="grid md:grid-cols-2 gap-6">
-    {% for r in recommendations %}
-      <div class="border rounded-lg p-4 hover:shadow transition">
-        <h4 class="font-semibold mb-1">{{ r.keyword|capfirst }}</h4>
-        <p class="text-sm text-gray-600 mb-2">{{ r.description }}</p>
-        <ul class="text-sm list-disc ml-4 mb-3">
-          {% for t in r.tool_list %}
-            <li>{{ t }}</li>
-          {% endfor %}
-        </ul>
-        {% if r.url %}
-          <a href="{{ r.url }}" target="_blank" class="inline-block text-sm px-3 py-1 bg-black text-white rounded hover:bg-gray-800 transition">Explore</a>
-        {% endif %}
-      </div>
-    {% endfor %}
-  </div>
 </div>
 {% endif %}
-<!-- ------------------------------------------------------- -->
 
-<!-- ===========================================
-     SECTION: Strengths, Focus Areas, Weakest Qs
-     =========================================== -->
-<div class="grid md:grid-cols-1 gap-6 mt-6">
+{% if band %}
+    <div class="bg-white rounded-3xl shadow-xl p-8 mt-6 border border-gray-100">
+        <h3 class="text-lg font-semibold mb-4">Recommended Next Moves (Detailed)</h3>
+        <div class="prose max-w-none prose-ul:my-1 prose-li:my-0 prose-p:my-2">
+            {{ band_actions_html|safe }}
+        </div>
+    </div>
+{% endif %}
 
-  <!-- Top Strengths -->
-  <div class="bg-white rounded-2xl shadow p-6">
-    <h4 class="font-semibold mb-3">Top Strengths</h4>
-    <ul class="space-y-3">
-      {% for c in strengths_categories %}
-        <li class="border rounded-lg p-3">
-          <div class="flex items-center justify-between">
-            <div class="font-medium">{{ c.category.name }}</div>
-            <div class="text-sm text-gray-600">{{ c.avg|floatformat:2 }}/5</div>
-          </div>
-          <p class="text-xs text-gray-500 mt-1">Signal: performing above other areas — keep the cadence.</p>
-        </li>
-      {% empty %}
-        <li class="text-gray-500 text-sm">No clear strengths yet.</li>
-      {% endfor %}
-    </ul>
-  </div>
 
-  <!-- Top Focus Areas -->
-  <div class="bg-white rounded-2xl shadow p-6">
-    <h4 class="font-semibold mb-3">Top Focus Areas</h4>
-    <ul class="space-y-3">
-      {% for c in focus_categories %}
-        <li class="border rounded-lg p-3">
-          <div class="flex items-center justify-between">
-            <div class="font-medium">{{ c.category.name }}</div>
-            <div class="text-sm text-gray-600">{{ c.avg|floatformat:2 }}/5</div>
-          </div>
-          <p class="text-xs text-gray-500 mt-1">Why this matters: lifting this area has the highest impact on GTM readiness due to category weight.</p>
-          <div class="mt-2 flex gap-2">
-            <a href="{% url 'gtm:assessment_step' session.uuid c.step %}" class="px-3 py-1.5 rounded border text-sm">Review answers</a>
-            <a href="{% url 'gtm:playbook' session.uuid %}#actions" class="px-3 py-1.5 rounded bg-black text-white text-sm">See actions</a>
-          </div>
-        </li>
-      {% empty %}
-        <li class="text-gray-500 text-sm">No focus items detected.</li>
-      {% endfor %}
-    </ul>
-  </div>
+<div class="grid lg:grid-cols-2 gap-6 mt-8">
 
-  <!-- Weakest Questions -->
-  <div class="bg-white rounded-2xl shadow p-6">
-    <h4 class="font-semibold mb-3">Weakest Questions</h4>
-    <ul class="space-y-3">
-      {% for q in weakest_questions %}
-        <li class="border rounded-lg p-3">
-          <div class="flex items-center justify-between">
-            <div class="font-medium">{{ q.question.category.name }} • {{ q.question.id_code }}</div>
-            <div class="text-sm text-gray-600">{{ q.score }}/5</div>
-          </div>
-          <p class="text-sm mt-1">{{ q.question.text }}</p>
-          {% if q.note %}
-            <p class="text-xs text-gray-500 mt-1">Diagnostic: {{ q.note }}</p>
-          {% endif %}
-          <div class="mt-2 flex gap-2">
-            <a href="{% url 'gtm:assessment_step' session.uuid q.step %}" class="px-3 py-1.5 rounded border text-sm">Fix this item</a>
-            <button type="button" data-check="{{ q.question.text }}" class="copy-action px-3 py-1.5 rounded text-sm">Copy to checklist</button>
-          </div>
-        </li>
-      {% empty %}
-        <li class="text-gray-500 text-sm">No answered questions yet.</li>
-      {% endfor %}
-    </ul>
-  </div>
+  {% if recommendations %}
+    <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100">
+        <h4 class="text-xl font-semibold mb-4">Recommended Tools</h4>
+        <p class="text-gray-600 text-sm mb-4">Tools to address gaps in your weakest GTM areas.</p>
+
+        <div class="space-y-4">
+            {% for r in recommendations %}
+              <div class="p-3 border rounded-lg hover:border-indigo-300 transition">
+                <h5 class="font-semibold text-gray-900 mb-1 break-words">{{ r.keyword|capfirst }}</h5>
+                <p class="text-sm text-gray-600 mb-2 break-words">{{ r.description|truncatechars:80 }}</p>
+                <div class="flex justify-between items-center text-xs">
+                    <span class="text-gray-500 break-words">{{ r.tool_list|join:", " }}</span>
+                    {% if r.url %}
+                      <a href="{{ r.url }}" target="_blank" class="text-indigo-600 hover:text-indigo-800 font-medium transition shrink-0">Explore →</a>
+                    {% endif %}
+                </div>
+              </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100">
+        <h4 class="text-xl font-semibold mb-4">Top Strengths</h4>
+        <ul class="space-y-4">
+            {% for c in strengths_categories %}
+                <li class="p-3 bg-gray-50 rounded-lg">
+                    <div class="flex items-center justify-between">
+                        <div class="font-medium text-indigo-700 break-words">{{ c.category.name }}</div>
+                        <div class="text-sm text-gray-700 font-medium shrink-0">{{ c.avg|floatformat:2 }}/5</div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">Performing well — maintain the rigor in this area.</p>
+                </li>
+            {% empty %}
+                <li class="text-gray-500 text-sm">No clear strengths yet.</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    
 </div>
 
-<!-- ===========================================
-     SECTION: Footer actions (Playbook / PDF)
-     =========================================== -->
+
+<div class="bg-white rounded-3xl shadow-xl p-8 mt-6">
+  <h4 class="text-xl font-semibold mb-3">Weakest Questions & Insights</h4>
+  <p class="text-gray-600 mb-4">The areas where you scored lowest, including personalized AI insights for critical gaps.</p>
+  
+  <ul class="space-y-4">
+    {% for q in weakest_questions %}
+      <li class="border rounded-xl p-4 hover:shadow-lg transition">
+        <div class="flex items-center justify-between mb-2">
+            <div class="font-medium text-lg text-indigo-700 break-words">{{ q.question.category.name }} • {{ q.question.id_code }}</div>
+            <div class="text-xl font-semibold {% if q.score <= 2 %}text-red-600{% else %}text-gray-600{% endif %} shrink-0">{{ q.score }}/5</div>
+        </div>
+        <p class="text-sm mt-1 mb-3 break-words">{{ q.question.text }}</p>
+
+        {% if q.note %}
+            <p class="text-xs text-gray-500 mt-1 break-words">Diagnostic: {{ q.note }}</p>
+        {% endif %}
+
+        {% comment %} AI INSIGHT (Styled for visibility) {% endcomment %}
+        {% if q.ai_insight %}
+          <div class="mt-3 p-3 bg-red-50 border-l-4 border-red-500 rounded text-sm shadow-inner overflow-hidden">
+            <div class="flex items-center mb-1">
+                <span class="text-lg mr-2" role="img" aria-label="lightbulb">💡</span>
+                <span class="font-semibold text-red-700">AI Insight:</span>
+            </div>
+            <p class="text-gray-800 mt-1 leading-snug break-words">{{ q.ai_insight }}</p>
+          </div>
+        {% endif %}
+        
+        <div class="mt-4 flex flex-wrap items-center gap-2 border-t pt-3">
+          <a href="{% url 'gtm:assessment_step' session.uuid q.step %}" class="px-3 py-1.5 rounded border border-indigo-600 text-indigo-600 text-sm hover:bg-indigo-50 shrink-0">Fix this item</a>
+          <button type="button" data-check="{{ q.question.text }}" class="copy-action px-3 py-1.5 rounded border text-gray-700 text-sm hover:bg-gray-50 shrink-0">Copy to checklist</button>
+        </div>
+      </li>
+    {% empty %}
+      <li class="text-gray-500 text-sm">No answered questions yet.</li>
+    {% endfor %}
+  </ul>
+</div>
+
 <div class="mt-6 flex gap-3">
-  <a href="{% url 'gtm:playbook' session.uuid %}" class="px-4 py-2 rounded bg-black text-white">View Playbook</a>
-  <a href="{% url 'gtm:download' session.uuid %}" class="px-4 py-2 rounded border">Download Report (PDF)</a>
+    <a href="{% url 'gtm:playbook' session.uuid %}" class="px-4 py-2 rounded bg-indigo-700 text-white hover:bg-indigo-800 transition">View Playbook</a>
+    <a href="{% url 'gtm:download' session.uuid %}" class="px-4 py-2 rounded border hover:bg-gray-50 transition">Download Report (PDF)</a>
 </div>
 
-<!-- ===========================================
-     SCRIPTS: Chart.js (radar) + copy-to-clipboard
-     =========================================== -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
   const labels = {{ labels|safe }};
@@ -272,9 +199,29 @@
         label: 'Category avg (1–5)',
         data: values,
         fill: true,
+        backgroundColor: 'rgba(79, 70, 229, 0.15)', // Indigo-600 with opacity
+        borderColor: '#4F46E5', // Indigo-600
+        pointBackgroundColor: '#4F46E5',
+        pointBorderColor: '#fff',
+        pointHoverBackgroundColor: '#fff',
+        pointHoverBorderColor: '#4F46E5'
       }]
     },
-    options: { responsive: true, scales: { r: { min: 0, max: 5 } } }
+    options: { 
+      responsive: true, 
+      maintainAspectRatio: false,
+      scales: { 
+        r: { 
+          min: 0, 
+          max: 5, 
+          ticks: { backdropColor: 'rgba(255, 255, 255, 0.8)' },
+          grid: { color: 'rgba(0, 0, 0, 0.1)' }
+        } 
+      },
+      plugins: {
+        legend: { display: false }
+      }
+    }
   });
 </script>
 
