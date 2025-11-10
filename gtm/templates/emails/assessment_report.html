@@ -1,128 +1,243 @@
 {% extends "emails/base_email.html" %}
-{% block title %}GTM Assessment Report • {{ snap.company_name|default:session.company_name|default:"Untitled" }}{% endblock %}
+{% block title %}Your GTM Assessment Results & Action Plan • {{ snap.company_name|default:session.company_name|default:"Untitled" }}{% endblock %}
 
 {% block content %}
 
-<h1 style="margin:0 0 8px;font-size:22px;line-height:1.2;">GTM Assessment Report</h1>
-<p style="margin:0 0 16px;color:#6b7280;">
-  {{ snap.company_name|default:session.company_name|default:"Untitled company" }}
-  {% if snap.industry or session.industry %} — {{ snap.industry|default:session.industry }}{% endif %}
-</p>
+<!-- Hero Section -->
+<div style="background: linear-gradient(135deg, #4F46E5 0%, #6366F1 100%); border-radius: 12px; padding: 24px; margin-bottom: 24px; text-align: center;">
+  <h1 style="margin:0 0 8px;font-size:28px;line-height:1.2;color:#ffffff;font-weight:800;">
+    🎯 Your GTM Assessment Results
+  </h1>
+  <p style="margin:0;color:#E0E7FF;font-size:16px;">
+    {{ snap.company_name|default:session.company_name|default:"Your Company" }}
+    {% if snap.industry or session.industry %} • {{ snap.industry|default:session.industry }}{% endif %}
+  </p>
+</div>
 
-<!-- Score + Stage -->
-<div class="stack" style="display:flex;align-items:center;gap:12px;margin:8px 0 16px;">
-  <div class="score" style="font-size:34px;font-weight:800;letter-spacing:-0.02em;">
-    {{ overall|floatformat:0 }}/100
+<!-- Score Summary Card -->
+<div style="background:#F9FAFB;border:2px solid #E5E7EB;border-radius:12px;padding:20px;margin-bottom:24px;">
+  <div style="text-align:center;margin-bottom:16px;">
+    <div style="font-size:48px;font-weight:800;color:#1F2937;letter-spacing:-0.02em;line-height:1;">
+      {{ overall|floatformat:0 }}<span style="font-size:24px;color:#6B7280;">/100</span>
+    </div>
+    {% if band %}
+      <div style="margin-top:12px;">
+        <span style="display:inline-block;font-size:14px;background:#4F46E5;color:#ffffff;border-radius:20px;padding:8px 16px;font-weight:600;">
+          {{ band.stage }}
+        </span>
+      </div>
+    {% endif %}
   </div>
-  {% if band %}
-    <span class="pill" style="display:inline-block;font-size:12px;border:1px solid #e5e7eb;border-radius:9999px;padding:6px 10px;">
-      {{ band.stage }}
-    </span>
+  {% if band and band.headline %}
+    <p style="margin:0;color:#374151;text-align:center;font-size:15px;line-height:1.5;">
+      {{ band.headline }}
+    </p>
   {% endif %}
 </div>
-{% if band and band.headline %}
-  <p style="margin:0 0 16px;color:#374151;">{{ band.headline }}</p>
-{% endif %}
 
-<hr class="divider" style="border:none;border-top:1px solid #eef0f4;margin:16px 0;">
+<!-- Quick Actions -->
+<div style="background:#EEF2FF;border-left:4px solid #4F46E5;border-radius:8px;padding:16px;margin-bottom:24px;">
+  <p style="margin:0 0 12px;font-weight:600;color:#4F46E5;font-size:14px;">📥 YOUR RESOURCES</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <a href="{{ public_report_url }}" 
+       style="display:inline-block;background:#4F46E5;color:#ffffff;text-decoration:none;border-radius:8px;padding:12px 20px;font-weight:600;font-size:14px;">
+      📊 View Full Dashboard
+    </a>
+    <a href="{{ pdf_download_url }}" 
+       style="display:inline-block;background:#1F2937;color:#ffffff;text-decoration:none;border-radius:8px;padding:12px 20px;font-weight:600;font-size:14px;">
+      📄 Download PDF Report
+    </a>
+    <a href="{{ playbook_url }}" 
+       style="display:inline-block;background:#059669;color:#ffffff;text-decoration:none;border-radius:8px;padding:12px 20px;font-weight:600;font-size:14px;">
+      📖 View Your Playbook
+    </a>
+  </div>
+</div>
 
-<!-- Category table -->
-<h3 style="margin:0 0 8px;font-size:16px;">Category Breakdown</h3>
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+<!-- Performance Breakdown -->
+<h2 style="margin:24px 0 16px;font-size:20px;font-weight:700;color:#1F2937;">📊 Performance Breakdown</h2>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-bottom:24px;">
+  <thead>
+    <tr style="background:#F9FAFB;border-bottom:2px solid #E5E7EB;">
+      <th align="left" style="padding:12px;font-size:14px;color:#6B7280;font-weight:600;">Category</th>
+      <th align="right" style="padding:12px;font-size:14px;color:#6B7280;font-weight:600;">Score</th>
+      <th align="right" style="padding:12px;font-size:14px;color:#6B7280;font-weight:600;">Performance</th>
+    </tr>
+  </thead>
   <tbody>
     {% for c in categories %}
-      <tr>
-        <td style="padding:8px 0;border-bottom:1px solid #f3f4f6;">{{ c.category }}</td>
-        <td align="right" style="padding:8px 0;border-bottom:1px solid #f3f4f6;"><strong>{{ c.avg|floatformat:2 }}</strong></td>
+      <tr style="border-bottom:1px solid #F3F4F6;">
+        <td style="padding:12px;font-weight:500;color:#1F2937;">{{ c.category }}</td>
+        <td align="right" style="padding:12px;font-weight:700;font-size:16px;color:{% if c.avg >= 4 %}#059669{% elif c.avg >= 3 %}#4F46E5{% elif c.avg >= 2 %}#F59E0B{% else %}#DC2626{% endif %};">
+          {{ c.avg|floatformat:2 }}/5.0
+        </td>
+        <td align="right" style="padding:12px;font-size:13px;">
+          {% if c.avg >= 4 %}
+            <span style="background:#D1FAE5;color:#059669;padding:4px 10px;border-radius:12px;font-weight:600;">✓ Strong</span>
+          {% elif c.avg >= 3 %}
+            <span style="background:#E0E7FF;color:#4F46E5;padding:4px 10px;border-radius:12px;font-weight:600;">Good</span>
+          {% elif c.avg >= 2 %}
+            <span style="background:#FEF3C7;color:#F59E0B;padding:4px 10px;border-radius:12px;font-weight:600;">⚠ Focus</span>
+          {% else %}
+            <span style="background:#FEE2E2;color:#DC2626;padding:4px 10px;border-radius:12px;font-weight:600;">⚡ Critical</span>
+          {% endif %}
+        </td>
       </tr>
     {% endfor %}
   </tbody>
 </table>
 
-<!-- Company details (with professional layout + fallbacks) -->
-<h3 style="margin:16px 0 8px;font-size:16px;">Company Details</h3>
-<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
-  <tbody>
+<!-- Key Insights -->
+{% if weakest_areas %}
+<div style="background:#FEF3C7;border-left:4px solid #F59E0B;border-radius:8px;padding:16px;margin-bottom:24px;">
+  <p style="margin:0 0 8px;font-weight:700;color:#92400E;font-size:15px;">⚠️ Priority Areas for Improvement</p>
+  <ul style="margin:0;padding-left:20px;color:#78350F;">
+    {% for area in weakest_areas %}
+      <li style="margin:4px 0;">
+        <strong>{{ area.category }}</strong>: {{ area.avg|floatformat:2 }}/5.0 
+        <span style="color:#92400E;font-size:13px;">— Focus on this for maximum impact</span>
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
 
-    <!-- Website -->
+{% if strongest_areas %}
+<div style="background:#D1FAE5;border-left:4px solid #059669;border-radius:8px;padding:16px;margin-bottom:24px;">
+  <p style="margin:0 0 8px;font-weight:700;color:#065F46;font-size:15px;">✨ Your Competitive Strengths</p>
+  <ul style="margin:0;padding-left:20px;color:#047857;">
+    {% for area in strongest_areas %}
+      <li style="margin:4px 0;">
+        <strong>{{ area.category }}</strong>: {{ area.avg|floatformat:2 }}/5.0 
+        <span style="color:#065F46;font-size:13px;">— Keep up the excellent work!</span>
+      </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<!-- Recommended Actions -->
+{% if band and band.actions_markdown %}
+<h2 style="margin:24px 0 16px;font-size:20px;font-weight:700;color:#1F2937;">🎯 Your Next Steps</h2>
+<div style="background:#ffffff;border:1px solid #E5E7EB;border-radius:8px;padding:20px;margin-bottom:24px;">
+  <p style="margin:0 0 12px;color:#4B5563;line-height:1.6;">
+    Based on your <strong>{{ band.stage }}</strong> stage, here are the most impactful actions:
+  </p>
+  <div style="color:#374151;line-height:1.7;font-size:14px;">
+    {{ band_actions_html|safe }}
+  </div>
+</div>
+{% endif %}
+
+<!-- Action Items Summary -->
+{% if action_items_count > 0 %}
+<div style="background:#FEF3C7;border-left:4px solid #F59E0B;border-radius:8px;padding:16px;margin-bottom:24px;">
+  <p style="margin:0;font-weight:600;color:#92400E;">
+    📝 You have <strong>{{ action_items_count }} action item{{ action_items_count|pluralize }}</strong> waiting in your playbook!
+  </p>
+  <p style="margin:8px 0 0;color:#78350F;font-size:13px;">
+    <a href="{{ playbook_url }}" style="color:#92400E;text-decoration:underline;">View your task list →</a>
+  </p>
+</div>
+{% endif %}
+
+<!-- Company Information -->
+<h2 style="margin:24px 0 16px;font-size:20px;font-weight:700;color:#1F2937;">🏢 Assessment Details</h2>
+<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;background:#F9FAFB;border-radius:8px;overflow:hidden;margin-bottom:24px;">
+  <tbody>
     <tr>
-      <td style="padding:6px 0;color:#6b7280;">Website</td>
-      <td align="right" style="padding:6px 0;">
+      <td style="padding:12px 16px;color:#6B7280;font-size:13px;font-weight:600;">Website</td>
+      <td align="right" style="padding:12px 16px;font-size:14px;">
         {% with url=snap.website|default:session.website %}
           {% if url %}
-            <a href="{{ url }}" style="color:#3b82f6;text-decoration:none;">{{ url }}</a>
+            <a href="{{ url }}" style="color:#4F46E5;text-decoration:none;font-weight:500;">{{ url }}</a>
           {% else %} — {% endif %}
         {% endwith %}
       </td>
     </tr>
-
-    <!-- Contact -->
-    <tr>
-      <td style="padding:6px 0;color:#6b7280;">Contact</td>
-      <td align="right" style="padding:6px 0;">
-        {% with name=snap.contact_name|default:session.contact_name role=snap.contact_role|default:session.contact_role email=snap.contact_email|default:session.contact_email phone=snap.phone|default:session.phone %}
-          {% if name %}{{ name }}{% else %}—{% endif %}
-          {% if role %} ({{ role }}){% endif %}
-          {% if email %} • <a href="mailto:{{ email }}" style="color:#3b82f6;text-decoration:none;">{{ email }}</a>{% endif %}
-          {% if phone %} • {{ phone }}{% endif %}
+    <tr style="border-top:1px solid #E5E7EB;">
+      <td style="padding:12px 16px;color:#6B7280;font-size:13px;font-weight:600;">Contact</td>
+      <td align="right" style="padding:12px 16px;font-size:14px;">
+        {% with name=snap.contact_name|default:session.contact_name role=snap.contact_role|default:session.contact_role %}
+          {% if name %}<strong>{{ name }}</strong>{% else %}—{% endif %}
+          {% if role %}<br><span style="color:#6B7280;font-size:13px;">{{ role }}</span>{% endif %}
         {% endwith %}
       </td>
     </tr>
-
-    <!-- Location / Size -->
-    <tr>
-      <td style="padding:6px 0;color:#6b7280;">Location / Size</td>
-      <td align="right" style="padding:6px 0;">
-        {% with country=snap.country|default:session.country company_size=snap.company_size|default:session.company_size %}
-          {{ country|default:"—" }} • {{ company_size|default:"—" }}
+    <tr style="border-top:1px solid #E5E7EB;">
+      <td style="padding:12px 16px;color:#6B7280;font-size:13px;font-weight:600;">Email / Phone</td>
+      <td align="right" style="padding:12px 16px;font-size:14px;">
+        {% with email=snap.contact_email|default:session.contact_email phone=snap.phone|default:session.phone %}
+          {% if email %}<a href="mailto:{{ email }}" style="color:#4F46E5;text-decoration:none;">{{ email }}</a>{% endif %}
+          {% if phone %}<br><span style="color:#6B7280;">{{ phone }}</span>{% endif %}
+          {% if not email and not phone %}—{% endif %}
         {% endwith %}
       </td>
     </tr>
-
-    <!-- Revenue / CRM -->
-    <tr>
-      <td style="padding:6px 0;color:#6b7280;">Revenue / CRM</td>
-      <td align="right" style="padding:6px 0;">
-        {% with revenue=snap.revenue_range|default:session.revenue_range crm=snap.crm|default:session.crm %}
-          {{ revenue|default:"—" }} • {{ crm|default:"—" }}
-        {% endwith %}
+    <tr style="border-top:1px solid #E5E7EB;">
+      <td style="padding:12px 16px;color:#6B7280;font-size:13px;font-weight:600;">Company Size</td>
+      <td align="right" style="padding:12px 16px;font-size:14px;">
+        {{ snap.company_size|default:session.company_size|default:"—" }}
       </td>
     </tr>
-
-    <!-- Attribution (optional line, renders only if any exists) -->
-    {% with us=snap.utm_source|default:session.utm_source um=snap.utm_medium|default:session.utm_medium uc=snap.utm_campaign|default:session.utm_campaign ref=snap.referrer|default:session.referrer %}
-      {% if us or um or uc or ref %}
-      <tr>
-        <td style="padding:6px 0;color:#6b7280;">Attribution</td>
-        <td align="right" style="padding:6px 0;">
-          {% if us %}{{ us }}{% endif %}
-          {% if um %} / {{ um }}{% endif %}
-          {% if uc %} / {{ uc }}{% endif %}
-          {% if ref %} • {{ ref }}{% endif %}
-        </td>
-      </tr>
-      {% endif %}
-    {% endwith %}
-
+    <tr style="border-top:1px solid #E5E7EB;">
+      <td style="padding:12px 16px;color:#6B7280;font-size:13px;font-weight:600;">Revenue Range</td>
+      <td align="right" style="padding:12px 16px;font-size:14px;">
+        {{ snap.revenue_range|default:session.revenue_range|default:"—" }}
+      </td>
+    </tr>
+    <tr style="border-top:1px solid #E5E7EB;">
+      <td style="padding:12px 16px;color:#6B7280;font-size:13px;font-weight:600;">Location</td>
+      <td align="right" style="padding:12px 16px;font-size:14px;">
+        {{ snap.country|default:session.country|default:"—" }}
+      </td>
+    </tr>
+    <tr style="border-top:1px solid #E5E7EB;">
+      <td style="padding:12px 16px;color:#6B7280;font-size:13px;font-weight:600;">Current CRM</td>
+      <td align="right" style="padding:12px 16px;font-size:14px;">
+        {{ snap.crm|default:session.crm|default:"—" }}
+      </td>
+    </tr>
   </tbody>
 </table>
 
-<!-- Buttons -->
-<div style="margin:20px 0;">
-  <a class="btn"
-     href="{{ public_report_url }}"
-     style="display:inline-block;background:#111827;color:#ffffff;text-decoration:none;border-radius:10px;padding:10px 14px;font-weight:600;margin-right:8px;">
-     View Report
-  </a>
-  <a class="btn"
-     href="{{ admin_snapshot_url }}"
-     style="display:inline-block;background:#3b82f6;color:#ffffff;text-decoration:none;border-radius:10px;padding:10px 14px;font-weight:600;">
-     Open in Admin
-  </a>
+<!-- Call to Action -->
+<div style="background:linear-gradient(135deg, #4F46E5 0%, #6366F1 100%);border-radius:12px;padding:24px;text-align:center;margin:32px 0 24px;">
+  <h3 style="margin:0 0 8px;font-size:20px;color:#ffffff;font-weight:700;">Ready to Improve Your GTM?</h3>
+  <p style="margin:0 0 20px;color:#E0E7FF;font-size:14px;">
+    Access your complete playbook, download your PDF report, or schedule a strategy session.
+  </p>
+  <div style="display:inline-block;">
+    <a href="{{ playbook_url }}" 
+       style="display:inline-block;background:#ffffff;color:#4F46E5;text-decoration:none;border-radius:8px;padding:14px 28px;font-weight:700;margin:4px;font-size:15px;">
+      📖 View Your Playbook
+    </a>
+    <a href="{{ pdf_download_url }}" 
+       style="display:inline-block;background:#1F2937;color:#ffffff;text-decoration:none;border-radius:8px;padding:14px 28px;font-weight:700;margin:4px;font-size:15px;">
+      📥 Download PDF
+    </a>
+  </div>
 </div>
 
-<p class="muted" style="margin:16px 0 0;font-size:12px;color:#9ca3af;">
-  Report ID: {{ session.uuid }} • Generated {{ snap.created_at }}
-</p>
+<!-- Admin Link -->
+{% if admin_snapshot_url %}
+<div style="text-align:center;margin:16px 0;">
+  <a href="{{ admin_snapshot_url }}" 
+     style="color:#6B7280;text-decoration:none;font-size:13px;font-weight:500;">
+     🔧 Open in Admin Panel
+  </a>
+</div>
+{% endif %}
+
+<!-- Footer Info -->
+<div style="border-top:2px solid #E5E7EB;padding-top:20px;margin-top:32px;">
+  <p style="margin:0 0 8px;font-size:13px;color:#6B7280;text-align:center;">
+    <strong>Assessment ID:</strong> {{ session.uuid|slice:":8" }}... • 
+    <strong>Generated:</strong> {{ snap.created_at|date:"F j, Y" }}
+  </p>
+  <p style="margin:0;font-size:12px;color:#9CA3AF;text-align:center;">
+    Questions? Reply to this email or contact our support team.
+  </p>
+</div>
 
 {% endblock %}

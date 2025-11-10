@@ -8,63 +8,184 @@
     overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
   }
   .rating-label {
-    display:inline-block; padding:0.5rem 0.75rem; border:1px solid #e5e7eb;
-    border-radius:0.375rem; background:#fff; color:#374151; cursor:pointer;
-    transition:all .15s ease;
+    display:inline-block; padding:0.75rem 1rem; border:2px solid #e5e7eb;
+    border-radius:0.75rem; background:#fff; color:#374151; cursor:pointer;
+    transition:all .2s ease; font-weight:500; min-width:3rem; text-align:center;
   }
-  .rating-label:hover { border-color:#000; }
+  .rating-label:hover { 
+    border-color:#6366f1; 
+    background:#f0f9ff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  }
   /* Turn label into a selected pill when its radio is checked */
-  .rating-input:checked + .rating-label { background:#000; color:#fff; border-color:#000; }
+  .rating-input:checked + .rating-label { 
+    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+    color:#fff; 
+    border-color:#6366f1;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+  }
+  
+  @keyframes slideInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .question-item {
+    animation: slideInUp 0.4s ease-out forwards;
+    opacity: 0;
+  }
+  
+  .question-item:nth-child(1) { animation-delay: 0.1s; }
+  .question-item:nth-child(2) { animation-delay: 0.2s; }
+  .question-item:nth-child(3) { animation-delay: 0.3s; }
+  .question-item:nth-child(4) { animation-delay: 0.4s; }
+  .question-item:nth-child(5) { animation-delay: 0.5s; }
 </style>
 
-<div class="mb-6">
-  <div class="text-sm text-gray-600">Step {{ step }} of {{ total_steps }}</div>
-  <div class="w-full bg-gray-200 rounded h-2 mt-2">
-    <div class="bg-black h-2 rounded" style="width: {{ progress_pct }}%"></div>
-  </div>
-</div>
-
-<div class="bg-white rounded-2xl shadow p-8">
-  <h2 class="text-xl font-semibold mb-2">{{ category.name }}</h2>
-  <p class="text-sm text-gray-600 mb-6">
-    Rate each statement from 1 (No) to 5 (Best-in-class).
-    <span class="ml-2 underline decoration-dotted" title="{{ legend }}">What does 1–5 mean?</span>
-  </p>
-
-  <form method="post" class="space-y-6">
-    {% csrf_token %}
-
-    {% for field in form %}
-      <div>
-        <label class="block text-sm font-medium mb-2">{{ field.label }}</label>
-
-        <div class="flex gap-2">
-          {% for i in "12345" %}
-            {# Radio uses the Django field name so it binds to your IntegerField #}
-            <input
-              class="rating-input sr-only"
-              type="radio"
-              id="{{ field.name }}_{{ i }}"
-              name="{{ field.name }}"
-              value="{{ i }}"
-              {% if field.value|stringformat:'s' == i %}checked{% endif %}
-              required
-            >
-            <label class="rating-label" for="{{ field.name }}_{{ i }}">{{ i }}</label>
-          {% endfor %}
+<div class="max-w-4xl mx-auto">
+  <!-- Progress Header -->
+  <div class="mb-8">
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-3">
+        <div class="h-12 w-12 bg-gradient-to-br from-indigo-600 to-blue-500 rounded-xl flex items-center justify-center">
+          <i class="fas fa-clipboard-check text-white text-xl"></i>
+        </div>
+        <div>
+          <p class="text-sm font-semibold text-gray-600">Assessment Progress</p>
+          <p class="text-lg font-bold text-gray-900">Step {{ step }} of {{ total_steps }}</p>
         </div>
       </div>
-    {% endfor %}
-
-    <div class="flex gap-3 pt-2">
-      {% if step > 1 %}
-        <a href="{% url 'gtm:assessment_step' session.uuid step|add:-1 %}" class="px-4 py-2 border rounded">Back</a>
-      {% endif %}
-      <button class="px-5 py-2 rounded bg-black text-white">
-        {% if step == total_steps %}Finish{% else %}Next{% endif %}
-      </button>
+      <div class="text-right">
+        <p class="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">{{ progress_pct }}%</p>
+        <p class="text-xs text-gray-500">Complete</p>
+      </div>
     </div>
-  </form>
+    
+    <!-- Progress Bar -->
+    <div class="w-full bg-gray-200 rounded-full h-3 shadow-inner overflow-hidden">
+      <div class="bg-gradient-to-r from-indigo-600 to-blue-500 h-3 rounded-full transition-all duration-500 shadow-lg" 
+           style="width: {{ progress_pct }}%"></div>
+    </div>
+  </div>
+
+  <!-- Main Content Card -->
+  <div class="bg-white rounded-2xl shadow-xl border border-gray-200 p-8 md:p-10">
+    <!-- Category Header -->
+    <div class="mb-8 pb-6 border-b border-gray-200">
+      <div class="flex items-center gap-3 mb-3">
+        <div class="h-10 w-10 bg-gradient-to-br from-indigo-100 to-blue-100 rounded-lg flex items-center justify-center">
+          <i class="fas fa-folder-open text-indigo-600"></i>
+        </div>
+        <h2 class="text-2xl font-bold text-gray-900">{{ category.name }}</h2>
+      </div>
+      <p class="text-gray-600 flex items-start gap-2">
+        <i class="fas fa-info-circle text-indigo-600 mt-1"></i>
+        <span>
+          Rate each statement from <strong>1 (No/Poor)</strong> to <strong>5 (Best-in-class)</strong>.
+          <button type="button" class="ml-2 text-indigo-600 hover:text-indigo-800 underline decoration-dotted font-medium" 
+                  onclick="alert('{{ legend|escapejs }}')" title="{{ legend }}">
+            What does 1–5 mean?
+          </button>
+        </span>
+      </p>
+    </div>
+
+    <!-- Questions Form -->
+    <form method="post" class="space-y-8">
+      {% csrf_token %}
+
+      {% for field in form %}
+        <div class="question-item bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl p-6 border border-gray-200 hover:border-indigo-300 transition">
+          <label class="block text-base font-semibold text-gray-800 mb-4 flex items-start gap-2">
+            <i class="fas fa-chevron-right text-indigo-600 mt-1 text-sm"></i>
+            <span>{{ field.label }}</span>
+          </label>
+
+          <div class="flex flex-wrap gap-3">
+            {% for i in "12345" %}
+              <input
+                class="rating-input sr-only"
+                type="radio"
+                id="{{ field.name }}_{{ i }}"
+                name="{{ field.name }}"
+                value="{{ i }}"
+                {% if field.value|stringformat:'s' == i %}checked{% endif %}
+                required
+              >
+              <label class="rating-label" for="{{ field.name }}_{{ i }}">{{ i }}</label>
+            {% endfor %}
+          </div>
+          
+          <!-- Rating Guide -->
+          <div class="mt-4 pt-4 border-t border-gray-200">
+            <div class="grid grid-cols-5 gap-2 text-xs text-gray-600">
+              <div class="text-center">
+                <span class="block font-semibold text-red-600">1</span>
+                <span class="block text-gray-500">Poor</span>
+              </div>
+              <div class="text-center">
+                <span class="block font-semibold text-orange-600">2</span>
+                <span class="block text-gray-500">Fair</span>
+              </div>
+              <div class="text-center">
+                <span class="block font-semibold text-yellow-600">3</span>
+                <span class="block text-gray-500">Good</span>
+              </div>
+              <div class="text-center">
+                <span class="block font-semibold text-blue-600">4</span>
+                <span class="block text-gray-500">Very Good</span>
+              </div>
+              <div class="text-center">
+                <span class="block font-semibold text-green-600">5</span>
+                <span class="block text-gray-500">Excellent</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+
+      <!-- Navigation Buttons -->
+      <div class="flex gap-4 pt-6 border-t border-gray-200">
+        {% if step > 1 %}
+          <a href="{% url 'gtm:assessment_step' session.uuid step|add:-1 %}" 
+             class="px-6 py-3 border-2 border-gray-300 rounded-xl font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition flex items-center gap-2">
+            <i class="fas fa-arrow-left"></i>
+            Back
+          </a>
+        {% endif %}
+        <button type="submit" 
+                class="flex-1 px-8 py-4 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-500 text-white font-bold text-lg hover:shadow-xl transition transform hover:scale-105 flex items-center justify-center gap-3">
+          {% if step == total_steps %}
+            <i class="fas fa-check-circle"></i>
+            Finish Assessment
+          {% else %}
+            Continue
+            <i class="fas fa-arrow-right"></i>
+          {% endif %}
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Help Card -->
+  <div class="mt-6 bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl p-6 border border-indigo-200">
+    <div class="flex items-start gap-4">
+      <div class="h-12 w-12 bg-indigo-600 rounded-lg flex items-center justify-center shrink-0">
+        <i class="fas fa-lightbulb text-white text-xl"></i>
+      </div>
+      <div>
+        <h3 class="font-bold text-gray-900 mb-1">Need Help?</h3>
+        <p class="text-sm text-gray-700">Be honest in your ratings. Lower scores help us identify improvement opportunities and create a more personalized playbook for your GTM strategy.</p>
+      </div>
+    </div>
+  </div>
 </div>
 
 {% endblock %}

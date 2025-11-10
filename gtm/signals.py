@@ -7,13 +7,24 @@ from .utils_email import send_snapshot_report_email
 @receiver(post_save, sender=ResultSnapshot)
 def send_report_when_snapshot_saved(sender, instance: ResultSnapshot, created, **kwargs):
     """
-    Send exactly once per snapshot unless you reset the flag.
-    Guard with session.is_completed if you only want final results.
+    Send email when:
+    1. Assessment is completed (session.is_completed = True)
+    2. Email hasn't been sent yet (report_sent = False)
+    
+    This handles both:
+    - Snapshot created after assessment completion
+    - Snapshot updated when assessment is marked complete
     """
-    # Only send on create or when not previously sent
-    if created or not getattr(instance, "report_sent", False):
-        # Optional: only send when the assessment is completed
-        if hasattr(instance.session, "is_completed") and not instance.session.is_completed:
-            return
-        send_snapshot_report_email(instance)
-        type(instance).objects.filter(pk=instance.pk).update(report_sent=True)
+    # Check if session is completed and email not yet sent
+    if instance.session.is_completed and not instance.report_sent:
+        try:
+            send_snapshot_report_email(instance)
+            # Use direct SQL update to avoid triggering this signal again
+            type(instance).objects.filter(pk=instance.pk).update(report_sent=True)
+        except Exception as e:
+            # Log error but don't crash the assessment flow
+            from .utils_logging import log_error
+            log_error("Email Report Send Failed", e, {
+                "session_id": str(instance.session.uuid),
+                "snapshot_id": instance.pk
+            })

@@ -1,0 +1,180 @@
+{% extends "gtm/base.html" %}
+{% block content %}
+
+<div class="max-w-4xl mx-auto">
+  <!-- Page Header -->
+  <div class="mb-8">
+    <h1 class="text-4xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">My Profile</h1>
+    <p class="text-gray-600">Manage your account settings and view your assessment activity</p>
+  </div>
+
+  <!-- Profile Card -->
+  <div class="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden mb-6">
+    <div class="bg-gradient-to-r from-indigo-600 to-blue-500 h-24"></div>
+    <div class="px-8 pb-8">
+      <!-- Avatar & Name -->
+      <div class="flex items-start gap-6 -mt-12 mb-6">
+        <div class="h-24 w-24 bg-gradient-to-br from-indigo-600 to-blue-500 rounded-2xl flex items-center justify-center shadow-lg ring-4 ring-white">
+          <span class="text-white text-4xl font-bold">{{ user.username|slice:":1"|upper }}</span>
+        </div>
+        <div class="mt-14">
+          <h2 class="text-2xl font-bold text-gray-900">{{ user.username }}</h2>
+          <p class="text-gray-600">{{ user.email }}</p>
+        </div>
+      </div>
+
+      <!-- Account Details -->
+      <div class="grid md:grid-cols-2 gap-6">
+        <div class="space-y-4">
+          <h3 class="text-lg font-semibold text-gray-900 mb-3">Account Information</h3>
+          
+          <div class="flex items-start gap-3">
+            <div class="h-10 w-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <i class="fas fa-user text-indigo-600"></i>
+            </div>
+            <div>
+              <p class="text-sm text-gray-500">Username</p>
+              <p class="font-medium text-gray-900">{{ user.username }}</p>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3">
+            <div class="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <i class="fas fa-envelope text-blue-600"></i>
+            </div>
+            <div>
+              <p class="text-sm text-gray-500">Email Address</p>
+              <p class="font-medium text-gray-900">{{ user.email|default:"Not provided" }}</p>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3">
+            <div class="h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <i class="fas fa-calendar text-green-600"></i>
+            </div>
+            <div>
+              <p class="text-sm text-gray-500">Member Since</p>
+              <p class="font-medium text-gray-900">{{ user.date_joined|date:"F d, Y" }}</p>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-3">
+            <div class="h-10 w-10 bg-orange-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <i class="fas fa-clock text-orange-600"></i>
+            </div>
+            <div>
+              <p class="text-sm text-gray-500">Last Login</p>
+              <p class="font-medium text-gray-900">{{ user.last_login|date:"F d, Y g:i A"|default:"Never" }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Activity Stats -->
+        <div class="space-y-4">
+          <h3 class="text-lg font-semibold text-gray-900 mb-3">Activity Summary</h3>
+          
+          <div class="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl p-4 border border-indigo-200">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm text-gray-600">Total Assessments</span>
+              <i class="fas fa-chart-line text-indigo-600"></i>
+            </div>
+            <p class="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">{{ total_assessments }}</p>
+          </div>
+
+          <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm text-gray-600">Completed</span>
+              <i class="fas fa-check-circle text-green-600"></i>
+            </div>
+            <p class="text-3xl font-bold text-green-600">{{ completed_assessments }}</p>
+          </div>
+
+          <div class="bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-4 border border-orange-200">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm text-gray-600">In Progress</span>
+              <i class="fas fa-hourglass-half text-orange-600"></i>
+            </div>
+            <p class="text-3xl font-bold text-orange-600">{{ in_progress_assessments }}</p>
+          </div>
+
+          {% if avg_score %}
+          <div class="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-4 border border-blue-200">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-sm text-gray-600">Average Score</span>
+              <i class="fas fa-star text-blue-600"></i>
+            </div>
+            <p class="text-3xl font-bold text-blue-600">{{ avg_score|floatformat:1 }}/100</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="grid md:grid-cols-3 gap-4 mb-6">
+    <a href="{% url 'gtm:start' %}" class="group bg-white rounded-xl shadow border border-gray-200 p-6 hover:shadow-lg hover:border-indigo-500 transition">
+      <div class="h-12 w-12 bg-gradient-to-br from-indigo-600 to-blue-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition">
+        <i class="fas fa-plus text-white text-xl"></i>
+      </div>
+      <h3 class="font-semibold text-gray-900 mb-1">New Assessment</h3>
+      <p class="text-sm text-gray-600">Start a new GTM evaluation</p>
+    </a>
+
+    <a href="{% url 'gtm:history' %}" class="group bg-white rounded-xl shadow border border-gray-200 p-6 hover:shadow-lg hover:border-blue-500 transition">
+      <div class="h-12 w-12 bg-gradient-to-br from-blue-600 to-cyan-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition">
+        <i class="fas fa-history text-white text-xl"></i>
+      </div>
+      <h3 class="font-semibold text-gray-900 mb-1">View History</h3>
+      <p class="text-sm text-gray-600">See all your assessments</p>
+    </a>
+
+    <a href="{% url 'gtm:logout' %}" class="group bg-white rounded-xl shadow border border-gray-200 p-6 hover:shadow-lg hover:border-red-500 transition">
+      <div class="h-12 w-12 bg-gradient-to-br from-red-600 to-red-500 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition">
+        <i class="fas fa-sign-out-alt text-white text-xl"></i>
+      </div>
+      <h3 class="font-semibold text-gray-900 mb-1">Logout</h3>
+      <p class="text-sm text-gray-600">End your session securely</p>
+    </a>
+  </div>
+
+  <!-- Recent Assessments -->
+  {% if recent_assessments %}
+  <div class="bg-white rounded-2xl shadow-lg border border-gray-200 p-8">
+    <h3 class="text-xl font-bold text-gray-900 mb-6">Recent Assessments</h3>
+    <div class="space-y-4">
+      {% for assessment in recent_assessments %}
+      <div class="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition">
+        <div class="flex items-center gap-4">
+          <div class="h-12 w-12 bg-gradient-to-br from-indigo-600 to-blue-500 rounded-xl flex items-center justify-center">
+            <i class="fas fa-chart-line text-white"></i>
+          </div>
+          <div>
+            <p class="font-semibold text-gray-900">{{ assessment.company_name|default:"Assessment" }}</p>
+            <p class="text-sm text-gray-500">{{ assessment.created_at|date:"F d, Y" }}</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-4">
+          {% if assessment.is_completed %}
+            <span class="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">Completed</span>
+            {% if assessment.snapshot %}
+            <span class="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">{{ assessment.snapshot.overall|floatformat:1 }}</span>
+            {% endif %}
+            <a href="{% url 'gtm:results' assessment.uuid %}" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium">
+              View Results
+            </a>
+          {% else %}
+            <span class="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-medium">In Progress</span>
+            <a href="{% url 'gtm:resume' assessment.uuid %}" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium">
+              Continue
+            </a>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

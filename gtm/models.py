@@ -158,3 +158,30 @@ class ResultSnapshot(models.Model):
 
     def __str__(self):
         return f"Snapshot for {self.session.uuid} – {self.overall}/100"
+
+
+class ChatMessage(models.Model):
+    """Store chat conversation history for AI assistant"""
+    session = models.ForeignKey(
+        AssessmentSession,
+        on_delete=models.CASCADE,
+        related_name="chat_messages"
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+    
+    message = models.TextField()  # User's message
+    response = models.TextField()  # AI's response
+    intent = models.CharField(max_length=50, blank=True)  # Detected intent
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['created_at']
+    
+    def __str__(self):
+        return f"Chat {self.session.uuid} at {self.created_at}"

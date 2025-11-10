@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django.contrib import messages
 from .utils_email import send_snapshot_report_email
-from .models import AssessmentSession, ResultSnapshot, RecommendationBand, Category, Question, Response, ActionItem, ToolRecommendation
+from .models import AssessmentSession, ResultSnapshot, RecommendationBand, Category, Question, Response, ActionItem, ToolRecommendation, ChatMessage
 
 @admin.action(description="Resend report email")
 def resend_report(modeladmin, request, queryset):
@@ -163,10 +163,22 @@ class AssessmentSessionAdmin(admin.ModelAdmin):
         return format_html('<a href="{}">Open snapshot</a>', url)
     snapshot_link.short_description = "Snapshot"
 
-# (Optional) register the rest so they’re easy to inspect
+# (Optional) register the rest so they're easy to inspect
 admin.site.register(RecommendationBand)
 admin.site.register(Category)
 admin.site.register(Question)
 admin.site.register(Response)
 admin.site.register(ActionItem)
 admin.site.register(ToolRecommendation)
+
+@admin.register(ChatMessage)
+class ChatMessageAdmin(admin.ModelAdmin):
+    list_display = ("session", "message_preview", "intent", "created_at")
+    list_filter = ("intent", "created_at")
+    search_fields = ("message", "response", "session__company_name")
+    readonly_fields = ("created_at",)
+    ordering = ("-created_at",)
+    
+    def message_preview(self, obj):
+        return obj.message[:60] + "..." if len(obj.message) > 60 else obj.message
+    message_preview.short_description = "Message"

@@ -182,62 +182,127 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
     styles.add(ParagraphStyle(
         name="H1",
         fontName="Helvetica-Bold",
-        fontSize=18,
-        leading=22,
-        spaceAfter=10,
-        textColor=colors.HexColor("#1E3A8A"),
+        fontSize=20,
+        leading=26,
+        spaceAfter=14,
+        spaceBefore=8,
+        textColor=colors.HexColor("#1E40AF"),
     ))
     styles.add(ParagraphStyle(
         name="H2",
         fontName="Helvetica-Bold",
-        fontSize=13,
-        leading=18,
-        spaceAfter=6,
-        textColor=colors.HexColor("#334155"),
+        fontSize=14,
+        leading=20,
+        spaceAfter=8,
+        spaceBefore=6,
+        textColor=colors.HexColor("#1E3A8A"),
     ))
     styles.add(ParagraphStyle(
         name="Body",
         fontName="Helvetica",
         fontSize=11,
-        leading=16,
-        spaceAfter=6,
-        textColor=colors.HexColor("#334155"),
+        leading=17,
+        spaceAfter=8,
+        textColor=colors.HexColor("#1F2937"),
     ))
     styles.add(ParagraphStyle(
         name="Quote",
         fontName="Helvetica-Oblique",
         fontSize=10,
-        leading=14,
-        leftIndent=18,
-        textColor=colors.HexColor("#475569"),
+        leading=15,
+        leftIndent=20,
+        rightIndent=20,
+        spaceBefore=8,
+        spaceAfter=8,
+        textColor=colors.HexColor("#6B7280"),
+        backColor=colors.HexColor("#F9FAFB"),
     ))
     
     styles.add(ParagraphStyle(
         name="List",
         parent=styles["Body"],
-        leading=15,        # a bit more line height
-        spaceBefore=0,
-        spaceAfter=4,      # vertical gap BETWEEN list items
+        leading=16,
+        spaceBefore=2,
+        spaceAfter=6,
+    ))
+    
+    styles.add(ParagraphStyle(
+        name="Highlight",
+        fontName="Helvetica-Bold",
+        fontSize=12,
+        leading=18,
+        spaceAfter=6,
+        textColor=colors.HexColor("#DC2626"),
     ))
 
     content = []
 
-    # ── Cover / Summary
-    content.append(Paragraph("Funti3r GTM Validator – Health Report", styles["H1"]))
-    content.append(Paragraph(f"<b>Company:</b> {session.company_name or '-'}", styles["Body"]))
-    content.append(Paragraph(f"<b>Industry:</b> {session.industry or '-'}", styles["Body"]))
-    content.append(Paragraph(f"<b>Date:</b> {session.created_at.strftime('%Y-%m-%d %H:%M')}", styles["Body"]))
-    content.append(Spacer(1, 0.3 * cm))
-    content.append(Paragraph(f"<b>Overall Score:</b> {round(overall, 1)} / 100", styles["H2"]))
-    if band:
-        content.append(Paragraph(f"<b>Stage:</b> {band.stage}", styles["Body"]))
-        content.append(Paragraph(f"<b>Summary:</b> {band.headline}", styles["Body"]))
-
-    # Category breakdown
+    # ── Cover / Summary with improved layout
     content.append(Spacer(1, 0.5 * cm))
-    content.append(Paragraph("Category Averages (1–5):", styles["H2"]))
+    content.append(Paragraph("Funti3r GTM Validator", styles["H1"]))
+    content.append(Paragraph("Assessment Report", styles["H2"]))
+    content.append(Spacer(1, 0.8 * cm))
+    
+    # Company info box
+    company_data = [
+        [Paragraph("<b>Company</b>", styles["Body"]), Paragraph(session.company_name or '-', styles["Body"])],
+        [Paragraph("<b>Industry</b>", styles["Body"]), Paragraph(session.industry or '-', styles["Body"])],
+        [Paragraph("<b>Assessment Date</b>", styles["Body"]), Paragraph(session.created_at.strftime('%B %d, %Y at %H:%M'), styles["Body"])],
+    ]
+    company_table = Table(company_data, colWidths=[4*cm, 12*cm])
+    company_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#F1F5F9")),
+        ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#1F2937")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+    ]))
+    content.append(company_table)
+    content.append(Spacer(1, 0.8 * cm))
+    
+    # Score highlight box
+    score_color = colors.HexColor("#10B981") if overall >= 70 else (colors.HexColor("#F59E0B") if overall >= 50 else colors.HexColor("#EF4444"))
+    content.append(Paragraph(f'<font size="16" color="{score_color.hexval()}"><b>Overall Score: {round(overall, 1)} / 100</b></font>', styles["Body"]))
+    
+    if band:
+        content.append(Spacer(1, 0.3 * cm))
+        content.append(Paragraph(f"<b>GTM Maturity Stage:</b> {band.stage}", styles["Body"]))
+        content.append(Paragraph(f"{band.headline}", styles["Body"]))
+
+    # Category breakdown with better formatting
+    content.append(Spacer(1, 0.8 * cm))
+    content.append(Paragraph("Category Performance Breakdown", styles["H2"]))
+    content.append(Spacer(1, 0.2 * cm))
+    
+    cat_data = [[Paragraph("<b>Category</b>", styles["Body"]), Paragraph("<b>Score (1-5)</b>", styles["Body"]), Paragraph("<b>Performance</b>", styles["Body"])]]
     for row in cat_scores:
-        content.append(Paragraph(f"• {row['category'].name}: {round(row['avg'], 2)}", styles["Body"]))
+        score_val = round(row['avg'], 2)
+        performance = "Excellent" if score_val >= 4 else ("Good" if score_val >= 3 else ("Needs Improvement" if score_val >= 2 else "Critical"))
+        perf_color = "#10B981" if score_val >= 4 else ("#3B82F6" if score_val >= 3 else ("#F59E0B" if score_val >= 2 else "#EF4444"))
+        cat_data.append([
+            Paragraph(row['category'].name, styles["Body"]),
+            Paragraph(f"<b>{score_val}</b>", styles["Body"]),
+            Paragraph(f'<font color="{perf_color}"><b>{performance}</b></font>', styles["Body"])
+        ])
+    
+    cat_table = Table(cat_data, colWidths=[10*cm, 3*cm, 4*cm])
+    cat_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E3A8A")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (1, 1), (1, -1), "CENTER"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.white]),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+    ]))
+    content.append(cat_table)
 
     # --- Recommended Next Moves (band.actions_markdown) as formatted bullets/sections
     content.append(Spacer(1, 0.6 * cm))
@@ -247,10 +312,11 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
     else:
         content.append(Paragraph("No recommendations available for this score range.", styles["Body"]))
 
-    # --- New page: AI-Generated Playbook (the SAME markdown as the Playbook page)
+    # --- New page: AI-Generated GTM Playbook
     content.append(PageBreak())
-    content.append(Paragraph("AI-Generated GTM Playbook", styles["H1"]))
-
+    content.append(Paragraph("AI-Generated GTM Playbook & 30-Day Action Plan", styles["H1"]))
+    content.append(Spacer(1, 0.2 * cm))
+    
     ai_md = ""
     snap = getattr(session, "snapshot", None)
     if snap and getattr(snap, "ai_playbook", ""):
@@ -259,60 +325,60 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
         # Fallback to band actions if AI text not present
         ai_md = band.actions_markdown
 
-    if ai_md.strip():
-        content.extend(_md_to_flowables(ai_md, styles, doc.width))
-    else:
-        content.append(Paragraph("No AI playbook was generated for this session.", styles["Body"]))
-
-    # --- New page: 30-Day GTM Improvement Playbook (crisp, proportional columns)
-    content.append(PageBreak())
-    content.append(Paragraph("30-Day GTM Improvement Playbook", styles["H1"]))
-    
-    ai_md = ""
-    snap = getattr(session, "snapshot", None)
-    if snap and getattr(snap, "ai_playbook", ""):
-        ai_md = snap.ai_playbook
-    elif band and band.actions_markdown:
-        ai_md = band.actions_markdown
-
     # ✅ Normalize BEFORE converting to flowables
     if ai_md.strip():
         ai_md = _normalize_ai_markdown(ai_md)
+        content.append(Paragraph(
+            "This customized playbook provides week-by-week guidance to improve your GTM execution:",
+            styles["Body"]
+        ))
+        content.append(Spacer(1, 0.3 * cm))
         content.extend(_md_to_flowables(ai_md, styles, doc.width))
+        content.append(Spacer(1, 0.5 * cm))
     else:
-        content.append(Paragraph("No AI playbook was generated for this session.", styles["Body"]))
-    
-    
+        content.append(Paragraph(
+            "No AI playbook was generated for this session. Complete the assessment to generate personalized recommendations.",
+            styles["Body"]
+        ))
+        content.append(Spacer(1, 0.5 * cm))
+
+    # --- 30-Day Implementation Framework
+    content.append(Paragraph("30-Day Implementation Framework", styles["H2"]))
     content.append(Paragraph(
-        "Use this 4-week roadmap to focus your team, measure progress, and build momentum.",
+        "Use this structured roadmap to implement improvements systematically and track your progress:",
         styles["Body"]
     ))
     content.append(Spacer(1, 0.3 * cm))
 
     def P(txt): return Paragraph(strip_tags(txt), styles["Body"])
+    def PBold(txt): return Paragraph(f"<b>{strip_tags(txt)}</b>", styles["Body"])
 
     table_data = [
         [Paragraph("<b>Week</b>", styles["Body"]),
          Paragraph("<b>Focus Area</b>", styles["Body"]),
-         Paragraph("<b>Objectives</b>", styles["Body"]),
-         Paragraph("<b>Metrics to Track</b>", styles["Body"])],
-        [P("Week 1"), P("Audit & Alignment"),
-         P("Define your ideal customer type, refine your main message, review your lead sources."),
-         P("Clear target profile & updated message")],
-        [P("Week 2"), P("Process Optimization"),
-         P("Set reply-time goals, standardize lead fit checks, and improve follow-ups."),
-         P("Faster replies, higher qualification rate")],
-        [P("Week 3"), P("Demand Generation"),
-         P("Launch one consistent campaign (content, outreach, or ads) that runs every week."),
-         P("Traffic & leads increasing")],
-        [P("Week 4"), P("Measure & Refine"),
-         P("Review results, fix weak spots, and plan the next cycle."),
-         P("Improved conversion & retention")],
+         Paragraph("<b>Key Objectives</b>", styles["Body"]),
+         Paragraph("<b>Success Metrics</b>", styles["Body"])],
+        [PBold("Week 1"), 
+         Paragraph('<font color="#1E40AF"><b>Audit & Alignment</b></font>', styles["Body"]),
+         P("• Define ideal customer profile (ICP)<br/>• Refine value proposition & messaging<br/>• Review and document current lead sources"),
+         P("✓ Documented ICP<br/>✓ Updated messaging<br/>✓ Lead source audit complete")],
+        [PBold("Week 2"), 
+         Paragraph('<font color="#7C3AED"><b>Process Optimization</b></font>', styles["Body"]),
+         P("• Set response time targets (< 5 min ideal)<br/>• Standardize lead qualification criteria<br/>• Implement systematic follow-up sequences"),
+         P("✓ Response time < 1 hour<br/>✓ 80%+ leads qualified<br/>✓ Follow-up rate > 90%")],
+        [PBold("Week 3"), 
+         Paragraph('<font color="#059669"><b>Demand Generation</b></font>', styles["Body"]),
+         P("• Launch one consistent content/outreach campaign<br/>• Activate multiple lead channels<br/>• Test and iterate messaging across channels"),
+         P("✓ 20%+ increase in traffic<br/>✓ 15%+ more qualified leads<br/>✓ Campaign running weekly")],
+        [PBold("Week 4"), 
+         Paragraph('<font color="#DC2626"><b>Measure & Refine</b></font>', styles["Body"]),
+         P("• Review all metrics and conversion rates<br/>• Identify and fix bottlenecks<br/>• Plan next 30-day improvement cycle"),
+         P("✓ Full metrics dashboard<br/>✓ Conversion improved 10%+<br/>✓ Next cycle planned")],
     ]
 
     # Proportional widths based on available frame width
     avail = doc.width
-    col_widths = [0.13 * avail, 0.22 * avail, 0.43 * avail, 0.22 * avail]
+    col_widths = [0.12 * avail, 0.24 * avail, 0.42 * avail, 0.22 * avail]
 
     table = Table(
         table_data,
@@ -322,38 +388,51 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
         hAlign="LEFT",
     )
     table.setStyle(TableStyle([
-        # header
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E3A8A")),
+        # header with gradient-like effect
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E40AF")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-        ("FONTSIZE", (0, 0), (-1, 0), 10),
-        ("BOTTOMPADDING", (0, 0), (-1, 0), 9),
-        ("TOPPADDING", (0, 0), (-1, 0), 8),
+        ("FONTSIZE", (0, 0), (-1, 0), 11),
+        ("BOTTOMPADDING", (0, 0), (-1, 0), 10),
+        ("TOPPADDING", (0, 0), (-1, 0), 10),
 
-        # body
+        # body styling
         ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
         ("FONTSIZE", (0, 1), (-1, -1), 10),
-        ("TEXTCOLOR", (0, 1), (-1, -1), colors.HexColor("#334155")),
-        ("VALIGN", (0, 1), (-1, -1), "TOP"),
-        ("ALIGN", (0, 1), (0, -1), "CENTER"),   # Center the 'Week' column
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.whitesmoke, colors.white]),
+        ("TEXTCOLOR", (0, 1), (-1, -1), colors.HexColor("#1F2937")),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ALIGN", (0, 1), (0, -1), "CENTER"),
 
-        # padding & grid
-        ("LEFTPADDING", (0, 0), (-1, -1), 8),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 8),
-        ("TOPPADDING", (0, 1), (-1, -1), 6),
-        ("BOTTOMPADDING", (0, 1), (-1, -1), 8),
-        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+        # alternating row colors for better readability
+        ("BACKGROUND", (0, 1), (-1, 1), colors.HexColor("#EFF6FF")),
+        ("BACKGROUND", (0, 2), (-1, 2), colors.white),
+        ("BACKGROUND", (0, 3), (-1, 3), colors.HexColor("#F5F3FF")),
+        ("BACKGROUND", (0, 4), (-1, 4), colors.white),
 
-        # subtle box + thicker header bottom line
-        ("LINEBEFORE", (0, 0), (0, -1), 0.5, colors.HexColor("#CBD5E1")),
-        ("LINEAFTER", (-1, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
-        ("LINEBELOW", (0, 0), (-1, 0), 1.0, colors.HexColor("#0F172A")),
+        # padding for breathing room
+        ("LEFTPADDING", (0, 0), (-1, -1), 10),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+        ("TOPPADDING", (0, 1), (-1, -1), 10),
+        ("BOTTOMPADDING", (0, 1), (-1, -1), 12),
+        
+        # grid and borders
+        ("GRID", (0, 0), (-1, -1), 0.75, colors.HexColor("#CBD5E1")),
+        ("LINEBELOW", (0, 0), (-1, 0), 1.5, colors.HexColor("#1E3A8A")),
+        ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#94A3B8")),
     ]))
     content.append(table)
+    content.append(Spacer(1, 0.6 * cm))
+    
+    # Enhanced tip with icon-like styling
+    content.append(Paragraph(
+        "💡 <b>Implementation Tip:</b> Focus on completing one week fully before moving to the next. "
+        "Small, consistent improvements compound into significant growth over time.",
+        styles["Quote"]
+    ))
     content.append(Spacer(1, 0.4 * cm))
     content.append(Paragraph(
-        "Tip: Keep it simple — small weekly improvements compound into real growth.",
+        "📊 <b>Tracking Advice:</b> Review progress weekly and adjust tactics based on what's working. "
+        "Document wins and lessons learned to build institutional knowledge.",
         styles["Quote"]
     ))
 

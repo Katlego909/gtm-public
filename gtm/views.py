@@ -24,6 +24,8 @@ from django.shortcuts import redirect
 from django.utils.safestring import mark_safe
 from django.db import transaction
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth import logout
+from django.db.models import Avg
 
 from django.shortcuts import get_object_or_404
 from .utils_pdf import render_gtm_report_pdf_response
@@ -40,7 +42,8 @@ LEGEND = {
 
 # ---------- helpers ----------
 
-def _steps():
+def _paginated_questions():
+    """Return a list of steps, each = list[Question]. One category per step."""
     return [list(cat.questions.all().order_by("id"))
             for cat in Category.objects.all().order_by("id")]
     
@@ -49,7 +52,7 @@ def _category_step_map():
     return {cat.id: idx + 1 for idx, cat in enumerate(Category.objects.all().order_by("id"))}    
 
 def _first_incomplete_step(session):
-    steps = _steps()
+    steps = _paginated_questions()
     for idx, qs in enumerate(steps, start=1):
         answered = Response.objects.filter(session=session, question__in=qs).count()
         if answered < len(qs):
@@ -109,11 +112,6 @@ def _remember_session(request, sess_uuid):
         request.session["gtm_sessions"].append(str(sess_uuid))
         request.session.modified = True       
 
-def _paginated_questions():
-    # keep your original ordering by category
-    return [list(cat.questions.all().order_by("id"))
-            for cat in Category.objects.all().order_by("id")]
-
 def _is_session_complete(session: AssessmentSession) -> bool:
     total_q = Question.objects.count()
     if total_q == 0:
@@ -122,16 +120,6 @@ def _is_session_complete(session: AssessmentSession) -> bool:
                   .filter(session=session)
                   .values("question_id").distinct().count())
     return answered_q == total_q
-
-def _first_incomplete_step(session: AssessmentSession) -> int:
-    steps = _paginated_questions()
-    for idx, qs in enumerate(steps, start=1):
-        answered = (Response.objects
-                    .filter(session=session, question__in=qs)
-                    .values("question_id").distinct().count())
-        if answered < len(qs):
-            return idx
-    return max(1, len(steps)) 
 
 def _save_snapshot(session, cat_scores, overall, band, labels, values):
     with transaction.atomic():
@@ -188,7 +176,7 @@ def start_assessment(request):
         return redirect("gtm:resume", session_id=existing_incomplete.uuid)
 
     # 1) Daily cap (per browser/client)
-    MAX_ASSESSMENTS_PER_DAY = 1
+    MAX_ASSESSMENTS_PER_DAY = 3
     today = timezone.now().date()
     daily_count = AssessmentSession.objects.filter(
         owner_client_id=cid,
@@ -278,14 +266,6 @@ def resume_latest(request):
         return redirect("gtm:start")
     step = _first_incomplete_step(s)
     return redirect("gtm:assessment_step", session_id=s.uuid, step=step)
-
-
-def _paginated_questions():
-    """Return a list of steps, each = list[Question]. One category per step."""
-    steps = []
-    for cat in Category.objects.all().order_by("id"):
-        steps.append(list(cat.questions.all().order_by("id")))
-    return steps
 
 def assessment_step(request, session_id, step: int):
     session = get_object_or_404(AssessmentSession, pk=session_id)
@@ -384,36 +364,6 @@ def assessment_step(request, session_id, step: int):
         "progress_pct": progress_pct, "legend": mark_safe(legend_html),
         "category": questions[0].category if questions else None
     })
-
-def _compute_scores(session: AssessmentSession):
-    # Per-category weighted average (1..5)
-    cat_scores = []
-    for cat in Category.objects.all():
-        qs = cat.questions.all()
-        if not qs.exists():
-            continue
-        rows = Response.objects.filter(session=session, question__in=qs).values("question__weight", "score")
-        if not rows:
-            avg = 0.0
-        else:
-            num = sum(r["question__weight"] * r["score"] for r in rows)
-            den = sum(r["question__weight"] for r in rows)
-            avg = num / den if den else 0.0
-        cat_scores.append({"category": cat, "avg": avg})
-
-    # Normalize category weights (e.g., 0.4/0.4/0.2)
-    total_w = sum(c.weight for c in Category.objects.all()) or 1.0
-    overall = 0.0
-    for c in cat_scores:
-        contrib = (c["avg"] / 5.0) * (c["category"].weight / total_w) * 100.0
-        overall += contrib
-
-    return cat_scores, overall
-
-def _band_for_score(score: float):
-    return RecommendationBand.objects.filter(min_score__lte=score, max_score__gte=score).first()
-
-
 
 def results(request, session_id):
     session = get_object_or_404(AssessmentSession, pk=session_id)
@@ -732,3 +682,119 @@ def action_delete(request, action_id):
     sess_id = a.session.uuid
     a.delete()
     return redirect("gtm:playbook", session_id=sess_id)
+
+# ================================================================
+# AI CHAT ASSISTANT
+# ================================================================
+from django.http import JsonResponse
+from django.views.decorators.http import require_http_methods
+from .ai_chat import process_chat_message, get_suggested_prompts
+from .models import ChatMessage
+
+def chat_view(request, session_id):
+    """Render the chat interface page"""
+    session = get_object_or_404(AssessmentSession, pk=session_id)
+    
+    # Get chat history
+    chat_history = ChatMessage.objects.filter(session=session).order_by('created_at')[:50]
+    
+    # Get suggested prompts
+    suggested = get_suggested_prompts(session)
+    
+    return render(request, "gtm/chat.html", {
+        "session": session,
+        "chat_history": chat_history,
+        "suggested_prompts": suggested,
+    })
+
+@require_http_methods(["POST"])
+def chat_api(request, session_id):
+    """API endpoint for chat messages"""
+    import json
+    
+    try:
+        session = get_object_or_404(AssessmentSession, pk=session_id)
+        
+        # Parse JSON body
+        data = json.loads(request.body)
+        message = data.get("message", "").strip()
+        
+        if not message:
+            return JsonResponse({
+                "success": False,
+                "error": "Message cannot be empty"
+            }, status=400)
+        
+        # Process the message
+        result = process_chat_message(
+            session_id=str(session_id),
+            message=message,
+            user=request.user if request.user.is_authenticated else None
+        )
+        
+        # Save to database
+        if result.get("success"):
+            ChatMessage.objects.create(
+                session=session,
+                user=request.user if request.user.is_authenticated else None,
+                message=message,
+                response=result.get("response", ""),
+                intent=result.get("intent", "")
+            )
+        
+        return JsonResponse(result)
+        
+    except json.JSONDecodeError:
+        return JsonResponse({
+            "success": False,
+            "error": "Invalid JSON"
+        }, status=400)
+    except Exception as e:
+        log_error("Chat API Error", e, {"session_id": str(session_id)})
+        return JsonResponse({
+            "success": False,
+            "error": "An error occurred processing your message"
+        }, status=500)
+
+# ================================================================
+# USER PROFILE & AUTHENTICATION
+# ================================================================
+
+@login_required
+def profile(request):
+    """Display user profile with stats and recent activity"""
+    user = request.user
+    
+    # Get user's assessments
+    assessments = AssessmentSession.objects.filter(user=user).select_related('snapshot')
+    
+    # Calculate stats
+    total_assessments = assessments.count()
+    completed_assessments = assessments.filter(is_completed=True).count()
+    in_progress_assessments = assessments.filter(is_completed=False).count()
+    
+    # Calculate average score from completed assessments with snapshots
+    completed_with_scores = assessments.filter(
+        is_completed=True,
+        snapshot__isnull=False
+    )
+    avg_score = completed_with_scores.aggregate(
+        avg=Avg('snapshot__overall')
+    )['avg']
+    
+    # Get recent assessments (last 5)
+    recent_assessments = assessments.order_by('-created_at')[:5]
+    
+    return render(request, "gtm/profile.html", {
+        "total_assessments": total_assessments,
+        "completed_assessments": completed_assessments,
+        "in_progress_assessments": in_progress_assessments,
+        "avg_score": avg_score,
+        "recent_assessments": recent_assessments,
+    })
+
+def logout_view(request):
+    """Logout user and redirect to landing page"""
+    logout(request)
+    messages.success(request, "You have been successfully logged out.")
+    return redirect("gtm:landing")

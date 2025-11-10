@@ -7,11 +7,10 @@
   <title>Funti3r GTM Validator</title>
 
   <!-- ✅ Tailwind CDN -->
-  {% comment %} <script src="https://cdn.tailwindcss.com"></script> {% endcomment %}
   <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
 
-  <!-- ✅ Google Fonts: Inter + DM Sans -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <!-- ✅ Google Fonts: Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
@@ -37,12 +36,51 @@
   {% comment %} {% tailwind_css %} {% endcomment %}
 </head>
 <body class="bg-gray-50 text-gray-900">
-  <nav class="bg-white border-b sticky top-0 z-10">
-    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-      <div class="font-semibold text-lg tracking-tight">Funti3r GTM Validator</div>
-      <div class="flex items-center gap-4">
-        <a href="{% url 'gtm:landing' %}" class="text-sm text-gray-600 hover:text-gray-900 transition">Home</a>
-        <a href="{% url 'gtm:history' %}" class="text-sm text-gray-600 hover:text-gray-900 transition">History</a>
+  <!-- Modern Navigation Bar -->
+  <nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-lg border-b border-gray-200 shadow-sm">
+    <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+      <a href="{% url 'gtm:landing' %}" class="flex items-center gap-2 hover:opacity-80 transition">
+        <div class="h-10 w-10 bg-gradient-to-br from-indigo-600 to-blue-500 rounded-xl flex items-center justify-center">
+          <span class="text-white font-bold text-xl">F</span>
+        </div>
+        <span class="text-xl font-bold bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">Funti3r GTM</span>
+      </a>
+      <div class="flex items-center gap-6">
+        <a href="{% url 'gtm:landing' %}" class="text-gray-700 hover:text-indigo-600 transition font-medium">Home</a>
+        <a href="{% url 'gtm:history' %}" class="text-gray-700 hover:text-indigo-600 transition font-medium">My Assessments</a>
+        
+        {% if user.is_authenticated %}
+          <!-- Authenticated User Menu -->
+          <div class="relative group">
+            <button class="flex items-center gap-2 text-gray-700 hover:text-indigo-600 transition font-medium">
+              <div class="h-8 w-8 bg-gradient-to-br from-indigo-600 to-blue-500 rounded-full flex items-center justify-center">
+                <span class="text-white text-sm font-semibold">{{ user.username|slice:":1"|upper }}</span>
+              </div>
+              <span>{{ user.username }}</span>
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+              </svg>
+            </button>
+            <!-- Dropdown Menu -->
+            <div class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+              <a href="{% url 'gtm:profile' %}" class="block px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition rounded-t-xl">
+                <i class="fas fa-user mr-2"></i>Profile
+              </a>
+              <a href="{% url 'gtm:start' %}" class="block px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition">
+                <i class="fas fa-plus-circle mr-2"></i>New Assessment
+              </a>
+              <hr class="border-gray-200">
+              <a href="{% url 'gtm:logout' %}" class="block px-4 py-3 text-red-600 hover:bg-red-50 transition rounded-b-xl">
+                <i class="fas fa-sign-out-alt mr-2"></i>Logout
+              </a>
+            </div>
+          </div>
+        {% else %}
+          <!-- Guest User CTA -->
+          <a href="{% url 'gtm:start' %}" class="bg-gradient-to-r from-indigo-600 to-blue-500 text-white px-6 py-2.5 rounded-xl font-semibold hover:shadow-lg transition transform hover:scale-105">
+            Start Free →
+          </a>
+        {% endif %}
       </div>
     </div>
   </nav>

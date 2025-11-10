@@ -18,5 +18,13 @@ urlpatterns = [
     path("actions/toggle/<int:action_id>/", views.action_toggle, name="action_toggle"),
     path("actions/update/<int:action_id>/", views.action_update, name="action_update"),
     path("actions/delete/<int:action_id>/", views.action_delete, name="action_delete"),
+    
+    # AI Chat Assistant
+    path("chat/<uuid:session_id>/", views.chat_view, name="chat"),
+    path("api/chat/<uuid:session_id>/", views.chat_api, name="chat_api"),
+    
+    # User Profile & Auth
+    path("profile/", views.profile, name="profile"),
+    path("logout/", views.logout_view, name="logout"),
 
 ]

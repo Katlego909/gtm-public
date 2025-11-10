@@ -8,9 +8,14 @@ def send_snapshot_report_email(snapshot):
     """
     Renders and sends a premium HTML + plaintext email for a completed assessment.
     Uses Gmail SMTP via settings.py. Supports staging redirection.
+    Includes comprehensive assessment data, action items, and downloadable resources.
     """
+    from django.urls import reverse
+    from .models import ActionItem
+    import markdown
+    
     session = snapshot.session
-    subject = f"GTM Assessment Report — {snapshot.company_name or 'Untitled'} ({int(round(snapshot.overall))}/100)"
+    subject = f"🎯 Your GTM Assessment Results — {snapshot.company_name or 'Untitled'} ({int(round(snapshot.overall))}/100)"
 
     # Recipients
     to_recipients = []
@@ -25,22 +30,47 @@ def send_snapshot_report_email(snapshot):
     else:
         bcc_recipients = list(getattr(settings, "GTM_REPORT_INTERNAL_TO", []))
 
+    # Sort categories to identify strengths and weaknesses
+    categories_sorted = sorted(snapshot.category_breakdown, key=lambda x: x.get('avg', 0))
+    weakest_areas = categories_sorted[:2]  # Bottom 2
+    strongest_areas = categories_sorted[-2:]  # Top 2
+    
+    # Get action items count
+    action_items_count = ActionItem.objects.filter(session=session).count()
+    
+    # Convert band actions markdown to HTML
+    band_actions_html = ""
+    if snapshot.band and snapshot.band.actions_markdown:
+        band_actions_html = markdown.markdown(snapshot.band.actions_markdown)
+
+    # Build absolute URLs
+    base_url = getattr(settings, "SITE_BASE_URL", "http://127.0.0.1:8000")
+    
     context = {
         "snap": snapshot,
         "session": session,
         "overall": snapshot.overall,
         "band": snapshot.band,
         "categories": snapshot.category_breakdown,
+        "weakest_areas": weakest_areas,
+        "strongest_areas": strongest_areas,
+        "action_items_count": action_items_count,
+        "band_actions_html": band_actions_html,
         "radar_labels": snapshot.radar_labels,
         "radar_values": snapshot.radar_values,
-        # handy links (adjust to your domains / admin URL)
-        "admin_session_url": f"/admin/{session._meta.app_label}/{session._meta.model_name}/{session.pk}/change/",
-        "admin_snapshot_url": f"/admin/{snapshot._meta.app_label}/{snapshot._meta.model_name}/{snapshot.pk}/change/",
-        "public_report_url": f"/results/{session.uuid}/",  # if you expose a public results page
-        "brand_name": "Funti3r GTM",
+        
+        # Absolute URLs for email links
+        "admin_session_url": base_url + f"/admin/{session._meta.app_label}/{session._meta.model_name}/{session.pk}/change/",
+        "admin_snapshot_url": base_url + f"/admin/{snapshot._meta.app_label}/{snapshot._meta.model_name}/{snapshot.pk}/change/",
+        "public_report_url": base_url + reverse('gtm:results', args=[session.uuid]),
+        "playbook_url": base_url + reverse('gtm:playbook', args=[session.uuid]),
+        "pdf_download_url": base_url + reverse('gtm:download', args=[session.uuid]),
+        
+        # Branding
+        "brand_name": "Funti3r GTM Validator",
         "brand_url": "https://funti3r.xyz",
-        "logo_url": "https://funti3r.xyz/static/brand/funti3r-logo.png",  # use your hosted HTTPS logo
-        "preheader": f"{(snapshot.company_name or 'Company')} scored {int(round(snapshot.overall))}/100 • {snapshot.band.stage if snapshot.band else ''}",
+        "logo_url": "https://funti3r.xyz/static/brand/funti3r-logo.png",
+        "preheader": f"Your GTM score: {int(round(snapshot.overall))}/100 • {snapshot.band.stage if snapshot.band else 'Assessment Complete'} • Download your playbook now!",
     }
 
     html_body = render_to_string("emails/assessment_report.html", context)

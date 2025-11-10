@@ -1,11 +1,49 @@
 {% extends "gtm/base.html" %}
 {% block content %}
 
-<h1 class="text-3xl font-bold text-gray-800 mb-6">GTM Assessment Report: {{ session.company_name|default:"Untitled" }}</h1>
+<style>
+  /* Enhanced chart animations and interactions */
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .fade-in-up {
+    animation: fadeInUp 0.6s ease-out forwards;
+  }
+  
+  .stagger-1 { animation-delay: 0.1s; opacity: 0; }
+  .stagger-2 { animation-delay: 0.2s; opacity: 0; }
+  .stagger-3 { animation-delay: 0.3s; opacity: 0; }
+  
+  /* Smooth hover effects for interactive elements */
+  .chart-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+  }
+  
+  .chart-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  }
+</style>
+
+<!-- Page Header -->
+<div class="mb-8 text-center fade-in-up">
+  <h1 class="text-4xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">
+    GTM Assessment Report
+  </h1>
+  <p class="text-xl text-gray-600">{{ session.company_name|default:"Your Company" }}</p>
+</div>
 
 <div class="grid lg:grid-cols-3 gap-6 mb-8">
 
-    <div class="lg:col-span-2 bg-white rounded-3xl shadow-xl p-8 border border-gray-100">
+    <div class="lg:col-span-2 bg-white rounded-3xl shadow-xl p-8 border border-gray-100 chart-card fade-in-up stagger-1">
         
         <div class="flex items-center justify-between border-b pb-6 mb-6">
             <div>
@@ -21,7 +59,7 @@
                 <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
                     <path class="text-gray-200" stroke="currentColor" stroke-width="3" fill="none"
                           d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                    <path stroke="#4F46E5" stroke-width="4" stroke-linecap="round" fill="none"
+                    <path id="progressRing" stroke="#4F46E5" stroke-width="4" stroke-linecap="round" fill="none"
                           stroke-dasharray="{{ overall|floatformat:0 }}, 100"
                           d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                 </svg>
@@ -40,21 +78,36 @@
         </div>
     </div>
 
-    <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100">
-        <h2 class="text-xl font-semibold mb-6">Performance Breakdown</h2>
+    <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 chart-card fade-in-up stagger-2">
+        <!-- Header with icon -->
+        <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
+            <div class="flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-500 shadow-lg flex-shrink-0">
+                <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+            </div>
+            <div>
+                <h2 class="text-2xl font-bold text-gray-900 mb-1">Performance Breakdown</h2>
+                <p class="text-sm text-gray-600">Category-level score distribution</p>
+            </div>
+        </div>
         <div class="space-y-6">
             {% for c in cat_scores %}
                 {# Assuming c.is_focus (boolean) is passed from the view logic (e.g., c.avg < 3.0) #}
                 {% with is_focus=c.is_focus %}
                 <div>
-                    <div class="flex justify-between text-base font-medium mb-1">
+                    <div class="flex justify-between text-base font-medium mb-2">
                         <span class="{% if is_focus %}text-red-600{% endif %} break-words">{{ c.category.name }}</span>
-                        <span class="{% if is_focus %}text-red-600{% endif %}">{{ c.avg|floatformat:2 }}/5</span>
+                        <span class="{% if is_focus %}text-red-600 font-bold{% else %}text-indigo-600 font-semibold{% endif %}">{{ c.avg|floatformat:2 }}/5</span>
                     </div>
-                    <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                        <div class="h-3 rounded-full transition-all duration-500 
-                            {% if is_focus %}bg-red-500{% else %}bg-indigo-500{% endif %}" 
+                    <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden shadow-inner">
+                        <div class="h-3 rounded-full transition-all duration-500 relative
+                            {% if c.avg >= 4 %}bg-gradient-to-r from-green-400 to-green-600
+                            {% elif c.avg >= 3 %}bg-gradient-to-r from-indigo-400 to-indigo-600
+                            {% elif c.avg >= 2 %}bg-gradient-to-r from-yellow-400 to-orange-500
+                            {% else %}bg-gradient-to-r from-red-400 to-red-600{% endif %}" 
                             style="width: calc({{ c.avg|floatformat:2 }} / 5 * 100%);">
+                            <div class="absolute inset-0 bg-white opacity-20 animate-pulse"></div>
                         </div>
                     </div>
                 </div>
@@ -66,7 +119,9 @@
 
 
 {% if band %}
-<div class="mt-8 bg-indigo-700 rounded-3xl p-8 shadow-2xl text-white">
+<div class="mt-8 bg-gradient-to-br from-indigo-700 to-indigo-900 rounded-3xl p-8 shadow-2xl text-white fade-in-up stagger-3 relative overflow-hidden">
+    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-10 transform -skew-x-12 animate-pulse"></div>
+    <div class="relative z-10">
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
             <span class="text-sm font-semibold mb-1 block opacity-80">RECOMMENDED NEXT STAGE</span>
@@ -85,13 +140,33 @@
             </a>
         </div>
     </div>
+    </div>
 </div>
 {% endif %}
 
 {% if band %}
-    <div class="bg-white rounded-3xl shadow-xl p-8 mt-6 border border-gray-100">
-        <h3 class="text-lg font-semibold mb-4">Recommended Next Moves (Detailed)</h3>
-        <div class="prose max-w-none prose-ul:my-1 prose-li:my-0 prose-p:my-2">
+    <div class="bg-white rounded-3xl shadow-xl p-8 mt-6 border border-gray-100 fade-in-up">
+        <!-- Header with icon -->
+        <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
+            <div class="flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-500 shadow-lg flex-shrink-0">
+                <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+            </div>
+            <div>
+                <h3 class="text-2xl font-bold text-gray-900 mb-1">Recommended Next Moves</h3>
+                <p class="text-sm text-gray-600">Strategic actions to accelerate your GTM maturity</p>
+            </div>
+        </div>
+        
+        <!-- Content with enhanced styling -->
+        <div class="prose prose-base max-w-none 
+                    prose-headings:text-gray-900 prose-headings:font-bold prose-headings:text-lg prose-headings:mb-3 prose-headings:mt-6 first:prose-headings:mt-0
+                    prose-p:text-gray-700 prose-p:text-base prose-p:leading-relaxed prose-p:my-3
+                    prose-strong:text-indigo-700 prose-strong:font-semibold prose-strong:text-base
+                    prose-ul:my-4 prose-ul:space-y-2.5 prose-ul:ml-6
+                    prose-li:text-gray-700 prose-li:text-base prose-li:leading-relaxed prose-li:pl-2
+                    prose-li:marker:text-indigo-500 prose-li:marker:font-bold">
             {{ band_actions_html|safe }}
         </div>
     </div>
@@ -101,9 +176,19 @@
 <div class="grid lg:grid-cols-2 gap-6 mt-8">
 
   {% if recommendations %}
-    <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100">
-        <h4 class="text-xl font-semibold mb-4">Recommended Tools</h4>
-        <p class="text-gray-600 text-sm mb-4">Tools to address gaps in your weakest GTM areas.</p>
+    <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 chart-card fade-in-up">
+        <!-- Header with icon -->
+        <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
+            <div class="flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-500 shadow-lg flex-shrink-0">
+                <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                </svg>
+            </div>
+            <div>
+                <h4 class="text-2xl font-bold text-gray-900 mb-1">Recommended Tools</h4>
+                <p class="text-sm text-gray-600">Tools to address gaps in your weakest GTM areas</p>
+            </div>
+        </div>
 
         <div class="space-y-4">
             {% for r in recommendations %}
@@ -122,8 +207,19 @@
     </div>
     {% endif %}
 
-    <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100">
-        <h4 class="text-xl font-semibold mb-4">Top Strengths</h4>
+    <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 chart-card fade-in-up">
+        <!-- Header with icon -->
+        <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
+            <div class="flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-500 shadow-lg flex-shrink-0">
+                <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <div>
+                <h4 class="text-2xl font-bold text-gray-900 mb-1">Top Strengths</h4>
+                <p class="text-sm text-gray-600">Your highest-performing categories</p>
+            </div>
+        </div>
         <ul class="space-y-4">
             {% for c in strengths_categories %}
                 <li class="p-3 bg-gray-50 rounded-lg">
@@ -143,9 +239,19 @@
 </div>
 
 
-<div class="bg-white rounded-3xl shadow-xl p-8 mt-6">
-  <h4 class="text-xl font-semibold mb-3">Weakest Questions & Insights</h4>
-  <p class="text-gray-600 mb-4">The areas where you scored lowest, including personalized AI insights for critical gaps.</p>
+<div class="bg-white rounded-3xl shadow-xl p-8 mt-6 chart-card fade-in-up">
+  <!-- Header with icon -->
+  <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
+      <div class="flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-500 shadow-lg flex-shrink-0">
+          <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+      </div>
+      <div>
+          <h4 class="text-2xl font-bold text-gray-900 mb-1">Weakest Questions & Insights</h4>
+          <p class="text-sm text-gray-600">Areas where you scored lowest with personalized AI insights</p>
+      </div>
+  </div>
   
   <ul class="space-y-4">
     {% for q in weakest_questions %}
@@ -182,46 +288,189 @@
   </ul>
 </div>
 
-<div class="mt-6 flex gap-3">
-    <a href="{% url 'gtm:playbook' session.uuid %}" class="px-4 py-2 rounded bg-indigo-700 text-white hover:bg-indigo-800 transition">View Playbook</a>
-    <a href="{% url 'gtm:download' session.uuid %}" class="px-4 py-2 rounded border hover:bg-gray-50 transition">Download Report (PDF)</a>
+<div class="mt-6 flex gap-3 flex-wrap">
+    <a href="{% url 'gtm:chat' session.uuid %}" class="px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-500 text-white font-semibold hover:shadow-xl transition transform hover:scale-105 flex items-center gap-2">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+      </svg>
+      Ask AI Assistant
+    </a>
+    <a href="{% url 'gtm:playbook' session.uuid %}" class="px-6 py-3 rounded-xl bg-gray-900 text-white font-semibold hover:bg-gray-800 transition">View Playbook</a>
+    <a href="{% url 'gtm:download' session.uuid %}" class="px-6 py-3 rounded-xl border-2 border-gray-300 font-semibold hover:bg-gray-50 transition">Download Report (PDF)</a>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
   const labels = {{ labels|safe }};
   const values = {{ values|safe }};
+  
+  // Enhanced Radar Chart with animations and interactions
   new Chart(document.getElementById('radar'), {
     type: 'radar',
     data: {
       labels: labels,
       datasets: [{
-        label: 'Category avg (1–5)',
+        label: 'Your GTM Performance',
         data: values,
         fill: true,
-        backgroundColor: 'rgba(79, 70, 229, 0.15)', // Indigo-600 with opacity
-        borderColor: '#4F46E5', // Indigo-600
+        backgroundColor: 'rgba(79, 70, 229, 0.2)', // Slightly more visible
+        borderColor: '#4F46E5',
+        borderWidth: 3,
         pointBackgroundColor: '#4F46E5',
         pointBorderColor: '#fff',
+        pointBorderWidth: 2,
+        pointRadius: 6,
+        pointHoverRadius: 8,
         pointHoverBackgroundColor: '#fff',
-        pointHoverBorderColor: '#4F46E5'
+        pointHoverBorderColor: '#4F46E5',
+        pointHoverBorderWidth: 3
       }]
     },
     options: { 
       responsive: true, 
       maintainAspectRatio: false,
+      animation: {
+        duration: 1500,
+        easing: 'easeInOutQuart',
+        onComplete: function() {
+          // Add a subtle pulse effect after initial animation
+          this.options.animation.duration = 300;
+        }
+      },
       scales: { 
         r: { 
           min: 0, 
-          max: 5, 
-          ticks: { backdropColor: 'rgba(255, 255, 255, 0.8)' },
-          grid: { color: 'rgba(0, 0, 0, 0.1)' }
+          max: 5,
+          beginAtZero: true,
+          ticks: { 
+            backdropColor: 'rgba(255, 255, 255, 0.9)',
+            backdropPadding: 4,
+            color: '#6B7280',
+            font: {
+              size: 12,
+              weight: '500'
+            },
+            stepSize: 1,
+            callback: function(value) {
+              return value + '/5';
+            }
+          },
+          grid: { 
+            color: 'rgba(0, 0, 0, 0.08)',
+            lineWidth: 1
+          },
+          angleLines: {
+            color: 'rgba(0, 0, 0, 0.1)',
+            lineWidth: 1
+          },
+          pointLabels: {
+            color: '#1F2937',
+            font: {
+              size: 13,
+              weight: '600'
+            },
+            padding: 10,
+            callback: function(label) {
+              // Truncate long labels
+              return label.length > 15 ? label.substring(0, 15) + '...' : label;
+            }
+          }
         } 
       },
       plugins: {
-        legend: { display: false }
+        legend: { 
+          display: false 
+        },
+        tooltip: {
+          enabled: true,
+          backgroundColor: 'rgba(17, 24, 39, 0.95)',
+          titleColor: '#fff',
+          bodyColor: '#E5E7EB',
+          borderColor: '#4F46E5',
+          borderWidth: 1,
+          padding: 12,
+          displayColors: false,
+          titleFont: {
+            size: 14,
+            weight: '600'
+          },
+          bodyFont: {
+            size: 13
+          },
+          callbacks: {
+            title: function(context) {
+              return context[0].label;
+            },
+            label: function(context) {
+              const score = context.parsed.r;
+              const percentage = ((score / 5) * 100).toFixed(0);
+              let rating = '';
+              
+              if (score >= 4.5) rating = '🟢 Excellent';
+              else if (score >= 4.0) rating = '🟢 Strong';
+              else if (score >= 3.5) rating = '🟡 Good';
+              else if (score >= 3.0) rating = '🟡 Average';
+              else if (score >= 2.0) rating = '🟠 Needs Work';
+              else rating = '🔴 Critical';
+              
+              return [
+                `Score: ${score.toFixed(2)}/5.0`,
+                `Performance: ${percentage}%`,
+                `Status: ${rating}`
+              ];
+            }
+          }
+        }
+      },
+      interaction: {
+        mode: 'nearest',
+        intersect: false
       }
     }
+  });
+
+  // Animate circular progress ring on load
+  window.addEventListener('load', function() {
+    const progressRing = document.getElementById('progressRing');
+    if (progressRing) {
+      const finalValue = progressRing.getAttribute('stroke-dasharray').split(',')[0];
+      progressRing.setAttribute('stroke-dasharray', '0, 100');
+      
+      setTimeout(() => {
+        progressRing.style.transition = 'stroke-dasharray 1.5s ease-out';
+        progressRing.setAttribute('stroke-dasharray', `${finalValue}, 100`);
+      }, 300);
+      
+      // Animate the score number
+      const scoreElement = progressRing.parentElement.querySelector('.text-4xl');
+      if (scoreElement) {
+        const targetScore = parseInt(scoreElement.textContent);
+        let currentScore = 0;
+        const duration = 1500;
+        const increment = targetScore / (duration / 16);
+        
+        const counter = setInterval(() => {
+          currentScore += increment;
+          if (currentScore >= targetScore) {
+            currentScore = targetScore;
+            clearInterval(counter);
+          }
+          scoreElement.textContent = Math.floor(currentScore);
+        }, 16);
+      }
+    }
+    
+    // Animate progress bars
+    const progressBars = document.querySelectorAll('.h-3.rounded-full.transition-all');
+    progressBars.forEach((bar, index) => {
+      const finalWidth = bar.style.width;
+      bar.style.width = '0%';
+      
+      setTimeout(() => {
+        bar.style.transition = 'width 1.2s ease-out';
+        bar.style.width = finalWidth;
+      }, 500 + (index * 150));
+    });
   });
 </script>
 

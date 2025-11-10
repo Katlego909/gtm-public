@@ -1,0 +1,190 @@
+{% extends "gtm/base.html" %}
+{% load allauth i18n %}
+
+{% block content %}
+<div class="max-w-md mx-auto">
+  <!-- Page Header -->
+  <div class="mb-8 text-center">
+    <div class="inline-flex items-center justify-center mb-4">
+      <div class="h-16 w-16 bg-gradient-to-br from-indigo-600 to-blue-500 rounded-2xl flex items-center justify-center shadow-xl">
+        <i class="fas fa-user-plus text-white text-2xl"></i>
+      </div>
+    </div>
+    <h1 class="text-4xl font-bold mb-3 bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">
+      {% trans "Create Account" %}
+    </h1>
+    <p class="text-gray-600 text-lg">
+      Join us to unlock powerful GTM insights and recommendations.
+    </p>
+  </div>
+
+  <!-- Signup Card -->
+  <div class="bg-white rounded-2xl shadow-xl border border-gray-200 p-8">
+    {% setvar link %}
+      <a href="{{ login_url }}" class="text-indigo-600 hover:text-indigo-800 font-semibold">{% trans "sign in" %}</a>
+    {% endsetvar %}
+    <p class="text-gray-600 mb-6 text-center">
+      {% blocktrans %}Already have an account? Then please {{ link }}.{% endblocktrans %}
+    </p>
+
+    <!-- Social Signup (if configured) -->
+    {% if SOCIALACCOUNT_ENABLED %}
+      <div class="mb-6">
+        {% include "socialaccount/snippets/login.html" with page_layout="entrance" %}
+      </div>
+      <div class="relative mb-6">
+        <div class="absolute inset-0 flex items-center">
+          <div class="w-full border-t border-gray-300"></div>
+        </div>
+        <div class="relative flex justify-center text-sm">
+          <span class="px-4 bg-white text-gray-500 font-medium">Or sign up with email</span>
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Signup Form -->
+    <form method="post" action="{% url 'account_signup' %}" class="space-y-5">
+      {% csrf_token %}
+      
+      <!-- Display Form Errors -->
+      {% if form.non_field_errors %}
+        <div class="bg-red-50 border-l-4 border-red-500 rounded-lg p-4 mb-4">
+          <div class="flex items-start">
+            <i class="fas fa-exclamation-circle text-red-500 mt-1 mr-3"></i>
+            <div class="text-red-800">
+              {% for error in form.non_field_errors %}
+                <p>{{ error }}</p>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      <!-- Username Field (if enabled) -->
+      {% if form.username %}
+        <div>
+          <label for="id_username" class="block text-sm font-semibold text-gray-700 mb-2">
+            <i class="fas fa-user text-indigo-600 mr-2"></i>
+            {% trans "Username" %}
+          </label>
+          <input type="text" 
+                 name="username" 
+                 id="id_username"
+                 placeholder="Choose a username"
+                 autocomplete="username"
+                 maxlength="150"
+                 required
+                 class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition">
+          {% if form.username.errors %}
+            <p class="text-red-600 text-sm mt-1">{{ form.username.errors.0 }}</p>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <!-- Email Field -->
+      <div>
+        <label for="id_email" class="block text-sm font-semibold text-gray-700 mb-2">
+          <i class="fas fa-envelope text-indigo-600 mr-2"></i>
+          {% trans "Email" %}
+        </label>
+        <input type="email" 
+               name="email" 
+               id="id_email"
+               placeholder="Enter your email address"
+               autocomplete="email"
+               maxlength="320"
+               required
+               class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition">
+        {% if form.email.errors %}
+          <p class="text-red-600 text-sm mt-1">{{ form.email.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <!-- Password Field -->
+      <div>
+        <label for="id_password1" class="block text-sm font-semibold text-gray-700 mb-2">
+          <i class="fas fa-lock text-indigo-600 mr-2"></i>
+          {% trans "Password" %}
+        </label>
+        <input type="password" 
+               name="password1" 
+               id="id_password1"
+               placeholder="Create a strong password"
+               autocomplete="new-password"
+               required
+               class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition">
+        {% if form.password1.errors %}
+          <p class="text-red-600 text-sm mt-1">{{ form.password1.errors.0 }}</p>
+        {% endif %}
+      </div>
+
+      <!-- Password Confirmation Field -->
+      <div>
+        <label for="id_password2" class="block text-sm font-semibold text-gray-700 mb-2">
+          <i class="fas fa-lock text-indigo-600 mr-2"></i>
+          {% trans "Confirm Password" %}
+        </label>
+        <input type="password" 
+               name="password2" 
+               id="id_password2"
+               placeholder="Confirm your password"
+               autocomplete="new-password"
+               required
+               class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition">
+        {% if form.password2.errors %}
+          <p class="text-red-600 text-sm mt-1">{{ form.password2.errors.0 }}</p>
+        {% endif %}
+        <p class="text-xs text-gray-500 mt-2">
+          <i class="fas fa-info-circle mr-1"></i>
+          Password must be at least 8 characters long
+        </p>
+      </div>
+
+      <!-- Hidden Redirect Field -->
+      {% if redirect_field_value %}
+        <input type="hidden" name="{{ redirect_field_name }}" value="{{ redirect_field_value }}" />
+      {% endif %}
+
+      <!-- Submit Button -->
+      <button type="submit" 
+              class="w-full bg-gradient-to-r from-indigo-600 to-blue-500 text-white px-8 py-4 rounded-xl font-bold text-lg hover:shadow-xl transition transform hover:scale-105 flex items-center justify-center gap-3">
+        <i class="fas fa-user-plus"></i>
+        {% trans "Sign Up" %}
+        <i class="fas fa-arrow-right"></i>
+      </button>
+    </form>
+
+    <!-- Sign In Link -->
+    <div class="mt-6 text-center">
+      <p class="text-gray-600">
+        {% trans "Already have an account?" %}
+        <a href="{{ login_url }}" class="text-indigo-600 hover:text-indigo-800 font-semibold">
+          {% trans "Sign in instead" %}
+        </a>
+      </p>
+    </div>
+  </div>
+
+  <!-- Benefits Cards -->
+  <div class="grid grid-cols-3 gap-4 mt-8">
+    <div class="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl p-4 border border-indigo-200 text-center">
+      <div class="h-10 w-10 bg-indigo-600 rounded-lg flex items-center justify-center mb-2 mx-auto">
+        <i class="fas fa-chart-line text-white"></i>
+      </div>
+      <p class="text-xs font-semibold text-gray-900">Track Progress</p>
+    </div>
+    <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200 text-center">
+      <div class="h-10 w-10 bg-green-600 rounded-lg flex items-center justify-center mb-2 mx-auto">
+        <i class="fas fa-brain text-white"></i>
+      </div>
+      <p class="text-xs font-semibold text-gray-900">AI Insights</p>
+    </div>
+    <div class="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-4 border border-blue-200 text-center">
+      <div class="h-10 w-10 bg-blue-600 rounded-lg flex items-center justify-center mb-2 mx-auto">
+        <i class="fas fa-file-pdf text-white"></i>
+      </div>
+      <p class="text-xs font-semibold text-gray-900">Full Reports</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
