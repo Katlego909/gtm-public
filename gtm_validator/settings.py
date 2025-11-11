@@ -191,6 +191,11 @@ AUTHENTICATION_BACKENDS = [
 
 ]
 
+# Redirect after login/logout
+LOGIN_REDIRECT_URL = 'gtm:landing'
+LOGOUT_REDIRECT_URL = 'gtm:landing'
+ACCOUNT_LOGOUT_REDIRECT_URL = 'gtm:landing'
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
