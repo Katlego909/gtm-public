@@ -28,7 +28,7 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-c=&nz9k*2q%_@ft=n_+
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG", "True") == "True"
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
 
 # Application definition
@@ -62,7 +62,9 @@ INTERNAL_IPS = [
     "127.0.0.1"
 ]
 
-NPM_BIN_PATH = r"C:\Program Files\nodejs\npm.cmd"
+# NPM_BIN_PATH only needed for local Tailwind development
+# On PythonAnywhere, use pre-compiled CSS (no npm/tailwind running on server)
+NPM_BIN_PATH = os.getenv("NPM_BIN_PATH", r"C:\Program Files\nodejs\npm.cmd")
 
 MIDDLEWARE = [
     "gtm.middleware.EnsureClientIdMiddleware",
@@ -73,10 +75,13 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
-    "django_browser_reload.middleware.BrowserReloadMiddleware",
-    
-    "allauth.account.middleware.AccountMiddleware",
 ]
+
+# Only enable browser reload in development
+if DEBUG:
+    MIDDLEWARE.append("django_browser_reload.middleware.BrowserReloadMiddleware")
+    
+MIDDLEWARE.append("allauth.account.middleware.AccountMiddleware")
 
 ROOT_URLCONF = "gtm_validator.urls"
 
@@ -144,6 +149,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field

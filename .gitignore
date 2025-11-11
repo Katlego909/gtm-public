@@ -12,6 +12,7 @@ __pycache__/
 staticfiles/
 .env
 db.sqlite3
+gtm_errors.log
 
 # VSCode / PyCharm
 .vscode/
