@@ -7,6 +7,11 @@ from django.core.serializers.json import DjangoJSONEncoder
 class Category(models.Model):
     name = models.CharField(max_length=50, unique=True)
     weight = models.FloatField(default=1.0)  # Demand 0.4, Conversion 0.4, Delivery 0.2 (normalized later)
+    
+    class Meta:
+        verbose_name_plural = "Categories"
+       
+    
     def __str__(self): return self.name
 
 class Question(models.Model):

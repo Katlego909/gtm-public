@@ -206,4 +206,11 @@ def generate_diagnostic_insight(response: Response) -> str:
     except Exception as e:
         logger.error(f"Gemini diagnostic generation failed for {response.question.id_code}: {e}")
         
+        # Fallback to static diagnostic note if AI fails
+        if response.question.diagnostic_note:
+            text = response.question.diagnostic_note
+            response.ai_insight = text
+            response.save(update_fields=["ai_insight"])
+            logger.info(f"📝 Using static diagnostic for {response.question.id_code}")
+        
     return text    

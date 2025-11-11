@@ -98,7 +98,14 @@
     </div>
 
     <!-- Questions Form -->
-    <form method="post" class="space-y-8">
+    <form method="post" 
+          hx-post="{% url 'gtm:assessment_step' session.uuid step %}" 
+          hx-target="#main-content" 
+          hx-select="#main-content"
+          hx-swap="innerHTML swap:200ms"
+          hx-push-url="true"
+          hx-indicator=".htmx-indicator"
+          class="space-y-8">
       {% csrf_token %}
 
       {% for field in form %}
@@ -155,18 +162,24 @@
       <div class="flex gap-4 pt-6 border-t border-gray-200">
         {% if step > 1 %}
           <a href="{% url 'gtm:assessment_step' session.uuid step|add:-1 %}" 
+             hx-get="{% url 'gtm:assessment_step' session.uuid step|add:-1 %}"
+             hx-target="#main-content"
+             hx-select="#main-content"
+             hx-swap="innerHTML swap:200ms"
+             hx-push-url="true"
              class="px-6 py-3 border-2 border-gray-300 rounded-xl font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition flex items-center gap-2">
             <i class="fas fa-arrow-left"></i>
             Back
           </a>
         {% endif %}
         <button type="submit" 
+                id="submitBtn"
                 class="flex-1 px-8 py-4 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-500 text-white font-bold text-lg hover:shadow-xl transition transform hover:scale-105 flex items-center justify-center gap-3">
           {% if step == total_steps %}
-            <i class="fas fa-check-circle"></i>
-            Finish Assessment
+            <i class="fas fa-check-circle" id="submitIcon"></i>
+            <span id="submitText">Finish Assessment</span>
           {% else %}
-            Continue
+            <span>Continue</span>
             <i class="fas fa-arrow-right"></i>
           {% endif %}
         </button>
@@ -187,5 +200,36 @@
     </div>
   </div>
 </div>
+
+<style>
+  /* Add spinner animation */
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  .spinning {
+    animation: spin 1s linear infinite;
+  }
+</style>
+
+<script>
+  // Use HTMX beforeRequest event to show loading state without blocking submission
+  document.body.addEventListener('htmx:beforeRequest', function(event) {
+    // Check if this is the assessment form being submitted
+    const form = event.detail.elt;
+    if (form.tagName === 'FORM') {
+      const submitBtn = document.getElementById('submitBtn');
+      const submitText = document.getElementById('submitText');
+      const submitIcon = document.getElementById('submitIcon');
+      
+      if (submitBtn && submitText && submitIcon) {
+        submitText.textContent = 'Generating Your Results...';
+        submitIcon.classList.add('spinning');
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.7';
+        submitBtn.style.pointerEvents = 'none';
+      }
+    }
+  });
+</script>
 
 {% endblock %}

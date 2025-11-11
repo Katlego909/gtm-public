@@ -71,7 +71,7 @@
         </div>
 
         <h3 class="text-2xl font-semibold mb-2">{{ band.headline|default:"Your GTM journey is underway." }}</h3>
-        <p class="text-gray-600 mb-6">{{ band.headline|default:"Review the breakdown below to identify your next best steps." }}</p>
+        <p class="text-gray-600 mb-6">Review the breakdown below to identify your next best steps.</p>
 
         <div class="relative w-full" style="height: 350px; max-width: 100%;">
             <canvas id="radar" class="w-full h-full"></canvas>
@@ -132,7 +132,13 @@
         </div>
         
         <div class="flex flex-wrap gap-3 shrink-0">
-            <a href="{% url 'gtm:playbook' session.uuid %}" class="px-6 py-3 rounded-xl bg-white text-indigo-700 font-bold shadow-lg hover:bg-gray-100 transition">
+            <a href="{% url 'gtm:playbook' session.uuid %}" 
+               hx-get="{% url 'gtm:playbook' session.uuid %}" 
+               hx-target="#main-content" 
+               hx-select="#main-content"
+               hx-swap="innerHTML swap:200ms" 
+               hx-push-url="true"
+               class="px-6 py-3 rounded-xl bg-white text-indigo-700 font-bold shadow-lg hover:bg-gray-100 transition">
                 View 30-Day Playbook →
             </a>
             <a href="{% url 'gtm:download' session.uuid %}" class="px-6 py-3 rounded-xl border border-indigo-300 text-white hover:bg-indigo-600 transition">
@@ -175,7 +181,6 @@
 
 <div class="grid lg:grid-cols-2 gap-6 mt-8">
 
-  {% if recommendations %}
     <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 chart-card fade-in-up">
         <!-- Header with icon -->
         <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
@@ -191,21 +196,26 @@
         </div>
 
         <div class="space-y-4">
-            {% for r in recommendations %}
-              <div class="p-3 border rounded-lg hover:border-indigo-300 transition">
-                <h5 class="font-semibold text-gray-900 mb-1 break-words">{{ r.keyword|capfirst }}</h5>
-                <p class="text-sm text-gray-600 mb-2 break-words">{{ r.description|truncatechars:80 }}</p>
-                <div class="flex justify-between items-center text-xs">
-                    <span class="text-gray-500 break-words">{{ r.tool_list|join:", " }}</span>
-                    {% if r.url %}
-                      <a href="{{ r.url }}" target="_blank" class="text-indigo-600 hover:text-indigo-800 font-medium transition shrink-0">Explore →</a>
-                    {% endif %}
+            {% if recommendations %}
+              {% for r in recommendations %}
+                <div class="p-3 border rounded-lg hover:border-indigo-300 transition">
+                  <h5 class="font-semibold text-gray-900 mb-1 break-words">{{ r.keyword|capfirst }}</h5>
+                  <p class="text-sm text-gray-600 mb-2 break-words">{{ r.description|truncatechars:80 }}</p>
+                  <div class="flex justify-between items-center text-xs">
+                      <span class="text-gray-500 break-words">{{ r.tool_list|join:", " }}</span>
+                      {% if r.url %}
+                        <a href="{{ r.url }}" target="_blank" class="text-indigo-600 hover:text-indigo-800 font-medium transition shrink-0">Explore →</a>
+                      {% endif %}
+                  </div>
                 </div>
+              {% endfor %}
+            {% else %}
+              <div class="p-4 bg-gray-50 rounded-lg text-center text-gray-600">
+                <p>Complete your assessment to receive personalized tool recommendations.</p>
               </div>
-            {% endfor %}
+            {% endif %}
         </div>
     </div>
-    {% endif %}
 
     <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 chart-card fade-in-up">
         <!-- Header with icon -->
@@ -289,95 +299,117 @@
 </div>
 
 <div class="mt-6 flex gap-3 flex-wrap">
-    <a href="{% url 'gtm:chat' session.uuid %}" class="px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-500 text-white font-semibold hover:shadow-xl transition transform hover:scale-105 flex items-center gap-2">
+    <a href="{% url 'gtm:chat' session.uuid %}" 
+       hx-get="{% url 'gtm:chat' session.uuid %}" 
+       hx-target="#main-content" 
+       hx-select="#main-content"
+       hx-swap="innerHTML swap:200ms" 
+       hx-push-url="true"
+       class="px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-500 text-white font-semibold hover:shadow-xl transition transform hover:scale-105 flex items-center gap-2">
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
       </svg>
       Ask AI Assistant
     </a>
-    <a href="{% url 'gtm:playbook' session.uuid %}" class="px-6 py-3 rounded-xl bg-gray-900 text-white font-semibold hover:bg-gray-800 transition">View Playbook</a>
+    <a href="{% url 'gtm:playbook' session.uuid %}" 
+       hx-get="{% url 'gtm:playbook' session.uuid %}" 
+       hx-target="#main-content" 
+       hx-select="#main-content"
+       hx-swap="innerHTML swap:200ms" 
+       hx-push-url="true"
+       class="px-6 py-3 rounded-xl bg-gray-900 text-white font-semibold hover:bg-gray-800 transition">View Playbook</a>
     <a href="{% url 'gtm:download' session.uuid %}" class="px-6 py-3 rounded-xl border-2 border-gray-300 font-semibold hover:bg-gray-50 transition">Download Report (PDF)</a>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-  const labels = {{ labels|safe }};
-  const values = {{ values|safe }};
-  
-  // Enhanced Radar Chart with animations and interactions
-  new Chart(document.getElementById('radar'), {
-    type: 'radar',
-    data: {
-      labels: labels,
-      datasets: [{
-        label: 'Your GTM Performance',
-        data: values,
-        fill: true,
-        backgroundColor: 'rgba(79, 70, 229, 0.2)', // Slightly more visible
-        borderColor: '#4F46E5',
-        borderWidth: 3,
-        pointBackgroundColor: '#4F46E5',
-        pointBorderColor: '#fff',
-        pointBorderWidth: 2,
-        pointRadius: 6,
-        pointHoverRadius: 8,
-        pointHoverBackgroundColor: '#fff',
-        pointHoverBorderColor: '#4F46E5',
-        pointHoverBorderWidth: 3
-      }]
-    },
-    options: { 
-      responsive: true, 
-      maintainAspectRatio: false,
-      animation: {
-        duration: 1500,
-        easing: 'easeInOutQuart',
-        onComplete: function() {
-          // Add a subtle pulse effect after initial animation
-          this.options.animation.duration = 300;
-        }
+  // Wrap chart initialization in a function so it can be called after HTMX swaps
+  function initRadarChart() {
+    const radarCanvas = document.getElementById('radar');
+    if (!radarCanvas) return; // Exit if canvas doesn't exist
+    
+    const labels = {{ labels|safe }};
+    const values = {{ values|safe }};
+    
+    // Destroy existing chart instance if it exists to prevent duplicates
+    const existingChart = Chart.getChart(radarCanvas);
+    if (existingChart) {
+      existingChart.destroy();
+    }
+    
+    // Enhanced Radar Chart with animations and interactions
+    new Chart(radarCanvas, {
+      type: 'radar',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Your GTM Performance',
+          data: values,
+          fill: true,
+          backgroundColor: 'rgba(79, 70, 229, 0.2)', // Slightly more visible
+          borderColor: '#4F46E5',
+          borderWidth: 3,
+          pointBackgroundColor: '#4F46E5',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointRadius: 6,
+          pointHoverRadius: 8,
+          pointHoverBackgroundColor: '#fff',
+          pointHoverBorderColor: '#4F46E5',
+          pointHoverBorderWidth: 3
+        }]
       },
-      scales: { 
-        r: { 
-          min: 0, 
-          max: 5,
-          beginAtZero: true,
-          ticks: { 
-            backdropColor: 'rgba(255, 255, 255, 0.9)',
-            backdropPadding: 4,
-            color: '#6B7280',
-            font: {
-              size: 12,
-              weight: '500'
-            },
-            stepSize: 1,
-            callback: function(value) {
-              return value + '/5';
-            }
-          },
-          grid: { 
-            color: 'rgba(0, 0, 0, 0.08)',
-            lineWidth: 1
-          },
-          angleLines: {
-            color: 'rgba(0, 0, 0, 0.1)',
-            lineWidth: 1
-          },
-          pointLabels: {
-            color: '#1F2937',
-            font: {
-              size: 13,
-              weight: '600'
-            },
-            padding: 10,
-            callback: function(label) {
-              // Truncate long labels
-              return label.length > 15 ? label.substring(0, 15) + '...' : label;
-            }
+      options: { 
+        responsive: true, 
+        maintainAspectRatio: false,
+        animation: {
+          duration: 1500,
+          easing: 'easeInOutQuart',
+          onComplete: function() {
+            // Add a subtle pulse effect after initial animation
+            this.options.animation.duration = 300;
           }
-        } 
-      },
-      plugins: {
+        },
+        scales: { 
+          r: { 
+            min: 0, 
+            max: 5,
+            beginAtZero: true,
+            ticks: { 
+              backdropColor: 'rgba(255, 255, 255, 0.9)',
+              backdropPadding: 4,
+              color: '#6B7280',
+              font: {
+                size: 12,
+                weight: '500'
+              },
+              stepSize: 1,
+              callback: function(value) {
+                return value + '/5';
+              }
+            },
+            grid: { 
+              color: 'rgba(0, 0, 0, 0.08)',
+              lineWidth: 1
+            },
+            angleLines: {
+              color: 'rgba(0, 0, 0, 0.1)',
+              lineWidth: 1
+            },
+            pointLabels: {
+              color: '#1F2937',
+              font: {
+                size: 13,
+                weight: '600'
+              },
+              padding: 10,
+              callback: function(label) {
+                // Truncate long labels
+                return label.length > 15 ? label.substring(0, 15) + '...' : label;
+              }
+            }
+          } 
+        },
+        plugins: {
         legend: { 
           display: false 
         },
@@ -428,6 +460,14 @@
       }
     }
   });
+  }
+  
+  // Initialize on page load (will be called by base.html event listener after HTMX swap)
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initRadarChart);
+  } else {
+    initRadarChart();
+  }
 
   // Animate circular progress ring on load
   window.addEventListener('load', function() {

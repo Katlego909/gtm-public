@@ -13,7 +13,13 @@
   </div>
 
   <!-- Form Card -->
-  <form method="post" class="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 space-y-6">
+  <form method="post" 
+        hx-post="{% url 'gtm:start' %}" 
+        hx-target="#main-content" 
+        hx-select="#main-content"
+        hx-swap="innerHTML swap:200ms"
+        hx-push-url="true"
+        class="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 space-y-6">
     {% csrf_token %}
 
     <!-- Company Basics Section -->

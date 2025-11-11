@@ -459,10 +459,34 @@ Provide a helpful, specific answer using the assessment data above:"""
         return response.text.strip()
     except Exception as e:
         logger.error(f"Gemini chat error: {e}")
-        # Even on error, try to give context-aware fallback
-        if "company" in message.lower() or "name" in message.lower():
-            return f"The company in this assessment is **{context['company_name']}** in the **{context['industry']}** industry, with an overall GTM score of **{context['overall_score']}/100**."
-        return "I encountered a technical error. Let me help you with: 'show scores', 'weakest areas', 'recommendations', or 'roadmap'."
+        
+        # Smart fallback responses based on common questions
+        msg_lower = message.lower()
+        
+        # Company/basic info
+        if any(word in msg_lower for word in ["company", "name", "industry", "who"]):
+            return f"This assessment is for **{context['company_name']}** in the **{context['industry']}** industry. Your overall GTM score is **{context['overall_score']}/100** at the **{context['stage']}** stage."
+        
+        # Weakest areas
+        if any(word in msg_lower for word in ["weak", "worst", "low", "improve", "focus"]):
+            weak_list = "\n".join([f"• **{c['name']}:** {c['score']}/5.0" for c in context['weakest_categories']])
+            return f"Your weakest areas that need focus:\n\n{weak_list}\n\nThese are your highest-impact improvement opportunities."
+        
+        # Strongest areas  
+        if any(word in msg_lower for word in ["strong", "best", "good", "well"]):
+            strong_list = "\n".join([f"• **{c['name']}:** {c['score']}/5.0" for c in context['strongest_categories']])
+            return f"Your strongest areas:\n\n{strong_list}\n\nThese are your competitive advantages!"
+        
+        # Recommendations
+        if any(word in msg_lower for word in ["recommend", "suggest", "should", "what to do", "next step"]):
+            return f"Based on your **{context['stage']}** stage:\n\n1. Focus on improving **{context['weakest_categories'][0]['name']}** (scored {context['weakest_categories'][0]['score']}/5)\n2. Set up metrics to track progress\n3. Allocate resources to close critical gaps\n\nView your full playbook for detailed action plans!"
+        
+        # Roadmap
+        if any(word in msg_lower for word in ["roadmap", "plan", "timeline", "days", "month"]):
+            return f"**Quick 30-60-90 Day Plan:**\n\n**Days 1-30:** Focus on {context['weakest_categories'][0]['name']}\n**Days 31-60:** Build systems and track metrics\n**Days 61-90:** Optimize and scale\n\n**Goal:** Increase your score from {context['overall_score']} to {min(100, int(context['overall_score']) + 15)} points!"
+        
+        # Default fallback with actual data
+        return f"I'm currently experiencing high demand (AI quota limit). Here's what I can tell you:\n\n**Your GTM Score:** {context['overall_score']}/100\n**Stage:** {context['stage']}\n**Top Priority:** Improve {context['weakest_categories'][0]['name']} (scored {context['weakest_categories'][0]['score']}/5)\n\nTry: 'show scores', 'weakest areas', 'recommendations', or 'roadmap'"
 
 # ================================================================
 # MAIN CHAT HANDLER
@@ -485,20 +509,18 @@ def process_chat_message(session_id: str, message: str, user=None) -> Dict[str, 
         intent = detect_intent(message)
         
         # Route to appropriate handler
+        # For specific structured requests, use handlers
+        # For everything else, use AI for natural conversation
         handler_map = {
             "show_scores": handle_show_scores,
-            "weakest_areas": handle_weakest_areas,
-            "strongest_areas": handle_strongest_areas,
-            "recommendations": handle_recommendations,
-            "roadmap": handle_roadmap,
             "export_report": handle_export,
-            "company_info": handle_company_info,
             "schedule_meeting": handle_schedule_meeting,
         }
         
         if intent in handler_map:
             response_text = handler_map[intent](session, context)
         else:
+            # Use AI for all conversational queries (weakest areas, recommendations, roadmap, general chat, etc.)
             response_text = handle_general_chat(session, context, message)
         
         return {

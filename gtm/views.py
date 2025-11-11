@@ -26,6 +26,7 @@ from django.db import transaction
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout
 from django.db.models import Avg
+from functools import wraps
 
 from django.shortcuts import get_object_or_404
 from .utils_pdf import render_gtm_report_pdf_response
@@ -41,6 +42,89 @@ LEGEND = {
 }
 
 # ---------- helpers ----------
+
+def _client_id(request):
+    """Extract client ID from cookie for anonymous user tracking."""
+    return request.COOKIES.get("gtm_client", "")
+
+def _is_htmx(request):
+    """Check if request is from HTMX."""
+    return request.headers.get('HX-Request') == 'true'
+
+def _get_template(request, base_template, partial_template=None):
+    """Return partial template for HTMX requests, full template otherwise."""
+    if _is_htmx(request) and partial_template:
+        return partial_template
+    return base_template
+
+def require_session_ownership(view_func):
+    """
+    Decorator to enforce session ownership.
+    Checks if authenticated user owns the session or if anonymous client ID matches.
+    """
+    @wraps(view_func)
+    def wrapper(request, session_id, *args, **kwargs):
+        session = get_object_or_404(AssessmentSession, pk=session_id)
+        
+        # Check ownership
+        if request.user.is_authenticated:
+            if session.user != request.user:
+                messages.error(request, "Access denied.")
+                return redirect("gtm:history")
+        elif session.owner_client_id != _client_id(request):
+            messages.error(request, "Access denied.")
+            return redirect("gtm:history")
+        
+        # Pass session to view to avoid re-querying
+        return view_func(request, session, *args, **kwargs)
+    return wrapper
+
+def require_action_ownership(view_func):
+    """
+    Decorator to enforce ActionItem ownership.
+    Checks if the user owns the session associated with the action item.
+    """
+    @wraps(view_func)
+    def wrapper(request, action_id, *args, **kwargs):
+        action = get_object_or_404(ActionItem, pk=action_id)
+        
+        # Check ownership via session
+        if request.user.is_authenticated:
+            if action.session.user != request.user:
+                messages.error(request, "Access denied.")
+                return redirect("gtm:history")
+        elif action.session.owner_client_id != _client_id(request):
+            messages.error(request, "Access denied.")
+            return redirect("gtm:history")
+        
+        # Pass action to view to avoid re-querying
+        return view_func(request, action, *args, **kwargs)
+    return wrapper
+
+def _format_band_actions_markdown(markdown_text):
+    """
+    Centralized markdown formatting for band actions.
+    Applies consistent formatting rules across all views.
+    """
+    if not markdown_text:
+        return ""
+    
+    # Replace heading keywords with bold markdown
+    actions_md = markdown_text.replace("Action Plan:", "**Action Plan**")
+    actions_md = actions_md.replace("Recommended Tools:", "**Recommended Tools**")
+    
+    # Force blank line before bullets for proper rendering
+    actions_md = re.sub(r"\n-\s*", "\n\n• ", actions_md)
+    
+    # Clean up excessive newlines
+    actions_md = re.sub(r"\n{3,}", "\n\n", actions_md).strip()
+    
+    # Render markdown to HTML
+    try:
+        return mark_safe(md.markdown(actions_md, extensions=["extra", "sane_lists"]))
+    except Exception:
+        # Fallback to simple line break conversion
+        return mark_safe(actions_md.replace("\n", "<br>"))
 
 def _paginated_questions():
     """Return a list of steps, each = list[Question]. One category per step."""
@@ -247,9 +331,10 @@ def start_assessment(request):
             user=request.user if request.user.is_authenticated else None,
             owner_client_id=_client_id(request),
         )
+        
         return redirect("gtm:resume", session_id=session.uuid)
 
-    return render(request, "gtm/start.html")
+    return render(request, "gtm/start.html", {"is_htmx": _is_htmx(request)})
 
 
 def resume_assessment(request, session_id):
@@ -304,6 +389,9 @@ def assessment_step(request, session_id, step: int):
     if request.method == "POST":
         form = StepForm(request.POST, initial=initial)
         if form.is_valid():
+            # Collect responses that need AI insights
+            low_score_responses = []
+            
             # save/update answers for this step
             for q in questions:
                 score = form.cleaned_data[q.id_code]
@@ -313,35 +401,24 @@ def assessment_step(request, session_id, step: int):
                     session=session, question=q, defaults={"score": score}
                 )
                 
-                # We need to compute scores and update the snapshot *after* the responses
-                # for this step are saved, ensuring the AI call has access to the most
-                # current 'band_stage' via the snapshot.
-                
-                # ----------------------------------------------------
-                # 🆕 CRITICAL FIX: Ensure Snapshot is Fresh and Exists
-                # ----------------------------------------------------
-                cat_scores, overall = _compute_scores(session)
-                band = _band_for_score(overall)
-                
-                # Re-calculate radar data (as required by _save_snapshot)
-                labels = [c["category"].name for c in cat_scores]
-                values = [round(c["avg"], 2) for c in cat_scores]
-                
-                # Save the snapshot now so 'session.snapshot' is current
-                # The _save_snapshot function already handles update_or_create.
-                _save_snapshot(session, cat_scores, overall, band, labels, values)
-                # ----------------------------------------------------
-                
-                # 🆕 NEW CALL: Generate diagnostic for low scores (1 or 2)
-                # The session.snapshot is now guaranteed to exist and be current.
+                # Track low-scoring responses for AI insight generation
                 if response_instance.score <= 2:
-                    try:
-                        # We don't need the return value, just the side effect of saving to DB
-                        # The AI function relies on session.snapshot.band_stage
-                        generate_diagnostic_insight(response_instance)
-                    except Exception as e:
-                        log_error("Diagnostic Insight Generation", e, {"qid": q.id_code})
-
+                    low_score_responses.append(response_instance)
+            
+            # ----------------------------------------------------
+            # 🔧 OPTIMIZATION: Compute scores and save snapshot ONCE after all responses
+            # ----------------------------------------------------
+            cat_scores, overall = _compute_scores(session)
+            band = _band_for_score(overall)
+            
+            # Re-calculate radar data (as required by _save_snapshot)
+            labels = [c["category"].name for c in cat_scores]
+            values = [round(c["avg"], 2) for c in cat_scores]
+            
+            # Save the snapshot now so 'session.snapshot' is current
+            _save_snapshot(session, cat_scores, overall, band, labels, values)
+            # ----------------------------------------------------
+            
             # update progress + completion flag (data-driven)
             next_step = step + 1
             session.current_step = min(next_step, total_steps)
@@ -352,6 +429,7 @@ def assessment_step(request, session_id, step: int):
 
             if next_step > total_steps:
                 return redirect("gtm:results", session_id=session.uuid)
+            
             return redirect("gtm:assessment_step", session_id=session.uuid, step=next_step)
     else:
         form = StepForm(initial=initial)
@@ -362,7 +440,8 @@ def assessment_step(request, session_id, step: int):
     return render(request, "gtm/assessment_step.html", {
         "session": session, "form": form, "step": step, "total_steps": total_steps,
         "progress_pct": progress_pct, "legend": mark_safe(legend_html),
-        "category": questions[0].category if questions else None
+        "category": questions[0].category if questions else None,
+        "is_htmx": _is_htmx(request),
     })
 
 def results(request, session_id):
@@ -417,25 +496,38 @@ def results(request, session_id):
             seen.add(r.id)
             uniq.append(r)
     recommendations = uniq[:6]
+    
+    # ⚡ FALLBACK: If insufficient recommendations, add generic tools from weakest categories
+    if len(recommendations) < 5:
+        # Get unique weakest categories not already represented
+        weak_categories = []
+        for w in weakest_questions:
+            cat = w["question"].category
+            if cat not in weak_categories:
+                weak_categories.append(cat)
+        
+        # Add generic tools from each weak category until we have at least 5
+        for cat in weak_categories:
+            if len(recommendations) >= 5:
+                break
+            # Get tools from this category not already in recommendations
+            fallback_tools = ToolRecommendation.objects.filter(
+                category=cat
+            ).exclude(id__in=[r.id for r in recommendations])[:2]
+            
+            for tool in fallback_tools:
+                if tool.id not in seen:
+                    seen.add(tool.id)
+                    recommendations.append(tool)
+                    if len(recommendations) >= 5:
+                        break
 
     # -----------------------------
-    # ✅ Render band actions (vertical bullet formatting)
+    # ✅ Render band actions (using centralized formatter)
     # -----------------------------
-    band_actions_html = ""
-    if band and getattr(band, "actions_markdown", ""):
-        actions_md = band.actions_markdown
-        actions_md = actions_md.replace("Action Plan:", "**Action Plan**")
-        actions_md = actions_md.replace("Recommended Tools:", "**Recommended Tools**")
-
-        import re
-        actions_md = re.sub(r"\n-\s*", "\n\n• ", actions_md)   # force blank line before bullets
-        actions_md = re.sub(r"\n{3,}", "\n\n", actions_md).strip()
-
-        try:
-            band_actions_html = md.markdown(actions_md, extensions=["extra", "sane_lists"])
-        except Exception:
-            band_actions_html = actions_md.replace("\n", "<br>")
-        band_actions_html = mark_safe(band_actions_html)
+    band_actions_html = _format_band_actions_markdown(
+        getattr(band, "actions_markdown", "") if band else ""
+    )
 
     # -----------------------------
     # 📊 Save snapshot (single source of truth)
@@ -444,7 +536,26 @@ def results(request, session_id):
     snap = _save_snapshot(session, cat_scores, overall, band, labels, values)
 
     # -----------------------------
-    # 🤖 Populate AI playbook once
+    # 🤖 Generate AI insights for low-scoring questions (if not already generated)
+    # -----------------------------
+    for q_data in weakest_questions:
+        if not q_data.get("ai_insight"):
+            try:
+                # Get the response object
+                response = Response.objects.filter(
+                    session=session,
+                    question=q_data["question"]
+                ).first()
+                if response and response.score <= 2:
+                    generate_diagnostic_insight(response)
+                    # Refresh the insight
+                    response.refresh_from_db()
+                    q_data["ai_insight"] = response.ai_insight
+            except Exception as e:
+                log_error("Diagnostic Insight Generation", e, {"qid": q_data["question"].id_code})
+    
+    # -----------------------------
+    # 🤖 Trigger AI playbook generation immediately (blocking for now)
     # -----------------------------
     if snap and not (snap.ai_playbook or "").strip():
         try:
@@ -454,6 +565,7 @@ def results(request, session_id):
                 snap.save(update_fields=["ai_playbook"])
         except Exception as e:
             log_error("AI Playbook Generation", e, {"session_id": str(session.uuid)})
+            # Continue rendering even if AI fails
 
     return render(request, "gtm/results.html", {
         "session": session,
@@ -467,6 +579,7 @@ def results(request, session_id):
         "focus_categories": focus_categories,
         "weakest_questions": weakest_questions,
         "recommendations": recommendations,
+        "is_htmx": _is_htmx(request),
     })
 
 # Playbook
@@ -477,21 +590,11 @@ def playbook(request, session_id):
     cat_sorted = sorted(cat_scores, key=lambda x: x["avg"])
 
     # -----------------------------
-    # 🧩 Format Recommended Next Moves
+    # 🧩 Format Recommended Next Moves (using centralized formatter)
     # -----------------------------
-    band_actions_html = ""
-    if band and getattr(band, "actions_markdown", ""):
-        try:
-            actions_md = band.actions_markdown
-            actions_md = actions_md.replace("Action Plan:", "**Action Plan**")
-            actions_md = actions_md.replace("Recommended Tools:", "**Recommended Tools**")
-            actions_md = re.sub(r"\n-\s*", "\n\n• ", actions_md)  # vertical bullets
-            actions_md = re.sub(r"\n{3,}", "\n\n", actions_md).strip()
-            band_actions_html = md.markdown(actions_md, extensions=["extra", "sane_lists"])
-        except Exception as e:
-            log_error("Markdown rendering (band.actions_markdown)", e, {"session_id": str(session.uuid)})
-            band_actions_html = (band.actions_markdown or "").replace("\n", "<br>")
-        band_actions_html = mark_safe(band_actions_html)
+    band_actions_html = _format_band_actions_markdown(
+        getattr(band, "actions_markdown", "") if band else ""
+    )
 
     # -----------------------------
     # 🤖 AI Playbook Rendering (+ optional lazy-generate)
@@ -499,7 +602,7 @@ def playbook(request, session_id):
     # Ensure we actually have a snapshot even if user skips Results page
     snap = getattr(session, "snapshot", None) or ResultSnapshot.objects.filter(session=session).first()
 
-    # (Optional) Lazy-generate once if empty
+    # (Optional) Generate if empty - blocking to ensure it's ready when user arrives
     if snap and not (snap.ai_playbook or "").strip():
         try:
             ai_md_src = generate_playbook_with_gemini(snap)
@@ -550,6 +653,7 @@ def playbook(request, session_id):
         "cat_sorted": cat_sorted,
         "band_actions_html": band_actions_html,
         "ai_playbook_html": mark_safe(ai_playbook_html),
+        "is_htmx": _is_htmx(request),
     })
 
 
@@ -595,27 +699,13 @@ def history(request):
     #     band = _band_for_score(overall) if overall is not None else None
     #     rows.append({"session": s, "overall": (round(overall,1) if overall is not None else None), "band": band})
 
-    return render(request, "gtm/history.html", {"rows": rows})
+    return render(request, "gtm/history.html", {"rows": rows, "is_htmx": _is_htmx(request)})
 
-
-def _client_id(request):
-    return request.COOKIES.get("gtm_client", "")
 
 @require_POST
-def action_add(request, session_id):
-    
-    session = get_object_or_404(AssessmentSession, pk=session_id)
-    
-    # 🚨 IMPROVEMENT: Enforce strict ownership check 
-    if request.user.is_authenticated:
-        if session.user != request.user:
-            messages.error(request, "Access denied.")
-            return redirect("gtm:results", session_id=session.uuid)
-    # Fallback for anonymous users
-    elif session.owner_client_id != _client_id(request):
-        messages.error(request, "Access denied.")
-        return redirect("gtm:results", session_id=session.uuid)
-
+@require_session_ownership
+def action_add(request, session, session_id):
+    """Add a new action item to the session."""
     note = request.POST.get("note","").strip()
     
     question_id = request.POST.get("question_id")
@@ -628,59 +718,44 @@ def action_add(request, session_id):
     return redirect("gtm:playbook", session_id=session.uuid)
 
 @require_POST
-@require_POST
-def action_toggle(request, action_id):
-    a = get_object_or_404(ActionItem, pk=action_id)
-    
-    # 🚨 IMPROVEMENT: Enforce strict ownership check
-    if request.user.is_authenticated:
-        if a.session.user != request.user:
-            messages.error(request, "Access denied.")
-            return redirect("gtm:results", session_id=a.session.uuid)
-    # Fallback for anonymous users
-    elif a.session.owner_client_id != _client_id(request):
-        messages.error(request, "Access denied.")
-        return redirect("gtm:results", session_id=a.session.uuid)
-        
-    a.status = "done" if a.status != "done" else "todo"
-    a.save(update_fields=["status"])
-    return redirect("gtm:playbook", session_id=a.session.uuid)
+@require_action_ownership
+def action_toggle(request, action, action_id):
+    """Toggle action item status between todo and done."""
+    action.status = "done" if action.status != "done" else "todo"
+    action.save(update_fields=["status"])
+    return redirect("gtm:playbook", session_id=action.session.uuid)
 
 @require_POST
-def action_update(request, action_id):
-    a = get_object_or_404(ActionItem, pk=action_id)
-    # simple ownership guard
-    if a.session.owner_client_id != _client_id(request):
-        return redirect("gtm:playbook", session_id=a.session.uuid)
-
+@require_action_ownership
+def action_update(request, action, action_id):
+    """Update action item fields (note, owner, status, due_date)."""
     note = request.POST.get("note", "").strip()
     owner = request.POST.get("owner", "").strip()
-    status = request.POST.get("status", a.status)
+    status = request.POST.get("status", action.status)
     due_raw = request.POST.get("due_date", "").strip()
 
-    a.note = note or a.note
-    a.owner = owner
+    action.note = note or action.note
+    action.owner = owner
     if status in dict(ActionItem.STATUS_CHOICES):
-        a.status = status
+        action.status = status
     # parse date safely (YYYY-MM-DD from <input type="date">)
     if due_raw:
         try:
-            a.due_date = datetime.strptime(due_raw, "%Y-%m-%d").date()
+            action.due_date = datetime.strptime(due_raw, "%Y-%m-%d").date()
         except ValueError:
             pass  # ignore bad date input
     else:
-        a.due_date = None
+        action.due_date = None
 
-    a.save()
-    return redirect("gtm:playbook", session_id=a.session.uuid)
+    action.save()
+    return redirect("gtm:playbook", session_id=action.session.uuid)
 
 @require_POST
-def action_delete(request, action_id):
-    a = get_object_or_404(ActionItem, pk=action_id)
-    if a.session.owner_client_id != _client_id(request):
-        return redirect("gtm:playbook", session_id=a.session.uuid)
-    sess_id = a.session.uuid
-    a.delete()
+@require_action_ownership
+def action_delete(request, action, action_id):
+    """Delete action item."""
+    sess_id = action.session.uuid
+    action.delete()
     return redirect("gtm:playbook", session_id=sess_id)
 
 # ================================================================
@@ -705,6 +780,7 @@ def chat_view(request, session_id):
         "session": session,
         "chat_history": chat_history,
         "suggested_prompts": suggested,
+        "is_htmx": _is_htmx(request),
     })
 
 @require_http_methods(["POST"])
@@ -791,6 +867,7 @@ def profile(request):
         "in_progress_assessments": in_progress_assessments,
         "avg_score": avg_score,
         "recent_assessments": recent_assessments,
+        "is_htmx": _is_htmx(request),
     })
 
 def logout_view(request):
