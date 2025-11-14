@@ -54,71 +54,73 @@
     <div class="space-y-4">
       {% for r in rows %}
         <div class="group bg-white rounded-2xl shadow-lg border border-gray-200 overflow-hidden hover:shadow-xl hover:border-indigo-300 transition-all duration-200">
-          <div class="p-6">
-            <div class="flex items-start justify-between gap-6">
+          <div class="p-4 sm:p-6">
+            <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4 lg:gap-6">
               <!-- Left Side: Info -->
-              <div class="flex items-start gap-4 flex-1 min-w-0">
+              <div class="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
                 <!-- Icon -->
-                <div class="h-14 w-14 bg-gradient-to-br from-indigo-600 to-blue-500 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                  <i class="fas fa-chart-line text-white text-xl"></i>
+                <div class="h-12 w-12 sm:h-14 sm:w-14 bg-gradient-to-br from-indigo-600 to-blue-500 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                  <i class="fas fa-chart-line text-white text-lg sm:text-xl"></i>
                 </div>
                 
                 <!-- Details -->
                 <div class="flex-1 min-w-0">
                   <!-- Company Name -->
-                  <h3 class="text-xl font-bold text-gray-900 mb-1 truncate">
+                  <h3 class="text-lg sm:text-xl font-bold text-gray-900 mb-1 break-words">
                     {{ r.session.company_name|default:"Untitled Assessment" }}
                   </h3>
                   
                   <!-- Date & Industry -->
-                  <div class="flex items-center gap-3 text-sm text-gray-600 mb-3">
+                  <div class="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm text-gray-600 mb-3">
                     <span class="flex items-center gap-1">
                       <i class="fas fa-calendar text-gray-400"></i>
-                      {{ r.session.created_at|date:"F d, Y" }}
+                      <span class="break-words">{{ r.session.created_at|date:"M d, Y" }}</span>
                     </span>
                     {% if r.session.industry %}
                       <span class="flex items-center gap-1">
                         <i class="fas fa-building text-gray-400"></i>
-                        {{ r.session.industry }}
+                        <span class="break-words">{{ r.session.industry }}</span>
                       </span>
                     {% endif %}
                   </div>
 
                   <!-- Status & Score Bar -->
-                  <div class="flex items-center gap-4 flex-wrap">
+                  <div class="flex flex-wrap items-center gap-2 sm:gap-4">
                     {% if r.session.is_completed %}
                       <!-- Completed Badge -->
-                      <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                      <span class="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs sm:text-sm font-medium">
                         <i class="fas fa-check-circle"></i>
-                        Completed
+                        <span class="hidden xs:inline">Completed</span>
+                        <span class="xs:hidden">Done</span>
                       </span>
                       
                       {% if r.overall %}
                         <!-- Score Display -->
-                        <div class="flex items-center gap-2">
-                          <span class="text-sm text-gray-600">Score:</span>
-                          <span class="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">
+                        <div class="flex items-center gap-1.5 sm:gap-2">
+                          <span class="text-xs sm:text-sm text-gray-600">Score:</span>
+                          <span class="text-xl sm:text-2xl font-bold bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">
                             {{ r.overall }}
                           </span>
-                          <span class="text-gray-400 text-sm">/100</span>
+                          <span class="text-gray-400 text-xs sm:text-sm">/100</span>
                         </div>
 
                         {% if r.band %}
                           <!-- Stage Badge -->
-                          <span class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm font-medium">
+                          <span class="px-2.5 sm:px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs sm:text-sm font-medium break-words">
                             {{ r.band.stage }}
                           </span>
                         {% endif %}
                       {% endif %}
                     {% else %}
                       <!-- In Progress Badge -->
-                      <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-medium">
+                      <span class="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs sm:text-sm font-medium">
                         <i class="fas fa-hourglass-half"></i>
-                        In Progress
+                        <span class="hidden xs:inline">In Progress</span>
+                        <span class="xs:hidden">Active</span>
                       </span>
                       
                       {% if r.session.current_step %}
-                        <span class="text-sm text-gray-600">
+                        <span class="text-xs sm:text-sm text-gray-600">
                           Step {{ r.session.current_step }}
                         </span>
                       {% endif %}
@@ -128,7 +130,7 @@
               </div>
 
               <!-- Right Side: Actions -->
-              <div class="flex flex-col gap-2 flex-shrink-0">
+              <div class="flex flex-row lg:flex-col gap-2 flex-shrink-0 w-full lg:w-auto">
                 {% if r.session.is_completed %}
                   <!-- Completed Actions -->
                   <a href="{% url 'gtm:results' r.session.uuid %}" 
@@ -137,9 +139,10 @@
                      hx-select="#main-content"
                      hx-swap="innerHTML swap:200ms" 
                      hx-push-url="true"
-                     class="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-xl font-semibold hover:shadow-lg transition transform hover:scale-105 whitespace-nowrap">
+                     class="flex-1 lg:flex-none inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-xl text-xs sm:text-sm font-semibold hover:shadow-lg transition transform hover:scale-105 whitespace-nowrap">
                     <i class="fas fa-chart-bar"></i>
-                    View Results
+                    <span class="hidden sm:inline">View Results</span>
+                    <span class="sm:hidden">Results</span>
                   </a>
                   
                   <a href="{% url 'gtm:playbook' r.session.uuid %}" 
@@ -148,14 +151,14 @@
                      hx-select="#main-content"
                      hx-swap="innerHTML swap:200ms" 
                      hx-push-url="true"
-                     class="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white border-2 border-gray-300 text-gray-700 rounded-xl font-semibold hover:border-indigo-500 hover:text-indigo-600 transition whitespace-nowrap">
+                     class="flex-1 lg:flex-none inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-white border-2 border-gray-300 text-gray-700 rounded-xl text-xs sm:text-sm font-semibold hover:border-indigo-500 hover:text-indigo-600 transition whitespace-nowrap">
                     <i class="fas fa-book"></i>
-                    Playbook
+                    <span>Playbook</span>
                   </a>
                   
-                  <a href="{% url 'gtm:download' r.session.uuid %}" class="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-white border-2 border-gray-300 text-gray-700 rounded-xl font-semibold hover:border-blue-500 hover:text-blue-600 transition whitespace-nowrap">
+                  <a href="{% url 'gtm:download' r.session.uuid %}" class="flex-1 lg:flex-none inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-white border-2 border-gray-300 text-gray-700 rounded-xl text-xs sm:text-sm font-semibold hover:border-blue-500 hover:text-blue-600 transition whitespace-nowrap">
                     <i class="fas fa-download"></i>
-                    PDF
+                    <span>PDF</span>
                   </a>
                 {% else %}
                   <!-- In Progress Actions -->
@@ -165,9 +168,9 @@
                      hx-select="#main-content"
                      hx-swap="innerHTML swap:200ms" 
                      hx-push-url="true"
-                     class="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-xl font-semibold hover:shadow-lg transition transform hover:scale-105 whitespace-nowrap">
+                     class="flex-1 lg:flex-none inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-xl text-xs sm:text-sm font-semibold hover:shadow-lg transition transform hover:scale-105 whitespace-nowrap">
                     <i class="fas fa-play"></i>
-                    Continue
+                    <span>Continue</span>
                   </a>
                 {% endif %}
               </div>

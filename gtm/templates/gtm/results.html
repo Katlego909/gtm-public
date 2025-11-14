@@ -34,28 +34,28 @@
 </style>
 
 <!-- Page Header -->
-<div class="mb-8 text-center fade-in-up">
-  <h1 class="text-4xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">
+<div class="mb-6 sm:mb-8 text-center fade-in-up px-4">
+  <h1 class="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">
     GTM Assessment Report
   </h1>
-  <p class="text-xl text-gray-600">{{ session.company_name|default:"Your Company" }}</p>
+  <p class="text-lg sm:text-xl text-gray-600 break-words">{{ session.company_name|default:"Your Company" }}</p>
 </div>
 
-<div class="grid lg:grid-cols-3 gap-6 mb-8">
+<div class="grid lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8 px-2 sm:px-0">
 
-    <div class="lg:col-span-2 bg-white rounded-3xl shadow-xl p-8 border border-gray-100 chart-card fade-in-up stagger-1">
+    <div class="lg:col-span-2 bg-white rounded-2xl sm:rounded-3xl shadow-xl p-4 sm:p-6 lg:p-8 border border-gray-100 chart-card fade-in-up stagger-1">
         
-        <div class="flex items-center justify-between border-b pb-6 mb-6">
-            <div>
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b pb-4 sm:pb-6 mb-4 sm:mb-6 gap-4">
+            <div class="flex-1 min-w-0">
                 {% if band %}
-                    <span class="text-xs font-semibold px-4 py-1 rounded-full bg-indigo-600 text-white shadow-md uppercase tracking-wider">
+                    <span class="inline-block text-xs font-semibold px-3 sm:px-4 py-1 rounded-full bg-indigo-600 text-white shadow-md uppercase tracking-wider break-words">
                         {{ band.stage }}
                     </span>
                 {% endif %}
-                <h2 class="text-xl font-medium text-gray-500 mt-2">Overall GTM Score</h2>
+                <h2 class="text-base sm:text-lg lg:text-xl font-medium text-gray-500 mt-2">Overall GTM Score</h2>
             </div>
             
-            <div class="relative w-28 h-28 shrink-0">
+            <div class="relative w-24 h-24 sm:w-28 sm:h-28 shrink-0 mx-auto sm:mx-0">
                 <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
                     <path class="text-gray-200" stroke="currentColor" stroke-width="3" fill="none"
                           d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
@@ -70,25 +70,25 @@
             </div>
         </div>
 
-        <h3 class="text-2xl font-semibold mb-2">{{ band.headline|default:"Your GTM journey is underway." }}</h3>
-        <p class="text-gray-600 mb-6">Review the breakdown below to identify your next best steps.</p>
+        <h3 class="text-lg sm:text-xl lg:text-2xl font-semibold mb-2 break-words">{{ band.headline|default:"Your GTM journey is underway." }}</h3>
+        <p class="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6">Review the breakdown below to identify your next best steps.</p>
 
-        <div class="relative w-full" style="height: 350px; max-width: 100%;">
+        <div class="relative w-full overflow-hidden" style="height: 280px; max-width: 100%;">
             <canvas id="radar" class="w-full h-full"></canvas>
         </div>
     </div>
 
-    <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 chart-card fade-in-up stagger-2">
+    <div class="bg-white rounded-2xl sm:rounded-3xl shadow-xl p-4 sm:p-6 lg:p-8 border border-gray-100 chart-card fade-in-up stagger-2">
         <!-- Header with icon -->
-        <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
-            <div class="flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-500 shadow-lg flex-shrink-0">
-                <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="flex items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6 pb-4 sm:pb-5 border-b border-gray-200">
+            <div class="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-500 shadow-lg flex-shrink-0">
+                <svg class="w-6 h-6 sm:w-7 sm:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
             </div>
-            <div>
-                <h2 class="text-2xl font-bold text-gray-900 mb-1">Performance Breakdown</h2>
-                <p class="text-sm text-gray-600">Category-level score distribution</p>
+            <div class="flex-1 min-w-0">
+                <h2 class="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900 mb-1 break-words">Performance Breakdown</h2>
+                <p class="text-xs sm:text-sm text-gray-600">Category-level score distribution</p>
             </div>
         </div>
         <div class="space-y-6">
@@ -119,30 +119,32 @@
 
 
 {% if band %}
-<div class="mt-8 bg-gradient-to-br from-indigo-700 to-indigo-900 rounded-3xl p-8 shadow-2xl text-white fade-in-up stagger-3 relative overflow-hidden">
+<div class="mt-6 sm:mt-8 bg-gradient-to-br from-indigo-700 to-indigo-900 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 shadow-2xl text-white fade-in-up stagger-3 relative overflow-hidden mx-2 sm:mx-0">
     <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-10 transform -skew-x-12 animate-pulse"></div>
     <div class="relative z-10">
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+    <div class="flex flex-col gap-4 sm:gap-6">
         <div>
-            <span class="text-sm font-semibold mb-1 block opacity-80">RECOMMENDED NEXT STAGE</span>
-            <h3 class="text-3xl font-extrabold mb-1">Move to the {{ band.stage }}</h3>
-            <p class="text-indigo-100 text-md max-w-2xl">
+            <span class="text-xs sm:text-sm font-semibold mb-1 block opacity-80">RECOMMENDED NEXT STAGE</span>
+            <h3 class="text-xl sm:text-2xl lg:text-3xl font-extrabold mb-2 break-words">Move to the {{ band.stage }}</h3>
+            <p class="text-indigo-100 text-sm sm:text-base lg:text-md">
                 Ready for the plan? Click below to access your full AI-generated 30-day playbook with weekly action items and success metrics.
             </p>
         </div>
         
-        <div class="flex flex-wrap gap-3 shrink-0">
+        <div class="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3">
             <a href="{% url 'gtm:playbook' session.uuid %}" 
                hx-get="{% url 'gtm:playbook' session.uuid %}" 
                hx-target="#main-content" 
                hx-select="#main-content"
                hx-swap="innerHTML swap:200ms" 
                hx-push-url="true"
-               class="px-6 py-3 rounded-xl bg-white text-indigo-700 font-bold shadow-lg hover:bg-gray-100 transition">
-                View 30-Day Playbook →
+               class="inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-white text-indigo-700 font-bold shadow-lg hover:bg-gray-100 transition text-sm sm:text-base whitespace-nowrap">
+                <span class="hidden sm:inline">View 30-Day Playbook →</span>
+                <span class="sm:hidden">View Playbook →</span>
             </a>
-            <a href="{% url 'gtm:download' session.uuid %}" class="px-6 py-3 rounded-xl border border-indigo-300 text-white hover:bg-indigo-600 transition">
-                Download PDF
+            <a href="{% url 'gtm:download' session.uuid %}" class="inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl border border-indigo-300 text-white hover:bg-indigo-600 transition text-sm sm:text-base whitespace-nowrap">
+                <i class="fas fa-download mr-2"></i>
+                <span>Download PDF</span>
             </a>
         </div>
     </div>
@@ -298,18 +300,18 @@
   </ul>
 </div>
 
-<div class="mt-6 flex gap-3 flex-wrap">
+<div class="mt-6 flex flex-col sm:flex-row gap-2 sm:gap-3 px-2 sm:px-0">
     <a href="{% url 'gtm:chat' session.uuid %}" 
        hx-get="{% url 'gtm:chat' session.uuid %}" 
        hx-target="#main-content" 
        hx-select="#main-content"
        hx-swap="innerHTML swap:200ms" 
        hx-push-url="true"
-       class="px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-500 text-white font-semibold hover:shadow-xl transition transform hover:scale-105 flex items-center gap-2">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+       class="flex-1 sm:flex-none inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-500 text-white text-sm sm:text-base font-semibold hover:shadow-xl transition transform hover:scale-105 gap-2">
+      <svg class="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
       </svg>
-      Ask AI Assistant
+      <span>Ask AI Assistant</span>
     </a>
     <a href="{% url 'gtm:playbook' session.uuid %}" 
        hx-get="{% url 'gtm:playbook' session.uuid %}" 
@@ -317,8 +319,11 @@
        hx-select="#main-content"
        hx-swap="innerHTML swap:200ms" 
        hx-push-url="true"
-       class="px-6 py-3 rounded-xl bg-gray-900 text-white font-semibold hover:bg-gray-800 transition">View Playbook</a>
-    <a href="{% url 'gtm:download' session.uuid %}" class="px-6 py-3 rounded-xl border-2 border-gray-300 font-semibold hover:bg-gray-50 transition">Download Report (PDF)</a>
+       class="flex-1 sm:flex-none inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-gray-900 text-white text-sm sm:text-base font-semibold hover:bg-gray-800 transition">View Playbook</a>
+    <a href="{% url 'gtm:download' session.uuid %}" class="flex-1 sm:flex-none inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl border-2 border-gray-300 text-sm sm:text-base font-semibold hover:bg-gray-50 transition">
+      <span class="hidden sm:inline">Download Report (PDF)</span>
+      <span class="sm:hidden">Download PDF</span>
+    </a>
 </div>
 
 <script>

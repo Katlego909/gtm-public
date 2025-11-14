@@ -3,9 +3,9 @@
 
 <div class="max-w-4xl mx-auto">
   <!-- Page Header -->
-  <div class="mb-8">
-    <h1 class="text-4xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">My Profile</h1>
-    <p class="text-gray-600">Manage your account settings and view your assessment activity</p>
+  <div class="mb-6 sm:mb-8 px-4 sm:px-0">
+    <h1 class="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">My Profile</h1>
+    <p class="text-sm sm:text-base text-gray-600">Manage your account settings and view your assessment activity</p>
   </div>
 
   <!-- Profile Card -->
@@ -156,21 +156,21 @@
     <h3 class="text-xl font-bold text-gray-900 mb-6">Recent Assessments</h3>
     <div class="space-y-4">
       {% for assessment in recent_assessments %}
-      <div class="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition">
-        <div class="flex items-center gap-4">
-          <div class="h-12 w-12 bg-gradient-to-br from-indigo-600 to-blue-500 rounded-xl flex items-center justify-center">
+      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition">
+        <div class="flex items-center gap-3 sm:gap-4 min-w-0">
+          <div class="h-12 w-12 shrink-0 bg-gradient-to-br from-indigo-600 to-blue-500 rounded-xl flex items-center justify-center">
             <i class="fas fa-chart-line text-white"></i>
           </div>
-          <div>
-            <p class="font-semibold text-gray-900">{{ assessment.company_name|default:"Assessment" }}</p>
+          <div class="min-w-0">
+            <p class="font-semibold text-gray-900 truncate">{{ assessment.company_name|default:"Assessment" }}</p>
             <p class="text-sm text-gray-500">{{ assessment.created_at|date:"F d, Y" }}</p>
           </div>
         </div>
-        <div class="flex items-center gap-4">
+        <div class="flex flex-wrap items-center gap-2 sm:gap-4 w-full sm:w-auto">
           {% if assessment.is_completed %}
-            <span class="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">Completed</span>
+            <span class="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap">Completed</span>
             {% if assessment.snapshot %}
-            <span class="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">{{ assessment.snapshot.overall|floatformat:1 }}</span>
+            <span class="text-xl sm:text-2xl font-bold bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">{{ assessment.snapshot.overall|floatformat:1 }}</span>
             {% endif %}
             <a href="{% url 'gtm:results' assessment.uuid %}" 
                hx-get="{% url 'gtm:results' assessment.uuid %}" 
@@ -178,12 +178,12 @@
                hx-select="#main-content"
                hx-swap="innerHTML swap:200ms" 
                hx-push-url="true"
-               class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium">
+               class="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium text-center whitespace-nowrap">
               View Results
             </a>
           {% else %}
-            <span class="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-medium">In Progress</span>
-            <a href="{% url 'gtm:resume' assessment.uuid %}" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium">
+            <span class="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap">In Progress</span>
+            <a href="{% url 'gtm:resume' assessment.uuid %}" class="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium text-center whitespace-nowrap">
               Continue
             </a>
           {% endif %}

@@ -2,26 +2,26 @@
 {% block content %}
 
 <!-- Page Header -->
-<div class="mb-8">
-  <div class="text-center mb-6">
-    <h1 class="text-4xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">
+<div class="mb-6 sm:mb-8 px-4 sm:px-0">
+  <div class="text-center mb-4 sm:mb-6">
+    <h1 class="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">
       Your GTM Playbook
     </h1>
-    <p class="text-gray-600 text-lg">Personalized action plan for your go-to-market success</p>
+    <p class="text-gray-600 text-base sm:text-lg">Personalized action plan for your go-to-market success</p>
   </div>
   
-  <div class="flex gap-3 flex-wrap justify-center">
+  <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center flex-wrap">
     {# AI Chat Button #}
-    <a href="{% url 'gtm:chat' session.uuid %}" class="px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-500 text-white font-semibold hover:shadow-xl transition transform hover:scale-105 flex items-center gap-2">
-      <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <a href="{% url 'gtm:chat' session.uuid %}" class="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-500 text-white font-semibold hover:shadow-xl transition transform hover:scale-105 flex items-center justify-center gap-2">
+      <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
       </svg>
-      Ask AI Assistant
+      <span class="truncate">Ask AI Assistant</span>
     </a>
     {# Download PDF Button #}
-    <a href="{% url 'gtm:download' session.uuid %}" class="px-6 py-3 rounded-xl border-2 border-gray-300 font-semibold hover:bg-gray-50 transition flex items-center gap-2">
-      <i class="fas fa-file-pdf"></i>
-      Download PDF
+    <a href="{% url 'gtm:download' session.uuid %}" class="w-full sm:w-auto px-6 py-3 rounded-xl border-2 border-gray-300 font-semibold hover:bg-gray-50 transition flex items-center justify-center gap-2">
+      <i class="fas fa-file-pdf shrink-0"></i>
+      <span class="truncate">Download PDF</span>
     </a>
     {# Back to Dashboard Button #}
     <a href="{% url 'gtm:results' session.uuid %}" 
@@ -30,9 +30,9 @@
        hx-select="#main-content"
        hx-swap="innerHTML swap:200ms" 
        hx-push-url="true"
-       class="px-6 py-3 rounded-xl border-2 border-gray-300 font-semibold hover:bg-gray-50 transition flex items-center gap-2">
-      <i class="fas fa-arrow-left"></i>
-      Back to Results
+       class="w-full sm:w-auto px-6 py-3 rounded-xl border-2 border-gray-300 font-semibold hover:bg-gray-50 transition flex items-center justify-center gap-2">
+      <i class="fas fa-arrow-left shrink-0"></i>
+      <span class="truncate">Back to Results</span>
     </a>
   </div>
 </div>
@@ -69,21 +69,21 @@
         </div>
       {% endif %}
 
-      <div class="flex items-center gap-3 mb-4">
-        <div class="h-10 w-10 bg-gradient-to-br from-orange-600 to-red-500 rounded-lg flex items-center justify-center">
+      <div class="flex flex-wrap items-center gap-2 md:gap-3 mb-4">
+        <div class="h-10 w-10 bg-gradient-to-br from-orange-600 to-red-500 rounded-lg flex items-center justify-center shrink-0">
           <i class="fas fa-bullseye text-white"></i>
         </div>
-        <h3 class="font-semibold text-xl text-gray-900">Focus Areas</h3>
-        <span class="text-sm text-gray-500">(weakest first)</span>
+        <h3 class="font-semibold text-lg md:text-xl text-gray-900">Focus Areas</h3>
+        <span class="text-xs md:text-sm text-gray-500">(weakest first)</span>
       </div>
       <div class="space-y-3 mb-6">
         {% for c in cat_sorted %}
-          <div class="flex items-center justify-between p-3 bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg border border-gray-200 hover:border-indigo-300 transition">
-            <div class="flex items-center gap-3">
-              <span class="h-8 w-8 bg-gradient-to-br from-indigo-600 to-blue-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">{{ forloop.counter }}</span>
-              <span class="font-medium text-gray-800 break-words">{{ c.category.name }}</span>
+          <div class="flex items-center justify-between gap-3 p-3 bg-gradient-to-r from-gray-50 to-blue-50 rounded-lg border border-gray-200 hover:border-indigo-300 transition">
+            <div class="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+              <span class="h-8 w-8 bg-gradient-to-br from-indigo-600 to-blue-500 rounded-lg flex items-center justify-center text-white font-bold text-sm shrink-0">{{ forloop.counter }}</span>
+              <span class="font-medium text-gray-800 text-sm md:text-base truncate">{{ c.category.name }}</span>
             </div>
-            <span class="font-bold text-indigo-700 text-lg shrink-0">{{ c.avg|floatformat:2 }}/5</span>
+            <span class="font-bold text-indigo-700 text-base md:text-lg shrink-0">{{ c.avg|floatformat:2 }}/5</span>
           </div>
         {% endfor %}
       </div>
@@ -106,16 +106,16 @@
     {% if ai_playbook_html %}
       <div id="ai-playbook" class="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden">
         {# Styled header using gradient #}
-        <div class="px-8 pt-6 pb-4 flex items-center justify-between sticky top-0 bg-gradient-to-r from-indigo-600 to-blue-500 border-b-2 border-indigo-700 z-10">
-          <div class="flex items-center gap-3">
-            <div class="h-10 w-10 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur">
+        <div class="px-4 sm:px-8 pt-6 pb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sticky top-0 bg-gradient-to-r from-indigo-600 to-blue-500 border-b-2 border-indigo-700 z-10">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="h-10 w-10 shrink-0 bg-white/20 rounded-lg flex items-center justify-center backdrop-blur">
               <i class="fas fa-robot text-white text-xl"></i>
             </div>
-            <h3 class="text-xl font-bold text-white">AI-Generated GTM Playbook</h3>
+            <h3 class="text-lg sm:text-xl font-bold text-white truncate">AI-Generated GTM Playbook</h3>
           </div>
-          <div class="flex items-center gap-3">
-            <a href="#actions" class="text-sm text-white/90 hover:text-white underline font-medium">Jump to Steps</a>
-            <button id="copyPlaybook" title="Copy Playbook" class="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white font-medium text-sm transition backdrop-blur">
+          <div class="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+            <a href="#actions" class="text-xs sm:text-sm text-white/90 hover:text-white underline font-medium shrink-0">Jump to Steps</a>
+            <button id="copyPlaybook" title="Copy Playbook" class="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-white font-medium text-xs sm:text-sm transition backdrop-blur shrink-0">
               <i class="fas fa-copy mr-1"></i> Copy
             </button>
           </div>
@@ -135,10 +135,10 @@
         <h4 class="font-semibold text-xl text-gray-900">Your GTM Task List</h4>
       </div>
 
-      <form method="post" action="{% url 'gtm:action_add' session.uuid %}" class="flex gap-2 mb-6">
+      <form method="post" action="{% url 'gtm:action_add' session.uuid %}" class="flex flex-col sm:flex-row gap-2 mb-6">
         {% csrf_token %}
         <input name="note" class="flex-1 border-2 border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition" placeholder="Add a task (e.g., Set 4-hour lead SLA)" required>
-        <button class="px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-500 text-white font-semibold hover:shadow-lg transition shrink-0 flex items-center gap-2">
+        <button class="w-full sm:w-auto px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-500 text-white font-semibold hover:shadow-lg transition shrink-0 flex items-center justify-center gap-2">
           <i class="fas fa-plus"></i>
           Add
         </button>
@@ -160,18 +160,18 @@
                     {% if a.due_date %}<span class="shrink-0">Due: {{ a.due_date }}</span>{% endif %}
                 </div>
               </div>
-              <div class="flex gap-2 shrink-0 ml-4">
+              <div class="flex flex-col sm:flex-row gap-2 shrink-0 ml-2 sm:ml-4">
                 <form method="post" action="{% url 'gtm:action_toggle' a.id %}">
                   {% csrf_token %}
                   {# Styled toggle button #}
-                  <button class="text-sm px-3 py-1 rounded-lg border hover:bg-gray-100 transition">
+                  <button class="text-xs sm:text-sm px-3 py-1 rounded-lg border hover:bg-gray-100 transition whitespace-nowrap">
                     {% if a.status == 'done' %}Mark todo{% else %}Mark done{% endif %}
                   </button>
                 </form>
                 <form method="post" action="{% url 'gtm:action_delete' a.id %}" onsubmit="return confirm('Delete this task?');">
                   {% csrf_token %}
                   {# Styled delete button #}
-                  <button class="text-sm px-3 py-1 rounded-lg border text-red-600 hover:bg-red-50 transition">Delete</button>
+                  <button class="text-xs sm:text-sm px-3 py-1 rounded-lg border text-red-600 hover:bg-red-50 transition whitespace-nowrap">Delete</button>
                 </form>
               </div>
             </div>

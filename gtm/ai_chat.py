@@ -17,6 +17,14 @@ from .views import _compute_scores, _band_for_score
 
 logger = logging.getLogger(__name__)
 
+# Import monitoring utility
+try:
+    from .utils_ai_monitoring import AIUsageTracker
+    MONITORING_AVAILABLE = True
+except ImportError:
+    MONITORING_AVAILABLE = False
+    logger.warning("AI monitoring not available")
+
 # ================================================================
 # GEMINI INITIALIZATION
 # ================================================================
@@ -456,6 +464,19 @@ Provide a helpful, specific answer using the assessment data above:"""
 
     try:
         response = model.generate_content(system_prompt)
+        
+        # Log token usage
+        if hasattr(response, 'usage_metadata'):
+            usage = response.usage_metadata
+            total_tokens = usage.total_token_count
+            logger.info(
+                f"Chat response | Tokens: {usage.prompt_token_count} input + "
+                f"{usage.candidates_token_count} output = {total_tokens} total"
+            )
+            # Track usage against quotas
+            if MONITORING_AVAILABLE:
+                AIUsageTracker.log_usage(total_tokens, 'chat')
+        
         return response.text.strip()
     except Exception as e:
         logger.error(f"Gemini chat error: {e}")

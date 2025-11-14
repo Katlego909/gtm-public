@@ -14,6 +14,13 @@ from .models import ResultSnapshot, RecommendationBand, AssessmentSession, Quest
 
 logger = logging.getLogger(__name__)
 
+# Import AI usage tracker
+try:
+    from .utils_ai_monitoring import AIUsageTracker
+    MONITORING_AVAILABLE = True
+except ImportError:
+    MONITORING_AVAILABLE = False
+
 # ================================================================
 # TRY IMPORTING GEMINI CLIENT (SAFE IMPORT)
 # ================================================================
@@ -106,7 +113,19 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
             text = response.text.strip()
             if text:
                 final_playbook_text = text
-                logger.info(f"✅ AI playbook generated for {snapshot.company_name}")
+                # Log token usage
+                if hasattr(response, 'usage_metadata'):
+                    usage = response.usage_metadata
+                    total_tokens = usage.total_token_count
+                    logger.info(
+                        f"✅ AI playbook generated for {snapshot.company_name} | "
+                        f"Tokens: {usage.prompt_token_count} input + {usage.candidates_token_count} output = {total_tokens} total"
+                    )
+                    # Track usage against quotas
+                    if MONITORING_AVAILABLE:
+                        AIUsageTracker.log_usage(total_tokens, 'playbook')
+                else:
+                    logger.info(f"✅ AI playbook generated for {snapshot.company_name}")
         except Exception as e:
             logger.error(f"Gemini generation failed: {e}")
 
@@ -200,7 +219,20 @@ def generate_diagnostic_insight(response: Response) -> str:
             # 🌟 Save the insight directly to the Response object
             response.ai_insight = text
             response.save(update_fields=["ai_insight"])
-            logger.info(f"✅ Diagnostic insight generated for {response.question.id_code}")
+            
+            # Log token usage
+            if hasattr(ai_response, 'usage_metadata'):
+                usage = ai_response.usage_metadata
+                total_tokens = usage.total_token_count
+                logger.info(
+                    f"✅ Diagnostic insight for {response.question.id_code} | "
+                    f"Tokens: {total_tokens}"
+                )
+                # Track usage against quotas
+                if MONITORING_AVAILABLE:
+                    AIUsageTracker.log_usage(total_tokens, 'diagnostic')
+            else:
+                logger.info(f"✅ Diagnostic insight generated for {response.question.id_code}")
             
     except Exception as e:
         logger.error(f"Gemini diagnostic generation failed for {response.question.id_code}: {e}")
