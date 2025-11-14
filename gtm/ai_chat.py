@@ -34,7 +34,7 @@ def _init_gemini_chat():
         return None
     try:
         genai.configure(api_key=api_key)
-        return genai.GenerativeModel("models/gemini-2.0-flash-exp")
+        return genai.GenerativeModel("models/gemini-2.5-flash")
     except Exception as e:
         logger.error(f"Gemini chat init failed: {e}")
         return None

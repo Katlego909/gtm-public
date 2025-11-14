@@ -20,7 +20,7 @@ cd gtm
 ## Step 2: Create Virtual Environment
 
 ```bash
-mkvirtualenv --python=/usr/bin/python3.10 gtmenv
+mkvirtualenv --python=/usr/bin/python3.11 gtmenv
 ```
 
 Activate it (if not already active):
