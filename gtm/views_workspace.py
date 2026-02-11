@@ -21,9 +21,19 @@ def workspace_create(request):
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
         if name:
+            from django.utils.text import slugify
+            
+            # Generate unique slug
+            slug = slugify(name)
+            counter = 1
+            original_slug = slug
+            while Workspace.objects.filter(slug=slug).exists():
+                slug = f"{original_slug}-{counter}"
+                counter += 1
+            
             workspace = Workspace.objects.create(
                 name=name,
-                created_by=request.user
+                slug=slug
             )
             WorkspaceMembership.objects.create(
                 workspace=workspace,
@@ -43,11 +53,15 @@ def workspace_detail(request, workspace_id):
     members = WorkspaceMembership.objects.filter(workspace=workspace).select_related('user')
     pending_invites = WorkspaceInvitation.objects.filter(workspace=workspace, accepted_at__isnull=True)
     
+    # Get the admin user who created this workspace
+    admin_member = members.filter(role='admin').first()
+    
     return render(request, 'gtm/workspace/detail.html', {
         'workspace': workspace,
         'members': members,
         'pending_invites': pending_invites,
-        'user_membership': request.workspace_membership
+        'user_membership': request.workspace_membership,
+        'admin_member': admin_member,
     })
 
 

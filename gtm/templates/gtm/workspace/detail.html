@@ -9,7 +9,7 @@
         <div>
             <h1 class="text-3xl font-bold text-indigo-900">{{ workspace.name }}</h1>
             <p class="text-gray-600">
-                Created {{ workspace.created_at|date:"M d, Y" }} by {{ workspace.created_by.get_full_name|default:workspace.created_by.username }}
+                Created {{ workspace.created_at|date:"M d, Y" }}{% if admin_member %} by {{ admin_member.user.get_full_name|default:admin_member.user.username }}{% endif %}
             </p>
         </div>
         <a href="{% url 'gtm:workspace:list' %}" class="text-indigo-600 hover:text-indigo-800">

@@ -698,9 +698,20 @@ def create_workspace_dashboard(request):
         name = request.POST.get('name', '').strip()
         if name:
             from gtm.models_workspace import Workspace, WorkspaceMembership
+            from django.utils.text import slugify
+            import uuid
+            
+            # Generate unique slug
+            slug = slugify(name)
+            counter = 1
+            original_slug = slug
+            while Workspace.objects.filter(slug=slug).exists():
+                slug = f"{original_slug}-{counter}"
+                counter += 1
+            
             workspace = Workspace.objects.create(
                 name=name,
-                created_by=request.user
+                slug=slug
             )
             WorkspaceMembership.objects.create(
                 workspace=workspace,

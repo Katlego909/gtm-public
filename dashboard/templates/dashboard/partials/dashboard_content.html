@@ -82,11 +82,13 @@
             <div>
                 <p class="text-xs md:text-sm font-medium text-gray-500 uppercase tracking-wider">Total Sessions</p>
                 <p class="text-2xl md:text-3xl font-bold text-gray-900 mt-1">{{ total_sessions }}</p>
-                <div class="flex items-center mt-2 text-xs font-medium {% if sessions_change_positive %}text-green-600 bg-green-50{% else %}text-red-600 bg-red-50{% endif %} px-2 py-1 rounded w-fit">
+                <div class="flex items-center mt-2 text-xs font-medium {% if sessions_has_meaningful_change %}{% if sessions_change_positive %}text-green-600 bg-green-50{% else %}text-red-600 bg-red-50{% endif %}{% else %}text-gray-600 bg-gray-50{% endif %} px-2 py-1 rounded w-fit">
                     {% if sessions_has_meaningful_change %}
                         {% if sessions_change_positive %}↑{% else %}↓{% endif %} {{ sessions_change }}% {% if sessions_change_positive %}increase{% else %}decrease{% endif %}
                     {% elif total_sessions > 0 %}
-                        <span class="text-gray-600 bg-gray-50">No change this week</span>
+                        No change this week
+                    {% else %}
+                        Start your first assessment
                     {% endif %}
                 </div>
             </div>
@@ -216,6 +218,63 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+    </div>
+    {% else %}
+    <!-- Empty State for New Workspace -->
+    <div class="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl p-8 shadow-sm border border-indigo-100 mb-8">
+        <div class="text-center">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-full mb-4">
+                <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                </svg>
+            </div>
+            <h3 class="text-xl font-bold text-gray-900 mb-2">Welcome to Your {% if current_workspace %}{{ current_workspace.name }}{% else %}New{% endif %} Workspace!</h3>
+            <p class="text-gray-600 mb-6 max-w-md mx-auto">Start by running your first GTM assessment to analyze your go-to-market strategy and identify improvement opportunities.</p>
+            
+            <div class="flex flex-col sm:flex-row gap-4 justify-center">
+                <a href="{% url 'gtm:start' %}" 
+                   class="px-6 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm inline-flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                    Start Assessment
+                </a>
+                
+                {% if current_workspace %}
+                <button onclick="openInviteModal()" 
+                        class="px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors inline-flex items-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"></path>
+                    </svg>
+                    Invite Team
+                </button>
+                {% endif %}
+            </div>
+            
+            <div class="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                <div class="bg-white rounded-lg p-4">
+                    <div class="w-8 h-8 bg-blue-100 rounded-full mx-auto mb-2 flex items-center justify-center">
+                        <span class="text-blue-600 font-bold text-sm">1</span>
+                    </div>
+                    <h4 class="font-semibold text-gray-900 mb-1">Assess</h4>
+                    <p class="text-sm text-gray-600">Run GTM assessment to analyze your strategy</p>
+                </div>
+                <div class="bg-white rounded-lg p-4">
+                    <div class="w-8 h-8 bg-green-100 rounded-full mx-auto mb-2 flex items-center justify-center">
+                        <span class="text-green-600 font-bold text-sm">2</span>
+                    </div>
+                    <h4 class="font-semibold text-gray-900 mb-1">Plan</h4>
+                    <p class="text-sm text-gray-600">Get personalized action items and recommendations</p>
+                </div>
+                <div class="bg-white rounded-lg p-4">
+                    <div class="w-8 h-8 bg-purple-100 rounded-full mx-auto mb-2 flex items-center justify-center">
+                        <span class="text-purple-600 font-bold text-sm">3</span>
+                    </div>
+                    <h4 class="font-semibold text-gray-900 mb-1">Collaborate</h4>
+                    <p class="text-sm text-gray-600">Assign tasks and track progress with your team</p>
+                </div>
+            </div>
         </div>
     </div>
     {% endif %}
@@ -456,23 +515,37 @@
 <script>
 // This script block is now self-contained and will execute when the partial is loaded.
 (function() {
-    // Use a timeout to ensure the DOM elements (like canvas) are available.
-    setTimeout(() => {
-        const chartData = {
-            total_sessions: {{ total_sessions|default:0 }},
-            completed_items: {{ completed_items|default:0 }},
-            pending_items: {{ pending_items|default:0 }},
-            days_labels: {{ days_labels|safe|default:'[]' }},
-            sessions_per_day: {{ sessions_per_day|safe|default:'[]' }},
-            channel_data: {{ channel_data|safe|default:'[]' }}
-        };
-        
-        // Check if the chart initialization function is available
-        if (typeof initializeDashboardCharts === 'function') {
-            initializeDashboardCharts(chartData);
-        } else {
-            console.error('initializeDashboardCharts function not found. Make sure dashboard-charts.js is loaded.');
-        }
+        // Check if charts are properly loading with sufficient timeout
+        setTimeout(() => {
+            const chartData = {
+                total_sessions: {{ total_sessions|default:0 }},
+                completed_items: {{ completed_items|default:0 }},
+                pending_items: {{ pending_items|default:0 }},
+                days_labels: {{ days_labels|safe|default:'["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]' }},
+                sessions_per_day: {{ sessions_per_day|safe|default:'[0,0,0,0,0,0,0]' }},
+                channel_data: {{ channel_data|safe|default:'[]' }}
+            };
+            
+            console.log('Initializing charts with data:', chartData);
+            
+            // Check if Chart.js is loaded
+            if (typeof Chart === 'undefined') {
+                console.error('Chart.js is not loaded. Cannot initialize charts.');
+                return;
+            }
+            
+            // Check if the chart initialization function is available
+            if (typeof initializeDashboardCharts === 'function') {
+                try {
+                    initializeDashboardCharts(chartData);
+                    console.log('Charts initialized successfully');
+                } catch (error) {
+                    console.error('Error initializing charts:', error);
+                }
+            } else {
+                console.error('initializeDashboardCharts function not found. Make sure dashboard-charts.js is loaded.');
+            }
+        }, 100); // Increased timeout to ensure DOM is ready
         
         // Initialize Score Trend Chart if data exists
         {% if score_trend_data.scores|length > 1 %}
