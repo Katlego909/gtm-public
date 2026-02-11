@@ -40,14 +40,32 @@ class ActionItemForm(forms.ModelForm):
         input_formats=['%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y', '%Y/%m/%d'],
         widget=forms.DateInput(attrs={'class': 'w-full p-2 border rounded', 'type': 'date'})
     )
-    owner = forms.CharField(
+    assigned_to = forms.ModelChoiceField(
+        queryset=User.objects.none(),  # Start with empty, will be set in __init__
         required=False,
-        widget=forms.TextInput(attrs={'class': 'w-full p-2 border rounded', 'placeholder': 'Assignee'})
+        empty_label="Select team member...",
+        widget=forms.Select(attrs={'class': 'w-full p-2 border rounded'})
     )
+
+    def __init__(self, *args, workspace=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        if workspace:
+            try:
+                # Get team members from the workspace
+                from gtm.models_workspace import WorkspaceMembership
+                memberships = WorkspaceMembership.objects.filter(workspace=workspace).select_related('user')
+                user_ids = [m.user.id for m in memberships]
+                self.fields['assigned_to'].queryset = User.objects.filter(id__in=user_ids)
+            except Exception as e:
+                # Fallback to empty queryset if workspace model issues
+                self.fields['assigned_to'].queryset = User.objects.none()
+        else:
+            self.fields['assigned_to'].queryset = User.objects.none()
 
     class Meta:
         model = ActionItem
-        fields = ['note', 'status', 'due_date', 'owner']
+        fields = ['note', 'status', 'due_date', 'assigned_to']
         widgets = {
             'note': forms.TextInput(attrs={'class': 'w-full p-2 border rounded', 'placeholder': 'Task description'}),
             'status': forms.Select(attrs={'class': 'w-full p-2 border rounded'}),

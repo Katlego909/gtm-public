@@ -694,7 +694,8 @@ def playbook(request, session_id):
                 ActionItem.objects.create(
                     session=session,
                     note=task,
-                    status="todo"
+                    status="todo",
+                    created_by=session.user if session.user else None
                 )
 
     # -----------------------------
@@ -789,7 +790,8 @@ def action_add(request, session, session_id):
         ActionItem.objects.create(
             session=session,
             question=Question.objects.filter(id=question_id).first() if question_id else None,
-            note=note
+            note=note,
+            created_by=request.user
         )
     return redirect("gtm:playbook", session_id=session.uuid)
 

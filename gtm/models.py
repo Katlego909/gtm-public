@@ -124,6 +124,15 @@ class ActionItem(models.Model):
     note = models.CharField(max_length=240)
     owner = models.CharField(max_length=120, blank=True)  # Legacy field, kept for compatibility
     
+    # Creator tracking
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="created_action_items",
+        help_text="User who created this action item"
+    )
+    
     # Team assignment fields
     assigned_to = models.ForeignKey(
         settings.AUTH_USER_MODEL,

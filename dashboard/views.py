@@ -6,6 +6,7 @@ Dashboard views for GTM Validator
 import datetime
 import json
 import markdown
+import uuid
 
 from django.shortcuts import get_object_or_404, render, redirect
 from django.db import models
@@ -17,6 +18,10 @@ from django.views.decorators.vary import vary_on_headers
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib import messages
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.utils.text import slugify
+from django.urls import reverse
 
 from gtm.models import (
     AssessmentSession,
@@ -25,37 +30,44 @@ from gtm.models import (
     ResultSnapshot,
     ChatMessage,
 )
-from gtm.models_workspace import Workspace, WorkspaceMembership
+from gtm.models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation
+from gtm.decorators import workspace_permission_required, workspace_admin_required, workspace_member_required
 from dashboard.models import Channel, ChannelAnalytics, GapAnalysisMetric
 from .forms import GapAnalysisMetricForm, ActionItemForm, UserProfileForm
 from gtm.views import _compute_scores, _band_for_score
-
-from django.urls import reverse
 from .utils import calculate_gap_metric_display_properties
 
 # ================================================================
 # GAP ANALYSIS METRIC CRUD VIEWS
 # ================================================================
 
+@workspace_member_required('session')
 @vary_on_headers('HX-Request')
 def add_edit_gap_metric(request, pk=None):
+    # Get current workspace context
+    workspace_id = request.session.get('current_workspace_id')
+    current_workspace = None
+    if workspace_id:
+        try:
+            from gtm.models_workspace import Workspace
+            current_workspace = Workspace.objects.get(id=workspace_id)
+        except Workspace.DoesNotExist:
+            pass
+    
     if pk:
-        # Only allow access to metrics in user's workspace or user-created metrics
-        workspace_id = request.session.get('current_workspace_id')
-        if workspace_id:
-            instance = get_object_or_404(
-                GapAnalysisMetric.objects.filter(
-                    models.Q(session__workspace_id=workspace_id) | models.Q(session__user=request.user) | models.Q(session__isnull=True)
-                ), 
-                pk=pk
-            )
+        if current_workspace:
+            instance = get_object_or_404(GapAnalysisMetric, pk=pk, workspace=current_workspace)
+            # Only the creator can edit
+            if instance.user is not None and instance.user != request.user:
+                if request.htmx:
+                    return render(request, 'dashboard/partials/error_modal.html', {
+                        'title': 'Access Denied',
+                        'message': 'You can only edit metrics that you created.'
+                    })
+                messages.error(request, 'You can only edit your own metrics.')
+                return redirect('dashboard')
         else:
-            instance = get_object_or_404(
-                GapAnalysisMetric.objects.filter(
-                    models.Q(session__user=request.user) | models.Q(session__isnull=True)
-                ), 
-                pk=pk
-            )
+            instance = get_object_or_404(GapAnalysisMetric, pk=pk, user=request.user, workspace__isnull=True)
         title = "Edit Gap Metric"
     else:
         instance = None
@@ -65,20 +77,21 @@ def add_edit_gap_metric(request, pk=None):
         form = GapAnalysisMetricForm(request.POST, instance=instance)
         if form.is_valid():
             instance = form.save(commit=False)
-            if not hasattr(instance, 'user') or not instance.user:
+            # Auto-assign workspace and user for new metrics
+            if not instance.pk:
+                instance.workspace = current_workspace
                 instance.user = request.user
             instance.save()
             
             if request.htmx:
                 # Return the updated gap analysis table and close modal
-                workspace_id = request.session.get('current_workspace_id')
-                if workspace_id:
+                if current_workspace:
                     gap_analysis = GapAnalysisMetric.objects.filter(
-                        models.Q(session__workspace_id=workspace_id) | models.Q(session__isnull=True)
+                        workspace=current_workspace
                     ).order_by('category', 'priority')
                 else:
                     gap_analysis = GapAnalysisMetric.objects.filter(
-                        models.Q(session__user=request.user) | models.Q(session__isnull=True)
+                        user=request.user, workspace__isnull=True
                     ).order_by('category', 'priority')
                 for metric in gap_analysis:
                     calculate_gap_metric_display_properties(metric)
@@ -99,47 +112,72 @@ def add_edit_gap_metric(request, pk=None):
     return render(request, template, context)
 
 
+@workspace_member_required('session')
 @vary_on_headers('HX-Request')
 def delete_gap_metric(request, pk):
-    try:
-        # Only allow access to metrics in user's workspace or user-created metrics
-        workspace_id = request.session.get('current_workspace_id')
-        if workspace_id:
-            instance = get_object_or_404(
-                GapAnalysisMetric.objects.filter(
-                    models.Q(session__workspace_id=workspace_id) | models.Q(session__user=request.user) | models.Q(session__isnull=True)
-                ), 
-                pk=pk
+    # Get current workspace context
+    workspace_id = request.session.get('current_workspace_id')
+    current_workspace = None
+    if workspace_id:
+        try:
+            current_workspace = Workspace.objects.get(id=workspace_id)
+        except Workspace.DoesNotExist:
+            pass
+    
+    # First, check if the metric exists in the workspace
+    if current_workspace:
+        try:
+            metric = GapAnalysisMetric.objects.get(
+                pk=pk, 
+                workspace=current_workspace
             )
-        else:
-            instance = get_object_or_404(
-                GapAnalysisMetric.objects.filter(
-                    models.Q(session__user=request.user) | models.Q(session__isnull=True)
-                ), 
-                pk=pk
+        except GapAnalysisMetric.DoesNotExist:
+            if request.htmx:
+                return render(request, 'dashboard/partials/error_row.html', {
+                    'pk': pk,
+                    'message': 'This metric no longer exists.',
+                })
+            raise Http404
+        
+        # Only the creator can delete (user=None means no owner recorded yet, claim it)
+        if metric.user is None:
+            metric.user = request.user
+            metric.save(update_fields=['user'])
+        elif metric.user != request.user:
+            if request.htmx:
+                return render(request, 'dashboard/partials/error_row.html', {
+                    'pk': pk,
+                    'message': 'You can only delete metrics that you created.',
+                    'restore_url': reverse('get_gap_metric_row', kwargs={'pk': pk}),
+                })
+            messages.error(request, 'You can only delete your own gap analysis metrics.')
+            return redirect('dashboard')
+            
+        instance = metric
+    else:
+        try:
+            instance = GapAnalysisMetric.objects.get(
+                pk=pk, 
+                user=request.user, 
+                workspace__isnull=True
             )
-    except Http404:
-        # If the object doesn't exist, and it's an HTMX request, 
-        # redirect back to dashboard
-        if request.htmx:
-            response = HttpResponse(status=204)
-            response['HX-Redirect'] = reverse('dashboard')
-            return response
-        raise
+        except GapAnalysisMetric.DoesNotExist:
+            if request.htmx:
+                return render(request, 'dashboard/partials/error_row.html', {
+                    'pk': pk,
+                    'message': 'This metric no longer exists.',
+                })
+            raise Http404
 
     if request.method == 'POST':
         instance.delete()
         if request.htmx:
-            # Return empty response - row will be removed via hx-swap="outerHTML swap:0.3s"
             return HttpResponse('')
         return redirect('dashboard')
 
+    # Show inline delete confirmation (replaces the row)
     context = {'instance': instance}
-
-    if request.htmx:
-        return render(request, 'dashboard/partials/_gap_metric_confirm_delete_inline.html', context)
-    
-    return render(request, 'dashboard/gap_metric_confirm_delete.html', context)
+    return render(request, 'dashboard/partials/_gap_metric_confirm_delete_inline.html', context)
 # ================================================================
 # INSIGHT VIEWS
 # ================================================================
@@ -258,10 +296,11 @@ def dashboard(request):
             if orphaned_assessments.exists():
                 orphaned_assessments.update(workspace=current_workspace)
             
-            # Auto-fix orphaned action items from user's sessions
+            # Auto-fix orphaned action items (from user's sessions or assigned to user)
             orphaned_items = ActionItem.objects.filter(
-                session__user=request.user,
                 workspace__isnull=True
+            ).filter(
+                models.Q(session__user=request.user) | models.Q(assigned_to=request.user)
             )
             if orphaned_items.exists():
                 orphaned_items.update(workspace=current_workspace)
@@ -503,11 +542,11 @@ def dashboard(request):
     # --- Gap Analysis Logic --- (workspace-scoped)
     if current_workspace:
         gap_analysis = GapAnalysisMetric.objects.filter(
-            models.Q(session__workspace=current_workspace) | models.Q(session__isnull=True)
+            workspace=current_workspace
         ).order_by('category', 'priority')
     else:
         gap_analysis = GapAnalysisMetric.objects.filter(
-            models.Q(session__user=request.user) | models.Q(session__isnull=True)
+            user=request.user, workspace__isnull=True
         ).order_by('category', 'priority') if request.user.is_authenticated else GapAnalysisMetric.objects.none()
     for metric in gap_analysis:
         calculate_gap_metric_display_properties(metric)
@@ -658,8 +697,8 @@ def refresh_gap_analysis_table(request):
 def refresh_action_items(request):
     """Returns the updated action items board - workspace-aware."""
     
-    # Get workspace context from request
-    workspace_id = request.GET.get('workspace')
+    # Get workspace context from request or session
+    workspace_id = request.GET.get('workspace') or request.session.get('current_workspace_id')
     current_workspace = None
     
     if request.user.is_authenticated and workspace_id:
@@ -674,7 +713,7 @@ def refresh_action_items(request):
     if current_workspace:
         action_items_qs = ActionItem.objects.filter(workspace=current_workspace)
     else:
-        action_items_qs = ActionItem.objects.filter(session__user=request.user) if request.user.is_authenticated else ActionItem.objects.none()
+        action_items_qs = ActionItem.objects.filter(session__user=request.user, workspace__isnull=True) if request.user.is_authenticated else ActionItem.objects.none()
     
     top_todo = action_items_qs.filter(status='todo').order_by('due_date').select_related('assigned_to')
     top_doing = action_items_qs.filter(status='doing').order_by('due_date').select_related('assigned_to')
@@ -696,24 +735,54 @@ def refresh_action_items(request):
     return render(request, 'dashboard/partials/action_items.html', context)
 
 
+@workspace_member_required('session')
 @vary_on_headers('HX-Request')
 def add_edit_action_item(request, pk=None):
+    # Get current workspace context
+    workspace_id = request.session.get('current_workspace_id')
+    current_workspace = None
+    if workspace_id:
+        try:
+            from gtm.models_workspace import Workspace
+            current_workspace = Workspace.objects.get(id=workspace_id)
+        except Workspace.DoesNotExist:
+            pass
+    
     if pk:
-        # Only allow access to action items in user's workspace
-        workspace_id = request.session.get('current_workspace_id')
-        if workspace_id:
-            instance = get_object_or_404(ActionItem, pk=pk, workspace_id=workspace_id)
+        if current_workspace:
+            instance = get_object_or_404(ActionItem, pk=pk, workspace=current_workspace)
+            # Creator or assignee can edit
+            is_creator = instance.created_by == request.user
+            is_assignee = instance.assigned_to == request.user
+            is_unclaimed = instance.created_by is None
+            if not (is_creator or is_assignee or is_unclaimed):
+                if request.htmx:
+                    return render(request, 'dashboard/partials/error_modal.html', {
+                        'title': 'Access Denied',
+                        'message': 'You can only edit action items that you created or are assigned to.'
+                    })
+                messages.error(request, 'You can only edit your own action items.')
+                return redirect('dashboard')
         else:
-            instance = get_object_or_404(ActionItem, pk=pk, session__user=request.user)
+            instance = get_object_or_404(
+                ActionItem.objects.filter(pk=pk, workspace__isnull=True).filter(
+                    models.Q(created_by=request.user) | models.Q(session__user=request.user) | models.Q(created_by__isnull=True)
+                )
+            )
         title = "Edit Action Item"
     else:
         instance = None
         title = "Add Action Item"
 
     if request.method == 'POST':
-        form = ActionItemForm(request.POST, instance=instance)
+        form = ActionItemForm(request.POST, instance=instance, workspace=current_workspace)
         if form.is_valid():
-            instance = form.save()
+            instance = form.save(commit=False)
+            # Auto-assign workspace and creator for new action items
+            if not instance.pk:
+                instance.workspace = current_workspace
+                instance.created_by = request.user
+            instance.save()
             # Return the updated action items board
             if request.htmx:
                 return refresh_action_items(request)
@@ -727,7 +796,11 @@ def add_edit_action_item(request, pk=None):
             }
             return render(request, 'dashboard/partials/action_item_form.html', context)
     else:
-        form = ActionItemForm(instance=instance)
+        try:
+            form = ActionItemForm(instance=instance, workspace=current_workspace)
+        except Exception as e:
+            # Fallback form if workspace issues
+            form = ActionItemForm(instance=instance)
 
     context = {
         'form': form,
@@ -738,14 +811,62 @@ def add_edit_action_item(request, pk=None):
     return render(request, 'dashboard/partials/action_item_form.html', context)
 
 
+@workspace_member_required('session')
 @vary_on_headers('HX-Request')
 def delete_action_item(request, pk):
-    # Only allow access to action items in user's workspace
+    # Get current workspace context
     workspace_id = request.session.get('current_workspace_id')
+    current_workspace = None
     if workspace_id:
-        instance = get_object_or_404(ActionItem, pk=pk, workspace_id=workspace_id)
+        try:
+            current_workspace = Workspace.objects.get(id=workspace_id)
+        except Workspace.DoesNotExist:
+            pass
+    
+    # First, check if the action item exists in the workspace
+    if current_workspace:
+        try:
+            action_item = ActionItem.objects.get(
+                pk=pk, 
+                workspace=current_workspace
+            )
+        except ActionItem.DoesNotExist:
+            if request.htmx:
+                return render(request, 'dashboard/partials/error_modal.html', {
+                    'title': 'Item Not Found',
+                    'message': 'This action item does not exist or has been removed.'
+                })
+            raise Http404
+            
+        # Only the creator can delete (claim unclaimed items)
+        if action_item.created_by is None:
+            action_item.created_by = request.user
+            action_item.save(update_fields=['created_by'])
+        elif action_item.created_by != request.user:
+            if request.htmx:
+                return render(request, 'dashboard/partials/error_modal.html', {
+                    'title': 'Access Denied',
+                    'message': 'You can only delete action items that you created.'
+                })
+            messages.error(request, 'You can only delete action items that you created.')
+            return redirect('dashboard')
+            
+        instance = action_item
     else:
-        instance = get_object_or_404(ActionItem, pk=pk, session__user=request.user)
+        try:
+            instance = ActionItem.objects.get(
+                pk=pk, 
+                session__user=request.user, 
+                workspace__isnull=True
+            )
+        except ActionItem.DoesNotExist:
+            if request.htmx:
+                return render(request, 'dashboard/partials/error_modal.html', {
+                    'title': 'Item Not Found',
+                    'message': 'This action item does not exist or has been removed.'
+                })
+            raise Http404
+    
     if request.method == 'POST':
         instance.delete()
         # Return the updated action items board
@@ -753,18 +874,31 @@ def delete_action_item(request, pk):
             return refresh_action_items(request)
         return redirect('dashboard')
     
-    return render(request, 'dashboard/partials/action_item_confirm_delete.html', {'instance': instance})
+    # Show delete confirmation modal
+    context = {'instance': instance}
+    return render(request, 'dashboard/partials/action_item_confirm_delete.html', context)
 
 
+@workspace_permission_required('can_assign_tasks', 'session')
 @csrf_exempt
 def move_action_item(request, pk, new_status):
     if request.method == 'POST':
-        # Only allow access to action items in user's workspace
+        # Get current workspace context
         workspace_id = request.session.get('current_workspace_id')
+        current_workspace = None
         if workspace_id:
-            item = get_object_or_404(ActionItem, pk=pk, workspace_id=workspace_id)
+            try:
+                from gtm.models_workspace import Workspace
+                current_workspace = Workspace.objects.get(id=workspace_id)
+            except Workspace.DoesNotExist:
+                pass
+        
+        # Only allow access to action items in user's workspace
+        if current_workspace:
+            item = get_object_or_404(ActionItem, pk=pk, workspace=current_workspace)
         else:
-            item = get_object_or_404(ActionItem, pk=pk, session__user=request.user)
+            item = get_object_or_404(ActionItem, pk=pk, session__user=request.user, workspace__isnull=True)
+        
         if new_status in ['todo', 'doing', 'done']:
             item.status = new_status
             item.save()
@@ -807,25 +941,18 @@ def profile(request):
 # TEAM COLLABORATION VIEWS
 # ================================================================
 
-@login_required
+@workspace_permission_required('can_assign_tasks', 'session')
 def assign_action_item(request, action_id):
     """Assign an action item to a team member."""
-    # Only allow access to action items in user's workspace
-    workspace_id = request.session.get('current_workspace_id')
-    if workspace_id:
-        action_item = get_object_or_404(ActionItem, id=action_id, workspace_id=workspace_id)
+    # Workspace context is automatically added by decorator
+    current_workspace = request.workspace
+    
+    # Get the action item (workspace access already verified)
+    if current_workspace:
+        action_item = get_object_or_404(ActionItem, id=action_id, workspace=current_workspace)
     else:
-        action_item = get_object_or_404(ActionItem, id=action_id, session__user=request.user)
-    
-    # Check user has access to this action item's workspace
-    if action_item.workspace:
-        membership = WorkspaceMembership.objects.filter(
-            workspace=action_item.workspace, 
-            user=request.user
-        ).first()
-        if not membership or membership.role not in ['admin', 'manager', 'funti3r_consultant']:
-            return JsonResponse({'error': 'No permission'}, status=403)
-    
+        action_item = get_object_or_404(ActionItem, id=action_id, session__user=request.user, workspace__isnull=True)
+    # Check user has access to this action item's workspace (already checked by decorator)
     if request.method == 'POST':
         assigned_to_id = request.POST.get('assigned_to')
         if assigned_to_id:
@@ -853,24 +980,17 @@ def assign_action_item(request, action_id):
     return JsonResponse({'error': 'Invalid request'}, status=400)
 
 
-@login_required
+@workspace_permission_required('can_assign_tasks', 'session')
 def unassign_action_item(request, action_id):
     """Remove assignment from an action item."""
-    # Only allow access to action items in user's workspace
-    workspace_id = request.session.get('current_workspace_id')
-    if workspace_id:
-        action_item = get_object_or_404(ActionItem, id=action_id, workspace_id=workspace_id)
-    else:
-        action_item = get_object_or_404(ActionItem, id=action_id, session__user=request.user)
+    # Workspace context is automatically added by decorator
+    current_workspace = request.workspace
     
-    # Check user has access
-    if action_item.workspace:
-        membership = WorkspaceMembership.objects.filter(
-            workspace=action_item.workspace, 
-            user=request.user
-        ).first()
-        if not membership or membership.role not in ['admin', 'manager', 'funti3r_consultant']:
-            return JsonResponse({'error': 'No permission'}, status=403)
+    # Get the action item (workspace access already verified)
+    if current_workspace:
+        action_item = get_object_or_404(ActionItem, id=action_id, workspace=current_workspace)
+    else:
+        action_item = get_object_or_404(ActionItem, id=action_id, session__user=request.user, workspace__isnull=True)
     
     if request.method == 'POST':
         action_item.assigned_to = None
@@ -893,9 +1013,6 @@ def create_workspace_dashboard(request):
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
         if name:
-            from gtm.models_workspace import Workspace, WorkspaceMembership
-            from django.utils.text import slugify
-            import uuid
             
             # Generate unique slug
             slug = slugify(name)
@@ -923,9 +1040,6 @@ def create_workspace_dashboard(request):
 @login_required
 def invite_to_workspace(request, workspace_id):
     """Handle team invitations from the dashboard."""
-    from gtm.models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation
-    from django.core.mail import send_mail
-
     workspace = get_object_or_404(Workspace, id=workspace_id)
     dashboard_url = f'/dashboard/?workspace={workspace_id}'
 
@@ -963,67 +1077,19 @@ def invite_to_workspace(request, workspace_id):
         try:
             invite_url = request.build_absolute_uri(f'/workspace/join/{invitation.token}/')
             inviter_name = request.user.get_full_name() or request.user.username
-            plain_message = (
-                f'You have been invited to join "{workspace.name}".\n\n'
-                f'Click here to join: {invite_url}\n\n'
-                f'Invited by: {inviter_name}'
-            )
-            html_message = f'''<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:0;background-color:#f3f4f6;font-family:'Inter',Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:40px 0;">
-    <tr>
-      <td align="center">
-        <table width="560" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,0.05);">
-          <!-- Header -->
-          <tr>
-            <td style="background:linear-gradient(135deg,#4f46e5,#6366f1);padding:32px 40px;text-align:center;">
-              <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;">Funti3r GTM</h1>
-            </td>
-          </tr>
-          <!-- Body -->
-          <tr>
-            <td style="padding:40px;">
-              <h2 style="margin:0 0 8px;color:#111827;font-size:22px;font-weight:700;">You&#39;re Invited!</h2>
-              <p style="margin:0 0 24px;color:#6b7280;font-size:15px;line-height:1.6;">
-                <strong style="color:#111827;">{inviter_name}</strong> has invited you to collaborate on the workspace:
-              </p>
-              <div style="background-color:#f0f0ff;border-left:4px solid #4f46e5;border-radius:8px;padding:16px 20px;margin-bottom:28px;">
-                <p style="margin:0;color:#4f46e5;font-size:18px;font-weight:600;">{workspace.name}</p>
-                <p style="margin:4px 0 0;color:#6b7280;font-size:13px;">Role: {role.replace("_", " ").title()}</p>
-              </div>
-              <table width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                  <td align="center" style="padding:4px 0 28px;">
-                    <a href="{invite_url}" style="display:inline-block;background-color:#4f46e5;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 36px;border-radius:8px;">
-                      Accept Invitation
-                    </a>
-                  </td>
-                </tr>
-              </table>
-              <p style="margin:0 0 8px;color:#9ca3af;font-size:13px;line-height:1.5;">
-                If the button doesn&#39;t work, copy and paste this link into your browser:
-              </p>
-              <p style="margin:0 0 24px;word-break:break-all;color:#4f46e5;font-size:13px;">{invite_url}</p>
-              <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
-              <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.5;text-align:center;">
-                This invitation expires in 7 days. If you didn&#39;t expect this email, you can safely ignore it.
-              </p>
-            </td>
-          </tr>
-          <!-- Footer -->
-          <tr>
-            <td style="background-color:#f9fafb;padding:20px 40px;text-align:center;border-top:1px solid #e5e7eb;">
-              <p style="margin:0;color:#9ca3af;font-size:12px;">&copy; 2026 Funti3r GTM. All rights reserved.</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>'''
+            
+            # Template context for email
+            email_context = {
+                'workspace': workspace,
+                'inviter_name': inviter_name,
+                'invite_url': invite_url,
+                'role': role.replace('_', ' '),
+            }
+            
+            # Render email templates
+            html_message = render_to_string('emails/workspace_invitation.html', email_context)
+            plain_message = render_to_string('emails/workspace_invitation.txt', email_context)
+            
             send_mail(
                 subject=f'You\'ve been invited to join {workspace.name}',
                 message=plain_message,

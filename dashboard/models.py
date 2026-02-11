@@ -1,5 +1,7 @@
 from django.db import models
+from django.contrib.auth.models import User
 from gtm.models import AssessmentSession
+from gtm.models_workspace import Workspace
 
 class Channel(models.Model):
 	name = models.CharField(max_length=100, unique=True)
@@ -54,9 +56,11 @@ class GapAnalysisMetric(models.Model):
     recommendation = models.TextField()
     source = models.CharField(max_length=4, choices=SOURCE_CHOICES, default='USER')
     session = models.ForeignKey(AssessmentSession, on_delete=models.CASCADE, related_name='gap_metrics', null=True, blank=True)
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='gap_metrics', null=True, blank=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='gap_metrics', null=True, blank=True)
 
     class Meta:
-        unique_together = ('metric', 'session')
+        unique_together = ('metric', 'session', 'workspace')
 
     def __str__(self):
         return self.metric
