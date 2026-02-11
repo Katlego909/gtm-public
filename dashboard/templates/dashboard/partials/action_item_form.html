@@ -1,0 +1,32 @@
+<div class="p-8">
+    <h1 class="text-2xl font-bold mb-6">{{ title }}</h1>
+    <form hx-post="{{ request.path }}"
+          hx-target="#action-items-container"
+          hx-swap="outerHTML"
+          class="bg-white p-6 rounded-lg shadow-md"
+          novalidate>
+            {% csrf_token %}
+            
+            {% if form.errors %}
+            <div class="mb-4 p-4 bg-red-50 border-l-4 border-red-500 text-red-700">
+                <p class="font-bold">Please correct the errors below:</p>
+                <ul class="list-disc ml-5">
+                    {% for field in form %}
+                        {% for error in field.errors %}
+                            <li>{{ field.label }}: {{ error }}</li>
+                        {% endfor %}
+                    {% endfor %}
+                    {% for error in form.non_field_errors %}
+                        <li>{{ error }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            {% endif %}
+
+            {{ form.as_p }}
+            <div class="mt-6 flex items-center gap-4">
+                <button type="submit" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">Save</button>
+                <button type="button" onclick="closeModal()" class="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">Cancel</button>
+            </div>
+        </form>
+</div>

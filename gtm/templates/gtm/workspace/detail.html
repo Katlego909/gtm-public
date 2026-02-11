@@ -1,0 +1,190 @@
+{% extends 'gtm/base.html' %}
+
+{% block title %}{{ workspace.name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-indigo-900">{{ workspace.name }}</h1>
+            <p class="text-gray-600">
+                Created {{ workspace.created_at|date:"M d, Y" }} by {{ workspace.created_by.get_full_name|default:workspace.created_by.username }}
+            </p>
+        </div>
+        <a href="{% url 'gtm:workspace:list' %}" class="text-indigo-600 hover:text-indigo-800">
+            ← Back to Workspaces
+        </a>
+    </div>
+
+    <div class="grid gap-8 lg:grid-cols-3">
+        <!-- Main Content -->
+        <div class="lg:col-span-2">
+            <!-- Assessments -->
+            <div class="bg-white rounded-xl border border-indigo-100 p-6 mb-8">
+                <h2 class="text-xl font-semibold text-indigo-900 mb-4">Assessments</h2>
+                {% if workspace.assessments.all %}
+                    <div class="space-y-4">
+                        {% for assessment in workspace.assessments.all %}
+                            <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                                <div>
+                                    <h3 class="font-medium">{{ assessment.company_name|default:"Assessment" }}</h3>
+                                    <p class="text-sm text-gray-600">
+                                        Created {{ assessment.created_at|date:"M d, Y" }}
+                                    </p>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    {% if assessment.is_completed %}
+                                        <span class="text-green-600 text-sm">Completed</span>
+                                    {% else %}
+                                        <span class="text-yellow-600 text-sm">In Progress</span>
+                                    {% endif %}
+                                    <a href="{% url 'gtm:results' assessment.uuid %}" 
+                                       class="text-indigo-600 hover:text-indigo-800">
+                                        View →
+                                    </a>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-gray-600 text-center py-8">No assessments yet</p>
+                {% endif %}
+            </div>
+
+            <!-- Action Items -->
+            <div class="bg-white rounded-xl border border-indigo-100 p-6">
+                <h2 class="text-xl font-semibold text-indigo-900 mb-4">Team Action Items</h2>
+                {% if workspace.action_items.all %}
+                    <div class="space-y-3">
+                        {% for action in workspace.action_items.all %}
+                            <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <div class="flex-1">
+                                    <p class="font-medium">{{ action.note }}</p>
+                                    {% if action.assigned_to %}
+                                        <p class="text-sm text-gray-600">
+                                            Assigned to {{ action.assigned_to.get_full_name|default:action.assigned_to.username }}
+                                        </p>
+                                    {% endif %}
+                                </div>
+                                <span class="text-sm px-3 py-1 rounded-full
+                                    {% if action.status == 'done' %}bg-green-100 text-green-700
+                                    {% elif action.status == 'doing' %}bg-yellow-100 text-yellow-700
+                                    {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                    {{ action.get_status_display }}
+                                </span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-gray-600 text-center py-8">No action items yet</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div>
+            <!-- Team Members -->
+            <div class="bg-white rounded-xl border border-indigo-100 p-6 mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-indigo-900">Team Members</h3>
+                    {% if user_membership.role in 'admin,manager' %}
+                        <button onclick="document.getElementById('invite-modal').classList.remove('hidden')"
+                                class="text-indigo-600 hover:text-indigo-800 text-sm">
+                            + Invite
+                        </button>
+                    {% endif %}
+                </div>
+                
+                <div class="space-y-3">
+                    {% for member in members %}
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="font-medium">{{ member.user.get_full_name|default:member.user.username }}</p>
+                                <p class="text-sm text-gray-600">{{ member.user.email }}</p>
+                            </div>
+                            <span class="text-xs px-2 py-1 rounded-full
+                                {% if member.role == 'admin' %}bg-indigo-100 text-indigo-700
+                                {% elif member.role == 'manager' %}bg-blue-100 text-blue-700
+                                {% elif member.role == 'funti3r_consultant' %}bg-purple-100 text-purple-700
+                                {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                {{ member.get_role_display }}
+                            </span>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Pending Invites -->
+            {% if pending_invites %}
+                <div class="bg-white rounded-xl border border-indigo-100 p-6">
+                    <h3 class="text-lg font-semibold text-indigo-900 mb-4">Pending Invites</h3>
+                    <div class="space-y-3">
+                        {% for invite in pending_invites %}
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="font-medium">{{ invite.email }}</p>
+                                    <p class="text-sm text-gray-600">Invited {{ invite.created_at|timesince }} ago</p>
+                                </div>
+                                <span class="text-xs px-2 py-1 rounded-full bg-yellow-100 text-yellow-700">
+                                    Pending
+                                </span>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Invite Modal -->
+{% if user_membership.role in 'admin,manager' %}
+<div id="invite-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold">Invite Team Member</h3>
+            <button onclick="document.getElementById('invite-modal').classList.add('hidden')"
+                    class="text-gray-400 hover:text-gray-600">
+                ✕
+            </button>
+        </div>
+        
+        <form method="post" action="{% url 'gtm:workspace:invite' workspace.id %}">
+            {% csrf_token %}
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input type="email" name="email" required
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                    <select name="role" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="contributor">Contributor</option>
+                        <option value="manager">Manager</option>
+                        {% if user_membership.role == 'admin' %}
+                            <option value="admin">Admin</option>
+                            <option value="funti3r_consultant">Funti3r Consultant</option>
+                        {% endif %}
+                    </select>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button type="submit" class="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
+                        Send Invite
+                    </button>
+                    <button type="button" 
+                            onclick="document.getElementById('invite-modal').classList.add('hidden')"
+                            class="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200">
+                        Cancel
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

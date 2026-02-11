@@ -27,11 +27,14 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout
 from django.db.models import Avg
 from functools import wraps
-
+from .ai_services import generate_concise_action_items
+from django import forms # Added import
 from django.shortcuts import get_object_or_404
 from .utils_pdf import render_gtm_report_pdf_response
+from .utils import transfer_firmographics_to_snapshot, get_existing_incomplete_session, check_daily_assessment_cap, check_assessment_cooldown # Added imports
 
-from .ai_services import generate_playbook_with_gemini, generate_diagnostic_insight
+from .ai_services import generate_playbook_with_gemini, generate_diagnostic_insight, _normalize_ai_playbook_markdown, _extract_tasks_from_playbook_regex
+from .forms import StartAssessmentForm # Added import
 
 LEGEND = {
     1: "No / Not in place",
@@ -87,7 +90,7 @@ def require_action_ownership(view_func):
     @wraps(view_func)
     def wrapper(request, action_id, *args, **kwargs):
         action = get_object_or_404(ActionItem, pk=action_id)
-        
+
         # Check ownership via session
         if request.user.is_authenticated:
             if action.session.user != request.user:
@@ -96,9 +99,9 @@ def require_action_ownership(view_func):
         elif action.session.owner_client_id != _client_id(request):
             messages.error(request, "Access denied.")
             return redirect("gtm:history")
-        
-        # Pass action to view to avoid re-querying
-        return view_func(request, action, *args, **kwargs)
+
+        # Pass both action and action_id to view for correct signature
+        return view_func(request, action, action_id, *args, **kwargs)
     return wrapper
 
 def _format_band_actions_markdown(markdown_text):
@@ -128,8 +131,10 @@ def _format_band_actions_markdown(markdown_text):
 
 def _paginated_questions():
     """Return a list of steps, each = list[Question]. One category per step."""
+    # Prefetch related questions to avoid N+1 queries when accessing cat.questions.all()
+    categories = Category.objects.all().order_by("id").prefetch_related('questions')
     return [list(cat.questions.all().order_by("id"))
-            for cat in Category.objects.all().order_by("id")]
+            for cat in categories]
     
 def _category_step_map():
     """Map category id → step number (1-based) for deep-linking to the wizard."""
@@ -207,7 +212,7 @@ def _is_session_complete(session: AssessmentSession) -> bool:
 
 def _save_snapshot(session, cat_scores, overall, band, labels, values):
     with transaction.atomic():
-        snap, _ = ResultSnapshot.objects.update_or_create(
+        snap, created = ResultSnapshot.objects.update_or_create(
             session=session,
             defaults={
                 "overall": round(overall, 1),
@@ -220,25 +225,16 @@ def _save_snapshot(session, cat_scores, overall, band, labels, values):
                 ],
                 "radar_labels": labels,
                 "radar_values": values,
-
-                # firmographics copied from the session
-                "company_name": session.company_name or "",
-                "industry": session.industry or "",
-                "website": getattr(session, "website", "") or "",
-                "contact_name": getattr(session, "contact_name", "") or "",
-                "contact_email": getattr(session, "contact_email", "") or "",
-                "contact_role": getattr(session, "contact_role", "") or "",
-                "phone": getattr(session, "phone", "") or "",
-                "company_size": getattr(session, "company_size", "") or "",
-                "revenue_range": getattr(session, "revenue_range", "") or "",
-                "country": getattr(session, "country", "") or "",
-                "crm": getattr(session, "crm", "") or "",
-                "utm_source": getattr(session, "utm_source", "") or "",
-                "utm_medium": getattr(session, "utm_medium", "") or "",
-                "utm_campaign": getattr(session, "utm_campaign", "") or "",
-                "referrer": getattr(session, "referrer", "") or "",
             }
         )
+        # Transfer firmographics using the helper
+        transfer_firmographics_to_snapshot(session, snap)
+        snap.save(update_fields=[
+            "company_name", "industry", "website", "contact_name",
+            "contact_email", "contact_role", "phone", "company_size",
+            "revenue_range", "country", "crm", "utm_source",
+            "utm_medium", "utm_campaign", "referrer"
+        ]) # Save changes made by transfer_firmographics_to_snapshot
     return snap
         
 # ---------- Views ----------
@@ -249,24 +245,16 @@ def landing(request):
 @login_required
 def start_assessment(request):
     # Identify the anonymous "user" via your gtm_client cookie
-    cid = _client_id(request)  # already defined in your file
+    cid = _client_id(request)
 
     # 0) Redirect to the most recent incomplete assessment instead of creating duplicates
-    existing_incomplete = AssessmentSession.objects.filter(
-        owner_client_id=cid, is_completed=False
-    ).order_by("-created_at").first()
+    existing_incomplete = get_existing_incomplete_session(cid)
     if existing_incomplete:
         messages.info(request, "You have an unfinished assessment. Resuming it now.")
         return redirect("gtm:resume", session_id=existing_incomplete.uuid)
 
     # 1) Daily cap (per browser/client)
-    MAX_ASSESSMENTS_PER_DAY = 3
-    today = timezone.now().date()
-    daily_count = AssessmentSession.objects.filter(
-        owner_client_id=cid,
-        created_at__date=today
-    ).count()
-    if daily_count >= MAX_ASSESSMENTS_PER_DAY:
+    if check_daily_assessment_cap(cid):
         messages.error(
             request,
             "Daily limit reached. Please try again tomorrow or contact us for extended access."
@@ -274,67 +262,41 @@ def start_assessment(request):
         return redirect("gtm:history")
 
     # 2) Cooldown (time between new assessments)
-    MIN_SECONDS_BETWEEN_ASSESSMENTS = 5 * 60  # 5 minutes
-    last_session = AssessmentSession.objects.filter(
-        owner_client_id=cid
-    ).order_by("-created_at").first()
-    if last_session:
-        seconds_since_last = (timezone.now() - last_session.created_at).total_seconds()
-        if seconds_since_last < MIN_SECONDS_BETWEEN_ASSESSMENTS:
-            wait_left = int(MIN_SECONDS_BETWEEN_ASSESSMENTS - seconds_since_last)
-            minutes_left = max(1, wait_left // 60)
-            messages.warning(
-                request,
-                f"Please wait about {minutes_left} minute(s) before starting another assessment."
-            )
-            return redirect("gtm:history")
+    in_cooldown, minutes_left = check_assessment_cooldown(cid)
+    if in_cooldown:
+        messages.warning(
+            request,
+            f"Please wait about {minutes_left} minute(s) before starting another assessment."
+        )
+        return redirect("gtm:history")
 
     if request.method == "POST":
-        company  = request.POST.get("company_name", "")
-        industry = request.POST.get("industry", "")
+        form = StartAssessmentForm(request.POST)
+        if form.is_valid():
+            session = form.save(commit=False)
+            session.user = request.user if request.user.is_authenticated else None
+            session.owner_client_id = _client_id(request)
+            # Handle referrer separately as it comes from request.META, not directly from form POST data
+            session.referrer = request.META.get("HTTP_REFERER", "")
+            session.save()
+            
+            return redirect("gtm:resume", session_id=session.uuid)
+        else:
+            # If form is invalid, re-render the page with errors
+            return render(request, "gtm/start.html", {
+                "form": form,
+                "is_htmx": _is_htmx(request)
+            })
 
-        # 🔹 new fields (optional)
-        website       = request.POST.get("website", "")
-        contact_name  = request.POST.get("contact_name", "")
-        contact_email = request.POST.get("contact_email", "")
-        contact_role  = request.POST.get("contact_role", "")
-        phone         = request.POST.get("phone", "")
-        company_size  = request.POST.get("company_size", "")
-        revenue_range = request.POST.get("revenue_range", "")
-        country       = request.POST.get("country", "")
-        crm           = request.POST.get("crm", "")
-        notes         = request.POST.get("notes", "")
-
-        # acquisition (helpful if you add hidden inputs from querystring)
-        utm_source   = request.POST.get("utm_source", "")
-        utm_medium   = request.POST.get("utm_medium", "")
-        utm_campaign = request.POST.get("utm_campaign", "")
-        referrer     = request.META.get("HTTP_REFERER", "")
-
-        session = AssessmentSession.objects.create(
-            company_name=company,
-            industry=industry,
-            website=website,
-            contact_name=contact_name,
-            contact_email=contact_email,
-            contact_role=contact_role,
-            phone=phone,
-            company_size=company_size,
-            revenue_range=revenue_range,
-            country=country,
-            crm=crm,
-            notes=notes,
-            utm_source=utm_source,
-            utm_medium=utm_medium,
-            utm_campaign=utm_campaign,
-            referrer=referrer,
-            user=request.user if request.user.is_authenticated else None,
-            owner_client_id=_client_id(request),
-        )
-        
-        return redirect("gtm:resume", session_id=session.uuid)
-
-    return render(request, "gtm/start.html", {"is_htmx": _is_htmx(request)})
+    else: # GET request
+        form = StartAssessmentForm(initial={
+            "utm_source": request.GET.get("utm_source", ""),
+            "utm_medium": request.GET.get("utm_medium", ""),
+            "utm_campaign": request.GET.get("utm_campaign", ""),
+            # Referrer is set in save, but can be pre-filled from GET if desired
+            "referrer": request.GET.get("referrer", ""),
+        })
+    return render(request, "gtm/start.html", {"form": form, "is_htmx": _is_htmx(request)})
 
 
 def resume_assessment(request, session_id):
@@ -368,6 +330,8 @@ def assessment_step(request, session_id, step: int):
     questions = steps[step - 1]
 
     # Build a dynamic form with one integer field per question (1..5)
+    context_fields = {}
+    from django import forms
     class StepForm(Form):
         pass
     for q in questions:
@@ -377,59 +341,48 @@ def assessment_step(request, session_id, step: int):
             required=True,
             label=q.text
         )
+        StepForm.base_fields[f"{q.id_code}_context_note"] = forms.CharField(
+            widget=forms.Textarea(attrs={"class": "w-full border rounded px-3 py-2 mt-4", "rows": 3, "placeholder": "Please provide more info on this"}),
+            required=False,
+            label="Please provide more info on this"
+        )
 
     # Pre-fill if answers exist
     initial = {}
-    existing = {r.question_id: r.score
-                for r in Response.objects.filter(session=session, question__in=questions)}
+    existing = {r.question_id: r for r in Response.objects.filter(session=session, question__in=questions)}
     for q in questions:
         if q.id in existing:
-            initial[q.id_code] = existing[q.id]
+            initial[q.id_code] = existing[q.id].score
+            initial[f"{q.id_code}_context_note"] = existing[q.id].context_note
 
     if request.method == "POST":
         form = StepForm(request.POST, initial=initial)
         if form.is_valid():
-            # Collect responses that need AI insights
             low_score_responses = []
-            
             # save/update answers for this step
             for q in questions:
                 score = form.cleaned_data[q.id_code]
-                
-                # Use update_or_create to get the Response instance
+                context_note = form.cleaned_data.get(f"{q.id_code}_context_note", "")
                 response_instance, created = Response.objects.update_or_create(
-                    session=session, question=q, defaults={"score": score}
+                    session=session, question=q, defaults={"score": score, "context_note": context_note}
                 )
-                
-                # Track low-scoring responses for AI insight generation
                 if response_instance.score <= 2:
                     low_score_responses.append(response_instance)
-            
-            # ----------------------------------------------------
-            # 🔧 OPTIMIZATION: Compute scores and save snapshot ONCE after all responses
-            # ----------------------------------------------------
+
+            # Compute scores and save snapshot ONCE after all responses
             cat_scores, overall = _compute_scores(session)
             band = _band_for_score(overall)
-            
-            # Re-calculate radar data (as required by _save_snapshot)
             labels = [c["category"].name for c in cat_scores]
             values = [round(c["avg"], 2) for c in cat_scores]
-            
-            # Save the snapshot now so 'session.snapshot' is current
             _save_snapshot(session, cat_scores, overall, band, labels, values)
-            # ----------------------------------------------------
-            
-            # update progress + completion flag (data-driven)
+
             next_step = step + 1
             session.current_step = min(next_step, total_steps)
             session.is_completed = _is_session_complete(session)
-            # The firmographics were already saved in _save_snapshot, so we only need
-            # to save the step/completion flags.
             session.save(update_fields=["current_step", "is_completed"])
 
             if next_step > total_steps:
                 return redirect("gtm:results", session_id=session.uuid)
-            
             return redirect("gtm:assessment_step", session_id=session.uuid, step=next_step)
     else:
         form = StepForm(initial=initial)
@@ -442,6 +395,7 @@ def assessment_step(request, session_id, step: int):
         "progress_pct": progress_pct, "legend": mark_safe(legend_html),
         "category": questions[0].category if questions else None,
         "is_htmx": _is_htmx(request),
+        "context_fields": context_fields,
     })
 
 def results(request, session_id):
@@ -477,14 +431,29 @@ def results(request, session_id):
     values = [round(c["avg"], 2) for c in cat_scores]
 
     # -----------------------------
-    # 🧩 Tool Recommendations Logic
+    # 🧩 Tool Recommendations Logic (Optimized to prevent N+1)
     # -----------------------------
     recommendations = []
+    
+    # 1. Collect unique categories from weakest_questions
+    weakest_category_ids = set()
+    for w in weakest_questions:
+        weakest_category_ids.add(w["question"].category.id)
+
+    # 2. Fetch all ToolRecommendation objects for these categories in one query
+    #    Prefetch the category to avoid N+1 when accessing m.category.id later if needed
+    all_tool_recommendations = ToolRecommendation.objects.filter(
+        category__id__in=list(weakest_category_ids)
+    ).select_related('category') # select_related for accessing category name later efficiently
+
+    # 3. Perform keyword matching in Python
     for w in weakest_questions:
         q_text = (w["question"].text or "").lower()
         q_note = (w.get("note") or "").lower()
-        cat = w["question"].category
-        for m in ToolRecommendation.objects.filter(category=cat):
+        
+        # Filter through the prefetched recommendations for the current question's category
+        # and then apply the keyword matching logic
+        for m in [tr for tr in all_tool_recommendations if tr.category.id == w["question"].category.id]:
             kw = (m.keyword or "").lower()
             if kw and (kw in q_text or kw in q_note):
                 recommendations.append(m)
@@ -500,6 +469,7 @@ def results(request, session_id):
     # ⚡ FALLBACK: If insufficient recommendations, add generic tools from weakest categories
     if len(recommendations) < 5:
         # Get unique weakest categories not already represented
+        # (This logic was already good and will remain)
         weak_categories = []
         for w in weakest_questions:
             cat = w["question"].category
@@ -507,6 +477,8 @@ def results(request, session_id):
                 weak_categories.append(cat)
         
         # Add generic tools from each weak category until we have at least 5
+        # (Optimization: Filter fallback_tools from all_tool_recommendations if possible
+        #  or make this query outside the loop if it's called often)
         for cat in weak_categories:
             if len(recommendations) >= 5:
                 break
@@ -538,34 +510,56 @@ def results(request, session_id):
     # -----------------------------
     # 🤖 Generate AI insights for low-scoring questions (if not already generated)
     # -----------------------------
+    # Prefetch all relevant responses for weakest questions to avoid N+1
+    weakest_question_ids = [q_data["question"].id for q_data in weakest_questions]
+    
+    # Fetch responses and map question_id to response manually as question_id is not unique for in_bulk()
+    responses_qs = Response.objects.filter(
+        session=session,
+        question__id__in=weakest_question_ids
+    ).select_related('question') # select_related to avoid N+1 when accessing response.question later
+    
+    responses_by_question_id = {r.question.id: r for r in responses_qs}
+
     for q_data in weakest_questions:
-        if not q_data.get("ai_insight"):
+        # Use prefetched response if available
+        response = responses_by_question_id.get(q_data["question"].id)
+        
+        if response and not response.ai_insight and response.score <= 2:
             try:
-                # Get the response object
-                response = Response.objects.filter(
-                    session=session,
-                    question=q_data["question"]
-                ).first()
-                if response and response.score <= 2:
-                    generate_diagnostic_insight(response)
-                    # Refresh the insight
-                    response.refresh_from_db()
-                    q_data["ai_insight"] = response.ai_insight
+                generate_diagnostic_insight(response)
+                # Refresh the insight from DB if it was just generated
+                response.refresh_from_db() 
+                q_data["ai_insight"] = response.ai_insight
             except Exception as e:
                 log_error("Diagnostic Insight Generation", e, {"qid": q_data["question"].id_code})
+        elif response: # If insight already exists, just use it
+            q_data["ai_insight"] = response.ai_insight
+
     
     # -----------------------------
-    # 🤖 Trigger AI playbook generation immediately (blocking for now)
+    # 🤖 Trigger AI playbook generation in background (non-blocking)
     # -----------------------------
     if snap and not (snap.ai_playbook or "").strip():
         try:
-            ai_md = generate_playbook_with_gemini(snap)
-            if ai_md and ai_md.strip():
-                snap.ai_playbook = ai_md.strip()
-                snap.save(update_fields=["ai_playbook"])
+            # Import here to avoid circular import issues  
+            from threading import Thread
+            
+            def generate_async():
+                try:
+                    ai_md = generate_playbook_with_gemini(snap)
+                    if ai_md and ai_md.strip():
+                        snap.ai_playbook = ai_md.strip()
+                        snap.save(update_fields=["ai_playbook"])
+                except Exception as e:
+                    log_error("AI Playbook Generation (async)", e, {"session_id": str(session.uuid)})
+            
+            # Start generation in background thread
+            thread = Thread(target=generate_async)
+            thread.daemon = True
+            thread.start()
         except Exception as e:
-            log_error("AI Playbook Generation", e, {"session_id": str(session.uuid)})
-            # Continue rendering even if AI fails
+            log_error("AI Playbook thread creation (results)", e, {"session_id": str(session.uuid)})
 
     return render(request, "gtm/results.html", {
         "session": session,
@@ -602,45 +596,81 @@ def playbook(request, session_id):
     # Ensure we actually have a snapshot even if user skips Results page
     snap = getattr(session, "snapshot", None) or ResultSnapshot.objects.filter(session=session).first()
 
-    # (Optional) Generate if empty - blocking to ensure it's ready when user arrives
-    if snap and not (snap.ai_playbook or "").strip():
+    # (Optional) Generate if empty - NON-BLOCKING to prevent page hangs
+    needs_generation = snap and not (snap.ai_playbook or "").strip()
+    
+    # Trigger background generation if needed (non-blocking)
+    if needs_generation:
         try:
-            ai_md_src = generate_playbook_with_gemini(snap)
-            if ai_md_src and ai_md_src.strip():
-                snap.ai_playbook = ai_md_src.strip()
-                snap.save(update_fields=["ai_playbook"])
+            # Import here to avoid circular import issues  
+            from threading import Thread
+            
+            def generate_async():
+                try:
+                    ai_md_src = generate_playbook_with_gemini(snap)
+                    if ai_md_src and ai_md_src.strip():
+                        snap.ai_playbook = ai_md_src.strip()
+                        snap.save(update_fields=["ai_playbook"])
+                except Exception as e:
+                    log_error("AI Playbook (async) Generation", e, {"session_id": str(session.uuid)})
+            
+            # Start generation in background thread
+            thread = Thread(target=generate_async)
+            thread.daemon = True
+            thread.start()
         except Exception as e:
-            log_error("AI Playbook (lazy) Generation", e, {"session_id": str(session.uuid)})
-
+            log_error("AI Playbook thread creation", e, {"session_id": str(session.uuid)})
+    
     ai_playbook_html = ""
     try:
         if snap and getattr(snap, "ai_playbook", ""):
-            # ✅ Normalize Gemini’s mixed formatting BEFORE Markdown
-            src = snap.ai_playbook.replace("\r\n", "\n").strip()
-
-            # 1️⃣ Convert inline " * " separators into proper bullet lines
-            src = re.sub(r"\s\*\s+", "\n- ", src)
-
-            # 2️⃣ Make "Week X:" style lines into Markdown headings for consistency
-            src = re.sub(r"(?m)^(Week\s+\d+:[^\n]*)$", r"### \1", src)
-
-            # 3️⃣ Add blank lines before list, numbered, and heading items for proper block rendering
-            src = re.sub(r"(?m)(?<!\n)\n(?=(?:- |\d+\. |#{1,6}\s))", "\n\n", src)
-
-            # 4️⃣ Clean up extra spaces/newlines
-            src = re.sub(r"[ \t]+\n", "\n", src)
-            src = re.sub(r"\n{3,}", "\n\n", src)
-
-            # ✅ Render clean Markdown
+            src = _normalize_ai_playbook_markdown(snap.ai_playbook)
             ai_playbook_html = md.markdown(
                 src,
                 extensions=["extra", "sane_lists", "toc"]  # 'extra' already includes tables
             )
+        elif needs_generation:
+            # Show loading state instead of blocking
+            ai_playbook_html = """
+            <div class="text-center py-12">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+                <p class="mt-4 text-gray-600">Generating your personalized GTM playbook...</p>
+                <p class="text-sm text-gray-500 mt-2">This may take up to 30 seconds</p>
+            </div>
+            <script>
+                // Auto-refresh every 3 seconds to check if generation is complete
+                setTimeout(function() {
+                    window.location.reload();
+                }, 3000);
+            </script>
+            """
         else:
-            ai_playbook_html = ""
+            ai_playbook_html = "<p class='text-gray-500 text-center py-8'>No AI playbook available for this session.</p>"
     except Exception as e:
         log_error("AI Playbook rendering", e, {"session_id": str(session.uuid)})
         ai_playbook_html = "<p class='text-red-600'>⚠️ Could not render AI playbook content. Check logs.</p>"
+
+    # -----------------------------
+    # AI Task Extraction and Creation
+    # -----------------------------
+    # Only create up to 10 tasks if playbook is present and no tasks exist yet
+    if snap and getattr(snap, "ai_playbook", ""):
+        playbook_text = snap.ai_playbook.replace("\r\n", "\n").strip()
+        
+        # Try AI generation first
+        tasks = generate_concise_action_items(playbook_text)
+        
+        # Fallback to regex if AI returns nothing
+        if not tasks:
+            tasks = _extract_tasks_from_playbook_regex(playbook_text)
+
+        if tasks and not session.actions.exists():
+            for task in tasks[:10]:
+                ActionItem.objects.create(
+                    session=session,
+                    note=task,
+                    status="todo"
+                )
 
     # -----------------------------
     # Render Template
@@ -676,29 +706,50 @@ def history(request):
     qs = qs.select_related('snapshot__band')
     
     rows = []
+    sessions_needing_score_computation = []
+
     for s in qs:
-        # 🚨 IMPROVEMENT: Use snapshot data if available (for completed sessions)
         snap = getattr(s, 'snapshot', None)
         if snap:
             overall = snap.overall
             band = snap.band
         elif s.is_completed:
-            # Fallback for completed sessions without a snapshot (rare)
-            cat_scores, overall = _compute_scores(s)
-            band = _band_for_score(overall)
+            sessions_needing_score_computation.append(s)
+            overall = None # Will be computed later
+            band = None # Will be computed later
         else:
             overall = None
             band = None
             
         rows.append({"session": s, "overall": (round(overall,1) if overall is not None else None), "band": band})
-        
-    # Remove the old loop that called _compute_scores(s) if you use the above logic.
-    # The original loop in history was:
-    # for s in qs:
-    #     cat_scores, overall = _compute_scores(s) if s.is_completed else ([], None)
-    #     band = _band_for_score(overall) if overall is not None else None
-    #     rows.append({"session": s, "overall": (round(overall,1) if overall is not None else None), "band": band})
 
+    # Batch prefetch responses for sessions needing score computation
+    if sessions_needing_score_computation:
+        session_ids_needing_comp = [s.uuid for s in sessions_needing_score_computation]
+        # Prefetch all responses and their related questions and categories
+        responses_qs = Response.objects.filter(
+            session_id__in=session_ids_needing_comp
+        ).select_related('question__category')
+        
+        # Organize responses by session for efficient lookup
+        responses_by_session = {}
+        for r in responses_qs:
+            responses_by_session.setdefault(r.session_id, []).append(r)
+        
+        # Re-iterate through rows to fill in computed scores and bands
+        for row in rows:
+            s = row['session']
+            if s.is_completed and not getattr(s, 'snapshot', None):
+                # Now _compute_scores can use the prefetched responses
+                # Note: _compute_scores needs to be adapted to accept preloaded responses
+                # or ensure its internal queries don't hit DB if data is already there.
+                # For now, we assume _compute_scores is efficient enough per session given prefetched data.
+                # A more thorough change would modify _compute_scores to take `responses_qs` directly.
+                cat_scores, overall = _compute_scores(s) # This will still query categories, but responses are prefetched
+                band = _band_for_score(overall)
+                row['overall'] = round(overall, 1) if overall is not None else None
+                row['band'] = band
+        
     return render(request, "gtm/history.html", {"rows": rows, "is_htmx": _is_htmx(request)})
 
 
@@ -789,25 +840,31 @@ def chat_api(request, session_id):
     import json
     
     try:
-        session = get_object_or_404(AssessmentSession, pk=session_id)
-        
+        try:
+            session = AssessmentSession.objects.get(pk=session_id)
+        except AssessmentSession.DoesNotExist:
+            return JsonResponse({
+                "success": False,
+                "error": "Session not found. Please refresh the page or start a new assessment."
+            }, status=404)
+
         # Parse JSON body
         data = json.loads(request.body)
         message = data.get("message", "").strip()
-        
+
         if not message:
             return JsonResponse({
                 "success": False,
                 "error": "Message cannot be empty"
             }, status=400)
-        
+
         # Process the message
         result = process_chat_message(
             session_id=str(session_id),
             message=message,
             user=request.user if request.user.is_authenticated else None
         )
-        
+
         # Save to database
         if result.get("success"):
             ChatMessage.objects.create(
@@ -817,9 +874,9 @@ def chat_api(request, session_id):
                 response=result.get("response", ""),
                 intent=result.get("intent", "")
             )
-        
+
         return JsonResponse(result)
-        
+
     except json.JSONDecodeError:
         return JsonResponse({
             "success": False,

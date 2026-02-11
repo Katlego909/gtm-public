@@ -1,0 +1,5 @@
+{% for gap in gap_analysis %}
+    {% include "dashboard/partials/_gap_analysis_row.html" with gap=gap %}
+{% empty %}
+    <tr><td colspan="8" class="px-4 py-10 text-center text-gray-400 italic">No gap analysis data found.</td></tr>
+{% endfor %}

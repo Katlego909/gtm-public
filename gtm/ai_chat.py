@@ -14,6 +14,7 @@ from django.conf import settings
 from django.shortcuts import get_object_or_404
 from .models import AssessmentSession, ResultSnapshot, Response, Question, Category, ActionItem
 from .views import _compute_scores, _band_for_score
+from .utils_logging import log_ai_error
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +45,7 @@ def _init_gemini_chat():
         genai.configure(api_key=api_key)
         return genai.GenerativeModel("models/gemini-2.5-flash")
     except Exception as e:
-        logger.error(f"Gemini chat init failed: {e}")
+        log_ai_error("Gemini chat initialization", e, service="google", model="gemini-2.5-flash")
         return None
 
 # ================================================================
@@ -139,6 +140,11 @@ def build_session_context(session: AssessmentSession) -> Dict[str, Any]:
         "done": actions.filter(status="done").count()
     }
     
+    # Collect all context notes for this session
+    context_notes = []
+    for resp in Response.objects.filter(session=session).exclude(context_note="").select_related('question'):
+        context_notes.append(f"{resp.question.text}: {resp.context_note}")
+
     context = {
         "company_name": session.company_name or "your company",
         "industry": session.industry or "your industry",
@@ -169,9 +175,9 @@ def build_session_context(session: AssessmentSession) -> Dict[str, Any]:
         ],
         "weak_questions": weak_questions,
         "action_items": action_summary,
-        "has_playbook": bool(snap and snap.ai_playbook)
+        "has_playbook": bool(snap and snap.ai_playbook),
+        "context_notes": context_notes,
     }
-    
     return context
 
 # ================================================================
@@ -416,7 +422,8 @@ def handle_general_chat(session: AssessmentSession, context: Dict, message: str)
             for q in context['weak_questions']
         ])
     
-    # Build a rich system prompt with COMPLETE context
+    # Build a rich system prompt with COMPLETE context, including user-provided context notes
+    context_notes_text = "\n".join(context.get('context_notes', []))
     system_prompt = f"""You are an expert Go-To-Market consultant directly assisting {context['company_name']} in the {context['industry']} industry.
 
 CRITICAL: You have COMPLETE access to their assessment data. NEVER say you don't know or can't access information. Always answer using the data provided below.
@@ -446,6 +453,9 @@ Action Items Status:
 - Completed: {context['action_items']['done']}
 
 AI Playbook Available: {"Yes" if context['has_playbook'] else "No"}
+
+=== USER-PROVIDED CONTEXT NOTES ===
+{context_notes_text if context_notes_text else 'No extra context provided.'}
 
 === YOUR INSTRUCTIONS ===
 1. ALWAYS answer questions using the specific data above
@@ -479,7 +489,14 @@ Provide a helpful, specific answer using the assessment data above:"""
         
         return response.text.strip()
     except Exception as e:
-        logger.error(f"Gemini chat error: {e}")
+        log_ai_error(
+            "General chat response",
+            e,
+            service="google",
+            model="gemini-2.5-flash",
+            prompt=system_prompt,
+            extra={"session_id": session.uuid},
+        )
         
         # Smart fallback responses based on common questions
         msg_lower = message.lower()

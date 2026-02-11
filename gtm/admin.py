@@ -5,6 +5,7 @@ from django.utils.html import format_html
 from django.contrib import messages
 from .utils_email import send_snapshot_report_email
 from .models import AssessmentSession, ResultSnapshot, RecommendationBand, Category, Question, Response, ActionItem, ToolRecommendation, ChatMessage
+from dashboard.models import GapAnalysisMetric
 
 @admin.action(description="Resend report email")
 def resend_report(modeladmin, request, queryset):
@@ -167,7 +168,12 @@ class AssessmentSessionAdmin(admin.ModelAdmin):
 admin.site.register(RecommendationBand)
 admin.site.register(Category)
 admin.site.register(Question)
-admin.site.register(Response)
+@admin.register(Response)
+class ResponseAdmin(admin.ModelAdmin):
+    list_display = ("session", "question", "score", "context_note", "ai_insight")
+    search_fields = ("session__company_name", "question__text", "context_note", "ai_insight")
+    list_filter = ("session", "question")
+    readonly_fields = ()
 admin.site.register(ActionItem)
 admin.site.register(ToolRecommendation)
 
@@ -182,3 +188,9 @@ class ChatMessageAdmin(admin.ModelAdmin):
     def message_preview(self, obj):
         return obj.message[:60] + "..." if len(obj.message) > 60 else obj.message
     message_preview.short_description = "Message"
+
+@admin.register(GapAnalysisMetric)
+class GapAnalysisMetricAdmin(admin.ModelAdmin):
+    list_display = ('metric', 'category', 'current', 'target', 'priority')
+    list_filter = ('category', 'priority')
+    search_fields = ('metric', 'recommendation')

@@ -4,6 +4,9 @@ from django.conf import settings
 from django.contrib.postgres.fields import ArrayField 
 from django.core.serializers.json import DjangoJSONEncoder
 
+# Import workspace models so Django can find them
+from .models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation
+
 class Category(models.Model):
     name = models.CharField(max_length=50, unique=True)
     weight = models.FloatField(default=1.0)  # Demand 0.4, Conversion 0.4, Delivery 0.2 (normalized later)
@@ -31,6 +34,16 @@ class AssessmentSession(models.Model):
         on_delete=models.CASCADE,
         null=True, blank=True,
         related_name="gtm_sessions"
+    )
+    
+    # Workspace relationship for collaboration
+    # Will be populated after workspace models are migrated
+    workspace = models.ForeignKey(
+        'Workspace',
+        on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name="assessments",
+        help_text="Workspace this assessment belongs to"
     )
 
     # Existing
@@ -76,6 +89,7 @@ class Response(models.Model):
     score = models.PositiveSmallIntegerField()  # 1..5
     
     ai_insight = models.TextField(blank=True, default="")
+    context_note = models.TextField(blank=True, default="")  # User-provided business context
 
     class Meta:
         unique_together = ("session", "question")
@@ -95,13 +109,34 @@ class RecommendationBand(models.Model):
 
 class ActionItem(models.Model):
     STATUS_CHOICES = [("todo","To do"),("doing","In progress"),("done","Done")]
-    session = models.ForeignKey(AssessmentSession, on_delete=models.CASCADE, related_name="actions")
+    session = models.ForeignKey(AssessmentSession, on_delete=models.CASCADE, related_name="actions", null=True, blank=True)
     question = models.ForeignKey(Question, on_delete=models.CASCADE, null=True, blank=True)
+    
+    # Workspace and team collaboration
+    workspace = models.ForeignKey(
+        'Workspace',
+        on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name="action_items",
+        help_text="Workspace this action item belongs to"
+    )
+    
     note = models.CharField(max_length=240)
-    owner = models.CharField(max_length=120, blank=True)
+    owner = models.CharField(max_length=120, blank=True)  # Legacy field, kept for compatibility
+    
+    # Team assignment fields
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="assigned_action_items",
+        help_text="Team member assigned to this action item"
+    )
+    
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="todo")
     due_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     
 class ToolRecommendation(models.Model):
     category = models.ForeignKey("Category", on_delete=models.CASCADE)

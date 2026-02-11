@@ -1,0 +1,40 @@
+{% extends 'dashboard/base.html' %}
+{% load static %}
+
+{% block title %}Dashboard Overview{% endblock %}
+
+{% block content %}
+    {% include 'dashboard/partials/dashboard_content.html' %}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/dashboard-charts.js' %}"></script>
+<script>
+    function initDashboard() {
+        const chartDataElement = document.getElementById('dashboard-chart-data');
+        if (chartDataElement) {
+            try {
+                const chartData = JSON.parse(chartDataElement.textContent);
+                initializeDashboardCharts(chartData);
+            } catch (e) {
+                console.error("Failed to parse chart data:", e);
+            }
+        }
+    }
+
+    // Initial load
+    document.addEventListener('DOMContentLoaded', function() {
+        initDashboard();
+    });
+
+    // Re-initialize after HTMX swap
+    document.body.addEventListener('htmx:afterSwap', function(event) {
+        // Check if the swapped content is our main dashboard area
+        if (event.detail.target.id === 'main-content') {
+            // The new content with the chart data script is now in the DOM
+            initDashboard();
+        }
+    });
+</script>
+{% endblock %}
+

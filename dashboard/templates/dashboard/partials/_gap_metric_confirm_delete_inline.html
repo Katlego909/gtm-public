@@ -1,0 +1,29 @@
+<tr id="gap-metric-{{ instance.id }}">
+    <td colspan="8" class="px-4 py-3 bg-red-50 border-t border-b border-red-200">
+        <form hx-post="{% url 'delete_gap_metric' pk=instance.id %}" 
+              hx-target="#gap-metric-{{ instance.id }}"
+              hx-swap="outerHTML swap:0.3s"
+              class="flex items-center justify-between w-full">
+            {% csrf_token %}
+            <div class="flex items-center text-red-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+                <span class="font-medium text-sm">Delete <strong>{{ instance.metric }}</strong>?</span>
+            </div>
+            <div class="flex gap-3">
+                <button type="button"
+                        hx-get="{% url 'get_gap_metric_row' pk=instance.id %}" 
+                        hx-target="#gap-metric-{{ instance.id }}" 
+                        hx-swap="outerHTML"
+                        class="text-sm text-gray-600 hover:text-gray-900 font-medium px-3 py-1.5 rounded hover:bg-gray-100 transition-colors">
+                    Cancel
+                </button>
+                <button type="submit" 
+                        class="text-sm text-white bg-red-600 hover:bg-red-700 font-medium px-3 py-1.5 rounded shadow-sm transition-colors">
+                    Delete
+                </button>
+            </div>
+        </form>
+    </td>
+</tr>

@@ -4,7 +4,7 @@
 <div class="max-w-6xl mx-auto">
   <!-- Page Header -->
   <div class="mb-8">
-    <h1 class="text-4xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">
+    <h1 class="text-4xl font-bold mb-2 text-indigo-600">
       {% if user.is_authenticated %}
         My Assessment History
       {% else %}
@@ -59,7 +59,7 @@
               <!-- Left Side: Info -->
               <div class="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
                 <!-- Icon -->
-                <div class="h-12 w-12 sm:h-14 sm:w-14 bg-gradient-to-br from-indigo-600 to-blue-500 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                <div class="h-12 w-12 sm:h-14 sm:w-14 bg-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
                   <i class="fas fa-chart-line text-white text-lg sm:text-xl"></i>
                 </div>
                 
@@ -98,7 +98,7 @@
                         <!-- Score Display -->
                         <div class="flex items-center gap-1.5 sm:gap-2">
                           <span class="text-xs sm:text-sm text-gray-600">Score:</span>
-                          <span class="text-xl sm:text-2xl font-bold bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">
+                          <span class="text-xl sm:text-2xl font-bold text-indigo-600">
                             {{ r.overall }}
                           </span>
                           <span class="text-gray-400 text-xs sm:text-sm">/100</span>
@@ -139,7 +139,7 @@
                      hx-select="#main-content"
                      hx-swap="innerHTML swap:200ms" 
                      hx-push-url="true"
-                     class="flex-1 lg:flex-none inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-xl text-xs sm:text-sm font-semibold hover:shadow-lg transition transform hover:scale-105 whitespace-nowrap">
+                     class="flex-1 lg:flex-none inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-indigo-600 text-white rounded-xl text-xs sm:text-sm font-semibold hover:shadow-lg transition transform hover:scale-105 whitespace-nowrap">
                     <i class="fas fa-chart-bar"></i>
                     <span class="hidden sm:inline">View Results</span>
                     <span class="sm:hidden">Results</span>
@@ -168,7 +168,7 @@
                      hx-select="#main-content"
                      hx-swap="innerHTML swap:200ms" 
                      hx-push-url="true"
-                     class="flex-1 lg:flex-none inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-gradient-to-r from-indigo-600 to-blue-500 text-white rounded-xl text-xs sm:text-sm font-semibold hover:shadow-lg transition transform hover:scale-105 whitespace-nowrap">
+                     class="flex-1 lg:flex-none inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-indigo-600 text-white rounded-xl text-xs sm:text-sm font-semibold hover:shadow-lg transition transform hover:scale-105 whitespace-nowrap">
                     <i class="fas fa-play"></i>
                     <span>Continue</span>
                   </a>
@@ -183,7 +183,7 @@
   {% else %}
     <!-- Empty State -->
     <div class="bg-white rounded-2xl shadow-lg border border-gray-200 p-12 text-center">
-      <div class="h-24 w-24 bg-gradient-to-br from-indigo-100 to-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+      <div class="h-24 w-24 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
         <i class="fas fa-chart-line text-indigo-600 text-4xl"></i>
       </div>
       <h3 class="text-2xl font-bold text-gray-900 mb-3">No Assessments Yet</h3>
@@ -196,7 +196,7 @@
          hx-select="#main-content"
          hx-swap="innerHTML swap:200ms" 
          hx-push-url="true"
-         class="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-600 to-blue-500 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg transition transform hover:scale-105">
+         class="inline-flex items-center gap-2 bg-indigo-600 text-white px-8 py-3 rounded-xl font-semibold hover:bg-indigo-700 hover:shadow-lg transition transform hover:scale-105">
         <i class="fas fa-plus-circle"></i>
         Start Your First Assessment
       </a>
@@ -205,7 +205,7 @@
 
   <!-- Quick Action CTA (only show if they have assessments) -->
   {% if rows %}
-    <div class="mt-8 bg-gradient-to-r from-indigo-600 to-blue-500 rounded-2xl shadow-lg p-8 text-center text-white">
+    <div class="mt-8 bg-indigo-600 rounded-2xl shadow-lg p-8 text-center text-white">
       <h3 class="text-2xl font-bold mb-3">Ready for Another Assessment?</h3>
       <p class="text-indigo-100 mb-6 max-w-2xl mx-auto">
         Track your GTM improvements over time by taking regular assessments and comparing your scores.

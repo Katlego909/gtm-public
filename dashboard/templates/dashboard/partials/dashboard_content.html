@@ -1,0 +1,693 @@
+<header class="hidden md:flex h-16 bg-white border-b border-gray-200 justify-between items-center px-8 flex-shrink-0">
+    <div class="flex items-center gap-6">
+        <h1 class="text-xl font-bold text-gray-800">Dashboard Overview</h1>
+        
+        <!-- Workspace Selector -->
+        {% if user_workspaces %}
+            <div class="flex items-center gap-3">
+                <label class="text-sm text-gray-600">Workspace:</label>
+                <select id="workspace-selector" 
+                        name="workspace"
+                        class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                        hx-get="/dashboard/"
+                        hx-target="body"
+                        hx-trigger="change"
+                        hx-push-url="true">
+                    {% for workspace in user_workspaces %}
+                        <option value="{{ workspace.id }}" 
+                                {% if current_workspace and current_workspace.id == workspace.id %}selected{% endif %}>
+                            {{ workspace.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+                
+                <button onclick="openWorkspaceModal()" 
+                        class="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                        title="Create or manage workspaces">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                    </svg>
+                </button>
+                
+                {% if current_workspace %}
+                    <span class="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full 
+                                 bg-indigo-100 text-indigo-700">
+                        {{ team_members|length }} member{{ team_members|length|pluralize }}
+                    </span>
+                    
+                    <button onclick="openInviteModal()" 
+                            class="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                            title="Invite team members">
+                        Invite
+                    </button>
+                {% endif %}
+            </div>
+        {% else %}
+            <button onclick="openWorkspaceModal()" 
+                    class="px-4 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+                Create Workspace
+            </button>
+        {% endif %}
+    </div>
+    
+    <div class="flex items-center gap-6">
+        <div class="relative">
+            <input type="search" placeholder="Search..." 
+                   class="pl-10 pr-4 py-2 w-64 text-sm bg-gray-50 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all">
+            <svg class="absolute left-3 top-2.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+        </div>
+        
+        <div class="flex items-center gap-3 pl-6 border-l border-gray-200">
+            <div class="text-right hidden lg:block">
+                <div class="text-sm font-bold text-gray-900">{{ request.user.get_full_name|default:request.user.username }}</div>
+                <div class="text-xs text-gray-500">{{ request.user.email|default:"Logged in" }}</div>
+            </div>
+            <button type="button"
+                    hx-get="{% url 'profile' %}"
+                    hx-target="#main-content"
+                    hx-push-url="true"
+                    class="w-10 h-10 rounded-full bg-indigo-100 border-2 border-white shadow-sm flex items-center justify-center text-indigo-700 font-bold text-sm hover:bg-indigo-200 transition-colors cursor-pointer">
+                {{ request.user.username|slice:":2"|upper }}
+            </button>
+        </div>
+    </div>
+</header>
+
+<div class="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50">
+    
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8">
+        <div class="bg-white rounded-xl p-5 md:p-6 shadow-sm border border-gray-100 flex items-center justify-between">
+            <div>
+                <p class="text-xs md:text-sm font-medium text-gray-500 uppercase tracking-wider">Total Sessions</p>
+                <p class="text-2xl md:text-3xl font-bold text-gray-900 mt-1">{{ total_sessions }}</p>
+                <div class="flex items-center mt-2 text-xs font-medium {% if sessions_change_positive %}text-green-600 bg-green-50{% else %}text-red-600 bg-red-50{% endif %} px-2 py-1 rounded w-fit">
+                    {% if sessions_has_meaningful_change %}
+                        {% if sessions_change_positive %}↑{% else %}↓{% endif %} {{ sessions_change }}% {% if sessions_change_positive %}increase{% else %}decrease{% endif %}
+                    {% elif total_sessions > 0 %}
+                        <span class="text-gray-600 bg-gray-50">No change this week</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="w-14 h-14 md:w-16 md:h-16">
+                <canvas id="kpiSessions"></canvas>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl p-5 md:p-6 shadow-sm border border-gray-100 flex items-center justify-between">
+            <div>
+                <p class="text-xs md:text-sm font-medium text-gray-500 uppercase tracking-wider">Completed</p>
+                <p class="text-2xl md:text-3xl font-bold text-gray-900 mt-1">{{ completed_items }}</p>
+                <div class="flex items-center mt-2 text-xs font-medium {% if completed_change_positive %}text-green-600 bg-green-50{% else %}text-red-600 bg-red-50{% endif %} px-2 py-1 rounded w-fit">
+                    {% if completed_has_meaningful_change %}
+                        {% if completed_change_positive %}↑{% else %}↓{% endif %} {{ completed_change }}% {% if completed_change_positive %}increase{% else %}decrease{% endif %}
+                    {% elif completed_items > 0 %}
+                        <span class="text-gray-600 bg-gray-50">No change this week</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="w-14 h-14 md:w-16 md:h-16">
+                <canvas id="kpiCompleted"></canvas>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl p-5 md:p-6 shadow-sm border border-gray-100 flex items-center justify-between">
+            <div>
+                <p class="text-xs md:text-sm font-medium text-gray-500 uppercase tracking-wider">Pending</p>
+                <p class="text-2xl md:text-3xl font-bold text-gray-900 mt-1">{{ pending_items }}</p>
+                <div class="flex items-center mt-2 text-xs font-medium {% if pending_change_positive %}text-green-600 bg-green-50{% else %}text-red-600 bg-red-50{% endif %} px-2 py-1 rounded w-fit">
+                    {% if pending_has_meaningful_change %}
+                        {% if pending_change_positive %}↓{% else %}↑{% endif %} {{ pending_change }}% {% if pending_change_positive %}decrease{% else %}increase{% endif %}
+                    {% elif pending_items > 0 %}
+                        <span class="text-orange-600 bg-orange-50">Needs Attention</span>
+                    {% elif pending_items == 0 %}
+                        <span class="text-green-600 bg-green-50">All Clear!</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="w-14 h-14 md:w-16 md:h-16">
+                <canvas id="kpiPending"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- GTM Assessment History & Trends -->
+    {% if assessment_stats %}
+    <div class="bg-indigo-50 rounded-xl p-6 shadow-sm border border-indigo-100 mb-8">
+        <div class="flex justify-between items-center mb-4">
+            <div>
+                <h3 class="text-lg font-bold text-indigo-900 flex items-center gap-2">
+                    <span class="inline-block bg-indigo-100 text-indigo-600 rounded-full p-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                    </span>
+                    Assessment History & Trends
+                </h3>
+                <p class="text-sm text-indigo-600 mt-1">Track your GTM improvement over time</p>
+            </div>
+            <a href="{% url 'gtm:history' %}" 
+               class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm">
+                View All
+            </a>
+        </div>
+        
+        <!-- Summary Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-lg p-4 shadow-sm">
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Total Assessments</p>
+                <p class="text-3xl font-bold text-indigo-900">{{ assessment_stats.total }}</p>
+            </div>
+            <div class="bg-white rounded-lg p-4 shadow-sm">
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Latest Score</p>
+                <p class="text-3xl font-bold text-indigo-900">{{ assessment_stats.latest_score }}</p>
+            </div>
+            <div class="bg-white rounded-lg p-4 shadow-sm">
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Average Score</p>
+                <p class="text-3xl font-bold text-indigo-900">{{ assessment_stats.average }}</p>
+            </div>
+            <div class="bg-white rounded-lg p-4 shadow-sm">
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Improvement</p>
+                <p class="text-3xl font-bold {% if assessment_stats.improvement >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                    {% if assessment_stats.improvement > 0 %}+{% endif %}{{ assessment_stats.improvement }}
+                </p>
+            </div>
+        </div>
+        
+        <!-- Score Trend Chart -->
+        {% if score_trend_data.scores|length > 1 %}
+        <div class="bg-white rounded-lg p-4 shadow-sm mb-4">
+            <h4 class="text-sm font-semibold text-gray-700 mb-3">Score Trend</h4>
+            <div class="relative h-48">
+                <canvas id="scoreTrendChart"></canvas>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Recent Assessments Table -->
+        <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+            <table class="w-full">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Company</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Industry</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Score</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Stage</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Action</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for assessment in assessment_history %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ assessment.company_name }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600">{{ assessment.industry }}</td>
+                        <td class="px-4 py-3 text-sm font-bold text-indigo-900">{{ assessment.overall_score }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600">{{ assessment.band_stage }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-500">{{ assessment.created_at|date:"M d, Y" }}</td>
+                        <td class="px-4 py-3 text-sm">
+                            <a href="{% url 'gtm:results' assessment.uuid %}" 
+                               class="text-indigo-600 hover:text-indigo-800 font-medium">
+                                View Report
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-8">
+        <div class="bg-white rounded-xl p-5 md:p-6 shadow-sm border border-gray-100 flex flex-col">
+            <h3 class="text-lg font-bold text-gray-800 mb-1">Weekly Activity</h3>
+            <div class="relative h-64 w-full">
+                <canvas id="sessionsChart"></canvas>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl p-5 md:p-6 shadow-sm border border-gray-100 flex flex-col">
+            <h3 class="text-lg font-bold text-gray-800 mb-1">Status Breakdown</h3>
+            <div class="relative flex-1 flex items-center justify-center min-h-[250px]">
+                <canvas id="statusDonut"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Action Items Kanban -->
+    {% include 'dashboard/partials/action_items.html' %}
+
+    <!-- Channel Distribution Card -->
+    <div class="bg-white rounded-xl p-5 md:p-6 shadow-sm border border-gray-100 flex flex-col mb-8">
+        <h3 class="text-lg font-bold text-gray-800 mb-1">Channel Distribution</h3>
+        <p class="text-sm text-gray-500 mb-4">Revenue contribution by acquisition channel</p>
+        <div class="flex flex-col md:flex-row gap-6 items-center">
+            <div class="relative w-40 h-40 flex-shrink-0">
+                <canvas id="channelDonut"></canvas>
+            </div>
+            <div class="flex-1 flex flex-col gap-4">
+                {% for channel in channel_data %}
+                <div class="flex items-center gap-4">
+                    <span class="w-3 h-3 rounded-full" style="background: {{ channel.color }};"></span>
+                    <div>
+                        <div class="font-semibold text-gray-800">{{ channel.name }}</div>
+                        <div class="text-xs text-gray-500">{{ channel.percent }}% of revenue</div>
+                    </div>
+                    <span class="ml-auto px-3 py-1 rounded text-xs font-semibold"
+                        style="background: {% if channel.change > 0 %}#FEF3C7{% else %}#FEE2E2{% endif %}; color: {% if channel.change > 0 %}#F59E42{% else %}#EF4444{% endif %};">
+                        ↘ {{ channel.change }}%
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Detailed Gap Analysis -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mt-8">
+                        <div class="flex justify-between items-center mb-2">
+                            <div>
+                                <h3 class="text-lg font-bold text-gray-800 mb-1">Detailed Gap Analysis</h3>
+                                <p class="text-sm text-gray-500">Actionable insights to close growth gaps</p>
+                            </div>
+                            <div class="flex items-center gap-4">
+                                <button type="button"
+                                        hx-get="{% url 'add_gap_metric' %}" 
+                                        hx-target="#modal-content" 
+                                        onclick="openModal()"
+                                        class="cursor-pointer px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm transition-colors">
+                                    Add Metric
+                                </button>
+                                <a href="{{ gap_report_url }}" class="text-sm text-purple-600 font-semibold hover:underline" target="_blank">View full report <span aria-hidden="true">↗</span></a>
+                            </div>
+                        </div>
+                        {% include 'dashboard/partials/gap_analysis_table.html' %}
+                    </div>
+
+
+    <div class="h-12"></div>
+    <!-- Top Tool Recommendations -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mt-8">
+        <h3 class="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+            <span class="inline-block bg-indigo-100 text-indigo-600 rounded-full p-2 mr-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m4 0h-1v-4h-1m4 0h-1v-4h-1" /></svg>
+            </span>
+            Top Tool Recommendations
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for tool in top_tools %}
+            <div class="bg-gray-50 rounded-lg p-4 flex flex-col gap-2 shadow-sm border border-gray-200">
+                <div class="flex items-center gap-2">
+                    <span class="font-semibold text-indigo-700">{{ tool.keyword }}</span>
+                    {% if tool.url %}<a href="{{ tool.url }}" class="text-xs text-blue-600 underline ml-2" target="_blank">Link</a>{% endif %}
+                </div>
+                <div class="text-sm text-gray-600">{{ tool.description }}</div>
+                <div class="text-xs text-gray-400">Tools: 
+                    <span class="text-indigo-600">
+                        {% for t in tool.tools_list %}
+                            {{ t }}{% if not forloop.last %}, {% endif %}
+                        {% endfor %}
+                    </span>
+                </div>
+            </div>
+            {% empty %}
+            <div class="text-gray-400 italic">No tools found.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Recent AI Insights -->
+                    
+
+
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mt-8">
+        <h3 class="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+            <span class="inline-block bg-green-100 text-green-600 rounded-full p-2 mr-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 21v-2a4 4 0 00-3-3.87M4 21v-2a4 4 0 013-3.87M12 3v4m0 0a4 4 0 014 4v4a4 4 0 01-4 4m0-12a4 4 0 00-4 4v4a4 4 0 004 4" /></svg>
+            </span>
+            Recent AI Insights
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for insight in insights %}
+            <div class="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-5 flex flex-col gap-3 shadow-sm border border-green-100 hover:shadow-md transition-shadow">
+                <div class="flex items-center justify-between">
+                    <h4 class="font-bold text-green-800 text-base">{{ insight.company_name }}</h4>
+                    <span class="px-3 py-1 bg-green-600 text-white text-xs font-semibold rounded-full shadow-sm">
+                        AI Generated
+                    </span>
+                </div>
+                
+                <div class="insight-preview">
+                    {% if insight.playbook_html %}
+                        {{ insight.playbook_html|safe|truncatewords_html:50 }}
+                    {% else %}
+                        <span class="text-gray-400 italic">No playbook available.</span>
+                    {% endif %}
+                </div>
+                
+                <div class="flex gap-2 mt-auto pt-2 border-t border-green-200">
+                    <button 
+                        class="flex-1 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors shadow-sm"
+                        onclick="openInsightModal('{{ insight.id }}')"
+                    >
+                        <span class="flex items-center justify-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
+                            </svg>
+                            View Details
+                        </span>
+                    </button>
+                    <button 
+                        class="px-4 py-2 bg-white text-green-700 text-sm font-medium rounded-lg hover:bg-green-50 border border-green-300 transition-colors"
+                        onclick="exportInsight('{{ insight.id }}')"
+                    >
+                        <span class="flex items-center justify-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            Export
+                        </span>
+                    </button>
+                </div>
+                <div id="insight-modal-{{ insight.id }}" class="fixed inset-0 z-50 hidden bg-black bg-opacity-50 flex items-center justify-center p-4">
+                    <div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full relative flex flex-col" style="max-height:85vh;">
+                        <div class="flex items-center justify-between p-6 border-b border-gray-200">
+                            <h4 class="text-2xl font-bold text-green-700 flex items-center gap-2">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                                </svg>
+                                {{ insight.company_name }}
+                            </h4>
+                            <button class="text-gray-400 hover:text-gray-600 text-3xl font-light focus:outline-none" onclick="closeInsightModal('{{ insight.id }}')" aria-label="Close">&times;</button>
+                        </div>
+                        
+                        <div class="overflow-y-auto px-6 py-4" style="max-height:55vh;">
+                            <div class="insight-content">
+                                {% if insight.playbook_html %}
+                                    {{ insight.playbook_html|safe }}
+                                {% else %}
+                                    <p class="text-gray-400 italic">No playbook available.</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        
+                        <div class="border-t border-gray-200 p-6 bg-gray-50">
+                            <form hx-post="{% url 'insight_feedback' pk=insight.id %}" hx-swap="outerHTML" class="flex flex-col gap-3">
+                                {% csrf_token %}
+                                <label for="feedback-{{ insight.id }}" class="text-sm font-semibold text-gray-700">Share Your Feedback:</label>
+                                <textarea id="feedback-{{ insight.id }}" name="feedback" rows="3" 
+                                          placeholder="Tell us what you think about this AI insight..."
+                                          class="border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-transparent"></textarea>
+                                <button type="submit" class="px-6 py-2 bg-green-600 text-white font-medium rounded-lg hover:bg-green-700 transition-colors shadow-sm">
+                                    Submit Feedback
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-span-2 text-center py-12 text-gray-400 italic">No AI insights available yet.</div>
+            {% endfor %}
+                <script>
+                function openInsightModal(id) {
+                    document.getElementById('insight-modal-' + id).classList.remove('hidden');
+                    document.body.style.overflow = 'hidden';
+                }
+                function closeInsightModal(id) {
+                    document.getElementById('insight-modal-' + id).classList.add('hidden');
+                    document.body.style.overflow = 'auto';
+                }
+                function exportInsight(id) {
+                    window.location.href = '/dashboard/insight/' + id + '/export/';
+                }
+                </script>
+        </div>
+    </div>
+
+    <!-- Recent Chat Messages -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mt-8">
+        <h3 class="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+            <span class="inline-block bg-pink-100 text-pink-600 rounded-full p-2 mr-2">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8a9 9 0 100-18 9 9 0 000 18z" /></svg>
+            </span>
+            Recent Chat Messages
+        </h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for chat in recent_chats %}
+            <div class="bg-gray-50 rounded-lg p-4 flex flex-col gap-2 shadow-sm border border-gray-200">
+                <div class="flex items-center gap-2">
+                    <span class="font-semibold text-pink-700">{{ chat.message }}</span>
+                    <span class="text-xs text-gray-500 ml-auto">{{ chat.created_at|date:'Y-m-d H:i' }}</span>
+                </div>
+                <div class="text-xs text-gray-400">→ {{ chat.response|truncatechars:80 }}</div>
+            </div>
+            {% empty %}
+            <div class="text-gray-400 italic">No chat messages found.</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<script>
+// This script block is now self-contained and will execute when the partial is loaded.
+(function() {
+    // Use a timeout to ensure the DOM elements (like canvas) are available.
+    setTimeout(() => {
+        const chartData = {
+            total_sessions: {{ total_sessions|default:0 }},
+            completed_items: {{ completed_items|default:0 }},
+            pending_items: {{ pending_items|default:0 }},
+            days_labels: {{ days_labels|safe|default:'[]' }},
+            sessions_per_day: {{ sessions_per_day|safe|default:'[]' }},
+            channel_data: {{ channel_data|safe|default:'[]' }}
+        };
+        
+        // Check if the chart initialization function is available
+        if (typeof initializeDashboardCharts === 'function') {
+            initializeDashboardCharts(chartData);
+        } else {
+            console.error('initializeDashboardCharts function not found. Make sure dashboard-charts.js is loaded.');
+        }
+        
+        // Initialize Score Trend Chart if data exists
+        {% if score_trend_data.scores|length > 1 %}
+        const scoreTrendCanvas = document.getElementById('scoreTrendChart');
+        if (scoreTrendCanvas && typeof Chart !== 'undefined') {
+            new Chart(scoreTrendCanvas, {
+                type: 'line',
+                data: {
+                    labels: {{ score_trend_data.labels|safe }},
+                    datasets: [{
+                        label: 'GTM Score',
+                        data: {{ score_trend_data.scores|safe }},
+                        borderColor: 'rgb(79, 70, 229)',
+                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                        pointRadius: 4,
+                        pointHoverRadius: 6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: {
+                                callback: function(value) {
+                                    return value;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        {% endif %}
+    }, 50); // A small delay can help with DOM readiness after swaps.
+})();
+
+// Workspace management functions
+function openWorkspaceModal() {
+    document.getElementById('workspace-modal').classList.remove('hidden');
+}
+
+function closeWorkspaceModal() {
+    document.getElementById('workspace-modal').classList.add('hidden');
+}
+
+function openInviteModal() {
+    document.getElementById('invite-modal').classList.remove('hidden');
+}
+
+function closeInviteModal() {
+    document.getElementById('invite-modal').classList.add('hidden');
+}
+
+function showCreateWorkspaceForm() {
+    document.getElementById('workspace-list-view').classList.add('hidden');
+    document.getElementById('create-workspace-view').classList.remove('hidden');
+}
+
+function showWorkspaceList() {
+    document.getElementById('create-workspace-view').classList.add('hidden');
+    document.getElementById('workspace-list-view').classList.remove('hidden');
+}
+</script>
+
+<!-- Workspace Management Modal -->
+<div id="workspace-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl max-w-md w-full mx-4 max-h-96 overflow-y-auto">
+        <!-- Workspace List View -->
+        <div id="workspace-list-view">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Manage Workspaces</h3>
+                    <button onclick="closeWorkspaceModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <div class="space-y-3 mb-4">
+                    {% for workspace in user_workspaces %}
+                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div>
+                                <h4 class="font-medium text-gray-900">{{ workspace.name }}</h4>
+                                <p class="text-sm text-gray-600">{{ workspace.members.count }} members</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="window.location.href='{% url 'gtm:workspace:detail' workspace.id %}'" 
+                                        class="text-sm px-3 py-1 bg-indigo-100 text-indigo-700 rounded hover:bg-indigo-200">
+                                    Manage
+                                </button>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <p class="text-gray-600 text-center py-4">No workspaces yet</p>
+                    {% endfor %}
+                </div>
+                
+                <button onclick="showCreateWorkspaceForm()" 
+                        class="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors">
+                    Create New Workspace
+                </button>
+            </div>
+        </div>
+        
+        <!-- Create Workspace View -->
+        <div id="create-workspace-view" class="hidden">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-900">Create Workspace</h3>
+                    <button onclick="closeWorkspaceModal()" class="text-gray-400 hover:text-gray-600">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                
+                <form hx-post="{% url 'create_workspace_dashboard' %}" 
+                      hx-target="body" 
+                      hx-swap="outerHTML"
+                      class="space-y-4">
+                    {% csrf_token %}
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Workspace Name</label>
+                        <input type="text" 
+                               name="name" 
+                               required
+                               placeholder="e.g., Acme Corp Assessment"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    
+                    <div class="flex gap-3">
+                        <button type="submit" 
+                                class="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
+                            Create Workspace
+                        </button>
+                        <button type="button" 
+                                onclick="showWorkspaceList()"
+                                class="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200">
+                            Back
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Team Invitation Modal -->
+{% if current_workspace %}
+<div id="invite-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white rounded-xl max-w-md w-full mx-4">
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-gray-900">Invite Team Member</h3>
+                <button onclick="closeInviteModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <p class="text-sm text-gray-600 mb-4">
+                Invite someone to collaborate on <strong>{{ current_workspace.name }}</strong>
+            </p>
+            
+            <form hx-post="{% url 'invite_to_workspace_dashboard' current_workspace.id %}" 
+                  hx-target="body"
+                  hx-swap="outerHTML"
+                  class="space-y-4">
+                {% csrf_token %}
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                    <input type="email" 
+                           name="email" 
+                           required
+                           placeholder="colleague@company.com"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                    <select name="role" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="contributor">Contributor</option>
+                        <option value="manager">Manager</option>
+                        <option value="admin">Admin</option>
+                        <option value="funti3r_consultant">Funti3r Consultant</option>
+                    </select>
+                </div>
+                
+                <div class="flex gap-3">
+                    <button type="submit" 
+                            class="flex-1 bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
+                        Send Invitation
+                    </button>
+                    <button type="button" 
+                            onclick="closeInviteModal()"
+                            class="flex-1 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200">
+                        Cancel
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+

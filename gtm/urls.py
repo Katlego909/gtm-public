@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from . import views
 
 app_name = "gtm"
@@ -26,5 +26,8 @@ urlpatterns = [
     # User Profile & Auth
     path("profile/", views.profile, name="profile"),
     path("logout/", views.logout_view, name="logout"),
+    
+    # Workspace management
+    path("workspace/", include('gtm.urls_workspace')),
 
 ]

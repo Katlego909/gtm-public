@@ -44,15 +44,22 @@ INSTALLED_APPS = [
     
     # Apps
     "gtm",  
+    "dashboard",
     
-    # Django-tailwind
-    'tailwind',
-    'theme',
+    # Django-tailwind - commented out until installed
+    # 'tailwind',
+    # 'theme',
     'django_browser_reload',
     
     # allauth
     'allauth',
     'allauth.account',
+    
+    # htmx
+    'django_htmx',
+    
+    # Turbo
+    'turbo_response',
     
 ]
 
@@ -73,8 +80,10 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "gtm.middleware_workspace.WorkspaceMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "django_htmx.middleware.HtmxMiddleware",
 ]
 
 # Only enable browser reload in development
@@ -161,9 +170,10 @@ EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.gmail.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
-DEFAULT_FROM_EMAIL = f"Funti3r GTM <{EMAIL_HOST_USER}>"
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "youraddress@gmail.com")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "your_app_password")
+# Ensure DEFAULT_FROM_EMAIL is always valid
+DEFAULT_FROM_EMAIL = f"Funti3r GTM <{EMAIL_HOST_USER if EMAIL_HOST_USER else 'youraddress@gmail.com'}>"
 SERVER_EMAIL = EMAIL_HOST_USER
 EMAIL_SUBJECT_PREFIX = "[Funti3r GTM]"
 
