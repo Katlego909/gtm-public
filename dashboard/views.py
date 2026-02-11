@@ -56,7 +56,15 @@ def add_edit_gap_metric(request, pk=None):
             
             if request.htmx:
                 # Return the updated gap analysis table and close modal
-                gap_analysis = GapAnalysisMetric.objects.all().order_by('category', 'priority')
+                workspace_id = request.session.get('current_workspace_id')
+                if workspace_id:
+                    gap_analysis = GapAnalysisMetric.objects.filter(
+                        models.Q(session__workspace_id=workspace_id) | models.Q(session__isnull=True)
+                    ).order_by('category', 'priority')
+                else:
+                    gap_analysis = GapAnalysisMetric.objects.filter(
+                        models.Q(session__user=request.user) | models.Q(session__isnull=True)
+                    ).order_by('category', 'priority')
                 for metric in gap_analysis:
                     calculate_gap_metric_display_properties(metric)
                 response = HttpResponse(render(request, 'dashboard/partials/gap_analysis_table.html', {'gap_analysis': gap_analysis}).content)
@@ -136,21 +144,42 @@ def insight_feedback(request, pk):
 
 def kpi_total_sessions(request):
     """Return total sessions as an HTML fragment."""
-    total_sessions = AssessmentSession.objects.count()
+    if request.user.is_authenticated:
+        workspace_id = request.GET.get('workspace') or request.session.get('current_workspace_id')
+        if workspace_id:
+            total_sessions = AssessmentSession.objects.filter(workspace_id=workspace_id).count()
+        else:
+            total_sessions = AssessmentSession.objects.filter(user=request.user).count()
+    else:
+        total_sessions = 0
     html = f'<div id="total-sessions">{total_sessions}</div>'
     return HttpResponse(html)
 
 
 def kpi_completed_items(request):
     """Return completed action items count as an HTML fragment."""
-    completed_items = ActionItem.objects.filter(status='done').count()
+    if request.user.is_authenticated:
+        workspace_id = request.GET.get('workspace') or request.session.get('current_workspace_id')
+        if workspace_id:
+            completed_items = ActionItem.objects.filter(workspace_id=workspace_id, status='done').count()
+        else:
+            completed_items = ActionItem.objects.filter(session__user=request.user, status='done').count()
+    else:
+        completed_items = 0
     html = f'<div id="completed-items">{completed_items}</div>'
     return HttpResponse(html)
 
 
 def kpi_pending_items(request):
     """Return pending action items count as an HTML fragment."""
-    pending_items = ActionItem.objects.exclude(status='done').count()
+    if request.user.is_authenticated:
+        workspace_id = request.GET.get('workspace') or request.session.get('current_workspace_id')
+        if workspace_id:
+            pending_items = ActionItem.objects.filter(workspace_id=workspace_id).exclude(status='done').count()
+        else:
+            pending_items = ActionItem.objects.filter(session__user=request.user).exclude(status='done').count()
+    else:
+        pending_items = 0
     html = f'<div id="pending-items">{pending_items}</div>'
     return HttpResponse(html)
 
@@ -436,8 +465,15 @@ def dashboard(request):
                 "color": channel.color,
             })
 
-    # --- Gap Analysis Logic ---
-    gap_analysis = GapAnalysisMetric.objects.all().order_by('category', 'priority')
+    # --- Gap Analysis Logic --- (workspace-scoped)
+    if current_workspace:
+        gap_analysis = GapAnalysisMetric.objects.filter(
+            models.Q(session__workspace=current_workspace) | models.Q(session__isnull=True)
+        ).order_by('category', 'priority')
+    else:
+        gap_analysis = GapAnalysisMetric.objects.filter(
+            models.Q(session__user=request.user) | models.Q(session__isnull=True)
+        ).order_by('category', 'priority') if request.user.is_authenticated else GapAnalysisMetric.objects.none()
     for metric in gap_analysis:
         calculate_gap_metric_display_properties(metric)
 
@@ -447,6 +483,7 @@ def dashboard(request):
     team_members = []
     workspace_memberships = []
     pending_invites = []
+    accepted_awaiting = []
     if current_workspace:
         from gtm.models_workspace import WorkspaceInvitation
 
@@ -526,7 +563,15 @@ def dashboard(request):
     return render(request, 'dashboard/home.html', context)
 
 def gap_analysis_table(request):
-    gap_analysis = GapAnalysisMetric.objects.all()
+    workspace_id = request.session.get('current_workspace_id')
+    if workspace_id:
+        gap_analysis = GapAnalysisMetric.objects.filter(
+            models.Q(session__workspace_id=workspace_id) | models.Q(session__isnull=True)
+        )
+    else:
+        gap_analysis = GapAnalysisMetric.objects.filter(
+            models.Q(session__user=request.user) | models.Q(session__isnull=True)
+        )
     for gap in gap_analysis:
         calculate_gap_metric_display_properties(gap)
             
@@ -540,8 +585,15 @@ def get_gap_metric_row(request, pk):
     return render(request, 'dashboard/partials/_gap_analysis_row.html', {'gap': metric})
 
 def refresh_gap_analysis_table(request):
-    # Use .all() to match the main dashboard view logic
-    gap_analysis = GapAnalysisMetric.objects.all().order_by('category', 'priority')
+    workspace_id = request.session.get('current_workspace_id')
+    if workspace_id:
+        gap_analysis = GapAnalysisMetric.objects.filter(
+            models.Q(session__workspace_id=workspace_id) | models.Q(session__isnull=True)
+        ).order_by('category', 'priority')
+    else:
+        gap_analysis = GapAnalysisMetric.objects.filter(
+            models.Q(session__user=request.user) | models.Q(session__isnull=True)
+        ).order_by('category', 'priority')
     
     for metric in gap_analysis:
         calculate_gap_metric_display_properties(metric)

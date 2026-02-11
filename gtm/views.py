@@ -240,6 +240,15 @@ def _save_snapshot(session, cat_scores, overall, band, labels, values):
 # ---------- Views ----------
 
 def landing(request):
+    # If user is authenticated and has workspace memberships, redirect to dashboard
+    if request.user.is_authenticated:
+        from .models_workspace import WorkspaceMembership
+        user_memberships = WorkspaceMembership.objects.filter(user=request.user, is_active=True)
+        if user_memberships.exists():
+            # User has workspace access, redirect to dashboard
+            first_workspace = user_memberships.first().workspace
+            return redirect(f'/dashboard/?workspace={first_workspace.id}')
+    
     return render(request, "gtm/landing.html")
 
 @login_required
