@@ -40,7 +40,22 @@ from .utils import calculate_gap_metric_display_properties
 @vary_on_headers('HX-Request')
 def add_edit_gap_metric(request, pk=None):
     if pk:
-        instance = get_object_or_404(GapAnalysisMetric, pk=pk)
+        # Only allow access to metrics in user's workspace or user-created metrics
+        workspace_id = request.session.get('current_workspace_id')
+        if workspace_id:
+            instance = get_object_or_404(
+                GapAnalysisMetric.objects.filter(
+                    models.Q(session__workspace_id=workspace_id) | models.Q(session__user=request.user) | models.Q(session__isnull=True)
+                ), 
+                pk=pk
+            )
+        else:
+            instance = get_object_or_404(
+                GapAnalysisMetric.objects.filter(
+                    models.Q(session__user=request.user) | models.Q(session__isnull=True)
+                ), 
+                pk=pk
+            )
         title = "Edit Gap Metric"
     else:
         instance = None
@@ -87,7 +102,22 @@ def add_edit_gap_metric(request, pk=None):
 @vary_on_headers('HX-Request')
 def delete_gap_metric(request, pk):
     try:
-        instance = get_object_or_404(GapAnalysisMetric, pk=pk)
+        # Only allow access to metrics in user's workspace or user-created metrics
+        workspace_id = request.session.get('current_workspace_id')
+        if workspace_id:
+            instance = get_object_or_404(
+                GapAnalysisMetric.objects.filter(
+                    models.Q(session__workspace_id=workspace_id) | models.Q(session__user=request.user) | models.Q(session__isnull=True)
+                ), 
+                pk=pk
+            )
+        else:
+            instance = get_object_or_404(
+                GapAnalysisMetric.objects.filter(
+                    models.Q(session__user=request.user) | models.Q(session__isnull=True)
+                ), 
+                pk=pk
+            )
     except Http404:
         # If the object doesn't exist, and it's an HTMX request, 
         # redirect back to dashboard
@@ -117,7 +147,12 @@ def delete_gap_metric(request, pk):
 @csrf_exempt
 def insight_export(request, pk):
     """Export AI insight/playbook as a text file."""
-    insight = get_object_or_404(ResultSnapshot, pk=pk)
+    # Only allow access to insights in user's workspace
+    workspace_id = request.session.get('current_workspace_id')
+    if workspace_id:
+        insight = get_object_or_404(ResultSnapshot, pk=pk, session__workspace_id=workspace_id)
+    else:
+        insight = get_object_or_404(ResultSnapshot, pk=pk, session__user=request.user)
     content = insight.ai_playbook or ''
     response = HttpResponse(content, content_type='text/plain')
     response['Content-Disposition'] = f'attachment; filename=insight_{pk}.txt'
@@ -578,7 +613,22 @@ def gap_analysis_table(request):
     return render(request, 'dashboard/partials/gap_analysis_table.html', {'gap_analysis': gap_analysis})
 
 def get_gap_metric_row(request, pk):
-    metric = get_object_or_404(GapAnalysisMetric, pk=pk)
+    # Only allow access to metrics in user's workspace or user-created metrics
+    workspace_id = request.session.get('current_workspace_id')
+    if workspace_id:
+        metric = get_object_or_404(
+            GapAnalysisMetric.objects.filter(
+                models.Q(session__workspace_id=workspace_id) | models.Q(session__user=request.user) | models.Q(session__isnull=True)
+            ), 
+            pk=pk
+        )
+    else:
+        metric = get_object_or_404(
+            GapAnalysisMetric.objects.filter(
+                models.Q(session__user=request.user) | models.Q(session__isnull=True)
+            ), 
+            pk=pk
+        )
     
     calculate_gap_metric_display_properties(metric)
         
@@ -649,7 +699,12 @@ def refresh_action_items(request):
 @vary_on_headers('HX-Request')
 def add_edit_action_item(request, pk=None):
     if pk:
-        instance = get_object_or_404(ActionItem, pk=pk)
+        # Only allow access to action items in user's workspace
+        workspace_id = request.session.get('current_workspace_id')
+        if workspace_id:
+            instance = get_object_or_404(ActionItem, pk=pk, workspace_id=workspace_id)
+        else:
+            instance = get_object_or_404(ActionItem, pk=pk, session__user=request.user)
         title = "Edit Action Item"
     else:
         instance = None
@@ -685,7 +740,12 @@ def add_edit_action_item(request, pk=None):
 
 @vary_on_headers('HX-Request')
 def delete_action_item(request, pk):
-    instance = get_object_or_404(ActionItem, pk=pk)
+    # Only allow access to action items in user's workspace
+    workspace_id = request.session.get('current_workspace_id')
+    if workspace_id:
+        instance = get_object_or_404(ActionItem, pk=pk, workspace_id=workspace_id)
+    else:
+        instance = get_object_or_404(ActionItem, pk=pk, session__user=request.user)
     if request.method == 'POST':
         instance.delete()
         # Return the updated action items board
@@ -699,7 +759,12 @@ def delete_action_item(request, pk):
 @csrf_exempt
 def move_action_item(request, pk, new_status):
     if request.method == 'POST':
-        item = get_object_or_404(ActionItem, pk=pk)
+        # Only allow access to action items in user's workspace
+        workspace_id = request.session.get('current_workspace_id')
+        if workspace_id:
+            item = get_object_or_404(ActionItem, pk=pk, workspace_id=workspace_id)
+        else:
+            item = get_object_or_404(ActionItem, pk=pk, session__user=request.user)
         if new_status in ['todo', 'doing', 'done']:
             item.status = new_status
             item.save()
@@ -745,7 +810,12 @@ def profile(request):
 @login_required
 def assign_action_item(request, action_id):
     """Assign an action item to a team member."""
-    action_item = get_object_or_404(ActionItem, id=action_id)
+    # Only allow access to action items in user's workspace
+    workspace_id = request.session.get('current_workspace_id')
+    if workspace_id:
+        action_item = get_object_or_404(ActionItem, id=action_id, workspace_id=workspace_id)
+    else:
+        action_item = get_object_or_404(ActionItem, id=action_id, session__user=request.user)
     
     # Check user has access to this action item's workspace
     if action_item.workspace:
@@ -786,7 +856,12 @@ def assign_action_item(request, action_id):
 @login_required
 def unassign_action_item(request, action_id):
     """Remove assignment from an action item."""
-    action_item = get_object_or_404(ActionItem, id=action_id)
+    # Only allow access to action items in user's workspace
+    workspace_id = request.session.get('current_workspace_id')
+    if workspace_id:
+        action_item = get_object_or_404(ActionItem, id=action_id, workspace_id=workspace_id)
+    else:
+        action_item = get_object_or_404(ActionItem, id=action_id, session__user=request.user)
     
     # Check user has access
     if action_item.workspace:
