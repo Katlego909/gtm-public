@@ -4,7 +4,9 @@ from django.contrib import messages
 from django.core.mail import send_mail
 from django.conf import settings
 from django.utils import timezone
+from django.urls import reverse
 from .models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation
+from .forms import WorkspaceInvitationForm
 from .middleware_workspace import workspace_required, role_required
 
 
@@ -56,12 +58,15 @@ def workspace_detail(request, workspace_id):
     # Get the admin user who created this workspace
     admin_member = members.filter(role='admin').first()
     
+    invitation_form = WorkspaceInvitationForm()
+
     return render(request, 'gtm/workspace/detail.html', {
         'workspace': workspace,
         'members': members,
         'pending_invites': pending_invites,
         'user_membership': request.workspace_membership,
         'admin_member': admin_member,
+        'invitation_form': invitation_form,
     })
 
 
@@ -69,33 +74,53 @@ def workspace_detail(request, workspace_id):
 @role_required(['admin', 'manager'])
 def workspace_invite(request, workspace_id):
     """Invite users to workspace"""
+    workspace = request.workspace
+    dashboard_url = f'/dashboard/?workspace={workspace_id}'
+    
     if request.method == 'POST':
-        email = request.POST.get('email', '').strip()
-        role = request.POST.get('role', 'contributor')
-        
-        if email:
-            invitation = WorkspaceInvitation.objects.create(
-                workspace=request.workspace,
-                email=email,
-                role=role,
-                invited_by=request.user
-            )
+        form = WorkspaceInvitationForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data['email']
+            
+            # Prevent duplicate pending invitations
+            if WorkspaceInvitation.objects.filter(workspace=workspace, email__iexact=email, accepted_at__isnull=True).exists():
+                messages.warning(request, f'An invitation has already been sent to {email} and is pending.')
+                return redirect(dashboard_url)
+
+            # Check if user is already a member
+            if WorkspaceMembership.objects.filter(workspace=workspace, user__email__iexact=email).exists():
+                messages.warning(request, f'The user with email {email} is already a member of this workspace.')
+                return redirect(dashboard_url)
+
+            invitation = form.save(commit=False)
+            invitation.workspace = workspace
+            invitation.invited_by = request.user
+            invitation.save()
             
             # Send invitation email
-            send_mail(
-                subject=f'Invitation to {request.workspace.name}',
-                message=f'You have been invited to join the workspace "{request.workspace.name}".\n\n'
-                       f'Click here to join: {request.build_absolute_uri(f"/workspace/join/{invitation.token}/")}\n\n'
-                       f'Invited by: {request.user.get_full_name() or request.user.username}',
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[email]
-            )
-            
-            messages.success(request, f'Invitation sent to {email}')
+            try:
+                invitation_url = request.build_absolute_uri(
+                    reverse('gtm:workspace:join', args=[invitation.token])
+                )
+                send_mail(
+                    subject=f'Invitation to join {workspace.name}',
+                    message=f'You have been invited to join the workspace "{workspace.name}".\n\n'
+                           f'Click here to join: {invitation_url}\n\n'
+                           f'Invited by: {request.user.get_full_name() or request.user.username}',
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[email]
+                )
+                messages.success(request, f'Invitation sent successfully to {email}!')
+            except Exception as e:
+                messages.error(request, f'Failed to send invitation email: {e}')
+                invitation.delete()
+
         else:
-            messages.error(request, 'Email is required')
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f"{field.capitalize()}: {error}")
             
-    return redirect('workspace:detail', workspace_id=workspace_id)
+    return redirect(dashboard_url)
 
 
 @login_required

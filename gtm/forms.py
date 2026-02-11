@@ -1,5 +1,6 @@
 from django import forms
 from .models import AssessmentSession
+from .models_workspace import WorkspaceInvitation
 
 class StartAssessmentForm(forms.ModelForm):
     class Meta:
@@ -30,4 +31,13 @@ class StartAssessmentForm(forms.ModelForm):
             "utm_medium": forms.HiddenInput(),
             "utm_campaign": forms.HiddenInput(),
             "referrer": forms.HiddenInput(),
+        }
+
+class WorkspaceInvitationForm(forms.ModelForm):
+    class Meta:
+        model = WorkspaceInvitation
+        fields = ['email', 'role']
+        widgets = {
+            'email': forms.EmailInput(attrs={'class': 'w-full border rounded px-3 py-2', 'placeholder': 'Enter email to invite'}),
+            'role': forms.Select(attrs={'class': 'w-full border rounded px-3 py-2'}),
         }

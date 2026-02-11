@@ -53,7 +53,7 @@ class WorkspaceMiddleware:
                 request.session['current_workspace_id'] = str(workspace.id)
             except:
                 # Invalid workspace, redirect to workspace selection
-                return redirect('workspace_list')
+                return redirect('gtm:workspace:list')
         else:
             # Try to get workspace from session
             workspace_id = request.session.get('current_workspace_id')
@@ -88,7 +88,7 @@ class WorkspaceMiddleware:
             except WorkspaceMembership.DoesNotExist:
                 # User not member of this workspace
                 messages.error(request, "You don't have access to this workspace.")
-                return redirect('workspace_list')
+                return redirect('gtm:workspace:list')
 
 
 def workspace_required(view_func):
@@ -98,7 +98,7 @@ def workspace_required(view_func):
     def wrapper(request, *args, **kwargs):
         if not hasattr(request, 'workspace') or not request.workspace:
             messages.error(request, "Please select a workspace to continue.")
-            return redirect('workspace_list')
+            return redirect('gtm:workspace:list')
         return view_func(request, *args, **kwargs)
     return wrapper
 
@@ -112,11 +112,11 @@ def role_required(allowed_roles):
         def wrapper(request, *args, **kwargs):
             if not hasattr(request, 'workspace_membership') or not request.workspace_membership:
                 messages.error(request, "Workspace access required.")
-                return redirect('workspace_list')
+                return redirect('gtm:workspace:list')
                 
             if request.workspace_membership.role not in allowed_roles:
                 messages.error(request, "You don't have sufficient permissions for this action.")
-                return redirect('dashboard')
+                return redirect('/dashboard/')
                 
             return view_func(request, *args, **kwargs)
         return wrapper

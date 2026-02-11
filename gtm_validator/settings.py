@@ -45,10 +45,10 @@ INSTALLED_APPS = [
     # Apps
     "gtm",  
     "dashboard",
+    "theme",
     
     # Django-tailwind - commented out until installed
     # 'tailwind',
-    # 'theme',
     'django_browser_reload',
     
     # allauth

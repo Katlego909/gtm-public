@@ -5,6 +5,7 @@ from django.utils.html import format_html
 from django.contrib import messages
 from .utils_email import send_snapshot_report_email
 from .models import AssessmentSession, ResultSnapshot, RecommendationBand, Category, Question, Response, ActionItem, ToolRecommendation, ChatMessage
+from .models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation
 from dashboard.models import GapAnalysisMetric
 
 @admin.action(description="Resend report email")
@@ -194,3 +195,62 @@ class GapAnalysisMetricAdmin(admin.ModelAdmin):
     list_display = ('metric', 'category', 'current', 'target', 'priority')
     list_filter = ('category', 'priority')
     search_fields = ('metric', 'recommendation')
+
+
+# ── Workspace Models ──────────────────────────────────────
+
+class WorkspaceMembershipInline(admin.TabularInline):
+    model = WorkspaceMembership
+    extra = 0
+    readonly_fields = ('invited_at', 'accepted_at')
+    raw_id_fields = ('user', 'invited_by')
+
+
+class WorkspaceInvitationInline(admin.TabularInline):
+    model = WorkspaceInvitation
+    extra = 0
+    readonly_fields = ('token', 'invited_at', 'expires_at', 'accepted_at')
+    raw_id_fields = ('invited_by',)
+
+
+@admin.register(Workspace)
+class WorkspaceAdmin(admin.ModelAdmin):
+    list_display = ('name', 'slug', 'industry', 'is_active', 'member_count', 'created_at')
+    list_filter = ('is_active', 'industry', 'created_at')
+    search_fields = ('name', 'slug', 'industry')
+    prepopulated_fields = {'slug': ('name',)}
+    readonly_fields = ('id', 'created_at', 'updated_at')
+    ordering = ('-created_at',)
+    inlines = [WorkspaceMembershipInline, WorkspaceInvitationInline]
+
+    def member_count(self, obj):
+        return WorkspaceMembership.objects.filter(workspace=obj, is_active=True).count()
+    member_count.short_description = 'Members'
+
+
+@admin.register(WorkspaceMembership)
+class WorkspaceMembershipAdmin(admin.ModelAdmin):
+    list_display = ('user', 'workspace', 'role', 'is_active', 'invited_at')
+    list_filter = ('role', 'is_active', 'invited_at')
+    search_fields = ('user__username', 'user__email', 'workspace__name')
+    raw_id_fields = ('user', 'workspace', 'invited_by')
+    readonly_fields = ('invited_at', 'accepted_at')
+    ordering = ('-invited_at',)
+
+
+@admin.register(WorkspaceInvitation)
+class WorkspaceInvitationAdmin(admin.ModelAdmin):
+    list_display = ('email', 'workspace', 'role', 'invited_by', 'status', 'invited_at', 'expires_at')
+    list_filter = ('role', 'is_accepted', 'invited_at')
+    search_fields = ('email', 'workspace__name', 'invited_by__username')
+    raw_id_fields = ('workspace', 'invited_by')
+    readonly_fields = ('token', 'invited_at', 'accepted_at', 'expires_at')
+    ordering = ('-invited_at',)
+
+    def status(self, obj):
+        if obj.is_accepted or obj.accepted_at:
+            return format_html('<span style="color:green;font-weight:bold;">Accepted</span>')
+        if obj.is_expired:
+            return format_html('<span style="color:red;">Expired</span>')
+        return format_html('<span style="color:orange;">Pending</span>')
+    status.short_description = 'Status'

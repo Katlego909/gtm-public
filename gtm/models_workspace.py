@@ -7,6 +7,8 @@ Separated from authentication (django-allauth) for clean separation of concerns.
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.conf import settings
+from django.utils import timezone
+from datetime import timedelta
 import uuid
 
 User = get_user_model()
@@ -115,6 +117,11 @@ class WorkspaceInvitation(models.Model):
     
     is_accepted = models.BooleanField(default=False)
     
+    def save(self, *args, **kwargs):
+        if not self.id:  # Set expiration only on creation
+            self.expires_at = timezone.now() + timedelta(days=7)
+        super().save(*args, **kwargs)
+
     class Meta:
         unique_together = ['workspace', 'email']
         ordering = ['-invited_at']

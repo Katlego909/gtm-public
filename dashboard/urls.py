@@ -35,5 +35,5 @@ urlpatterns = [
     
     # Workspace management from dashboard
     path('workspace/create/', views.create_workspace_dashboard, name='create_workspace_dashboard'),
-    path('workspace/<uuid:workspace_id>/invite/', views.invite_to_workspace_dashboard, name='invite_to_workspace_dashboard'),
+    path('workspace/<uuid:workspace_id>/invite/', views.invite_to_workspace, name='invite_to_workspace'),
 ]

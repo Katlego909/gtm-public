@@ -10,10 +10,12 @@ import markdown
 from django.shortcuts import get_object_or_404, render, redirect
 from django.http import HttpResponse, JsonResponse, Http404
 from django.utils import timezone
+from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.vary import vary_on_headers
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
+from django.contrib import messages
 
 from gtm.models import (
     AssessmentSession,
@@ -181,6 +183,23 @@ def dashboard(request):
         # Default to first workspace if none selected
         if not current_workspace and user_workspaces:
             current_workspace = user_workspaces[0]
+        
+        # Auto-fix orphaned assessments: associate user's assessments without workspace
+        if current_workspace:
+            orphaned_assessments = AssessmentSession.objects.filter(
+                user=request.user,
+                workspace__isnull=True
+            )
+            if orphaned_assessments.exists():
+                orphaned_assessments.update(workspace=current_workspace)
+            
+            # Auto-fix orphaned action items from user's sessions
+            orphaned_items = ActionItem.objects.filter(
+                session__user=request.user,
+                workspace__isnull=True
+            )
+            if orphaned_items.exists():
+                orphaned_items.update(workspace=current_workspace)
     
     # Filter data by workspace if selected
     if current_workspace:
@@ -317,15 +336,30 @@ def dashboard(request):
     else:
         top_tools = []
 
-    # Insights (from ResultSnapshot.ai_playbook)
-    insights_qs = ResultSnapshot.objects.exclude(ai_playbook="").order_by('-created_at')[:5]
+    # Insights (from ResultSnapshot.ai_playbook) - WORKSPACE-SCOPED
+    if current_workspace:
+        insights_qs = ResultSnapshot.objects.filter(
+            session__workspace=current_workspace
+        ).exclude(ai_playbook="").order_by('-created_at')[:5]
+    else:
+        insights_qs = ResultSnapshot.objects.filter(
+            session__user=request.user
+        ).exclude(ai_playbook="").order_by('-created_at')[:5] if request.user.is_authenticated else ResultSnapshot.objects.none()
+    
     insights = []
     for insight in insights_qs:
         insight.playbook_html = markdown.markdown(insight.ai_playbook or "")
         insights.append(insight)
 
-    # Recent chat messages
-    recent_chats = ChatMessage.objects.order_by('-created_at')[:5]
+    # Recent chat messages - WORKSPACE-SCOPED
+    if current_workspace:
+        recent_chats = ChatMessage.objects.filter(
+            session__workspace=current_workspace
+        ).order_by('-created_at')[:5]
+    else:
+        recent_chats = ChatMessage.objects.filter(
+            session__user=request.user
+        ).order_by('-created_at')[:5] if request.user.is_authenticated else ChatMessage.objects.none()
 
     # GTM Assessment History & Trends (workspace-scoped)
     assessment_history = []
@@ -412,7 +446,7 @@ def dashboard(request):
     team_members = []
     if current_workspace:
         memberships = WorkspaceMembership.objects.filter(workspace=current_workspace).select_related('user')
-        team_members = [{'membership': m, 'user': m.user} for m in memberships]
+        team_members = [m.user for m in memberships]
 
     context = {
         'total_sessions': total_sessions,
@@ -724,50 +758,120 @@ def create_workspace_dashboard(request):
     return redirect('/dashboard/')
 
 
-@login_required 
-def invite_to_workspace_dashboard(request, workspace_id):
-    """Invite user to workspace from dashboard and return updated dashboard view."""
+@login_required
+def invite_to_workspace(request, workspace_id):
+    """Handle team invitations from the dashboard."""
     from gtm.models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation
-    
+    from django.core.mail import send_mail
+
     workspace = get_object_or_404(Workspace, id=workspace_id)
-    
-    # Check user has permission
-    membership = WorkspaceMembership.objects.filter(
-        workspace=workspace, 
-        user=request.user
-    ).first()
+    dashboard_url = f'/dashboard/?workspace={workspace_id}'
+
+    # Permission check
+    membership = WorkspaceMembership.objects.filter(workspace=workspace, user=request.user).first()
     if not membership or membership.role not in ['admin', 'manager']:
-        return JsonResponse({'error': 'No permission'}, status=403)
-    
+        messages.error(request, "You don't have permission to invite members.")
+        return redirect(dashboard_url)
+
     if request.method == 'POST':
         email = request.POST.get('email', '').strip()
         role = request.POST.get('role', 'contributor')
-        
-        if email:
-            from django.core.mail import send_mail
-            from django.conf import settings
-            
-            invitation = WorkspaceInvitation.objects.create(
-                workspace=workspace,
-                email=email,
-                role=role,
-                invited_by=request.user
+
+        if not email:
+            messages.error(request, 'Email address is required.')
+            return redirect(dashboard_url)
+
+        # Prevent duplicate pending invitations
+        if WorkspaceInvitation.objects.filter(workspace=workspace, email__iexact=email, accepted_at__isnull=True).exists():
+            messages.warning(request, f'An invitation to {email} is already pending.')
+            return redirect(dashboard_url)
+
+        # Check if already a member
+        if WorkspaceMembership.objects.filter(workspace=workspace, user__email__iexact=email).exists():
+            messages.warning(request, f'{email} is already a member of this workspace.')
+            return redirect(dashboard_url)
+
+        invitation = WorkspaceInvitation.objects.create(
+            workspace=workspace,
+            email=email,
+            role=role,
+            invited_by=request.user,
+        )
+
+        try:
+            invite_url = request.build_absolute_uri(f'/workspace/join/{invitation.token}/')
+            inviter_name = request.user.get_full_name() or request.user.username
+            plain_message = (
+                f'You have been invited to join "{workspace.name}".\n\n'
+                f'Click here to join: {invite_url}\n\n'
+                f'Invited by: {inviter_name}'
             )
-            
-            # Send invitation email
-            try:
-                send_mail(
-                    subject=f'Invitation to {workspace.name}',
-                    message=f'You have been invited to join the workspace "{workspace.name}".\n\n'
-                           f'Click here to join: {request.build_absolute_uri(f"/workspace/join/{invitation.token}/")}\n\n'
-                           f'Invited by: {request.user.get_full_name() or request.user.username}',
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[email]
-                )
-            except Exception:
-                pass  # Silently handle email errors for now
-            
-            # Redirect to dashboard with current workspace
-            return redirect(f'/dashboard/?workspace={workspace_id}')
-        
-    return redirect(f'/dashboard/?workspace={workspace_id}')
+            html_message = f'''<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background-color:#f3f4f6;font-family:'Inter',Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:40px 0;">
+    <tr>
+      <td align="center">
+        <table width="560" cellpadding="0" cellspacing="0" style="background-color:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,0.05);">
+          <!-- Header -->
+          <tr>
+            <td style="background:linear-gradient(135deg,#4f46e5,#6366f1);padding:32px 40px;text-align:center;">
+              <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.5px;">Funti3r GTM</h1>
+            </td>
+          </tr>
+          <!-- Body -->
+          <tr>
+            <td style="padding:40px;">
+              <h2 style="margin:0 0 8px;color:#111827;font-size:22px;font-weight:700;">You&#39;re Invited!</h2>
+              <p style="margin:0 0 24px;color:#6b7280;font-size:15px;line-height:1.6;">
+                <strong style="color:#111827;">{inviter_name}</strong> has invited you to collaborate on the workspace:
+              </p>
+              <div style="background-color:#f0f0ff;border-left:4px solid #4f46e5;border-radius:8px;padding:16px 20px;margin-bottom:28px;">
+                <p style="margin:0;color:#4f46e5;font-size:18px;font-weight:600;">{workspace.name}</p>
+                <p style="margin:4px 0 0;color:#6b7280;font-size:13px;">Role: {role.replace("_", " ").title()}</p>
+              </div>
+              <table width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center" style="padding:4px 0 28px;">
+                    <a href="{invite_url}" style="display:inline-block;background-color:#4f46e5;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:14px 36px;border-radius:8px;">
+                      Accept Invitation
+                    </a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:0 0 8px;color:#9ca3af;font-size:13px;line-height:1.5;">
+                If the button doesn&#39;t work, copy and paste this link into your browser:
+              </p>
+              <p style="margin:0 0 24px;word-break:break-all;color:#4f46e5;font-size:13px;">{invite_url}</p>
+              <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+              <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.5;text-align:center;">
+                This invitation expires in 7 days. If you didn&#39;t expect this email, you can safely ignore it.
+              </p>
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td style="background-color:#f9fafb;padding:20px 40px;text-align:center;border-top:1px solid #e5e7eb;">
+              <p style="margin:0;color:#9ca3af;font-size:12px;">&copy; 2026 Funti3r GTM. All rights reserved.</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>'''
+            send_mail(
+                subject=f'You\'ve been invited to join {workspace.name}',
+                message=plain_message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[email],
+                html_message=html_message,
+            )
+            messages.success(request, f'Invitation sent successfully to {email}!')
+        except Exception as e:
+            invitation.delete()
+            messages.error(request, f'Failed to send invitation email: {e}')
+
+    return redirect(dashboard_url)

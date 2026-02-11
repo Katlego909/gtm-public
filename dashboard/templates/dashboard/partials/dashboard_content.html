@@ -77,6 +77,35 @@
 
 <div class="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50">
     
+    <!-- Flash Messages -->
+    {% if messages %}
+    <div class="mb-6 space-y-2">
+        {% for message in messages %}
+        <div class="flex items-center justify-between p-4 rounded-lg shadow-sm border
+            {% if message.tags == 'success' %}bg-green-50 border-green-200 text-green-800
+            {% elif message.tags == 'error' %}bg-red-50 border-red-200 text-red-800
+            {% elif message.tags == 'warning' %}bg-yellow-50 border-yellow-200 text-yellow-800
+            {% else %}bg-blue-50 border-blue-200 text-blue-800{% endif %}">
+            <div class="flex items-center gap-2">
+                {% if message.tags == 'success' %}
+                <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                {% elif message.tags == 'error' %}
+                <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>
+                {% elif message.tags == 'warning' %}
+                <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                {% else %}
+                <svg class="w-5 h-5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+                {% endif %}
+                <span class="text-sm font-medium">{{ message }}</span>
+            </div>
+            <button onclick="this.parentElement.remove()" class="text-current opacity-50 hover:opacity-100">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-8">
         <div class="bg-white rounded-xl p-5 md:p-6 shadow-sm border border-gray-100 flex items-center justify-between">
             <div>
@@ -513,84 +542,93 @@
 </div>
 
 <script>
-// This script block is now self-contained and will execute when the partial is loaded.
-(function() {
-        // Check if charts are properly loading with sufficient timeout
-        setTimeout(() => {
-            const chartData = {
-                total_sessions: {{ total_sessions|default:0 }},
-                completed_items: {{ completed_items|default:0 }},
-                pending_items: {{ pending_items|default:0 }},
-                days_labels: {{ days_labels|safe|default:'["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]' }},
-                sessions_per_day: {{ sessions_per_day|safe|default:'[0,0,0,0,0,0,0]' }},
-                channel_data: {{ channel_data|safe|default:'[]' }}
-            };
-            
-            console.log('Initializing charts with data:', chartData);
-            
-            // Check if Chart.js is loaded
-            if (typeof Chart === 'undefined') {
-                console.error('Chart.js is not loaded. Cannot initialize charts.');
-                return;
-            }
-            
-            // Check if the chart initialization function is available
-            if (typeof initializeDashboardCharts === 'function') {
-                try {
-                    initializeDashboardCharts(chartData);
-                    console.log('Charts initialized successfully');
-                } catch (error) {
-                    console.error('Error initializing charts:', error);
-                }
-            } else {
-                console.error('initializeDashboardCharts function not found. Make sure dashboard-charts.js is loaded.');
-            }
-        }, 100); // Increased timeout to ensure DOM is ready
-        
-        // Initialize Score Trend Chart if data exists
-        {% if score_trend_data.scores|length > 1 %}
-        const scoreTrendCanvas = document.getElementById('scoreTrendChart');
-        if (scoreTrendCanvas && typeof Chart !== 'undefined') {
-            new Chart(scoreTrendCanvas, {
-                type: 'line',
-                data: {
-                    labels: {{ score_trend_data.labels|safe }},
-                    datasets: [{
-                        label: 'GTM Score',
-                        data: {{ score_trend_data.scores|safe }},
-                        borderColor: 'rgb(79, 70, 229)',
-                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
-                        tension: 0.4,
-                        fill: true,
-                        pointRadius: 4,
-                        pointHoverRadius: 6
-                    }]
+// Initialize charts when DOM is ready
+document.addEventListener('DOMContentLoaded', function() {
+    initCharts();
+});
+
+// Also try to initialize immediately in case DOM isalready loaded (HTMX partial load)
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCharts);
+} else {
+    // DOM already loaded, initialize now
+    setTimeout(initCharts, 100);
+}
+
+function initCharts() {
+    const chartData = {
+        total_sessions: {{ total_sessions|default:0 }},
+        completed_items: {{ completed_items|default:0 }},
+        pending_items: {{ pending_items|default:0 }},
+        days_labels: {{ days_labels|safe|default:'["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]' }},
+        sessions_per_day: {{ sessions_per_day|safe|default:'[0,0,0,0,0,0,0]' }},
+        channel_data: {{ channel_data|safe|default:'[]' }}
+    };
+    
+    console.log('Initializing charts with data:', chartData);
+    
+    // Check if Chart.js is loaded
+    if (typeof Chart === 'undefined') {
+        console.error('Chart.js is not loaded. Cannot initialize charts.');
+        return;
+    }
+    
+    // Check if the chart initialization function is available
+    if (typeof initializeDashboardCharts === 'function') {
+        try {
+            initializeDashboardCharts(chartData);
+            console.log('Charts initialized successfully');
+        } catch (error) {
+            console.error('Error initializing charts:', error);
+        }
+    } else {
+        console.error('initializeDashboardCharts function not found. Make sure dashboard-charts.js is loaded.');
+    }
+    
+    // Initialize Score Trend Chart if data exists
+    {% if score_trend_data.scores|length > 1 %}
+    const scoreTrendCanvas = document.getElementById('scoreTrendChart');
+    if (scoreTrendCanvas && typeof Chart !== 'undefined') {
+        new Chart(scoreTrendCanvas, {
+            type: 'line',
+            data: {
+                labels: {{ score_trend_data.labels|safe }},
+                datasets: [{
+                    label: 'GTM Score',
+                    data: {{ score_trend_data.scores|safe }},
+                    borderColor: 'rgb(79, 70, 229)',
+                    backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            max: 100,
-                            ticks: {
-                                callback: function(value) {
-                                    return value;
-                                }
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value;
                             }
                         }
                     }
                 }
-            });
-        }
-        {% endif %}
-    }, 50); // A small delay can help with DOM readiness after swaps.
-})();
+            }
+        });
+    }
+    {% endif %}
+}
+
 
 // Workspace management functions
 function openWorkspaceModal() {
@@ -722,9 +760,7 @@ function showWorkspaceList() {
                 Invite someone to collaborate on <strong>{{ current_workspace.name }}</strong>
             </p>
             
-            <form hx-post="{% url 'invite_to_workspace_dashboard' current_workspace.id %}" 
-                  hx-target="body"
-                  hx-swap="outerHTML"
+            <form method="POST" action="{% url 'invite_to_workspace' current_workspace.id %}"
                   class="space-y-4">
                 {% csrf_token %}
                 <div>
@@ -743,7 +779,6 @@ function showWorkspaceList() {
                         <option value="contributor">Contributor</option>
                         <option value="manager">Manager</option>
                         <option value="admin">Admin</option>
-                        <option value="funti3r_consultant">Funti3r Consultant</option>
                     </select>
                 </div>
                 

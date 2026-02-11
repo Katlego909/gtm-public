@@ -276,6 +276,11 @@ def start_assessment(request):
             session = form.save(commit=False)
             session.user = request.user if request.user.is_authenticated else None
             session.owner_client_id = _client_id(request)
+            
+            # Associate with current workspace if available
+            if hasattr(request, 'workspace') and request.workspace:
+                session.workspace = request.workspace
+            
             # Handle referrer separately as it comes from request.META, not directly from form POST data
             session.referrer = request.META.get("HTTP_REFERER", "")
             session.save()
@@ -379,7 +384,12 @@ def assessment_step(request, session_id, step: int):
             next_step = step + 1
             session.current_step = min(next_step, total_steps)
             session.is_completed = _is_session_complete(session)
-            session.save(update_fields=["current_step", "is_completed"])
+            
+            # Ensure workspace association is set
+            if hasattr(request, 'workspace') and request.workspace and not session.workspace:
+                session.workspace = request.workspace
+            
+            session.save(update_fields=["current_step", "is_completed", "workspace"])
 
             if next_step > total_steps:
                 return redirect("gtm:results", session_id=session.uuid)
@@ -400,6 +410,12 @@ def assessment_step(request, session_id, step: int):
 
 def results(request, session_id):
     session = get_object_or_404(AssessmentSession, pk=session_id)
+    
+    # Ensure workspace association if missing
+    if hasattr(request, 'workspace') and request.workspace and not session.workspace:
+        session.workspace = request.workspace
+        session.save(update_fields=["workspace"])
+    
     cat_scores, overall = _compute_scores(session)
     band = _band_for_score(overall)
 
