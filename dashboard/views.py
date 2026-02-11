@@ -8,6 +8,7 @@ import json
 import markdown
 
 from django.shortcuts import get_object_or_404, render, redirect
+from django.db import models
 from django.http import HttpResponse, JsonResponse, Http404
 from django.utils import timezone
 from django.conf import settings
@@ -442,11 +443,42 @@ def dashboard(request):
 
     gap_report_url = '/dashboard/gap-report/'
     
-    # Get team members for the current workspace
+    # Get team members and pending invites for the current workspace
     team_members = []
+    workspace_memberships = []
+    pending_invites = []
     if current_workspace:
-        memberships = WorkspaceMembership.objects.filter(workspace=current_workspace).select_related('user')
-        team_members = [m.user for m in memberships]
+        from gtm.models_workspace import WorkspaceInvitation
+
+        # Auto-create memberships for accepted invitations with existing users
+        accepted_invites = WorkspaceInvitation.objects.filter(
+            workspace=current_workspace
+        ).filter(
+            models.Q(is_accepted=True) | models.Q(accepted_at__isnull=False)
+        )
+        for invite in accepted_invites:
+            matched_user = User.objects.filter(email__iexact=invite.email).first()
+            if matched_user and not WorkspaceMembership.objects.filter(workspace=current_workspace, user=matched_user).exists():
+                WorkspaceMembership.objects.create(
+                    workspace=current_workspace,
+                    user=matched_user,
+                    role=invite.role,
+                    invited_by=invite.invited_by,
+                )
+
+        workspace_memberships = WorkspaceMembership.objects.filter(workspace=current_workspace).select_related('user')
+        team_members = [m.user for m in workspace_memberships]
+        pending_invites = WorkspaceInvitation.objects.filter(
+            workspace=current_workspace, accepted_at__isnull=True, is_accepted=False
+        )
+        # Accepted invitations where the user hasn't registered yet
+        accepted_awaiting = WorkspaceInvitation.objects.filter(
+            workspace=current_workspace
+        ).filter(
+            models.Q(is_accepted=True) | models.Q(accepted_at__isnull=False)
+        ).exclude(
+            email__in=User.objects.values_list('email', flat=True)
+        )
 
     context = {
         'total_sessions': total_sessions,
@@ -483,6 +515,9 @@ def dashboard(request):
         'current_workspace': current_workspace,
         'user_workspaces': user_workspaces,
         'team_members': team_members,
+        'workspace_memberships': workspace_memberships,
+        'pending_invites': pending_invites,
+        'accepted_awaiting': accepted_awaiting,
     }
 
     if request.htmx:

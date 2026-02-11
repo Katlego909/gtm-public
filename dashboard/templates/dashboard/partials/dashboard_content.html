@@ -327,6 +327,97 @@
     <!-- Action Items Kanban -->
     {% include 'dashboard/partials/action_items.html' %}
 
+    <!-- Team Members & Invitations -->
+    {% if current_workspace %}
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+        <div class="flex items-center justify-between mb-6">
+            <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <span class="inline-block bg-indigo-100 text-indigo-600 rounded-full p-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                    </svg>
+                </span>
+                Team Members
+            </h3>
+            <button onclick="openInviteModal()" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors inline-flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                Invite
+            </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+            {% for membership in workspace_memberships %}
+            <div class="flex items-center gap-3 p-4 bg-gray-50 rounded-lg border border-gray-100">
+                <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm flex-shrink-0">
+                    {{ membership.user.username|slice:":2"|upper }}
+                </div>
+                <div class="min-w-0 flex-1">
+                    <p class="font-medium text-gray-900 truncate">{{ membership.user.get_full_name|default:membership.user.username }}</p>
+                    <p class="text-xs text-gray-500 truncate">{{ membership.user.email|default:"No email" }}</p>
+                </div>
+                <span class="text-xs font-medium px-2 py-1 rounded-full flex-shrink-0
+                    {% if membership.role == 'admin' %}bg-indigo-100 text-indigo-700
+                    {% elif membership.role == 'manager' %}bg-blue-100 text-blue-700
+                    {% elif membership.role == 'funti3r_consultant' %}bg-purple-100 text-purple-700
+                    {% else %}bg-gray-100 text-gray-600{% endif %}">
+                    {{ membership.get_role_display }}
+                </span>
+            </div>
+            {% empty %}
+            <p class="text-gray-400 italic col-span-full">No team members yet.</p>
+            {% endfor %}
+        </div>
+
+        {% if pending_invites or accepted_awaiting %}
+        <div class="border-t border-gray-100 pt-4">
+            {% if accepted_awaiting %}
+            <h4 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Accepted — Awaiting Registration</h4>
+            <div class="space-y-2 mb-4">
+                {% for invite in accepted_awaiting %}
+                <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-100">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-600 flex-shrink-0">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">{{ invite.email }}</p>
+                            <p class="text-xs text-gray-500">Accepted &middot; {{ invite.get_role_display }} &middot; Waiting for account signup</p>
+                        </div>
+                    </div>
+                    <span class="text-xs font-medium text-green-600 bg-green-100 px-2 py-1 rounded-full">Accepted</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if pending_invites %}
+            <h4 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Pending Invitations</h4>
+            <div class="space-y-2">
+                {% for invite in pending_invites %}
+                <div class="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-100">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-600 flex-shrink-0">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-gray-900">{{ invite.email }}</p>
+                            <p class="text-xs text-gray-500">Invited {{ invite.invited_at|timesince }} ago &middot; {{ invite.get_role_display }}</p>
+                        </div>
+                    </div>
+                    {% if invite.is_expired %}
+                    <span class="text-xs font-medium text-red-600 bg-red-50 px-2 py-1 rounded-full">Expired</span>
+                    {% else %}
+                    <span class="text-xs font-medium text-yellow-600 bg-yellow-100 px-2 py-1 rounded-full">Pending</span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
     <!-- Channel Distribution Card -->
     <div class="bg-white rounded-xl p-5 md:p-6 shadow-sm border border-gray-100 flex flex-col mb-8">
         <h3 class="text-lg font-bold text-gray-800 mb-1">Channel Distribution</h3>
