@@ -92,7 +92,7 @@
             "></span>
         </div>
         <div class="flex justify-between text-[10px] text-gray-400">
-            <span>Created: {{ item.created_at|date:"M d" }}</span>
+            <span>Created: {{ item.created_at|date:"M d" }}{% if item.created_by %} by {{ item.created_by.get_full_name|default:item.created_by.username }}{% endif %}</span>
             {% if item.updated_at and item.updated_at != item.created_at %}
             <span>Edited: {{ item.updated_at|date:"M d" }}</span>
             {% endif %}
