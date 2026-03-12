@@ -9,6 +9,7 @@ from django.shortcuts import redirect, get_object_or_404
 from django.urls import reverse
 from django.contrib import messages
 from .models_workspace import Workspace, WorkspaceMembership
+from uuid import UUID
 
 
 class WorkspaceMiddleware:
@@ -20,7 +21,9 @@ class WorkspaceMiddleware:
 
     def __call__(self, request):
         # Add workspace context to request
-        self.process_request(request)
+        response = self.process_request(request)
+        if response:
+            return response
         
         response = self.get_response(request)
         return response
@@ -38,17 +41,35 @@ class WorkspaceMiddleware:
             
         # Try to get workspace from URL or session
         workspace = None
-        workspace_slug = None
+        workspace_identifier = None
+
+        def _is_uuid(value):
+            try:
+                UUID(str(value))
+                return True
+            except (TypeError, ValueError):
+                return False
         
-        # Extract workspace slug from URL patterns like /workspace/{slug}/...
+        # Extract workspace identifier from /workspace/{id-or-slug}/...
         path_parts = request.path.strip('/').split('/')
         if len(path_parts) >= 2 and path_parts[0] == 'workspace':
-            workspace_slug = path_parts[1]
+            route_segment = path_parts[1]
+
+            # Route segments that are not workspace identifiers.
+            if route_segment in {'create', 'join'}:
+                request.workspace = None
+                request.workspace_membership = None
+                return
+
+            workspace_identifier = route_segment
         
-        # Get workspace from slug or get user's default workspace
-        if workspace_slug:
+        # Get workspace from URL identifier or user's default workspace
+        if workspace_identifier:
             try:
-                workspace = get_object_or_404(Workspace, slug=workspace_slug, is_active=True)
+                if _is_uuid(workspace_identifier):
+                    workspace = get_object_or_404(Workspace, id=workspace_identifier, is_active=True)
+                else:
+                    workspace = get_object_or_404(Workspace, slug=workspace_identifier, is_active=True)
                 # Store in session for subsequent requests
                 request.session['current_workspace_id'] = str(workspace.id)
             except:

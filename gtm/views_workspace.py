@@ -23,25 +23,7 @@ def workspace_create(request):
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
         if name:
-            from django.utils.text import slugify
-            
-            # Generate unique slug
-            slug = slugify(name)
-            counter = 1
-            original_slug = slug
-            while Workspace.objects.filter(slug=slug).exists():
-                slug = f"{original_slug}-{counter}"
-                counter += 1
-            
-            workspace = Workspace.objects.create(
-                name=name,
-                slug=slug
-            )
-            WorkspaceMembership.objects.create(
-                workspace=workspace,
-                user=request.user,
-                role='admin'
-            )
+            workspace = Workspace.create_for_user(name=name, user=request.user)
             messages.success(request, f'Workspace "{name}" created successfully')
             return redirect('workspace:detail', workspace_id=workspace.id)
         messages.error(request, 'Workspace name is required')
@@ -97,19 +79,10 @@ def workspace_invite(request, workspace_id):
             invitation.invited_by = request.user
             invitation.save()
             
-            # Send invitation email
+            # Send invitation email using unified utility
             try:
-                invitation_url = request.build_absolute_uri(
-                    reverse('gtm:workspace:join', args=[invitation.token])
-                )
-                send_mail(
-                    subject=f'Invitation to join {workspace.name}',
-                    message=f'You have been invited to join the workspace "{workspace.name}".\n\n'
-                           f'Click here to join: {invitation_url}\n\n'
-                           f'Invited by: {request.user.get_full_name() or request.user.username}',
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[email]
-                )
+                from .utils_email import send_workspace_invitation_email
+                send_workspace_invitation_email(invitation, request)
                 messages.success(request, f'Invitation sent successfully to {email}!')
             except Exception as e:
                 messages.error(request, f'Failed to send invitation email: {e}')

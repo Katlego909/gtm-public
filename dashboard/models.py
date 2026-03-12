@@ -2,23 +2,23 @@ from django.db import models
 from django.contrib.auth.models import User
 from gtm.models import AssessmentSession
 from gtm.models_workspace import Workspace
+import uuid
 
 class Channel(models.Model):
-	name = models.CharField(max_length=100, unique=True)
-	color = models.CharField(max_length=7, default="#3B82F6")  # HEX color for chart
+    name = models.CharField(max_length=100, unique=True)
+    color = models.CharField(max_length=7, default="#3B82F6")  # HEX color for chart
 
-	def __str__(self):
-		return self.name
+    def __str__(self):
+        return self.name
 
 class ChannelAnalytics(models.Model):
+    channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="analytics")
+    revenue = models.DecimalField(max_digits=10, decimal_places=2)  # Store actual revenue
+    change = models.DecimalField(max_digits=10, decimal_places=2)   # percent change or absolute change
+    date = models.DateField(auto_now_add=True)
 
-	channel = models.ForeignKey(Channel, on_delete=models.CASCADE, related_name="analytics")
-	revenue = models.DecimalField(max_digits=10, decimal_places=2)  # Store actual revenue
-	change = models.DecimalField(max_digits=10, decimal_places=2)   # percent change or absolute change
-	date = models.DateField(auto_now_add=True)
-
-	def __str__(self):
-		return f"{self.channel.name} ({self.date}): {self.revenue} revenue"
+    def __str__(self):
+        return f"{self.channel.name} ({self.date}): {self.revenue} revenue"
 
 class GapAnalysisMetric(models.Model):
     SOURCE_CHOICES = [
@@ -68,3 +68,53 @@ class GapAnalysisMetric(models.Model):
     @property
     def metric_field_name(self):
         return self.METRIC_FIELD_MAPPING.get(self.metric)
+
+class Resource(models.Model):
+    """
+    A shared document or link within a workspace.
+    Centralizes GTM assets like Sales Decks, Brand Guidelines, and CRM links.
+    """
+    RESOURCE_TYPES = [
+        ('file', 'File Upload'),
+        ('link', 'External Link'),
+    ]
+    
+    CATEGORIES = [
+        ('strategy', 'Strategy & Planning'),
+        ('sales', 'Sales Enablement'),
+        ('marketing', 'Marketing Assets'),
+        ('product', 'Product & Tech'),
+        ('other', 'Other'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name="resources")
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    resource_type = models.CharField(max_length=10, choices=RESOURCE_TYPES, default='link')
+    category = models.CharField(max_length=20, choices=CATEGORIES, default='other')
+    
+    # For 'file' type
+    file = models.FileField(upload_to='workspace_resources/%Y/%m/', null=True, blank=True)
+    
+    # For 'link' type
+    url = models.URLField(max_length=500, null=True, blank=True)
+    
+    uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="uploaded_resources")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name} ({self.get_category_display()})"
+
+    @property
+    def extension(self):
+        if self.resource_type == 'link':
+            return 'link'
+        if self.file:
+            import os
+            return os.path.splitext(self.file.name)[1].lower().replace('.', '')
+        return 'file'

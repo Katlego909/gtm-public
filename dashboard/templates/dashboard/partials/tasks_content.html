@@ -1,0 +1,44 @@
+<header class="hidden md:flex h-16 bg-white border-b border-gray-200 justify-between items-center px-8 flex-shrink-0">
+    <div class="flex items-center gap-6">
+        <h1 class="text-xl font-bold text-gray-800">Tasks & Execution</h1>
+        
+        <!-- Workspace Selector -->
+        {% if user_workspaces %}
+            <div class="flex items-center gap-3">
+                <label class="text-sm text-gray-600">Workspace:</label>
+                <select id="workspace-selector" 
+                        name="workspace"
+                        class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                        hx-get="{% url 'tasks_board' %}"
+                    hx-include="#workspace-selector"
+                        hx-target="#main-content"
+                        hx-trigger="change"
+                        hx-push-url="true">
+                    {% for workspace in user_workspaces %}
+                        <option value="{{ workspace.id }}" 
+                                {% if current_workspace and current_workspace.id == workspace.id %}selected{% endif %}>
+                            {{ workspace.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        {% endif %}
+    </div>
+    
+    <div class="flex items-center gap-4">
+        <button hx-get="{% url 'add_action_item' %}" 
+                hx-target="#modal-content"
+                onclick="openModal()"
+                class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Add Task
+        </button>
+    </div>
+</header>
+
+<div class="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50">
+    <!-- Kanban Board -->
+    <div class="h-full">
+        {% include 'dashboard/partials/action_items.html' %}
+    </div>
+</div>

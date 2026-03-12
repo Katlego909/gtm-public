@@ -1,0 +1,129 @@
+<header class="hidden md:flex h-16 bg-white border-b border-gray-200 justify-between items-center px-8 flex-shrink-0">
+    <div class="flex items-center gap-6">
+        <h1 class="text-xl font-bold text-gray-800">Workspace Hub</h1>
+        
+        <!-- Workspace Selector -->
+        {% if user_workspaces %}
+            <div class="flex items-center gap-3">
+                <label class="text-sm text-gray-600">Workspace:</label>
+                <select id="workspace-selector" 
+                        name="workspace"
+                        class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                        hx-get="{% url 'workspace_hub' %}"
+                    hx-include="#workspace-selector"
+                        hx-target="#main-content"
+                        hx-trigger="change"
+                        hx-push-url="true">
+                    {% for workspace in user_workspaces %}
+                        <option value="{{ workspace.id }}" 
+                                {% if current_workspace and current_workspace.id == workspace.id %}selected{% endif %}>
+                            {{ workspace.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        {% endif %}
+    </div>
+    
+    <div class="flex items-center gap-4">
+        {% if current_workspace %}
+            <button onclick="openInviteModal()" 
+                    class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                Invite Member
+            </button>
+        {% endif %}
+        <button onclick="openWorkspaceModal()" 
+                class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            New Workspace
+        </button>
+    </div>
+</header>
+
+<div class="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50">
+    
+    {% if current_workspace %}
+        <!-- Team Section -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <span class="inline-block bg-indigo-100 text-indigo-600 rounded-full p-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    </span>
+                    Team Members
+                </h3>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                {% for membership in workspace_memberships %}
+                <div class="flex items-center gap-3 p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-sm flex-shrink-0">
+                        {{ membership.user.username|slice:":2"|upper }}
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="font-medium text-gray-900 truncate">{{ membership.user.get_full_name|default:membership.user.username }}</p>
+                        <p class="text-xs text-gray-500 truncate">{{ membership.user.email }}</p>
+                    </div>
+                    <span class="text-xs font-medium px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 uppercase tracking-tighter">
+                        {{ membership.role }}
+                    </span>
+                </div>
+                {% endfor %}
+            </div>
+
+            {% if pending_invites or accepted_awaiting %}
+                <div class="border-t border-gray-100 pt-6">
+                    <h4 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Pending Invitations</h4>
+                    <div class="space-y-3">
+                        {% for invite in pending_invites %}
+                        <div class="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-100">
+                            <span class="text-sm font-medium text-gray-900">{{ invite.email }}</span>
+                            <span class="text-xs font-medium text-yellow-600 uppercase">{{ invite.role }} &middot; Pending</span>
+                        </div>
+                        {% endfor %}
+                        {% for invite in accepted_awaiting %}
+                        <div class="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-100">
+                            <span class="text-sm font-medium text-gray-900">{{ invite.email }}</span>
+                            <span class="text-xs font-medium text-green-600 uppercase">Accepted &middot; Awaiting Signup</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Resource Library Section -->
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                        <span class="inline-block bg-blue-100 text-blue-600 rounded-full p-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                        </span>
+                        Resource Library
+                    </h3>
+                    <p class="text-sm text-gray-500 mt-1">Shared documents, sales decks, and planning links</p>
+                </div>
+                
+                <button type="button"
+                        hx-get="{% url 'add_resource' %}" 
+                        hx-target="#modal-content" 
+                        onclick="openModal()"
+                        class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm transition-colors flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    Add Asset
+                </button>
+            </div>
+
+            {% include 'dashboard/partials/resource_list.html' %}
+        </div>
+    {% else %}
+        <!-- Empty State -->
+        <div class="text-center py-20 bg-white rounded-2xl border-2 border-dashed border-gray-200">
+            <h3 class="text-lg font-bold text-gray-900">No Workspace Selected</h3>
+            <p class="text-gray-500 mt-2">Select or create a workspace to manage your team and resources.</p>
+            <button onclick="openWorkspaceModal()" class="mt-6 px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition">Create First Workspace</button>
+        </div>
+    {% endif %}
+</div>

@@ -1,0 +1,16 @@
+<div class="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3">
+    <a href="{% url 'gtm:playbook' session.uuid %}" 
+       hx-get="{% url 'gtm:playbook' session.uuid %}" 
+       hx-target="#main-content" 
+       hx-select="#main-content"
+       hx-swap="innerHTML swap:200ms" 
+       hx-push-url="true"
+       class="inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-white text-indigo-700 font-bold shadow-lg hover:bg-gray-100 transition text-sm sm:text-base whitespace-nowrap">
+        <span class="hidden sm:inline">View 30-Day Playbook →</span>
+        <span class="sm:hidden">View Playbook →</span>
+    </a>
+    <a href="{% url 'gtm:download' session.uuid %}" class="inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl border border-indigo-300 text-white hover:bg-indigo-600 transition text-sm sm:text-base whitespace-nowrap">
+        <i class="fas fa-download mr-2"></i>
+        <span>Download PDF</span>
+    </a>
+</div>

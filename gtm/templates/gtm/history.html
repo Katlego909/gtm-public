@@ -22,29 +22,9 @@
 
   <!-- Messages -->
   {% if messages %}
-    <div class="mb-6 space-y-3">
+    <div class="hidden" id="history-server-messages" aria-hidden="true">
       {% for message in messages %}
-        {% if message.tags == "error" %}
-          <div class="bg-red-50 border-l-4 border-red-500 text-red-700 px-6 py-4 rounded-lg font-medium shadow-sm flex items-center gap-3">
-            <i class="fas fa-exclamation-circle text-xl"></i>
-            <span>{{ message }}</span>
-          </div>
-        {% elif message.tags == "warning" %}
-          <div class="bg-yellow-50 border-l-4 border-yellow-500 text-yellow-700 px-6 py-4 rounded-lg font-medium shadow-sm flex items-center gap-3">
-            <i class="fas fa-exclamation-triangle text-xl"></i>
-            <span>{{ message }}</span>
-          </div>
-        {% elif message.tags == "info" %}
-          <div class="bg-blue-50 border-l-4 border-blue-500 text-blue-700 px-6 py-4 rounded-lg font-medium shadow-sm flex items-center gap-3">
-            <i class="fas fa-info-circle text-xl"></i>
-            <span>{{ message }}</span>
-          </div>
-        {% else %}
-          <div class="bg-green-50 border-l-4 border-green-500 text-green-700 px-6 py-4 rounded-lg font-medium shadow-sm flex items-center gap-3">
-            <i class="fas fa-check-circle text-xl"></i>
-            <span>{{ message }}</span>
-          </div>
-        {% endif %}
+        <div data-server-message data-level="{{ message.tags|default:'info' }}" data-message="{{ message|escapejs }}"></div>
       {% endfor %}
     </div>
   {% endif %}
@@ -172,6 +152,16 @@
                     <i class="fas fa-play"></i>
                     <span>Continue</span>
                   </a>
+
+                  <form method="post" action="/cancel/{{ r.session.uuid }}/" class="flex-1 lg:flex-none"
+                    data-confirm="Cancel this assessment? This will remove all in-progress answers for this run.">
+                    {% csrf_token %}
+                    <button type="submit"
+                            class="w-full inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-white border-2 border-red-300 text-red-700 rounded-xl text-xs sm:text-sm font-semibold hover:bg-red-50 transition whitespace-nowrap">
+                      <i class="fas fa-times-circle"></i>
+                      <span>Cancel</span>
+                    </button>
+                  </form>
                 {% endif %}
               </div>
             </div>

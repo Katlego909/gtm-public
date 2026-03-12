@@ -1,6 +1,32 @@
 from django import forms
 from django.contrib.auth.models import User
-from .models import GapAnalysisMetric
+from .models import GapAnalysisMetric, Resource
+
+class ResourceForm(forms.ModelForm):
+    class Meta:
+        model = Resource
+        fields = ['name', 'description', 'resource_type', 'category', 'file', 'url']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'w-full p-2 border rounded', 'placeholder': 'Resource Name'}),
+            'description': forms.Textarea(attrs={'class': 'w-full p-2 border rounded', 'rows': 2, 'placeholder': 'Brief description'}),
+            'resource_type': forms.Select(attrs={'class': 'w-full p-2 border rounded', 'onchange': 'toggleResourceFields(this.value)'}),
+            'category': forms.Select(attrs={'class': 'w-full p-2 border rounded'}),
+            'file': forms.FileInput(attrs={'class': 'w-full p-2 border rounded'}),
+            'url': forms.URLInput(attrs={'class': 'w-full p-2 border rounded', 'placeholder': 'https://...'}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        resource_type = cleaned_data.get('resource_type')
+        file = cleaned_data.get('file')
+        url = cleaned_data.get('url')
+
+        if resource_type == 'file' and not file:
+            self.add_error('file', 'Please upload a file for this resource type.')
+        elif resource_type == 'link' and not url:
+            self.add_error('url', 'Please provide a URL for this resource type.')
+        
+        return cleaned_data
 from gtm.models import ActionItem
 
 class GapAnalysisMetricForm(forms.ModelForm):

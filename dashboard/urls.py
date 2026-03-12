@@ -3,6 +3,11 @@ from . import views
 
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
+    path('agent/', views.agent_hub, name='agent_hub'),
+    path('agent/chat/', views.dashboard_agent_api, name='dashboard_agent_api'),
+    path('agent/context/', views.dashboard_agent_context_api, name='dashboard_agent_context_api'),
+    path('tasks/', views.tasks_board, name='tasks_board'),
+    path('workspace/hub/', views.workspace_hub, name='workspace_hub'),
     path('kpi/total_sessions/', views.kpi_total_sessions, name='kpi_total_sessions'),
     path('kpi/completed_items/', views.kpi_completed_items, name='kpi_completed_items'),
     path('kpi/pending_items/', views.kpi_pending_items, name='kpi_pending_items'),
@@ -36,4 +41,10 @@ urlpatterns = [
     # Workspace management from dashboard
     path('workspace/create/', views.create_workspace_dashboard, name='create_workspace_dashboard'),
     path('workspace/<uuid:workspace_id>/invite/', views.invite_to_workspace, name='invite_to_workspace'),
+    
+    # Resource Library
+    path('resources/', views.refresh_resources, name='refresh_resources'),
+    path('resources/add/', views.add_edit_resource, name='add_resource'),
+    path('resources/<uuid:pk>/edit/', views.add_edit_resource, name='edit_resource'),
+    path('resources/<uuid:pk>/delete/', views.delete_resource, name='delete_resource'),
 ]

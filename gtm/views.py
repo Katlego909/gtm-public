@@ -26,14 +26,10 @@ from django.db import transaction
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout
 from django.db.models import Avg
+from django.conf import settings
 from functools import wraps
-from .ai_services import generate_concise_action_items
-from django import forms # Added import
-from django.shortcuts import get_object_or_404
-from .utils_pdf import render_gtm_report_pdf_response
-from .utils import transfer_firmographics_to_snapshot, get_existing_incomplete_session, check_daily_assessment_cap, check_assessment_cooldown # Added imports
-
-from .ai_services import generate_playbook_with_gemini, generate_diagnostic_insight, _normalize_ai_playbook_markdown, _extract_tasks_from_playbook_regex
+from .utils import transfer_firmographics_to_snapshot
+from .ai_services import generate_playbook_with_gemini, generate_diagnostic_insight, _normalize_ai_playbook_markdown
 from .forms import StartAssessmentForm # Added import
 
 LEGEND = {
@@ -62,24 +58,22 @@ def _get_template(request, base_template, partial_template=None):
 
 def require_session_ownership(view_func):
     """
-    Decorator to enforce session ownership.
-    Checks if authenticated user owns the session or if anonymous client ID matches.
+    Decorator to enforce authenticated session access.
+    Uses centralized workspace-aware session authorization.
     """
     @wraps(view_func)
     def wrapper(request, session_id, *args, **kwargs):
-        session = get_object_or_404(AssessmentSession, pk=session_id)
-        
-        # Check ownership
-        if request.user.is_authenticated:
-            if session.user != request.user:
-                messages.error(request, "Access denied.")
-                return redirect("gtm:history")
-        elif session.owner_client_id != _client_id(request):
+        if not request.user.is_authenticated:
+            messages.error(request, "Please sign in to continue.")
+            return redirect("account_login")
+
+        session, is_authorized = safe_get_session_or_403(request, session_id)
+        if not is_authorized:
             messages.error(request, "Access denied.")
             return redirect("gtm:history")
         
-        # Pass session to view to avoid re-querying
-        return view_func(request, session, *args, **kwargs)
+        # Pass both session object and session_id to preserve wrapped view signatures.
+        return view_func(request, session, session_id, *args, **kwargs)
     return wrapper
 
 def require_action_ownership(view_func):
@@ -91,18 +85,84 @@ def require_action_ownership(view_func):
     def wrapper(request, action_id, *args, **kwargs):
         action = get_object_or_404(ActionItem, pk=action_id)
 
-        # Check ownership via session
-        if request.user.is_authenticated:
-            if action.session.user != request.user:
-                messages.error(request, "Access denied.")
-                return redirect("gtm:history")
-        elif action.session.owner_client_id != _client_id(request):
+        if not request.user.is_authenticated:
+            messages.error(request, "Please sign in to continue.")
+            return redirect("account_login")
+
+        if not action.session:
+            messages.error(request, "Invalid action item.")
+            return redirect("gtm:history")
+
+        _, is_authorized = safe_get_session_or_403(request, action.session_id)
+        if not is_authorized:
             messages.error(request, "Access denied.")
             return redirect("gtm:history")
 
         # Pass both action and action_id to view for correct signature
         return view_func(request, action, action_id, *args, **kwargs)
     return wrapper
+
+def _log_access_denied(request, reason, session_id=None, details=None):
+    """Log denied access attempts for audit trail."""
+    user = request.user.username if request.user.is_authenticated else "anonymous"
+    client_id = _client_id(request)
+    log_details = {
+        "reason": reason,
+        "user": user,
+        "client_id": client_id,
+        "session_id": str(session_id) if session_id else None,
+        **(details or {})
+    }
+    log_error("Access Denied", Exception(reason), log_details)
+
+
+def safe_get_session_or_403(request, session_id):
+    """
+    Safely retrieve a session with comprehensive ownership & workspace checks.
+    - Only authenticated users are allowed.
+    - Authenticated users can access owned sessions.
+    - Workspace members can access sessions in their workspace.
+    
+    Returns: (session, is_authorized)
+    """
+    from gtm.models_workspace import WorkspaceMembership
+    
+    try:
+        session = AssessmentSession.objects.get(pk=session_id)
+    except AssessmentSession.DoesNotExist:
+        return None, False
+    
+    if not request.user.is_authenticated:
+        _log_access_denied(request, "Anonymous access denied", session_id)
+        return None, False
+    
+    # Authenticated user: check ownership first (always allowed)
+    if session.user == request.user:
+        return session, True
+    
+    # If session has a workspace, check if user is a member
+    if session.workspace:
+        try:
+            membership = WorkspaceMembership.objects.get(
+                user=request.user,
+                workspace=session.workspace,
+                is_active=True
+            )
+            # User is a member and can access workspace sessions
+            return session, True
+        except WorkspaceMembership.DoesNotExist:
+            _log_access_denied(
+                request,
+                "User not in session's workspace",
+                session_id,
+                {"workspace_id": str(session.workspace.id)}
+            )
+            return None, False
+    
+    # No workspace: can only be accessed by owner
+    _log_access_denied(request, "User is not the session owner", session_id)
+    return None, False
+
 
 def _format_band_actions_markdown(markdown_text):
     """
@@ -253,25 +313,37 @@ def landing(request):
 
 @login_required
 def start_assessment(request):
-    # Identify the anonymous "user" via your gtm_client cookie
-    cid = _client_id(request)
-
     # 0) Redirect to the most recent incomplete assessment instead of creating duplicates
-    existing_incomplete = get_existing_incomplete_session(cid)
+    existing_incomplete = AssessmentSession.objects.filter(
+        user=request.user,
+        is_completed=False,
+    ).order_by("-created_at").first()
     if existing_incomplete:
         messages.info(request, "You have an unfinished assessment. Resuming it now.")
         return redirect("gtm:resume", session_id=existing_incomplete.uuid)
 
-    # 1) Daily cap (per browser/client)
-    if check_daily_assessment_cap(cid):
+    # 1) Daily cap (per authenticated user)
+    today = timezone.now().date()
+    max_assessments_per_day = getattr(settings, "MAX_ASSESSMENTS_PER_DAY", 3)
+    daily_count = AssessmentSession.objects.filter(user=request.user, created_at__date=today).count()
+    if daily_count >= max_assessments_per_day:
         messages.error(
             request,
             "Daily limit reached. Please try again tomorrow or contact us for extended access."
         )
         return redirect("gtm:history")
 
-    # 2) Cooldown (time between new assessments)
-    in_cooldown, minutes_left = check_assessment_cooldown(cid)
+    # 2) Cooldown (time between new assessments per authenticated user)
+    min_seconds_between_assessments = getattr(settings, "MIN_SECONDS_BETWEEN_ASSESSMENTS", 5 * 60)
+    last_session = AssessmentSession.objects.filter(user=request.user).order_by("-created_at").first()
+    if last_session:
+        seconds_since_last = (timezone.now() - last_session.created_at).total_seconds()
+        in_cooldown = seconds_since_last < min_seconds_between_assessments
+        minutes_left = max(1, int((min_seconds_between_assessments - seconds_since_last) // 60)) if in_cooldown else 0
+    else:
+        in_cooldown = False
+        minutes_left = 0
+
     if in_cooldown:
         messages.warning(
             request,
@@ -313,23 +385,33 @@ def start_assessment(request):
     return render(request, "gtm/start.html", {"form": form, "is_htmx": _is_htmx(request)})
 
 
+@login_required
 def resume_assessment(request, session_id):
-    session = get_object_or_404(AssessmentSession, pk=session_id)
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        messages.error(request, "Access denied.")
+        return redirect("gtm:history")
+
     step = _first_incomplete_step(session)
     session.current_step = step
     session.save(update_fields=["current_step"])
     return redirect("gtm:assessment_step", session_id=session.uuid, step=step)
 
+@login_required
 def resume_latest(request):
-    cid = _client_id(request)
-    s = AssessmentSession.objects.filter(owner_client_id=cid, is_completed=False).order_by("-created_at").first()
+    s = AssessmentSession.objects.filter(user=request.user, is_completed=False).order_by("-created_at").first()
     if not s:
         return redirect("gtm:start")
     step = _first_incomplete_step(s)
     return redirect("gtm:assessment_step", session_id=s.uuid, step=step)
 
+@login_required
 def assessment_step(request, session_id, step: int):
-    session = get_object_or_404(AssessmentSession, pk=session_id)
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        messages.error(request, "Access denied.")
+        return redirect("gtm:history")
+
     steps = _paginated_questions()
     total_steps = len(steps)
     if total_steps == 0:
@@ -383,13 +465,7 @@ def assessment_step(request, session_id, step: int):
                 if response_instance.score <= 2:
                     low_score_responses.append(response_instance)
 
-            # Compute scores and save snapshot ONCE after all responses
-            cat_scores, overall = _compute_scores(session)
-            band = _band_for_score(overall)
-            labels = [c["category"].name for c in cat_scores]
-            values = [round(c["avg"], 2) for c in cat_scores]
-            _save_snapshot(session, cat_scores, overall, band, labels, values)
-
+            # Transition to next step
             next_step = step + 1
             session.current_step = min(next_step, total_steps)
             session.is_completed = _is_session_complete(session)
@@ -402,6 +478,14 @@ def assessment_step(request, session_id, step: int):
 
             if next_step > total_steps:
                 return redirect("gtm:results", session_id=session.uuid)
+            
+            # For non-final steps, we still compute score for the progress bar or snapshot
+            cat_scores, overall = _compute_scores(session)
+            band = _band_for_score(overall)
+            labels = [c["category"].name for c in cat_scores]
+            values = [round(c["avg"], 2) for c in cat_scores]
+            _save_snapshot(session, cat_scores, overall, band, labels, values)
+
             return redirect("gtm:assessment_step", session_id=session.uuid, step=next_step)
     else:
         form = StepForm(initial=initial)
@@ -418,7 +502,11 @@ def assessment_step(request, session_id, step: int):
     })
 
 def results(request, session_id):
-    session = get_object_or_404(AssessmentSession, pk=session_id)
+    # Access control: ensure user owns or is in session's workspace
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Access denied to this session.")
     
     # Ensure workspace association if missing
     if hasattr(request, 'workspace') and request.workspace and not session.workspace:
@@ -443,6 +531,7 @@ def results(request, session_id):
         if r:
             all_rows.append({
                 "question": q,
+                "response_id": r.id,
                 "score": r.score,
                 "weighted": r.score * q.weight,
                 "note": q.diagnostic_note or "",
@@ -550,16 +639,28 @@ def results(request, session_id):
         # Use prefetched response if available
         response = responses_by_question_id.get(q_data["question"].id)
         
-        if response and not response.ai_insight and response.score <= 2:
-            try:
-                generate_diagnostic_insight(response)
-                # Refresh the insight from DB if it was just generated
-                response.refresh_from_db() 
+        if response and response.score <= 2:
+            if not response.ai_insight:
+                # 🤖 TRIGGER ASYNC GENERATION
+                try:
+                    from threading import Thread
+                    # Capture response ID to avoid closure issues
+                    rid = response.id
+                    def gen_diagnostic_async(resp_id):
+                        try:
+                            from .models import Response
+                            from .ai_services import generate_diagnostic_insight
+                            r = Response.objects.get(id=resp_id)
+                            generate_diagnostic_insight(r)
+                        except Exception as e:
+                            log_error("Async Diagnostic Gen", e)
+                    
+                    Thread(target=gen_diagnostic_async, args=(rid,), daemon=True).start()
+                    q_data["ai_insight_loading"] = True
+                except Exception as e:
+                    log_error("Diagnostic Thread creation", e)
+            else:
                 q_data["ai_insight"] = response.ai_insight
-            except Exception as e:
-                log_error("Diagnostic Insight Generation", e, {"qid": q_data["question"].id_code})
-        elif response: # If insight already exists, just use it
-            q_data["ai_insight"] = response.ai_insight
 
     
     # -----------------------------
@@ -599,11 +700,83 @@ def results(request, session_id):
         "weakest_questions": weakest_questions,
         "recommendations": recommendations,
         "is_htmx": _is_htmx(request),
+        "snap": snap,
+    })
+
+def playbook_status(request, session_id):
+    """Checks if AI playbook is ready. Returns button partials for polling."""
+    # Access control: ensure user owns or is in session's workspace
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Access denied to this session.")
+    snap = getattr(session, "snapshot", None) or ResultSnapshot.objects.filter(session=session).first()
+    
+    if snap and (snap.ai_playbook or "").strip():
+        # Playbook is ready! Return the actual button to view it.
+        return render(request, "gtm/partials/playbook_ready_button.html", {"session": session})
+    
+    # Still generating. Return the loading state.
+    return render(request, "gtm/partials/playbook_loading_button.html", {"session": session})
+
+
+def playbook_content_status(request, session_id):
+    """Return only the playbook content panel for incremental HTMX polling."""
+    # Access control: ensure user owns or is in session's workspace
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Access denied to this session.")
+    snap = getattr(session, "snapshot", None) or ResultSnapshot.objects.filter(session=session).first()
+
+    playbook_ready = bool(snap and (snap.ai_playbook or "").strip())
+    ai_playbook_html = ""
+
+    if playbook_ready:
+        src = _normalize_ai_playbook_markdown(snap.ai_playbook)
+        ai_playbook_html = md.markdown(src, extensions=["extra", "sane_lists", "toc"])
+        return render(request, "gtm/partials/playbook_content_status.html", {
+            "session": session,
+            "playbook_ready": True,
+            "playbook_loading": False,
+            "ai_playbook_html": mark_safe(ai_playbook_html),
+        })
+
+    # Ensure generation remains non-blocking while polling.
+    if snap:
+        try:
+            from threading import Thread
+
+            def generate_async():
+                try:
+                    ai_md_src = generate_playbook_with_gemini(snap)
+                    if ai_md_src and ai_md_src.strip():
+                        snap.ai_playbook = ai_md_src.strip()
+                        snap.save(update_fields=["ai_playbook"])
+                except Exception as e:
+                    log_error("AI Playbook (async) Poll Generation", e, {"session_id": str(session.uuid)})
+
+            thread = Thread(target=generate_async)
+            thread.daemon = True
+            thread.start()
+        except Exception as e:
+            log_error("AI Playbook poll thread creation", e, {"session_id": str(session.uuid)})
+
+    return render(request, "gtm/partials/playbook_content_status.html", {
+        "session": session,
+        "playbook_ready": False,
+        "playbook_loading": bool(snap),
+        "ai_playbook_html": "",
     })
 
 # Playbook
 def playbook(request, session_id):
-    session = get_object_or_404(AssessmentSession, pk=session_id)
+    # Access control: ensure user owns or is in session's workspace
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Access denied to this session.")
+    
     cat_scores, overall = _compute_scores(session)
     band = _band_for_score(overall)
     cat_sorted = sorted(cat_scores, key=lambda x: x["avg"])
@@ -646,6 +819,8 @@ def playbook(request, session_id):
         except Exception as e:
             log_error("AI Playbook thread creation", e, {"session_id": str(session.uuid)})
     
+    playbook_ready = False
+    playbook_loading = bool(needs_generation)
     ai_playbook_html = ""
     try:
         if snap and getattr(snap, "ai_playbook", ""):
@@ -654,53 +829,18 @@ def playbook(request, session_id):
                 src,
                 extensions=["extra", "sane_lists", "toc"]  # 'extra' already includes tables
             )
-        elif needs_generation:
-            # Show loading state instead of blocking
-            ai_playbook_html = """
-            <div class="text-center py-12">
-                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-                <p class="mt-4 text-gray-600">Generating your personalized GTM playbook...</p>
-                <p class="text-sm text-gray-500 mt-2">This may take up to 30 seconds</p>
-            </div>
-            <script>
-                // Auto-refresh every 3 seconds to check if generation is complete
-                setTimeout(function() {
-                    window.location.reload();
-                }, 3000);
-            </script>
-            """
-        else:
-            ai_playbook_html = "<p class='text-gray-500 text-center py-8'>No AI playbook available for this session.</p>"
+            playbook_ready = True
     except Exception as e:
         log_error("AI Playbook rendering", e, {"session_id": str(session.uuid)})
-        ai_playbook_html = "<p class='text-red-600'>⚠️ Could not render AI playbook content. Check logs.</p>"
+        ai_playbook_html = ""
+        playbook_ready = False
+        playbook_loading = False
 
-    # -----------------------------
-    # AI Task Extraction and Creation
-    # -----------------------------
-    # Only create up to 10 tasks if playbook is present and no tasks exist yet
-    if snap and getattr(snap, "ai_playbook", ""):
-        playbook_text = snap.ai_playbook.replace("\r\n", "\n").strip()
-        
-        # Try AI generation first
-        tasks = generate_concise_action_items(playbook_text)
-        
-        # Fallback to regex if AI returns nothing
-        if not tasks:
-            tasks = _extract_tasks_from_playbook_regex(playbook_text)
+    # Note: Action items are now created explicitly via the "build my action plan" agent command.
+    # This prevents duplicate auto-creation and gives users explicit control over task generation.
 
-        if tasks and not session.actions.exists():
-            for task in tasks[:10]:
-                ActionItem.objects.create(
-                    session=session,
-                    note=task,
-                    status="todo",
-                    created_by=session.user if session.user else None
-                )
-
-    # -----------------------------
     # Render Template
-    # -----------------------------
+    # ----
     return render(request, "gtm/playbook.html", {
         "session": session,
         "overall": round(overall, 1),
@@ -709,24 +849,62 @@ def playbook(request, session_id):
         "cat_sorted": cat_sorted,
         "band_actions_html": band_actions_html,
         "ai_playbook_html": mark_safe(ai_playbook_html),
+        "playbook_ready": playbook_ready,
+        "playbook_loading": playbook_loading,
         "is_htmx": _is_htmx(request),
     })
 
 
+def insight_status(request, session_id, response_id):
+    """Return only one insight block so the results page updates without full-page refresh."""
+    # Access control: ensure user owns or is in session's workspace
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Access denied to this session.")
+    
+    response = get_object_or_404(Response.objects.select_related("question"), pk=response_id, session=session)
+
+    if response.score <= 2 and not (response.ai_insight or "").strip():
+        try:
+            from threading import Thread
+
+            def gen_diagnostic_async(resp_id):
+                try:
+                    from .models import Response
+                    from .ai_services import generate_diagnostic_insight
+                    r = Response.objects.get(id=resp_id)
+                    generate_diagnostic_insight(r)
+                except Exception as e:
+                    log_error("Async Diagnostic Gen (poll)", e)
+
+            Thread(target=gen_diagnostic_async, args=(response.id,), daemon=True).start()
+        except Exception as e:
+            log_error("Diagnostic poll thread creation", e)
+
+    # Refresh model state after potential async kickoff fallback writes.
+    response.refresh_from_db(fields=["ai_insight"])
+
+    return render(request, "gtm/partials/insight_status.html", {
+        "session": session,
+        "response": response,
+    })
+
+
 def download_report_pdf(request, session_id):
-    session = get_object_or_404(AssessmentSession, pk=session_id)
+    # Access control: ensure user owns or is in session's workspace
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Access denied to this session.")
+    
     cat_scores, overall = _compute_scores(session)
     band = _band_for_score(overall)
     return render_gtm_report_pdf_response(session=session, cat_scores=cat_scores, overall=overall, band=band)
 
+@login_required
 def history(request):
-    
-    if request.user.is_authenticated:
-        qs = AssessmentSession.objects.filter(user=request.user)
-    else:
-        cid = _client_id(request)
-        # 🚨 IMPROVEMENT: Fetch snapshot and band info in one go
-        qs = AssessmentSession.objects.filter(owner_client_id=cid).order_by("-created_at")
+    qs = AssessmentSession.objects.filter(user=request.user).order_by("-created_at")
         
     # Use select_related to minimize queries
     qs = qs.select_related('snapshot__band')
@@ -777,6 +955,20 @@ def history(request):
                 row['band'] = band
         
     return render(request, "gtm/history.html", {"rows": rows, "is_htmx": _is_htmx(request)})
+
+
+@require_POST
+@require_session_ownership
+def cancel_assessment(request, session, session_id):
+    """Cancel an in-progress assessment and remove it from history."""
+    if session.is_completed:
+        messages.warning(request, "Completed assessments cannot be canceled.")
+        return redirect("gtm:history")
+
+    company_label = session.company_name or "this assessment"
+    session.delete()
+    messages.success(request, f"Canceled {company_label}.")
+    return redirect("gtm:history")
 
 
 @require_POST
@@ -846,7 +1038,11 @@ from .models import ChatMessage
 
 def chat_view(request, session_id):
     """Render the chat interface page"""
-    session = get_object_or_404(AssessmentSession, pk=session_id)
+    # Access control: ensure user owns or is in session's workspace
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Access denied to this session.")
     
     # Get chat history
     chat_history = ChatMessage.objects.filter(session=session).order_by('created_at')[:50]
@@ -867,13 +1063,13 @@ def chat_api(request, session_id):
     import json
     
     try:
-        try:
-            session = AssessmentSession.objects.get(pk=session_id)
-        except AssessmentSession.DoesNotExist:
+        # Access control: ensure user owns or is in session's workspace
+        session, is_authorized = safe_get_session_or_403(request, session_id)
+        if not is_authorized:
             return JsonResponse({
                 "success": False,
-                "error": "Session not found. Please refresh the page or start a new assessment."
-            }, status=404)
+                "error": "Access denied to this session."
+            }, status=403)
 
         # Parse JSON body
         data = json.loads(request.body)

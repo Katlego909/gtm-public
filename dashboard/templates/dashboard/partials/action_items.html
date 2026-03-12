@@ -1,5 +1,9 @@
 {% load markdown_filters %}
 <div class="mt-8 mb-8 relative" id="action-items-container">
+    <form id="csrf-token-form" class="hidden" aria-hidden="true">
+        {% csrf_token %}
+    </form>
+
     <div class="flex items-center justify-between mb-6">
         <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
             <span class="inline-block bg-indigo-100 text-indigo-600 rounded-full p-2 mr-2">
@@ -77,7 +81,36 @@
 
 <script>
 (function() {
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return '';
+    }
+
     // Initialize drag and drop for action items kanban board
+    function syncTaskCountersFromBoard() {
+        const todoCount = document.querySelectorAll('#todo-list [data-id]').length;
+        const doingCount = document.querySelectorAll('#doing-list [data-id]').length;
+        const doneCount = document.querySelectorAll('#done-list [data-id]').length;
+        const pendingCount = todoCount + doingCount;
+
+        const sidebarPending = document.getElementById('sidebar-pending-count');
+        if (sidebarPending) {
+            sidebarPending.textContent = String(pendingCount);
+        }
+
+        const completedKpi = document.getElementById('completed-kpi-value');
+        if (completedKpi) {
+            completedKpi.textContent = String(doneCount);
+        }
+
+        const pendingKpi = document.getElementById('pending-kpi-value');
+        if (pendingKpi) {
+            pendingKpi.textContent = String(pendingCount);
+        }
+    }
+
     function initializeKanban() {
         const lists = ['todo-list', 'doing-list', 'done-list'];
         
@@ -102,6 +135,7 @@
                         // Get CSRF token
                         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
                                         document.querySelector('meta[name="csrf-token"]')?.content ||
+                                        getCookie('csrftoken') ||
                                         '';
                         
                         // Update item status via fetch
@@ -110,7 +144,8 @@
                             headers: {
                                 'X-CSRFToken': csrfToken,
                                 'X-Requested-With': 'XMLHttpRequest'
-                            }
+                            },
+                            credentials: 'same-origin'
                         })
                         .then(response => {
                             if (!response.ok) throw new Error('Network response was not ok');
@@ -121,7 +156,10 @@
                             const container = document.getElementById('action-items-container');
                             container.outerHTML = html;
                             // Re-initialize kanban after update
-                            setTimeout(initializeKanban, 100);
+                            setTimeout(() => {
+                                initializeKanban();
+                                syncTaskCountersFromBoard();
+                            }, 100);
                         })
                         .catch(error => {
                             console.error('Error updating item:', error);
@@ -141,12 +179,16 @@
         document.addEventListener('DOMContentLoaded', initializeKanban);
     } else {
         initializeKanban();
+        syncTaskCountersFromBoard();
     }
     
     // Re-initialize after HTMX swaps
     document.addEventListener('htmx:afterSwap', function(evt) {
         if (evt.target.id === 'action-items-container' || evt.target.closest('#action-items-container')) {
-            setTimeout(initializeKanban, 100);
+            setTimeout(() => {
+                initializeKanban();
+                syncTaskCountersFromBoard();
+            }, 100);
         }
     });
 })();

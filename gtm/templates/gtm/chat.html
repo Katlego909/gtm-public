@@ -87,11 +87,15 @@
                 </div>
                 <div class="flex items-start gap-2 text-sm text-gray-700">
                   <i class="fas fa-chevron-right text-indigo-600 mt-1 text-xs"></i>
-                  <span>"Give me a 90-day roadmap"</span>
+                  <span>"Build my action plan"</span>
                 </div>
                 <div class="flex items-start gap-2 text-sm text-gray-700">
                   <i class="fas fa-chevron-right text-indigo-600 mt-1 text-xs"></i>
-                  <span>"How do I improve conversion?"</span>
+                  <span>"Review my action items"</span>
+                </div>
+                <div class="flex items-start gap-2 text-sm text-gray-700">
+                  <i class="fas fa-chevron-right text-indigo-600 mt-1 text-xs"></i>
+                  <span>"Give me a 90-day roadmap"</span>
                 </div>
               </div>
             </div>
@@ -438,6 +442,18 @@
         const scheduleMessage = "I'd like to schedule a strategy meeting to discuss implementing my GTM playbook. Can you help me set up a Google Meet?";
         chatInput.value = scheduleMessage;
         sendMessage(scheduleMessage);
+      }, 500);
+    } else if (promptParam === 'action-plan') {
+      setTimeout(() => {
+        const actionPlanMessage = "Build my action plan";
+        chatInput.value = actionPlanMessage;
+        sendMessage(actionPlanMessage);
+      }, 500);
+    } else if (promptParam === 'review-actions') {
+      setTimeout(() => {
+        const reviewActionsMessage = "Review my action items";
+        chatInput.value = reviewActionsMessage;
+        sendMessage(reviewActionsMessage);
       }, 500);
     }
   });

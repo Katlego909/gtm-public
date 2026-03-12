@@ -11,6 +11,11 @@
 
   <!-- ✅ HTMX for SPA-like behavior -->
   <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <script>
+    document.body.addEventListener('htmx:configRequest', (event) => {
+        event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+    });
+  </script>
 
   <!-- ✅ Chart.js for radar charts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -55,18 +60,18 @@
       
       <!-- Desktop Navigation -->
       <div class="hidden md:flex items-center gap-6">
-        <a href="/dashboard/" 
+        {% if user.is_authenticated %}
+         <a href="/dashboard/" 
            class="text-gray-700 hover:text-indigo-600 transition font-medium">Dashboard</a>
-        
-        <a href="{% url 'gtm:history' %}" 
+
+         <a href="{% url 'gtm:history' %}" 
            hx-get="{% url 'gtm:history' %}" 
            hx-target="#main-content" 
            hx-select="#main-content"
            hx-swap="innerHTML swap:200ms" 
            hx-push-url="true"
            class="text-gray-700 hover:text-indigo-600 transition font-medium">My Assessments</a>
-        
-        {% if user.is_authenticated %}
+
           <a href="{% url 'gtm:workspace:list' %}" 
              hx-get="{% url 'gtm:workspace:list' %}" 
              hx-target="#main-content" 
@@ -157,22 +162,22 @@
     <!-- Mobile Menu -->
     <div id="mobile-menu" class="hidden md:hidden">
       <div class="px-4 py-3 space-y-1 bg-white border-t border-gray-200">
-        <a href="/dashboard/" 
-           class="block px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition font-medium">
-          <i class="fas fa-chart-line mr-3"></i>Dashboard
-        </a>
-        
-        <a href="{% url 'gtm:history' %}" 
-           hx-get="{% url 'gtm:history' %}" 
-           hx-target="#main-content" 
-           hx-select="#main-content"
-           hx-swap="innerHTML swap:200ms" 
-           hx-push-url="true"
-           class="block px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition font-medium">
-          <i class="fas fa-history mr-3"></i>My Assessments
-        </a>
-        
         {% if user.is_authenticated %}
+          <a href="/dashboard/" 
+             class="block px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition font-medium">
+            <i class="fas fa-chart-line mr-3"></i>Dashboard
+          </a>
+
+          <a href="{% url 'gtm:history' %}" 
+             hx-get="{% url 'gtm:history' %}" 
+             hx-target="#main-content" 
+             hx-select="#main-content"
+             hx-swap="innerHTML swap:200ms" 
+             hx-push-url="true"
+             class="block px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition font-medium">
+            <i class="fas fa-history mr-3"></i>My Assessments
+          </a>
+
           <a href="{% url 'gtm:profile' %}" 
              hx-get="{% url 'gtm:profile' %}" 
              hx-target="#main-content" 
@@ -258,6 +263,27 @@
     </div>
   </main>
 
+  <!-- Global Toast Notifications -->
+  <div id="app-toast-container" class="fixed top-24 right-4 z-[1100] flex flex-col gap-3 w-[min(92vw,380px)] pointer-events-none"></div>
+
+  <!-- Global Confirm Modal -->
+  <div id="app-confirm-backdrop" class="hidden fixed inset-0 z-[1050] bg-black/50 backdrop-blur-sm">
+    <div class="min-h-full flex items-center justify-center p-4">
+      <div class="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-md overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-100">
+          <h3 class="text-lg font-bold text-gray-900">Confirm Action</h3>
+        </div>
+        <div class="px-6 py-5">
+          <p id="app-confirm-message" class="text-sm text-gray-700 leading-relaxed"></p>
+        </div>
+        <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3">
+          <button id="app-confirm-cancel" type="button" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition">Cancel</button>
+          <button id="app-confirm-ok" type="button" class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- HTMX Loading Indicator -->
   <style>
     .htmx-indicator {
@@ -303,6 +329,121 @@
         }, 100);
       }
     });
+
+    (function () {
+      const toastContainer = document.getElementById('app-toast-container');
+      const confirmBackdrop = document.getElementById('app-confirm-backdrop');
+      const confirmMessage = document.getElementById('app-confirm-message');
+      const confirmOk = document.getElementById('app-confirm-ok');
+      const confirmCancel = document.getElementById('app-confirm-cancel');
+      let confirmCallback = null;
+
+      const toneClasses = {
+        success: 'border-green-200 bg-green-50 text-green-800',
+        error: 'border-red-200 bg-red-50 text-red-800',
+        warning: 'border-yellow-200 bg-yellow-50 text-yellow-800',
+        info: 'border-blue-200 bg-blue-50 text-blue-800',
+      };
+
+      function normalizeLevel(level) {
+        if (level === 'danger') return 'error';
+        if (!toneClasses[level]) return 'info';
+        return level;
+      }
+
+      function showAppToast(message, level = 'info', timeoutMs = 4200) {
+        if (!toastContainer || !message) return;
+        const tone = normalizeLevel(level);
+
+        const toast = document.createElement('div');
+        toast.className = `pointer-events-auto rounded-xl border shadow-lg px-4 py-3 text-sm font-medium transition-all duration-300 opacity-0 translate-y-2 ${toneClasses[tone]}`;
+        toast.innerHTML = `<div class="flex items-start gap-3"><span class="flex-1">${message}</span><button type="button" class="text-current/70 hover:text-current">&times;</button></div>`;
+
+        toast.querySelector('button').addEventListener('click', () => {
+          toast.classList.add('opacity-0', 'translate-y-2');
+          setTimeout(() => toast.remove(), 220);
+        });
+
+        toastContainer.appendChild(toast);
+        requestAnimationFrame(() => toast.classList.remove('opacity-0', 'translate-y-2'));
+
+        if (timeoutMs > 0) {
+          setTimeout(() => {
+            if (!toast.isConnected) return;
+            toast.classList.add('opacity-0', 'translate-y-2');
+            setTimeout(() => toast.remove(), 220);
+          }, timeoutMs);
+        }
+      }
+
+      function closeConfirm() {
+        if (!confirmBackdrop) return;
+        confirmBackdrop.classList.add('hidden');
+        confirmCallback = null;
+      }
+
+      function openConfirm(message, onConfirm) {
+        if (!confirmBackdrop || !confirmMessage) return;
+        confirmMessage.textContent = message || 'Are you sure you want to continue?';
+        confirmCallback = onConfirm;
+        confirmBackdrop.classList.remove('hidden');
+      }
+
+      function flushServerMessages(scope = document) {
+        scope.querySelectorAll('[data-server-message]').forEach((node) => {
+          const message = node.getAttribute('data-message');
+          const level = node.getAttribute('data-level') || 'info';
+          showAppToast(message, level);
+          node.remove();
+        });
+      }
+
+      if (confirmOk) {
+        confirmOk.addEventListener('click', () => {
+          const cb = confirmCallback;
+          closeConfirm();
+          if (typeof cb === 'function') cb();
+        });
+      }
+
+      if (confirmCancel) {
+        confirmCancel.addEventListener('click', closeConfirm);
+      }
+
+      if (confirmBackdrop) {
+        confirmBackdrop.addEventListener('click', (evt) => {
+          if (evt.target === confirmBackdrop) closeConfirm();
+        });
+      }
+
+      document.addEventListener('submit', function (evt) {
+        const form = evt.target;
+        if (!(form instanceof HTMLFormElement)) return;
+        const message = form.getAttribute('data-confirm');
+        if (!message) return;
+        if (form.dataset.confirmed === 'true') {
+          form.dataset.confirmed = 'false';
+          return;
+        }
+
+        evt.preventDefault();
+        openConfirm(message, function () {
+          form.dataset.confirmed = 'true';
+          HTMLFormElement.prototype.submit.call(form);
+        });
+      }, true);
+
+      document.addEventListener('DOMContentLoaded', function () {
+        flushServerMessages(document);
+      });
+
+      document.body.addEventListener('htmx:afterSwap', function (evt) {
+        flushServerMessages(evt.target);
+      });
+
+      window.showAppToast = showAppToast;
+      window.showAppConfirm = openConfirm;
+    })();
   </script>
 </body>
 </html>

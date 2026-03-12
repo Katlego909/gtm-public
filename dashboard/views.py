@@ -22,20 +22,108 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.text import slugify
 from django.urls import reverse
+from django.views.decorators.http import require_http_methods
 
 from gtm.models import (
     AssessmentSession,
     ActionItem,
+    ActionItemComment,
     ToolRecommendation,
     ResultSnapshot,
     ChatMessage,
 )
 from gtm.models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation
+from gtm.ai_chat import get_suggested_prompts, process_chat_message
 from gtm.decorators import workspace_permission_required, workspace_admin_required, workspace_member_required
-from dashboard.models import Channel, ChannelAnalytics, GapAnalysisMetric
-from .forms import GapAnalysisMetricForm, ActionItemForm, UserProfileForm
+from dashboard.models import Channel, ChannelAnalytics, GapAnalysisMetric, Resource
+from .forms import GapAnalysisMetricForm, ActionItemForm, UserProfileForm, ResourceForm
 from gtm.views import _compute_scores, _band_for_score
 from .utils import calculate_gap_metric_display_properties
+
+# ================================================================
+# RESOURCE LIBRARY VIEWS
+# ================================================================
+
+@workspace_member_required('session')
+def refresh_resources(request):
+    """Returns the updated resources list - workspace-aware."""
+    workspace_id = request.session.get('current_workspace_id')
+    if not workspace_id:
+        return HttpResponse("Workspace context missing", status=400)
+        
+    resources = Resource.objects.filter(workspace_id=workspace_id).order_by('category', '-created_at')
+    return render(request, 'dashboard/partials/resource_list.html', {'resources': resources})
+
+
+@workspace_member_required('session')
+@vary_on_headers('HX-Request')
+def add_edit_resource(request, pk=None):
+    workspace_id = request.session.get('current_workspace_id')
+    current_workspace = get_object_or_404(Workspace, id=workspace_id)
+    
+    if pk:
+        instance = get_object_or_404(Resource, pk=pk, workspace=current_workspace)
+        title = "Edit Resource"
+        action_label = "updated"
+    else:
+        instance = None
+        title = "Add Resource"
+        action_label = "created"
+
+    if request.method == 'POST':
+        form = ResourceForm(request.POST, request.FILES, instance=instance)
+        if form.is_valid():
+            resource = form.save(commit=False)
+            resource.workspace = current_workspace
+            resource.uploaded_by = request.user
+            resource.save()
+            
+            if request.htmx:
+                response = refresh_resources(request)
+                response['HX-Trigger'] = json.dumps({
+                    'closeModal': True,
+                    'resourceToast': {
+                        'message': f"Resource {action_label} successfully.",
+                        'level': 'success'
+                    }
+                })
+                return response
+            return redirect('dashboard')
+    else:
+        form = ResourceForm(instance=instance)
+
+    context = {
+        'form': form,
+        'title': title,
+        'instance': instance,
+        'current_workspace': current_workspace
+    }
+    
+    return render(request, 'dashboard/partials/resource_form.html', context)
+
+
+@workspace_member_required('session')
+@vary_on_headers('HX-Request')
+def delete_resource(request, pk):
+    workspace_id = request.session.get('current_workspace_id')
+    resource = get_object_or_404(Resource, pk=pk, workspace_id=workspace_id)
+    
+    if request.method == 'POST':
+        resource_name = resource.name
+        resource.delete()
+        if request.htmx:
+            response = refresh_resources(request)
+            response['HX-Trigger'] = json.dumps({
+                'closeModal': True,
+                'resourceToast': {
+                    'message': f"Resource '{resource_name}' deleted.",
+                    'level': 'success'
+                }
+            })
+            return response
+        return redirect('dashboard')
+    
+    return render(request, 'dashboard/partials/resource_confirm_delete.html', {'instance': resource})
 
 # ================================================================
 # GAP ANALYSIS METRIC CRUD VIEWS
@@ -263,11 +351,210 @@ def kpi_pending_items(request):
 
 @vary_on_headers('HX-Request')
 @login_required
+def workspace_hub(request):
+    """Dedicated workspace management hub for team and resources."""
+    workspace_id = request.GET.get('workspace') or request.session.get('current_workspace_id')
+    current_workspace = None
+    user_workspaces = []
+    
+    if request.user.is_authenticated:
+        memberships = WorkspaceMembership.objects.filter(user=request.user).select_related('workspace')
+        user_workspaces = [m.workspace for m in memberships]
+        if workspace_id:
+            try:
+                current_workspace = next(w for w in user_workspaces if str(w.id) == workspace_id)
+            except StopIteration:
+                current_workspace = None
+        if not current_workspace and user_workspaces:
+            current_workspace = user_workspaces[0]
+
+        if current_workspace:
+            request.session['current_workspace_id'] = str(current_workspace.id)
+
+    # Resource Library
+    resources = []
+    team_members = []
+    workspace_memberships = []
+    pending_invites = []
+    accepted_awaiting = []
+
+    if current_workspace:
+        resources = Resource.objects.filter(workspace=current_workspace).order_by('category', '-created_at')
+        
+        # Auto-create memberships for accepted invitations
+        accepted_invites = WorkspaceInvitation.objects.filter(workspace=current_workspace).filter(
+            models.Q(is_accepted=True) | models.Q(accepted_at__isnull=False)
+        )
+        for invite in accepted_invites:
+            matched_user = User.objects.filter(email__iexact=invite.email).first()
+            if matched_user and not WorkspaceMembership.objects.filter(workspace=current_workspace, user=matched_user).exists():
+                WorkspaceMembership.objects.create(
+                    workspace=current_workspace,
+                    user=matched_user,
+                    role=invite.role,
+                    invited_by=invite.invited_by,
+                )
+
+        workspace_memberships = WorkspaceMembership.objects.filter(workspace=current_workspace).select_related('user')
+        team_members = [m.user for m in workspace_memberships]
+        pending_invites = WorkspaceInvitation.objects.filter(
+            workspace=current_workspace, accepted_at__isnull=True, is_accepted=False
+        )
+        accepted_awaiting = WorkspaceInvitation.objects.filter(workspace=current_workspace).filter(
+            models.Q(is_accepted=True) | models.Q(accepted_at__isnull=False)
+        ).exclude(email__in=User.objects.values_list('email', flat=True))
+
+    context = {
+        'current_workspace': current_workspace,
+        'user_workspaces': user_workspaces,
+        'resources': resources,
+        'team_members': team_members,
+        'workspace_memberships': workspace_memberships,
+        'pending_invites': pending_invites,
+        'accepted_awaiting': accepted_awaiting,
+        'page_title': 'Workspace Hub'
+    }
+
+    if request.htmx:
+        return render(request, 'dashboard/partials/workspace_hub_content.html', context)
+    return render(request, 'dashboard/workspace_hub.html', context)
+
+@vary_on_headers('HX-Request')
+@login_required
+def tasks_board(request):
+    """Dedicated full-screen tasks/Kanban board view."""
+    workspace_id = request.GET.get('workspace') or request.session.get('current_workspace_id')
+    current_workspace = None
+    user_workspaces = []
+    
+    if request.user.is_authenticated:
+        memberships = WorkspaceMembership.objects.filter(user=request.user).select_related('workspace')
+        user_workspaces = [m.workspace for m in memberships]
+        if workspace_id:
+            try:
+                current_workspace = next(w for w in user_workspaces if str(w.id) == workspace_id)
+            except StopIteration:
+                current_workspace = None
+        if not current_workspace and user_workspaces:
+            current_workspace = user_workspaces[0]
+
+        if current_workspace:
+            request.session['current_workspace_id'] = str(current_workspace.id)
+
+    # Filter action items
+    if current_workspace:
+        action_items_qs = ActionItem.objects.filter(workspace=current_workspace)
+    else:
+        action_items_qs = ActionItem.objects.filter(session__user=request.user, workspace__isnull=True) if request.user.is_authenticated else ActionItem.objects.none()
+    
+    top_todo = action_items_qs.filter(status='todo').order_by('due_date').select_related('assigned_to')
+    top_doing = action_items_qs.filter(status='doing').order_by('due_date').select_related('assigned_to')
+    top_done = action_items_qs.filter(status='done').order_by('-created_at').select_related('assigned_to')
+    
+    # Team members for assignment dropdowns
+    team_members = []
+    if current_workspace:
+        memberships = WorkspaceMembership.objects.filter(workspace=current_workspace).select_related('user')
+        team_members = [m.user for m in memberships]
+
+    context = {
+        'current_workspace': current_workspace,
+        'user_workspaces': user_workspaces,
+        'top_todo': top_todo,
+        'top_doing': top_doing,
+        'top_done': top_done,
+        'team_members': team_members,
+        'page_title': 'Tasks & Execution'
+    }
+
+    if request.htmx:
+        return render(request, 'dashboard/partials/tasks_content.html', context)
+    return render(request, 'dashboard/tasks.html', context)
+
+
+@vary_on_headers('HX-Request')
+@login_required
+def agent_hub(request):
+    """Dedicated GTM agent page with persistent, session-scoped conversation context."""
+    workspace_id = request.GET.get('workspace') or request.session.get('current_workspace_id')
+    agent_session_id = request.GET.get('agent_session')
+    current_workspace = None
+    user_workspaces = []
+
+    if request.user.is_authenticated:
+        memberships = WorkspaceMembership.objects.filter(user=request.user).select_related('workspace')
+        user_workspaces = [m.workspace for m in memberships]
+        if workspace_id:
+            try:
+                current_workspace = next(w for w in user_workspaces if str(w.id) == workspace_id)
+            except StopIteration:
+                current_workspace = None
+        if not current_workspace and user_workspaces:
+            current_workspace = user_workspaces[0]
+
+        if current_workspace:
+            request.session['current_workspace_id'] = str(current_workspace.id)
+
+    if current_workspace:
+        assessments_qs = AssessmentSession.objects.filter(workspace=current_workspace)
+        pending_items = ActionItem.objects.filter(workspace=current_workspace).exclude(status='done').count()
+    else:
+        assessments_qs = AssessmentSession.objects.filter(user=request.user)
+        pending_items = ActionItem.objects.filter(session__user=request.user).exclude(status='done').count()
+
+    completed_sessions = assessments_qs.filter(is_completed=True).order_by('-created_at')[:10]
+    agent_session_options = [
+        {
+            'uuid': str(session.uuid),
+            'label': f"{session.company_name or 'Unnamed'} • {session.created_at.strftime('%b %d, %Y')}",
+        }
+        for session in completed_sessions
+    ]
+    if not agent_session_options:
+        agent_session_options = [
+            {
+                'uuid': str(session.uuid),
+                'label': f"{session.company_name or 'Unnamed'} • {session.created_at.strftime('%b %d, %Y')}",
+            }
+            for session in assessments_qs.order_by('-created_at')[:10]
+        ]
+
+    dashboard_agent_session = None
+    if agent_session_options:
+        if agent_session_id and any(option['uuid'] == agent_session_id for option in agent_session_options):
+            dashboard_agent_session = assessments_qs.filter(uuid=agent_session_id).first()
+        if not dashboard_agent_session:
+            dashboard_agent_session = assessments_qs.filter(uuid=agent_session_options[0]['uuid']).first()
+
+    dashboard_agent_prompts = get_suggested_prompts(dashboard_agent_session) if dashboard_agent_session else []
+    dashboard_agent_history = []
+    if dashboard_agent_session:
+        history_qs = ChatMessage.objects.filter(session=dashboard_agent_session).order_by('-created_at')[:50]
+        dashboard_agent_history = list(reversed(history_qs))
+
+    context = {
+        'current_workspace': current_workspace,
+        'user_workspaces': user_workspaces,
+        'agent_session_options': agent_session_options,
+        'dashboard_agent_session': dashboard_agent_session,
+        'dashboard_agent_prompts': dashboard_agent_prompts,
+        'dashboard_agent_history': dashboard_agent_history,
+        'pending_items': pending_items,
+        'page_title': 'Agent',
+    }
+
+    if request.htmx:
+        return render(request, 'dashboard/partials/agent_content.html', context)
+    return render(request, 'dashboard/agent.html', context)
+
+@vary_on_headers('HX-Request')
+@login_required
 def dashboard(request):
     """Main dashboard view - now workspace-aware for team collaboration."""
     
     # Get workspace context
-    workspace_id = request.GET.get('workspace')
+    workspace_id = request.GET.get('workspace') or request.session.get('current_workspace_id')
+    agent_session_id = request.GET.get('agent_session')
     current_workspace = None
     user_workspaces = []
     
@@ -286,6 +573,9 @@ def dashboard(request):
         # Default to first workspace if none selected
         if not current_workspace and user_workspaces:
             current_workspace = user_workspaces[0]
+
+        if current_workspace:
+            request.session['current_workspace_id'] = str(current_workspace.id)
         
         # Auto-fix orphaned assessments: associate user's assessments without workspace
         if current_workspace:
@@ -309,17 +599,17 @@ def dashboard(request):
     if current_workspace:
         # Workspace-scoped data
         assessments_qs = AssessmentSession.objects.filter(workspace=current_workspace)
-        action_items_qs = ActionItem.objects.filter(workspace=current_workspace)
+        action_items_qs = ActionItem.objects.filter(workspace=current_workspace).select_related('assigned_to', 'session')
     else:
         # Fallback to user's data (legacy support)
         assessments_qs = AssessmentSession.objects.filter(user=request.user) if request.user.is_authenticated else AssessmentSession.objects.none()
-        action_items_qs = ActionItem.objects.filter(session__user=request.user) if request.user.is_authenticated else ActionItem.objects.none()
+        action_items_qs = ActionItem.objects.filter(session__user=request.user).select_related('assigned_to', 'session') if request.user.is_authenticated else ActionItem.objects.none()
 
     # Recent validator results for dashboard
     if current_workspace:
-        validator_results = ResultSnapshot.objects.filter(session__workspace=current_workspace).order_by('-created_at')[:10]
+        validator_results = ResultSnapshot.objects.filter(session__workspace=current_workspace).select_related('session', 'band').order_by('-created_at')[:10]
     else:
-        validator_results = ResultSnapshot.objects.filter(session__user=request.user).order_by('-created_at')[:10] if request.user.is_authenticated else []
+        validator_results = ResultSnapshot.objects.filter(session__user=request.user).select_related('session', 'band').order_by('-created_at')[:10] if request.user.is_authenticated else []
 
     # Weekly Activity: Sessions, Items Created, Items Completed per day (last 7 days)
     today = timezone.now().date()
@@ -370,14 +660,15 @@ def dashboard(request):
     # Don't show percentage for 0 -> anything transitions
     
     # Completed items this week vs last week (workspace-scoped)
+    # Use updated_at so moving an existing task to Done this week is counted.
     this_week_completed = action_items_qs.filter(
-        status='done', 
-        created_at__date__gte=this_week_start
+        status='done',
+        updated_at__date__gte=this_week_start
     ).count()
     last_week_completed = action_items_qs.filter(
         status='done',
-        created_at__date__gte=last_week_start,
-        created_at__date__lte=last_week_end
+        updated_at__date__gte=last_week_start,
+        updated_at__date__lte=last_week_end
     ).count()
     
     # Calculate percentage change for completed items
@@ -388,7 +679,12 @@ def dashboard(request):
         completed_change = round(((this_week_completed - last_week_completed) / last_week_completed) * 100)
         completed_change_positive = completed_change >= 0
         completed_has_meaningful_change = completed_change != 0
-    # Don't show percentage for 0 -> anything transitions
+    elif this_week_completed > 0:
+        # Zero-baseline transition: show visible movement instead of "No change this week".
+        completed_change = 100
+        completed_change_positive = True
+        completed_has_meaningful_change = True
+    # Otherwise both weeks are zero -> no meaningful change.
         
     # Pending items this week vs last week (workspace-scoped)
     this_week_pending = action_items_qs.filter(
@@ -469,6 +765,10 @@ def dashboard(request):
     assessment_history = []
     assessment_stats = None
     score_trend_data = {'labels': [], 'scores': []}
+    agent_session_options = []
+    dashboard_agent_session = None
+    dashboard_agent_prompts = []
+    dashboard_agent_history = []
     
     if request.user.is_authenticated:
         # Get completed assessments for the workspace (or user if no workspace)
@@ -512,6 +812,33 @@ def dashboard(request):
                 'scores': list(reversed(all_scores))
             }
 
+        agent_session_options = [
+            {
+                'uuid': str(session.uuid),
+                'label': f"{session.company_name or 'Unnamed'} • {session.created_at.strftime('%b %d, %Y')}",
+            }
+            for session in completed_sessions
+        ]
+        if not agent_session_options:
+            agent_session_options = [
+                {
+                    'uuid': str(session.uuid),
+                    'label': f"{session.company_name or 'Unnamed'} • {session.created_at.strftime('%b %d, %Y')}",
+                }
+                for session in assessments_qs.order_by('-created_at')[:10]
+            ]
+
+        if agent_session_options:
+            if agent_session_id and any(option['uuid'] == agent_session_id for option in agent_session_options):
+                dashboard_agent_session = assessments_qs.filter(uuid=agent_session_id).first()
+            if not dashboard_agent_session:
+                dashboard_agent_session = assessments_qs.filter(uuid=agent_session_options[0]['uuid']).first()
+
+            if dashboard_agent_session:
+                dashboard_agent_prompts = get_suggested_prompts(dashboard_agent_session)
+                history_qs = ChatMessage.objects.filter(session=dashboard_agent_session).order_by('-created_at')[:30]
+                dashboard_agent_history = list(reversed(history_qs))
+
     # Convert markdown notes to HTML for all relevant items
     def convert_notes(items):
         for item in items:
@@ -519,9 +846,6 @@ def dashboard(request):
         return items
 
     recent_items = convert_notes(list(recent_items))
-    top_todo = convert_notes(list(top_todo))
-    top_doing = convert_notes(list(top_doing))
-    top_done = convert_notes(list(top_done))
 
     # Channel analytics for donut chart
     channels = Channel.objects.all()
@@ -553,44 +877,6 @@ def dashboard(request):
 
     gap_report_url = '/dashboard/gap-report/'
     
-    # Get team members and pending invites for the current workspace
-    team_members = []
-    workspace_memberships = []
-    pending_invites = []
-    accepted_awaiting = []
-    if current_workspace:
-        from gtm.models_workspace import WorkspaceInvitation
-
-        # Auto-create memberships for accepted invitations with existing users
-        accepted_invites = WorkspaceInvitation.objects.filter(
-            workspace=current_workspace
-        ).filter(
-            models.Q(is_accepted=True) | models.Q(accepted_at__isnull=False)
-        )
-        for invite in accepted_invites:
-            matched_user = User.objects.filter(email__iexact=invite.email).first()
-            if matched_user and not WorkspaceMembership.objects.filter(workspace=current_workspace, user=matched_user).exists():
-                WorkspaceMembership.objects.create(
-                    workspace=current_workspace,
-                    user=matched_user,
-                    role=invite.role,
-                    invited_by=invite.invited_by,
-                )
-
-        workspace_memberships = WorkspaceMembership.objects.filter(workspace=current_workspace).select_related('user')
-        team_members = [m.user for m in workspace_memberships]
-        pending_invites = WorkspaceInvitation.objects.filter(
-            workspace=current_workspace, accepted_at__isnull=True, is_accepted=False
-        )
-        # Accepted invitations where the user hasn't registered yet
-        accepted_awaiting = WorkspaceInvitation.objects.filter(
-            workspace=current_workspace
-        ).filter(
-            models.Q(is_accepted=True) | models.Q(accepted_at__isnull=False)
-        ).exclude(
-            email__in=User.objects.values_list('email', flat=True)
-        )
-
     context = {
         'total_sessions': total_sessions,
         'completed_items': completed_items,
@@ -608,9 +894,6 @@ def dashboard(request):
         'sessions_per_day': sessions_per_day,
         'days_labels': days_labels,
         'status_breakdown': status_breakdown,
-        'top_todo': top_todo,
-        'top_doing': top_doing,
-        'top_done': top_done,
         'top_tools': top_tools,
         'insights': insights,
         'recent_chats': recent_chats,
@@ -622,19 +905,135 @@ def dashboard(request):
         'assessment_history': assessment_history,
         'assessment_stats': assessment_stats,
         'score_trend_data': score_trend_data,
+        'agent_session_options': agent_session_options,
+        'dashboard_agent_session': dashboard_agent_session,
+        'dashboard_agent_prompts': dashboard_agent_prompts,
+        'dashboard_agent_history': dashboard_agent_history,
         # Workspace context
         'current_workspace': current_workspace,
         'user_workspaces': user_workspaces,
-        'team_members': team_members,
-        'workspace_memberships': workspace_memberships,
-        'pending_invites': pending_invites,
-        'accepted_awaiting': accepted_awaiting,
     }
 
     if request.htmx:
         return render(request, 'dashboard/partials/dashboard_content.html', context)
 
     return render(request, 'dashboard/home.html', context)
+
+
+@require_http_methods(["POST"])
+@login_required
+def dashboard_agent_api(request):
+    """Run the GTM agent inline from the dashboard without navigating to chat."""
+    try:
+        data = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({"success": False, "error": "Invalid JSON"}, status=400)
+
+    session_id = str(data.get('session_id', '')).strip()
+    message = (data.get('message') or '').strip()
+
+    if not session_id:
+        return JsonResponse({"success": False, "error": "Select an assessment first."}, status=400)
+    if not message:
+        return JsonResponse({"success": False, "error": "Message cannot be empty."}, status=400)
+
+    try:
+        session = AssessmentSession.objects.get(pk=session_id)
+    except AssessmentSession.DoesNotExist:
+        return JsonResponse({"success": False, "error": "Assessment session not found."}, status=404)
+
+    workspace_id = request.GET.get('workspace') or request.session.get('current_workspace_id')
+    if workspace_id:
+        if str(session.workspace_id) != str(workspace_id):
+            return JsonResponse({"success": False, "error": "That assessment is not in the current workspace."}, status=403)
+    elif session.user_id != request.user.id:
+        return JsonResponse({"success": False, "error": "You do not have access to that assessment."}, status=403)
+
+    result = process_chat_message(
+        session_id=str(session.uuid),
+        message=message,
+        user=request.user,
+    )
+
+    if result.get("success"):
+        ChatMessage.objects.create(
+            session=session,
+            user=request.user,
+            message=message,
+            response=result.get("response", ""),
+            intent=result.get("intent", ""),
+        )
+
+    return JsonResponse(result, status=200 if result.get("success") else 500)
+
+
+@require_http_methods(["GET"])
+@login_required
+def dashboard_agent_context_api(request):
+    """Return session options and prompts for the global dashboard agent widget."""
+    workspace_id = request.GET.get('workspace') or request.session.get('current_workspace_id')
+    requested_session_id = (request.GET.get('session_id') or '').strip()
+
+    assessments_qs = AssessmentSession.objects.none()
+    if workspace_id:
+        has_membership = WorkspaceMembership.objects.filter(
+            user=request.user,
+            workspace_id=workspace_id,
+            is_active=True,
+        ).exists()
+        if not has_membership:
+            return JsonResponse({"success": False, "error": "Access denied to this workspace."}, status=403)
+        assessments_qs = AssessmentSession.objects.filter(workspace_id=workspace_id)
+    else:
+        assessments_qs = AssessmentSession.objects.filter(user=request.user)
+
+    completed_sessions = list(assessments_qs.filter(is_completed=True).order_by('-created_at')[:20])
+    session_pool = completed_sessions if completed_sessions else list(assessments_qs.order_by('-created_at')[:20])
+
+    options = [
+        {
+            'uuid': str(session.uuid),
+            'label': f"{session.company_name or 'Unnamed'} • {session.created_at.strftime('%b %d, %Y')}",
+        }
+        for session in session_pool
+    ]
+
+    session_by_id = {str(session.uuid): session for session in session_pool}
+    session_memory_key = f"dashboard_agent_session_id:{workspace_id or 'personal'}"
+    remembered_session_id = request.session.get(session_memory_key)
+
+    selected_session = None
+    if requested_session_id and requested_session_id in session_by_id:
+        selected_session = session_by_id[requested_session_id]
+    elif remembered_session_id and remembered_session_id in session_by_id:
+        selected_session = session_by_id[remembered_session_id]
+    elif session_pool:
+        selected_session = session_pool[0]
+
+    selected_id = str(selected_session.uuid) if selected_session else None
+    if selected_id:
+        request.session[session_memory_key] = selected_id
+
+    prompts = get_suggested_prompts(selected_session) if selected_session else []
+
+    history = []
+    if selected_session:
+        recent_chats = ChatMessage.objects.filter(session=selected_session).order_by('-created_at')[:40]
+        for chat in reversed(list(recent_chats)):
+            history.append({
+                'message': chat.message,
+                'response': chat.response,
+                'intent': chat.intent,
+                'created_at': chat.created_at.isoformat(),
+            })
+
+    return JsonResponse({
+        "success": True,
+        "options": options,
+        "selected_session_id": selected_id,
+        "prompts": prompts,
+        "history": history,
+    })
 
 def gap_analysis_table(request):
     workspace_id = request.session.get('current_workspace_id')
@@ -880,7 +1279,6 @@ def delete_action_item(request, pk):
 
 
 @workspace_permission_required('can_assign_tasks', 'session')
-@csrf_exempt
 def move_action_item(request, pk, new_status):
     if request.method == 'POST':
         # Get current workspace context
@@ -1013,24 +1411,7 @@ def create_workspace_dashboard(request):
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
         if name:
-            
-            # Generate unique slug
-            slug = slugify(name)
-            counter = 1
-            original_slug = slug
-            while Workspace.objects.filter(slug=slug).exists():
-                slug = f"{original_slug}-{counter}"
-                counter += 1
-            
-            workspace = Workspace.objects.create(
-                name=name,
-                slug=slug
-            )
-            WorkspaceMembership.objects.create(
-                workspace=workspace,
-                user=request.user,
-                role='admin'
-            )
+            workspace = Workspace.create_for_user(name=name, user=request.user)
             # Redirect to dashboard with new workspace selected
             return redirect(f'/dashboard/?workspace={workspace.id}')
         
@@ -1075,28 +1456,8 @@ def invite_to_workspace(request, workspace_id):
         )
 
         try:
-            invite_url = request.build_absolute_uri(f'/workspace/join/{invitation.token}/')
-            inviter_name = request.user.get_full_name() or request.user.username
-            
-            # Template context for email
-            email_context = {
-                'workspace': workspace,
-                'inviter_name': inviter_name,
-                'invite_url': invite_url,
-                'role': role.replace('_', ' '),
-            }
-            
-            # Render email templates
-            html_message = render_to_string('emails/workspace_invitation.html', email_context)
-            plain_message = render_to_string('emails/workspace_invitation.txt', email_context)
-            
-            send_mail(
-                subject=f'You\'ve been invited to join {workspace.name}',
-                message=plain_message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[email],
-                html_message=html_message,
-            )
+            from gtm.utils_email import send_workspace_invitation_email
+            send_workspace_invitation_email(invitation, request)
             messages.success(request, f'Invitation sent successfully to {email}!')
         except Exception as e:
             invitation.delete()

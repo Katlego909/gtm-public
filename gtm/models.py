@@ -37,7 +37,6 @@ class AssessmentSession(models.Model):
     )
     
     # Workspace relationship for collaboration
-    # Will be populated after workspace models are migrated
     workspace = models.ForeignKey(
         'Workspace',
         on_delete=models.CASCADE,
@@ -109,6 +108,8 @@ class RecommendationBand(models.Model):
 
 class ActionItem(models.Model):
     STATUS_CHOICES = [("todo","To do"),("doing","In progress"),("done","Done")]
+    
+    id = models.AutoField(primary_key=True)
     session = models.ForeignKey(AssessmentSession, on_delete=models.CASCADE, related_name="actions", null=True, blank=True)
     question = models.ForeignKey(Question, on_delete=models.CASCADE, null=True, blank=True)
     
@@ -122,31 +123,47 @@ class ActionItem(models.Model):
     )
     
     note = models.CharField(max_length=240)
-    owner = models.CharField(max_length=120, blank=True)  # Legacy field, kept for compatibility
+    owner = models.CharField(max_length=120, blank=True)  # Legacy field
     
-    # Creator tracking
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True, blank=True,
-        related_name="created_action_items",
-        help_text="User who created this action item"
+        related_name="created_action_items"
     )
     
-    # Team assignment fields
     assigned_to = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True, blank=True,
-        related_name="assigned_action_items",
-        help_text="Team member assigned to this action item"
+        related_name="assigned_action_items"
     )
     
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="todo")
     due_date = models.DateField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
+
+    def __str__(self):
+        return self.note[:50]
+
+class ActionItemComment(models.Model):
+    """
+    Comments left by team members on a specific Action Item.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    action_item = models.ForeignKey(ActionItem, on_delete=models.CASCADE, related_name="comments")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="task_comments")
+    text = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"Comment by {self.user.username} on task {self.action_item.id}"
+
 class ToolRecommendation(models.Model):
     category = models.ForeignKey("Category", on_delete=models.CASCADE)
     keyword = models.CharField(max_length=255)
@@ -160,9 +177,6 @@ class ToolRecommendation(models.Model):
     def __str__(self):
         return f"{self.keyword} ({self.category.name})"   
 
-
-# Analytics
-
 class ResultSnapshot(models.Model):
     session = models.OneToOneField(
         "AssessmentSession", on_delete=models.CASCADE, related_name="snapshot"
@@ -171,19 +185,13 @@ class ResultSnapshot(models.Model):
     band = models.ForeignKey(
         "RecommendationBand", on_delete=models.SET_NULL, null=True, blank=True
     )
-    band_stage = models.CharField(max_length=40, blank=True)   # denormalized for quick filters
+    band_stage = models.CharField(max_length=40, blank=True)   
     band_headline = models.CharField(max_length=200, blank=True)
-
-    # e.g. [{"category":"Demand","avg":3.24},{"category":"Conversion","avg":3.79}, ...]
     category_breakdown = models.JSONField(encoder=DjangoJSONEncoder)
-
-    # store what was plotted (useful for PDFs/exports)
     radar_labels = models.JSONField(encoder=DjangoJSONEncoder, default=list)
     radar_values = models.JSONField(encoder=DjangoJSONEncoder, default=list)
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
     company_name   = models.CharField(max_length=120, blank=True, default="")
     industry       = models.CharField(max_length=120, blank=True, default="")
     website        = models.URLField(blank=True, default="")
@@ -199,15 +207,11 @@ class ResultSnapshot(models.Model):
     utm_medium     = models.CharField(max_length=80,  blank=True, default="")
     utm_campaign   = models.CharField(max_length=120, blank=True, default="")
     referrer       = models.CharField(max_length=200, blank=True, default="")
-    
     report_sent = models.BooleanField(default=False)
-    
     ai_playbook = models.TextField(blank=True, default="")
-
 
     def __str__(self):
         return f"Snapshot for {self.session.uuid} – {self.overall}/100"
-
 
 class ChatMessage(models.Model):
     """Store chat conversation history for AI assistant"""
@@ -222,11 +226,9 @@ class ChatMessage(models.Model):
         null=True,
         blank=True
     )
-    
-    message = models.TextField()  # User's message
-    response = models.TextField()  # AI's response
-    intent = models.CharField(max_length=50, blank=True)  # Detected intent
-    
+    message = models.TextField()  
+    response = models.TextField()  
+    intent = models.CharField(max_length=50, blank=True)  
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:

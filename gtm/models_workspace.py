@@ -44,7 +44,35 @@ class Workspace(models.Model):
     
     class Meta:
         ordering = ['-created_at']
-        
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            from django.utils.text import slugify
+            base_slug = slugify(self.name) or "workspace"
+            slug = base_slug
+            counter = 1
+            while Workspace.objects.filter(slug=slug).exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+            self.slug = slug
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def create_for_user(cls, name, user):
+        """
+        Atomic helper to create a workspace and assign the creator as 'admin'.
+        """
+        from django.db import transaction
+        with transaction.atomic():
+            workspace = cls.objects.create(name=name)
+            WorkspaceMembership.objects.create(
+                workspace=workspace,
+                user=user,
+                role='admin',
+                is_active=True
+            )
+            return workspace
+
     def __str__(self):
         return self.name
 

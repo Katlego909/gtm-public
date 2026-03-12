@@ -10,9 +10,13 @@ urlpatterns = [
     path("resume/latest/", views.resume_latest, name="resume_latest"),
     path("assessment/<uuid:session_id>/<int:step>/", views.assessment_step, name="assessment_step"),
     path("results/<uuid:session_id>/", views.results, name="results"),
+    path("results/<uuid:session_id>/insight/<int:response_id>/", views.insight_status, name="insight_status"),
     path("playbook/<uuid:session_id>/", views.playbook, name="playbook"),
+    path("playbook-status/<uuid:session_id>/", views.playbook_status, name="playbook_status"),
+    path("playbook-content-status/<uuid:session_id>/", views.playbook_content_status, name="playbook_content_status"),
     path("download/<uuid:session_id>/", views.download_report_pdf, name="download"),
     path("history/", views.history, name="history"),
+    path("cancel/<uuid:session_id>/", views.cancel_assessment, name="cancel_assessment"),
     
     path("actions/add/<uuid:session_id>/", views.action_add, name="action_add"),
     path("actions/toggle/<int:action_id>/", views.action_toggle, name="action_toggle"),

@@ -1,0 +1,208 @@
+<div class="p-6 md:p-8 h-full overflow-y-auto">
+    <div class="max-w-7xl mx-auto">
+        <div class="mb-6">
+            <h1 class="text-2xl md:text-3xl font-bold text-gray-900">Agent Workspace</h1>
+            <p class="text-gray-600 mt-2">Talk to your GTM agent with persistent context and history.</p>
+        </div>
+
+        {% if agent_session_options %}
+        <div class="grid grid-cols-1 xl:grid-cols-[320px,1fr] gap-6">
+            <aside class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 h-fit sticky top-4">
+                <div>
+                    <label for="dashboard-agent-session" class="block text-sm font-semibold text-gray-700 mb-2">Assessment Context</label>
+                    <select id="dashboard-agent-session" onchange="onDashboardAgentSessionChange(this.value)" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        {% for session_option in agent_session_options %}
+                        <option value="{{ session_option.uuid }}" {% if dashboard_agent_session and dashboard_agent_session.uuid|stringformat:'s' == session_option.uuid %}selected{% endif %}>{{ session_option.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mt-4">
+                    {% if dashboard_agent_session %}
+                    <a href="{% url 'gtm:chat' dashboard_agent_session.uuid %}"
+                       hx-get="{% url 'gtm:chat' dashboard_agent_session.uuid %}"
+                       hx-target="#main-content"
+                       hx-select="#main-content"
+                       hx-swap="innerHTML swap:200ms"
+                       hx-push-url="true"
+                       class="inline-flex items-center justify-center w-full px-4 py-2 rounded-lg border border-indigo-200 text-sm font-medium text-indigo-700 hover:bg-indigo-50 transition">
+                        Open Full Chat
+                    </a>
+                    {% endif %}
+                </div>
+
+                {% if dashboard_agent_prompts %}
+                <div class="mt-6">
+                    <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Quick Prompts</p>
+                    <div class="flex flex-wrap gap-2">
+                        {% for prompt in dashboard_agent_prompts %}
+                        <button type="button" onclick="sendDashboardAgentPrompt('{{ prompt|escapejs }}')" class="px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 hover:bg-indigo-50 hover:border-indigo-200 text-gray-700 transition">
+                            {{ prompt }}
+                        </button>
+                        {% endfor %}
+                        <button type="button" onclick="sendDashboardAgentPrompt('Build my action plan')" class="px-3 py-2 text-sm rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition">
+                            Build my action plan
+                        </button>
+                        <button type="button" onclick="sendDashboardAgentPrompt('Review my action items')" class="px-3 py-2 text-sm rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition">
+                            Review my action items
+                        </button>
+                    </div>
+                </div>
+                {% endif %}
+            </aside>
+
+            <section class="border border-gray-200 rounded-2xl overflow-hidden bg-slate-50 min-h-[640px] flex flex-col">
+                <div id="dashboard-agent-messages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-gradient-to-b from-white to-slate-50 scroll-smooth">
+                    {% for chat in dashboard_agent_history %}
+                    <div class="flex items-start gap-3 justify-end">
+                        <div class="bg-gray-900 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm max-w-3xl whitespace-pre-wrap">{{ chat.message }}</div>
+                    </div>
+                    <div class="flex items-start gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shrink-0 text-white shadow-md">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                        </div>
+                        <div class="bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl whitespace-pre-wrap">{{ chat.response }}</div>
+                    </div>
+                    {% endfor %}
+
+                    {% if not dashboard_agent_history %}
+                    <div class="flex items-start gap-3">
+                        <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shrink-0 text-white shadow-md">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+                        </div>
+                        <div class="bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl">
+                            Ask about this assessment, build an action plan, or review the current execution backlog.
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                <form id="dashboard-agent-form" class="border-t border-gray-200 bg-white p-4 flex gap-3">
+                    {% csrf_token %}
+                    <input id="dashboard-agent-input" type="text" placeholder="Ask the GTM agent anything about this assessment..." class="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <button id="dashboard-agent-send" type="submit" class="px-5 py-3 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                        Send
+                    </button>
+                </form>
+            </section>
+        </div>
+        {% else %}
+        <div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center">
+            <p class="text-gray-700 font-medium">No assessment context is available yet.</p>
+            <p class="text-sm text-gray-500 mt-2">Run your first GTM assessment to unlock Agent Workspace.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+function appendDashboardAgentMessage(message, isUser) {
+    const container = document.getElementById('dashboard-agent-messages');
+    if (!container) return;
+
+    const safeMessage = String(message || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;');
+
+    const wrapper = document.createElement('div');
+    wrapper.className = isUser ? 'flex items-start gap-3 justify-end' : 'flex items-start gap-3';
+
+    if (isUser) {
+        wrapper.innerHTML = `
+            <div class="bg-gray-900 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm max-w-3xl whitespace-pre-wrap">${safeMessage}</div>
+        `;
+    } else {
+        wrapper.innerHTML = `
+            <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shrink-0 text-white shadow-md">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
+            </div>
+            <div class="bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl whitespace-pre-wrap">${safeMessage}</div>
+        `;
+    }
+
+    container.appendChild(wrapper);
+    container.scrollTop = container.scrollHeight;
+}
+
+async function sendDashboardAgentMessage(message) {
+    const input = document.getElementById('dashboard-agent-input');
+    const button = document.getElementById('dashboard-agent-send');
+    const sessionSelect = document.getElementById('dashboard-agent-session');
+    if (!input || !button || !sessionSelect) return;
+
+    const sessionId = sessionSelect.value;
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
+    if (!sessionId) {
+        appendDashboardAgentMessage('Select an assessment first.', false);
+        return;
+    }
+
+    appendDashboardAgentMessage(message, true);
+    input.value = '';
+    input.disabled = true;
+    button.disabled = true;
+
+    try {
+        const agentApiUrl = `/dashboard/agent/chat/${window.location.search || ''}`;
+        const response = await fetch(agentApiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+            },
+            body: JSON.stringify({
+                session_id: sessionId,
+                message: message,
+            }),
+        });
+
+        const data = await response.json();
+        appendDashboardAgentMessage(data.success ? data.response : `Error: ${data.error || 'Unknown error'}`, false);
+    } catch (error) {
+        appendDashboardAgentMessage('Error: Could not reach the dashboard agent.', false);
+    } finally {
+        input.disabled = false;
+        button.disabled = false;
+        input.focus();
+    }
+}
+
+function sendDashboardAgentPrompt(prompt) {
+    const input = document.getElementById('dashboard-agent-input');
+    if (input) {
+        input.value = prompt;
+    }
+    sendDashboardAgentMessage(prompt);
+}
+
+function onDashboardAgentSessionChange(sessionId) {
+    if (!sessionId) return;
+    const currentUrl = new URL(window.location.href);
+    currentUrl.searchParams.set('agent_session', sessionId);
+    window.location.href = currentUrl.toString();
+}
+
+function initDashboardAgent() {
+    const agentForm = document.getElementById('dashboard-agent-form');
+    const agentInput = document.getElementById('dashboard-agent-input');
+    const container = document.getElementById('dashboard-agent-messages');
+    if (!agentForm || !agentInput || agentForm.dataset.initialized === 'true') return;
+
+    agentForm.dataset.initialized = 'true';
+
+    agentForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        const message = agentInput.value.trim();
+        if (!message) return;
+        sendDashboardAgentMessage(message);
+    });
+
+    if (container) {
+        container.scrollTop = container.scrollHeight;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', initDashboardAgent);
+document.addEventListener('htmx:afterSwap', initDashboardAgent);
+initDashboardAgent();
+</script>

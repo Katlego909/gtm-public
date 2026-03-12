@@ -7,7 +7,9 @@ Falls back to static RecommendationBand content if AI is unavailable.
 """
 
 import logging
+import time
 from django.conf import settings
+from django.core.cache import cache
 from django.utils.html import strip_tags
 
 from .models import ResultSnapshot, RecommendationBand, AssessmentSession, Question, Response
@@ -17,6 +19,76 @@ import markdown as md
 from django.utils.safestring import mark_safe
 
 logger = logging.getLogger(__name__)
+
+AI_QUOTA_COOLDOWN_CACHE_KEY = "gtm:ai:gemini:quota_cooldown_until"
+AI_REQUEST_COUNTER_CACHE_KEY = "gtm:ai:gemini:req_count:60s"
+AI_LOCK_TTL_SECONDS = 120
+AI_REQUEST_WINDOW_SECONDS = 60
+
+
+def _is_quota_error(error: Exception) -> bool:
+    """Return True when the exception indicates Gemini quota/rate-limit exhaustion."""
+    msg = str(error).lower()
+    return (
+        error.__class__.__name__ == "ResourceExhausted"
+        or "quota exceeded" in msg
+        or "resourceexhausted" in msg
+        or "rate limit" in msg
+    )
+
+
+def _extract_retry_delay_seconds(error: Exception) -> int:
+    """Extract retry delay from Gemini error text, defaulting to a conservative value."""
+    msg = str(error)
+    match = re.search(r"Please retry in\s+([0-9]+(?:\.[0-9]+)?)s", msg, flags=re.IGNORECASE)
+    if match:
+        try:
+            return max(1, int(float(match.group(1))))
+        except (ValueError, TypeError):
+            pass
+    return 60
+
+
+def _set_quota_cooldown(retry_after_seconds: int):
+    """Set a short global cooldown to prevent quota-storm retry loops."""
+    cooldown_seconds = min(max(retry_after_seconds, 1), 300)
+    cache.set(
+        AI_QUOTA_COOLDOWN_CACHE_KEY,
+        time.time() + cooldown_seconds,
+        timeout=cooldown_seconds,
+    )
+
+
+def _quota_cooldown_active() -> bool:
+    """Check if Gemini calls should be skipped temporarily due to recent quota errors."""
+    until_ts = cache.get(AI_QUOTA_COOLDOWN_CACHE_KEY)
+    return bool(until_ts and until_ts > time.time())
+
+
+def _acquire_lock(lock_key: str, ttl_seconds: int = AI_LOCK_TTL_SECONDS) -> bool:
+    """Acquire a cache lock to avoid duplicate concurrent AI calls."""
+    return cache.add(lock_key, "1", timeout=ttl_seconds)
+
+
+def _release_lock(lock_key: str):
+    """Release a previously acquired cache lock."""
+    cache.delete(lock_key)
+
+
+def _request_budget_available() -> bool:
+    """Simple process-safe request budget gate to stay under free-tier RPM limits."""
+    max_requests = int(getattr(settings, "GEMINI_MAX_REQUESTS_PER_MINUTE", 4))
+
+    if cache.add(AI_REQUEST_COUNTER_CACHE_KEY, 1, timeout=AI_REQUEST_WINDOW_SECONDS):
+        return True
+
+    try:
+        current = cache.incr(AI_REQUEST_COUNTER_CACHE_KEY)
+    except ValueError:
+        cache.set(AI_REQUEST_COUNTER_CACHE_KEY, 1, timeout=AI_REQUEST_WINDOW_SECONDS)
+        return True
+
+    return current <= max_requests
 
 # Import AI usage tracker
 try:
@@ -235,64 +307,74 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
 
     final_playbook_text = ""
 
-    # ---- 1️⃣ Attempt Gemini generation
-    model = _init_gemini()
-    if model:
-        prompt = _build_prompt(snapshot)
-        try:
-            response = model.generate_content(prompt)
-            text = response.text.strip()
-            if text:
-                final_playbook_text = text
-                # Log token usage
-                if hasattr(response, 'usage_metadata'):
-                    usage = response.usage_metadata
-                    total_tokens = usage.total_token_count
-                    logger.info(
-                        f"✅ AI playbook generated for {snapshot.company_name} | "
-                        f"Tokens: {usage.prompt_token_count} input + {usage.candidates_token_count} output = {total_tokens} total"
-                    )
-                    # Track usage against quotas
-                    if MONITORING_AVAILABLE:
-                        AIUsageTracker.log_usage(total_tokens, 'playbook')
-                else:
-                    logger.info(f"✅ AI playbook generated for {snapshot.company_name}")
-        except Exception as e:
-            log_ai_error(
-                "Playbook generation",
-                e,
-                service="google",
-                model="gemini-2.5-flash",
-                prompt=prompt,
-                extra={"snapshot_id": snapshot.id},
+    # Avoid duplicate concurrent generation for the same snapshot.
+    playbook_lock_key = f"gtm:ai:playbook:{snapshot.id}:lock"
+    if not _acquire_lock(playbook_lock_key):
+        return (snapshot.ai_playbook or "").strip()
+
+    try:
+        # ---- 1️⃣ Attempt Gemini generation
+        model = _init_gemini()
+        if model and not _quota_cooldown_active() and _request_budget_available():
+            prompt = _build_prompt(snapshot)
+            try:
+                response = model.generate_content(prompt)
+                text = response.text.strip()
+                if text:
+                    final_playbook_text = text
+                    # Log token usage
+                    if hasattr(response, 'usage_metadata'):
+                        usage = response.usage_metadata
+                        total_tokens = usage.total_token_count
+                        logger.info(
+                            f"✅ AI playbook generated for {snapshot.company_name} | "
+                            f"Tokens: {usage.prompt_token_count} input + {usage.candidates_token_count} output = {total_tokens} total"
+                        )
+                        # Track usage against quotas
+                        if MONITORING_AVAILABLE:
+                            AIUsageTracker.log_usage(total_tokens, 'playbook')
+                    else:
+                        logger.info(f"✅ AI playbook generated for {snapshot.company_name}")
+            except Exception as e:
+                if _is_quota_error(e):
+                    _set_quota_cooldown(_extract_retry_delay_seconds(e))
+                log_ai_error(
+                    "Playbook generation",
+                    e,
+                    service="google",
+                    model="gemini-2.5-flash",
+                    prompt=prompt,
+                    extra={"snapshot_id": snapshot.id},
+                )
+
+        # ---- 2️⃣ Fallback to static recommendation (only if AI failed or was disabled)
+        if not final_playbook_text:
+            logger.warning("⚠️ Falling back to static RecommendationBand playbook.")
+            
+            # Use snapshot.band first, or look it up if it's missing (safer)
+            band = snapshot.band
+            if not band and snapshot.overall is not None:
+                band = RecommendationBand.objects.filter(
+                    min_score__lte=snapshot.overall, max_score__gte=snapshot.overall
+                ).first()
+
+            if band and band.actions_markdown:
+                final_playbook_text = strip_tags(band.actions_markdown)
+
+        # ---- 3️⃣ Final generic fallback (if no content was found at all)
+        if not final_playbook_text:
+            final_playbook_text = (
+                "No AI-generated playbook available yet.\n\n"
+                "We recommend focusing on your lowest-rated GTM categories first."
             )
+            
+        # 🌟 CONSOLIDATED SAVE: Persist the final content once
+        snapshot.ai_playbook = final_playbook_text
+        snapshot.save(update_fields=["ai_playbook"])
 
-    # ---- 2️⃣ Fallback to static recommendation (only if AI failed or was disabled)
-    if not final_playbook_text:
-        logger.warning("⚠️ Falling back to static RecommendationBand playbook.")
-        
-        # Use snapshot.band first, or look it up if it's missing (safer)
-        band = snapshot.band
-        if not band and snapshot.overall is not None:
-            band = RecommendationBand.objects.filter(
-                min_score__lte=snapshot.overall, max_score__gte=snapshot.overall
-            ).first()
-
-        if band and band.actions_markdown:
-            final_playbook_text = strip_tags(band.actions_markdown)
-
-    # ---- 3️⃣ Final generic fallback (if no content was found at all)
-    if not final_playbook_text:
-        final_playbook_text = (
-            "No AI-generated playbook available yet.\n\n"
-            "We recommend focusing on your lowest-rated GTM categories first."
-        )
-        
-    # 🌟 CONSOLIDATED SAVE: Persist the final content once
-    snapshot.ai_playbook = final_playbook_text
-    snapshot.save(update_fields=["ai_playbook"])
-
-    return final_playbook_text
+        return final_playbook_text
+    finally:
+        _release_lock(playbook_lock_key)
 
 
 # ================================================================
@@ -342,54 +424,67 @@ def generate_diagnostic_insight(response: Response) -> str:
         return "" 
         
     model = _init_gemini()
-    if not model:
+    if not model or _quota_cooldown_active() or not _request_budget_available():
         logger.warning("Gemini client unavailable for diagnostic insight.")
-        return ""
+        fallback = response.question.diagnostic_note or ""
+        if fallback and not response.ai_insight:
+            response.ai_insight = fallback
+            response.save(update_fields=["ai_insight"])
+        return fallback
 
-    prompt = _build_diagnostic_prompt(response.session, response.question, response.score)
-    text = ""
+    lock_key = f"gtm:ai:diagnostic:{response.id}:lock"
+    if not _acquire_lock(lock_key):
+        return (response.ai_insight or "").strip()
+
     try:
-        # Use model to generate content
-        ai_response = model.generate_content(prompt)
-        text = ai_response.text.strip()
-        
-        if text:
-            # 🌟 Save the insight directly to the Response object
-            response.ai_insight = text
-            response.save(update_fields=["ai_insight"])
+        prompt = _build_diagnostic_prompt(response.session, response.question, response.score)
+        text = ""
+        try:
+            # Use model to generate content
+            ai_response = model.generate_content(prompt)
+            text = ai_response.text.strip()
             
-            # Log token usage
-            if hasattr(ai_response, 'usage_metadata'):
-                usage = ai_response.usage_metadata
-                total_tokens = usage.total_token_count
-                logger.info(
-                    f"✅ Diagnostic insight for {response.question.id_code} | "
-                    f"Tokens: {total_tokens}"
-                )
-                # Track usage against quotas
-                if MONITORING_AVAILABLE:
-                    AIUsageTracker.log_usage(total_tokens, 'diagnostic')
-            else:
-                logger.info(f"✅ Diagnostic insight generated for {response.question.id_code}")
+            if text:
+                # 🌟 Save the insight directly to the Response object
+                response.ai_insight = text
+                response.save(update_fields=["ai_insight"])
+                
+                # Log token usage
+                if hasattr(ai_response, 'usage_metadata'):
+                    usage = ai_response.usage_metadata
+                    total_tokens = usage.total_token_count
+                    logger.info(
+                        f"✅ Diagnostic insight for {response.question.id_code} | "
+                        f"Tokens: {total_tokens}"
+                    )
+                    # Track usage against quotas
+                    if MONITORING_AVAILABLE:
+                        AIUsageTracker.log_usage(total_tokens, 'diagnostic')
+                else:
+                    logger.info(f"✅ Diagnostic insight generated for {response.question.id_code}")
+                
+        except Exception as e:
+            if _is_quota_error(e):
+                _set_quota_cooldown(_extract_retry_delay_seconds(e))
+            log_ai_error(
+                "Diagnostic insight generation",
+                e,
+                service="google",
+                model="gemini-2.5-flash",
+                prompt=prompt,
+                extra={"response_id": response.id},
+            )
             
-    except Exception as e:
-        log_ai_error(
-            "Diagnostic insight generation",
-            e,
-            service="google",
-            model="gemini-2.5-flash",
-            prompt=prompt,
-            extra={"response_id": response.id},
-        )
-        
-        # Fallback to static diagnostic note if AI fails
-        if response.question.diagnostic_note:
-            text = response.question.diagnostic_note
-            response.ai_insight = text
-            response.save(update_fields=["ai_insight"])
-            logger.info(f"📝 Using static diagnostic for {response.question.id_code}")
-        
-    return text
+            # Fallback to static diagnostic note if AI fails
+            if response.question.diagnostic_note:
+                text = response.question.diagnostic_note
+                response.ai_insight = text
+                response.save(update_fields=["ai_insight"])
+                logger.info(f"📝 Using static diagnostic for {response.question.id_code}")
+            
+        return text
+    finally:
+        _release_lock(lock_key)
 
 
 def generate_concise_action_items(playbook_text: str) -> list:
@@ -398,7 +493,7 @@ def generate_concise_action_items(playbook_text: str) -> list:
     Returns a list of concise action strings.
     """
     model = _init_gemini()
-    if not model:
+    if not model or _quota_cooldown_active() or not _request_budget_available():
         return []
 
     prompt = f"""
@@ -426,6 +521,8 @@ def generate_concise_action_items(playbook_text: str) -> list:
                 
         return actions
     except Exception as e:
+        if _is_quota_error(e):
+            _set_quota_cooldown(_extract_retry_delay_seconds(e))
         log_ai_error(
             "Action item extraction",
             e,

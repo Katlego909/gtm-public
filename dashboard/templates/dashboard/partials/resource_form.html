@@ -1,0 +1,74 @@
+<div class="p-6">
+    <h2 class="text-2xl font-bold text-gray-900 mb-4">{{ title }}</h2>
+    <form hx-post="{% if instance %}{% url 'edit_resource' instance.id %}{% else %}{% url 'add_resource' %}{% endif %}" 
+          hx-target="#resource-grid" 
+          hx-swap="outerHTML" 
+          hx-encoding="multipart/form-data"
+          class="space-y-4">
+        {% csrf_token %}
+        
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Resource Name</label>
+            {{ form.name }}
+            {{ form.name.errors }}
+        </div>
+        
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                {{ form.resource_type }}
+                {{ form.resource_type.errors }}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                {{ form.category }}
+                {{ form.category.errors }}
+            </div>
+        </div>
+        
+        <div id="file-field-container" class="{% if form.resource_type.value == 'link' %}hidden{% endif %}">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Upload File</label>
+            {{ form.file }}
+            {{ form.file.errors }}
+        </div>
+        
+        <div id="url-field-container" class="{% if form.resource_type.value == 'file' or not form.resource_type.value %}hidden{% endif %}">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Link URL</label>
+            {{ form.url }}
+            {{ form.url.errors }}
+        </div>
+        
+        <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            {{ form.description }}
+            {{ form.description.errors }}
+        </div>
+        
+        <div class="flex justify-end gap-3 pt-4">
+            <button type="button" onclick="closeModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancel</button>
+            <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 shadow-sm">Save Resource</button>
+        </div>
+    </form>
+</div>
+
+<script>
+    function toggleResourceFields(value) {
+        const fileContainer = document.getElementById('file-field-container');
+        const urlContainer = document.getElementById('url-field-container');
+        
+        if (value === 'file') {
+            fileContainer.classList.remove('hidden');
+            urlContainer.classList.add('hidden');
+        } else {
+            fileContainer.classList.add('hidden');
+            urlContainer.classList.remove('hidden');
+        }
+    }
+    
+    // Auto-close modal after successful HTMX swap
+    document.body.addEventListener('htmx:afterOnLoad', function(evt) {
+        if (evt.detail.target.id === 'resource-grid') {
+            closeModal();
+        }
+    });
+</script>

@@ -14,6 +14,7 @@ from django.conf import settings
 from django.shortcuts import get_object_or_404
 from .models import AssessmentSession, ResultSnapshot, Response, Question, Category, ActionItem
 from .views import _compute_scores, _band_for_score
+from .agent_services import build_execution_plan, review_action_items
 from .utils_logging import log_ai_error
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,7 @@ def _init_gemini_chat():
         return None
     try:
         genai.configure(api_key=api_key)
-        return genai.GenerativeModel("models/gemini-2.5-flash")
+        return genai.GenerativeModel("gemini-2.5-flash")
     except Exception as e:
         log_ai_error("Gemini chat initialization", e, service="google", model="gemini-2.5-flash")
         return None
@@ -55,6 +56,14 @@ INTENTS = {
     "show_scores": [
         "show.*score", "what.*score", "how.*doing", "my.*results",
         "performance", "dashboard", "overview"
+    ],
+    "execution_plan": [
+        "build.*action plan", "create.*action plan", "create.*tasks", "generate.*tasks",
+        "turn.*into.*tasks", "build.*checklist", "create.*checklist", "priorit.*tasks"
+    ],
+    "review_action_items": [
+        "review.*action items", "review.*tasks", "my.*action items", "task list",
+        "checklist", "what.*open", "what.*pending", "status.*tasks"
     ],
     "weakest_areas": [
         "weak", "lowest", "worst", "need.*improve", "focus.*on",
@@ -261,6 +270,76 @@ Based on your {context['stage']} stage and focus areas:
     if context['has_playbook']:
         response += "\n📖 View your full AI-generated playbook for detailed action plans!"
     
+    return response
+
+
+def handle_execution_plan(session: AssessmentSession, context: Dict, user=None) -> str:
+    """Run the first execution agent: generate and persist prioritized action items."""
+    plan = build_execution_plan(session=session, actor=user, persist=True, limit=5)
+
+    if not plan["has_critical_gaps"]:
+        return (
+            "🤖 **Execution Agent**\n\n"
+            "You do not have any critical low-scoring responses right now, so I did not create new tasks. "
+            "Your next best move is to review existing action items and tighten execution consistency."
+        )
+
+    response = (
+        f"🤖 **Execution Agent Ran for {context['company_name']}**\n\n"
+        f"**Current Stage:** {plan['stage']}\n"
+        f"**Top Focus Areas:** {', '.join(plan['top_categories']) if plan['top_categories'] else 'General execution'}\n"
+        f"**Existing Action Items:** {plan['existing_action_count']}\n"
+        f"**New Action Items Created:** {plan['created_count']}\n"
+    )
+
+    if plan["created_items"]:
+        response += "\n**Created Now:**\n"
+        for item in plan["created_items"]:
+            due_text = f" _(due {item.due_date})_" if item.due_date else ""
+            response += f"• {item.note}{due_text}\n"
+    else:
+        response += "\nNo new tasks were created because matching actions already exist.\n"
+
+    if plan["skipped_items"]:
+        response += "\n**Skipped as duplicates:**\n"
+        for item in plan["skipped_items"][:3]:
+            response += f"• {item}\n"
+
+    response += (
+        "\n**Suggested next step:** Ask me to `review my action items` and I will summarize what should happen this week."
+    )
+    return response
+
+
+def handle_review_action_items(session: AssessmentSession, context: Dict) -> str:
+    """Summarize current task execution state like a lightweight weekly coach."""
+    summary = review_action_items(session)
+
+    if summary["total"] == 0:
+        return (
+            "🗂️ **Action Item Review**\n\n"
+            "You do not have any action items yet. Ask me to `build my action plan` and I will create a prioritized checklist from your weakest GTM gaps."
+        )
+
+    response = (
+        "🗂️ **Action Item Review**\n\n"
+        f"**Total:** {summary['total']}\n"
+        f"**To Do:** {summary['todo']}\n"
+        f"**In Progress:** {summary['in_progress']}\n"
+        f"**Done:** {summary['done']}\n"
+    )
+
+    if summary["overdue_count"]:
+        response += f"**Overdue:** {summary['overdue_count']}\n"
+
+    if summary["open_actions"]:
+        response += "\n**Open Priorities:**\n"
+        for action in summary["open_actions"]:
+            owner = action.assigned_to.get_full_name() if action.assigned_to else (action.owner or "Unassigned")
+            due = action.due_date.isoformat() if action.due_date else "No due date"
+            response += f"• {action.note} — **{action.get_status_display()}**, owner: {owner}, due: {due}\n"
+
+    response += "\n**Suggested next step:** Close one overdue item or assign owners to the unowned tasks first."
     return response
 
 def handle_roadmap(session: AssessmentSession, context: Dict) -> str:
@@ -555,7 +634,11 @@ def process_chat_message(session_id: str, message: str, user=None) -> Dict[str, 
             "schedule_meeting": handle_schedule_meeting,
         }
         
-        if intent in handler_map:
+        if intent == "execution_plan":
+            response_text = handle_execution_plan(session, context, user=user)
+        elif intent == "review_action_items":
+            response_text = handle_review_action_items(session, context)
+        elif intent in handler_map:
             response_text = handler_map[intent](session, context)
         else:
             # Use AI for all conversational queries (weakest areas, recommendations, roadmap, general chat, etc.)
@@ -592,6 +675,7 @@ def get_suggested_prompts(session: AssessmentSession) -> List[str]:
     if context['is_completed']:
         prompts.append("Show me my scores")
         prompts.append("What should I focus on?")
+        prompts.append("Build my action plan")
         prompts.append("Give me a 90-day roadmap")
     else:
         prompts.append("Help me understand this question")
