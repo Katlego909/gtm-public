@@ -3,6 +3,7 @@ from . import views
 
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
+    path('notifications/panel/', views.notifications_panel, name='notifications_panel'),
     path('agent/', views.agent_hub, name='agent_hub'),
     path('agent/chat/', views.dashboard_agent_api, name='dashboard_agent_api'),
     path('agent/context/', views.dashboard_agent_context_api, name='dashboard_agent_context_api'),
@@ -19,9 +20,15 @@ urlpatterns = [
     path('gap-metric/<int:pk>/edit/', views.add_edit_gap_metric, name='edit_gap_metric'),
     path('gap-metric/<int:pk>/delete/', views.delete_gap_metric, name='delete_gap_metric'),
     path('gap-metric/<int:pk>/', views.get_gap_metric_row, name='get_gap_metric_row'),
+    path('gap-suggestions/refresh/', views.refresh_gap_suggestions, name='refresh_gap_suggestions'),
+    path('gap-suggestions/generate/', views.generate_gap_suggestions, name='generate_gap_suggestions'),
+    path('gap-suggestions/<int:suggestion_id>/accept/', views.accept_gap_suggestion, name='accept_gap_suggestion'),
+    path('gap-suggestions/<int:suggestion_id>/reject/', views.reject_gap_suggestion, name='reject_gap_suggestion'),
+    path('agent/actions/recent/', views.refresh_recent_agent_actions, name='refresh_recent_agent_actions'),
 
     # New URL pattern for gap_analysis_table view
     path('gap-analysis-table/', views.gap_analysis_table, name='gap_analysis_table'),
+    path('gap-report/', views.gap_report, name='gap_report'),
 
     # New URL pattern for refresh_gap_analysis_table view
     path('refresh-gap-analysis-table/', views.refresh_gap_analysis_table, name='refresh_gap_analysis_table'),
@@ -33,6 +40,8 @@ urlpatterns = [
     path('action-item/<int:pk>/move/<str:new_status>/', views.move_action_item, name='move_action_item'),
     path('action-item/<int:action_id>/assign/', views.assign_action_item, name='assign_action_item'),
     path('action-item/<int:action_id>/unassign/', views.unassign_action_item, name='unassign_action_item'),
+    path('action-item/<int:action_id>/comments/add/', views.add_action_item_comment, name='add_action_item_comment'),
+    path('action-item/comments/<uuid:comment_id>/delete/', views.delete_action_item_comment, name='delete_action_item_comment'),
     path('refresh-action-items/', views.refresh_action_items, name='refresh_action_items'),
     
     # Profile URL

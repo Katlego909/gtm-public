@@ -124,7 +124,9 @@
                 ghostClass: 'opacity-30',
                 dragClass: 'shadow-2xl',
                 handle: '.bg-white', // The card itself is draggable
-                filter: '.border-dashed', // Ignore empty state divs
+                filter: '.border-dashed, button, a, input, textarea, form', // Keep interactive controls clickable
+                delayOnTouchOnly: true,
+                delay: 120,
                 onEnd: function(evt) {
                     const itemId = evt.item.dataset.id;
                     const newStatus = evt.to.dataset.status;
@@ -132,6 +134,12 @@
                     
                     // Only update if status actually changed
                     if (newStatus && itemId && newStatus !== oldStatus) {
+                        const workspaceSelector = document.getElementById('workspace-selector');
+                        const workspaceId = workspaceSelector ? workspaceSelector.value : '';
+                        const moveUrl = workspaceId
+                            ? `/dashboard/action-item/${itemId}/move/${newStatus}/?workspace=${encodeURIComponent(workspaceId)}`
+                            : `/dashboard/action-item/${itemId}/move/${newStatus}/`;
+
                         // Get CSRF token
                         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
                                         document.querySelector('meta[name="csrf-token"]')?.content ||
@@ -139,11 +147,12 @@
                                         '';
                         
                         // Update item status via fetch
-                        fetch(`/dashboard/action-item/${itemId}/move/${newStatus}/`, {
+                        fetch(moveUrl, {
                             method: 'POST',
                             headers: {
                                 'X-CSRFToken': csrfToken,
-                                'X-Requested-With': 'XMLHttpRequest'
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'HX-Request': 'true'
                             },
                             credentials: 'same-origin'
                         })
@@ -159,12 +168,18 @@
                             setTimeout(() => {
                                 initializeKanban();
                                 syncTaskCountersFromBoard();
+                                if (window.htmx) {
+                                    htmx.trigger(document.body, 'refreshNotifications');
+                                }
                             }, 100);
                         })
                         .catch(error => {
                             console.error('Error updating item:', error);
                             // Revert the DOM change on error by moving item back
                             evt.from.insertBefore(evt.item, evt.from.children[evt.oldIndex]);
+                            if (typeof window.showDashboardToast === 'function') {
+                                window.showDashboardToast('Could not move task. Please try again.', 'error');
+                            }
                         });
                     }
                 }
@@ -188,6 +203,9 @@
             setTimeout(() => {
                 initializeKanban();
                 syncTaskCountersFromBoard();
+                if (window.htmx) {
+                    htmx.trigger(document.body, 'refreshNotifications');
+                }
             }, 100);
         }
     });

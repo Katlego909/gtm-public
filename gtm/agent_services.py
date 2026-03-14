@@ -42,10 +42,15 @@ def _normalize_task_text(text: str) -> str:
 
 def _task_from_response(response: Response) -> str:
     question_text = (response.question.text or "").lower()
+    ai_metadata = response.question.ai_metadata if isinstance(response.question.ai_metadata, dict) else {}
 
     for pattern, task in QUESTION_TASK_PATTERNS:
         if re.search(pattern, question_text):
             return task
+
+    metadata_quick_win = _normalize_task_text(ai_metadata.get("quick_win_if_low", ""))
+    if metadata_quick_win:
+        return metadata_quick_win
 
     if response.question.diagnostic_note:
         return _normalize_task_text(response.question.diagnostic_note)

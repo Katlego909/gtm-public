@@ -19,14 +19,13 @@
 
                 <div class="mt-4">
                     {% if dashboard_agent_session %}
-                    <a href="{% url 'gtm:chat' dashboard_agent_session.uuid %}"
-                       hx-get="{% url 'gtm:chat' dashboard_agent_session.uuid %}"
+                    <a href="{% url 'agent_hub' %}?agent_session={{ dashboard_agent_session.uuid }}{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
+                       hx-get="{% url 'agent_hub' %}?agent_session={{ dashboard_agent_session.uuid }}{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
                        hx-target="#main-content"
-                       hx-select="#main-content"
                        hx-swap="innerHTML swap:200ms"
                        hx-push-url="true"
                        class="inline-flex items-center justify-center w-full px-4 py-2 rounded-lg border border-indigo-200 text-sm font-medium text-indigo-700 hover:bg-indigo-50 transition">
-                        Open Full Chat
+                        Reload Agent Context
                     </a>
                     {% endif %}
                 </div>
@@ -158,6 +157,19 @@ async function sendDashboardAgentMessage(message) {
 
         const data = await response.json();
         appendDashboardAgentMessage(data.success ? data.response : `Error: ${data.error || 'Unknown error'}`, false);
+
+        if (data.success && data.intent === 'dashboard_action' && window.htmx) {
+            htmx.trigger(document.body, 'refreshNotifications');
+            htmx.trigger(document.body, 'refreshAgentActions');
+            const actionItemsContainer = document.getElementById('action-items-container');
+            if (actionItemsContainer) {
+                const qs = window.location.search || '';
+                htmx.ajax('GET', `/dashboard/refresh-action-items/${qs}`, {
+                    target: '#action-items-container',
+                    swap: 'outerHTML',
+                });
+            }
+        }
     } catch (error) {
         appendDashboardAgentMessage('Error: Could not reach the dashboard agent.', false);
     } finally {

@@ -14,7 +14,7 @@ from django.utils.safestring import mark_safe
 import markdown as md
 import math
 import re
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
@@ -27,9 +27,15 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout
 from django.db.models import Avg
 from django.conf import settings
+from django.core.cache import cache
 from functools import wraps
 from .utils import transfer_firmographics_to_snapshot
-from .ai_services import generate_playbook_with_gemini, generate_diagnostic_insight, _normalize_ai_playbook_markdown
+from .ai_services import (
+    generate_playbook_with_gemini,
+    generate_diagnostic_insight,
+    _normalize_ai_playbook_markdown,
+    rewrite_context_note_with_ai,
+)
 from .forms import StartAssessmentForm # Added import
 
 LEGEND = {
@@ -55,6 +61,119 @@ def _get_template(request, base_template, partial_template=None):
     if _is_htmx(request) and partial_template:
         return partial_template
     return base_template
+
+
+def _expand_gtm_jargon(text: str) -> str:
+    """Replace common GTM acronyms with plain-language expansions for non-specialist users."""
+    expanded = text or ""
+    replacements = {
+        "ICP": "Ideal Customer Profile (ICP)",
+        "SLA": "service-level agreement (SLA)",
+        "CAC": "customer acquisition cost (CAC)",
+        "QBR": "quarterly business review (QBR)",
+        "TTV": "time to value (TTV)",
+        "CRM": "customer relationship management system (CRM)",
+    }
+    for short, full in replacements.items():
+        expanded = re.sub(rf"\b{re.escape(short)}\b", full, expanded)
+    return expanded
+
+
+def _build_question_guidance(question: Question) -> dict:
+    """Create user-friendly guidance shown under each assessment question."""
+    metadata = question.ai_metadata if isinstance(question.ai_metadata, dict) else {}
+    evidence_type = (metadata.get("evidence_type") or "qualitative").lower()
+    owner_role = (metadata.get("owner_role") or "team").lower()
+    time_horizon = (metadata.get("time_horizon") or "current").lower()
+    dimension = (metadata.get("dimension") or "").lower()
+    q_text = (question.text or "").lower()
+
+    evidence_hint_map = {
+        "system-data": "Use what your systems show: CRM reports, dashboards, or tracked metrics.",
+        "quantitative": "Use real numbers from the last 30 to 90 days instead of a gut feel.",
+        "qualitative": "Use team knowledge and documented process notes if hard metrics are not available.",
+    }
+    role_hint_map = {
+        "marketing": "You may need input from marketing or demand generation owners.",
+        "sales": "You may need input from sales leadership or frontline reps.",
+        "cs": "You may need input from customer success or account management.",
+        "revops": "You may need input from RevOps/data owners for accurate reporting.",
+        "founder": "Leadership context may be needed for strategy and prioritization.",
+    }
+
+    horizon_hint_map = {
+        "current": "Score based on your current process today.",
+        "30d": "Use evidence from the last 30 days where possible.",
+        "90d": "Use evidence from the last 90 days where possible.",
+        "12m": "Use longer-term trend evidence (up to 12 months) where relevant.",
+    }
+
+    quick_help = f"{horizon_hint_map.get(time_horizon, horizon_hint_map['current'])} Keep your score practical, not aspirational."
+
+    # Keep examples specific to the type of question so users can mirror the format.
+    if "icp" in dimension or "ideal customer" in q_text:
+        example_note = "We updated our ICP in January and now require industry, company size, and buyer role fields on every lead."
+    elif "attribution" in dimension or "utm" in q_text or "source" in q_text:
+        example_note = "Only 62% of leads have complete source tagging; paid social and referrals are often marked as direct."
+    elif "speed to lead" in dimension or "response" in q_text:
+        example_note = "Median first response is 9 hours for web leads and 2 days for email leads; no SLA alerts exist yet."
+    elif "qualification" in dimension or "qualif" in q_text:
+        example_note = "Reps use different qualification criteria; only budget and timeline are captured consistently in CRM."
+    elif "pipeline" in dimension or "stage" in q_text:
+        example_note = "Stage definitions are unclear and opportunities are moved forward without documented exit criteria."
+    elif "win-loss" in dimension or "win" in q_text or "loss" in q_text:
+        example_note = "Closed-lost reasons are mostly free text, so we cannot reliably see top loss patterns month to month."
+    elif "time to value" in dimension or "ttv" in q_text:
+        example_note = "Time to first value averages 28 days and varies widely by segment due to inconsistent onboarding steps."
+    elif "retention" in dimension or "renew" in q_text:
+        example_note = "We review renewals quarterly, but churn reasons are not tracked by segment so interventions are reactive."
+    elif "health" in dimension or "customer health" in q_text:
+        example_note = "We do not have a formal health score; risk is identified manually from support tickets and low usage."
+    elif "advocacy" in dimension or "testimonial" in q_text or "review" in q_text:
+        example_note = "We request testimonials informally, so only a few customer quotes were captured in the last quarter."
+    else:
+        example_note = "Our process exists but is inconsistent across teams, and we do not review this metric on a fixed cadence yet."
+
+    return {
+        "plain_question": _expand_gtm_jargon(question.text),
+        "quick_help": quick_help,
+        "why_this_matters": question.diagnostic_note or "This helps identify where GTM execution is blocking growth.",
+        "how_to_answer": evidence_hint_map.get(evidence_type, evidence_hint_map["qualitative"]),
+        "who_to_ask": role_hint_map.get(owner_role, "Ask the teammate closest to this part of your GTM process."),
+        "example_note": example_note,
+    }
+
+
+def _kickoff_playbook_generation(snapshot, session_id=None):
+    """Kick off non-blocking playbook generation once, guarded against rapid duplicate starts."""
+    if not snapshot:
+        return False
+    if (snapshot.ai_playbook or "").strip():
+        return False
+
+    kickoff_key = f"gtm:playbook:kickoff:{snapshot.id}"
+    # Throttle kickoff frequency across concurrent polling requests.
+    if not cache.add(kickoff_key, "1", timeout=20):
+        return False
+
+    try:
+        from threading import Thread
+
+        def generate_async(snapshot_id, sid):
+            try:
+                fresh_snapshot = ResultSnapshot.objects.filter(id=snapshot_id).first()
+                if not fresh_snapshot or (fresh_snapshot.ai_playbook or "").strip():
+                    return
+                generate_playbook_with_gemini(fresh_snapshot)
+            except Exception as e:
+                log_error("AI Playbook async kickoff", e, {"session_id": str(sid) if sid else ""})
+
+        thread = Thread(target=generate_async, args=(snapshot.id, session_id), daemon=True)
+        thread.start()
+        return True
+    except Exception as e:
+        log_error("AI Playbook thread creation", e, {"session_id": str(session_id) if session_id else ""})
+        return False
 
 def require_session_ownership(view_func):
     """
@@ -424,6 +543,7 @@ def assessment_step(request, session_id, step: int):
         return redirect("gtm:assessment_step", session_id=session.uuid, step=required_step)
 
     questions = steps[step - 1]
+    question_guidance = {q.id_code: _build_question_guidance(q) for q in questions}
 
     # Build a dynamic form with one integer field per question (1..5)
     context_fields = {}
@@ -438,7 +558,7 @@ def assessment_step(request, session_id, step: int):
             label=q.text
         )
         StepForm.base_fields[f"{q.id_code}_context_note"] = forms.CharField(
-            widget=forms.Textarea(attrs={"class": "w-full border rounded px-3 py-2 mt-4", "rows": 3, "placeholder": "Please provide more info on this"}),
+            widget=forms.Textarea(attrs={"class": "w-full border rounded px-3 py-2 text-sm", "rows": 3, "placeholder": "Please provide more info on this"}),
             required=False,
             label="Please provide more info on this"
         )
@@ -499,6 +619,40 @@ def assessment_step(request, session_id, step: int):
         "category": questions[0].category if questions else None,
         "is_htmx": _is_htmx(request),
         "context_fields": context_fields,
+        "question_guidance": question_guidance,
+    })
+
+
+@login_required
+@require_POST
+def rewrite_context_note(request, session_id):
+    """Rewrite/summarize a context note and return preview text without persisting it."""
+    import json
+
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        return JsonResponse({"success": False, "error": "Access denied."}, status=403)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"success": False, "error": "Invalid JSON payload."}, status=400)
+
+    note_text = (payload.get("note_text") or "").strip()
+    question_text = (payload.get("question_text") or "").strip()
+    mode = (payload.get("mode") or "rewrite").strip().lower()
+
+    if not note_text:
+        return JsonResponse({"success": False, "error": "Please add some text first."}, status=400)
+
+    rewritten = rewrite_context_note_with_ai(note_text=note_text, question_text=question_text, mode=mode)
+    if not rewritten:
+        return JsonResponse({"success": False, "error": "Could not rewrite note right now."}, status=500)
+
+    return JsonResponse({
+        "success": True,
+        "rewritten_text": rewritten,
+        "mode": mode,
     })
 
 def results(request, session_id):
@@ -526,8 +680,17 @@ def results(request, session_id):
         it["step"] = step_map.get(it["category"].id)
 
     all_rows = []
-    for q in Question.objects.all():
-        r = Response.objects.filter(session=session, question=q).first()
+    questions = list(Question.objects.select_related("category").all())
+    responses_by_question_id = {
+        r.question_id: r
+        for r in Response.objects.filter(
+            session=session,
+            question__in=questions,
+        ).select_related("question__category")
+    }
+
+    for q in questions:
+        r = responses_by_question_id.get(q.id)
         if r:
             all_rows.append({
                 "question": q,
@@ -561,13 +724,16 @@ def results(request, session_id):
     ).select_related('category') # select_related for accessing category name later efficiently
 
     # 3. Perform keyword matching in Python
+    tools_by_category = {}
+    for tool in all_tool_recommendations:
+        tools_by_category.setdefault(tool.category_id, []).append(tool)
+
     for w in weakest_questions:
         q_text = (w["question"].text or "").lower()
         q_note = (w.get("note") or "").lower()
         
-        # Filter through the prefetched recommendations for the current question's category
-        # and then apply the keyword matching logic
-        for m in [tr for tr in all_tool_recommendations if tr.category.id == w["question"].category.id]:
+        # Filter through prefetched recommendations for the current question's category only.
+        for m in tools_by_category.get(w["question"].category_id, []):
             kw = (m.keyword or "").lower()
             if kw and (kw in q_text or kw in q_note):
                 recommendations.append(m)
@@ -583,7 +749,6 @@ def results(request, session_id):
     # ⚡ FALLBACK: If insufficient recommendations, add generic tools from weakest categories
     if len(recommendations) < 5:
         # Get unique weakest categories not already represented
-        # (This logic was already good and will remain)
         weak_categories = []
         for w in weakest_questions:
             cat = w["question"].category
@@ -591,17 +756,12 @@ def results(request, session_id):
                 weak_categories.append(cat)
         
         # Add generic tools from each weak category until we have at least 5
-        # (Optimization: Filter fallback_tools from all_tool_recommendations if possible
-        #  or make this query outside the loop if it's called often)
         for cat in weak_categories:
             if len(recommendations) >= 5:
                 break
-            # Get tools from this category not already in recommendations
-            fallback_tools = ToolRecommendation.objects.filter(
-                category=cat
-            ).exclude(id__in=[r.id for r in recommendations])[:2]
-            
-            for tool in fallback_tools:
+
+            # Reuse prefetched tools for fallback; avoid per-category DB queries.
+            for tool in tools_by_category.get(cat.id, []):
                 if tool.id not in seen:
                     seen.add(tool.id)
                     recommendations.append(tool)
@@ -667,25 +827,7 @@ def results(request, session_id):
     # 🤖 Trigger AI playbook generation in background (non-blocking)
     # -----------------------------
     if snap and not (snap.ai_playbook or "").strip():
-        try:
-            # Import here to avoid circular import issues  
-            from threading import Thread
-            
-            def generate_async():
-                try:
-                    ai_md = generate_playbook_with_gemini(snap)
-                    if ai_md and ai_md.strip():
-                        snap.ai_playbook = ai_md.strip()
-                        snap.save(update_fields=["ai_playbook"])
-                except Exception as e:
-                    log_error("AI Playbook Generation (async)", e, {"session_id": str(session.uuid)})
-            
-            # Start generation in background thread
-            thread = Thread(target=generate_async)
-            thread.daemon = True
-            thread.start()
-        except Exception as e:
-            log_error("AI Playbook thread creation (results)", e, {"session_id": str(session.uuid)})
+        _kickoff_playbook_generation(snap, session_id=session.uuid)
 
     return render(request, "gtm/results.html", {
         "session": session,
@@ -715,6 +857,9 @@ def playbook_status(request, session_id):
     if snap and (snap.ai_playbook or "").strip():
         # Playbook is ready! Return the actual button to view it.
         return render(request, "gtm/partials/playbook_ready_button.html", {"session": session})
+
+    if snap:
+        _kickoff_playbook_generation(snap, session_id=session.uuid)
     
     # Still generating. Return the loading state.
     return render(request, "gtm/partials/playbook_loading_button.html", {"session": session})
@@ -744,23 +889,7 @@ def playbook_content_status(request, session_id):
 
     # Ensure generation remains non-blocking while polling.
     if snap:
-        try:
-            from threading import Thread
-
-            def generate_async():
-                try:
-                    ai_md_src = generate_playbook_with_gemini(snap)
-                    if ai_md_src and ai_md_src.strip():
-                        snap.ai_playbook = ai_md_src.strip()
-                        snap.save(update_fields=["ai_playbook"])
-                except Exception as e:
-                    log_error("AI Playbook (async) Poll Generation", e, {"session_id": str(session.uuid)})
-
-            thread = Thread(target=generate_async)
-            thread.daemon = True
-            thread.start()
-        except Exception as e:
-            log_error("AI Playbook poll thread creation", e, {"session_id": str(session.uuid)})
+        _kickoff_playbook_generation(snap, session_id=session.uuid)
 
     return render(request, "gtm/partials/playbook_content_status.html", {
         "session": session,
@@ -799,25 +928,7 @@ def playbook(request, session_id):
     
     # Trigger background generation if needed (non-blocking)
     if needs_generation:
-        try:
-            # Import here to avoid circular import issues  
-            from threading import Thread
-            
-            def generate_async():
-                try:
-                    ai_md_src = generate_playbook_with_gemini(snap)
-                    if ai_md_src and ai_md_src.strip():
-                        snap.ai_playbook = ai_md_src.strip()
-                        snap.save(update_fields=["ai_playbook"])
-                except Exception as e:
-                    log_error("AI Playbook (async) Generation", e, {"session_id": str(session.uuid)})
-            
-            # Start generation in background thread
-            thread = Thread(target=generate_async)
-            thread.daemon = True
-            thread.start()
-        except Exception as e:
-            log_error("AI Playbook thread creation", e, {"session_id": str(session.uuid)})
+        _kickoff_playbook_generation(snap, session_id=session.uuid)
     
     playbook_ready = False
     playbook_loading = bool(needs_generation)
@@ -1031,7 +1142,6 @@ def action_delete(request, action, action_id):
 # ================================================================
 # AI CHAT ASSISTANT
 # ================================================================
-from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from .ai_chat import process_chat_message, get_suggested_prompts
 from .models import ChatMessage

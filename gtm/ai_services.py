@@ -387,6 +387,11 @@ def _build_diagnostic_prompt(session: AssessmentSession, question: Question, sco
     company_name = session.company_name or "a B2B company"
     industry = session.industry or "a general industry"
     stage = session.snapshot.band_stage if getattr(session, 'snapshot', None) and session.snapshot.band_stage else "Unspecified"
+    ai_metadata = question.ai_metadata if isinstance(question.ai_metadata, dict) else {}
+    question_intent = ai_metadata.get("intent") or "N/A"
+    evidence_hint = ai_metadata.get("evidence_hint") or "N/A"
+    risk_if_low = ai_metadata.get("risk_if_low") or "N/A"
+    quick_win_if_low = ai_metadata.get("quick_win_if_low") or "N/A"
     
     # Score severity mapping
     severity = {1: "Critical Failure", 2: "Serious Gap", 3: "Improvement Needed"}.get(score, "Low Priority")
@@ -402,6 +407,10 @@ Company Context:
 - Question Text: {question.text}
 - User Score: {score}/5.0 (Severity: {severity})
 - Static Note (for context only): {question.diagnostic_note or 'N/A'}
+- Question Intent: {question_intent}
+- Evidence Hint: {evidence_hint}
+- Risk If Low: {risk_if_low}
+- Quick Win If Low: {quick_win_if_low}
 
 Task: Generate a single, concise paragraph (max 5 sentences) that explains the **immediate risk** or **consequence** of this low score in the context of the company's industry and stage. Do NOT provide a full action plan; keep the focus on the "WHY this matters now."
 
@@ -531,3 +540,83 @@ def generate_concise_action_items(playbook_text: str) -> list:
             prompt=prompt,
         )
         return []
+
+
+def _fallback_rewrite_context_note(note_text: str, mode: str) -> str:
+    """Deterministic fallback note cleanup when AI is unavailable."""
+    cleaned = re.sub(r"\s+", " ", (note_text or "").strip())
+    if not cleaned:
+        return ""
+
+    if mode == "summarize":
+        short = cleaned[:220]
+        if len(cleaned) > 220:
+            short = short.rstrip(" ,.;:") + "..."
+        return short
+
+    if mode == "specific":
+        if "last" not in cleaned.lower():
+            cleaned += " (based on what we observed in the last 90 days)."
+        return cleaned
+
+    # rewrite
+    if not cleaned.endswith("."):
+        cleaned += "."
+    return cleaned[0].upper() + cleaned[1:]
+
+
+def rewrite_context_note_with_ai(note_text: str, question_text: str = "", mode: str = "rewrite") -> str:
+    """Summarize or rewrite user context notes for clearer assessment inputs."""
+    mode = (mode or "rewrite").strip().lower()
+    if mode not in {"rewrite", "summarize", "specific"}:
+        mode = "rewrite"
+
+    source = (note_text or "").strip()
+    if not source:
+        return ""
+
+    model = _init_gemini()
+    if not model or _quota_cooldown_active() or not _request_budget_available():
+        return _fallback_rewrite_context_note(source, mode)
+
+    mode_instruction = {
+        "rewrite": "Rewrite the note in clearer plain English while preserving meaning.",
+        "summarize": "Summarize the note into one short clear sentence.",
+        "specific": "Rewrite the note to be more specific and actionable, without inventing any numbers.",
+    }[mode]
+
+    prompt = f"""
+You are helping a business user write a clearer assessment note.
+
+Task:
+- {mode_instruction}
+- Keep it under 320 characters.
+- Do not use bullets or markdown.
+- Do not invent facts, numbers, or tools.
+- Keep the same intent as the original.
+
+Assessment question:
+{question_text or 'N/A'}
+
+User note:
+{source}
+""".strip()
+
+    try:
+        response = model.generate_content(prompt)
+        text = (getattr(response, "text", "") or "").strip()
+        if not text:
+            return _fallback_rewrite_context_note(source, mode)
+        text = re.sub(r"\s+", " ", text)
+        return text[:320].rstrip()
+    except Exception as e:
+        if _is_quota_error(e):
+            _set_quota_cooldown(_extract_retry_delay_seconds(e))
+        log_ai_error(
+            "Context note rewrite",
+            e,
+            service="google",
+            model="gemini-2.5-flash",
+            prompt=prompt,
+        )
+        return _fallback_rewrite_context_note(source, mode)

@@ -15,6 +15,7 @@
         <tbody class="divide-y divide-gray-100 text-sm" 
                id="gap-analysis-table-body"
                hx-get="{% url 'refresh_gap_analysis_table' %}"
+             hx-include="#workspace-selector"
                hx-trigger="gapAnalysisUpdated from:body"
                hx-swap="innerHTML">
             {% for gap in gap_analysis %}

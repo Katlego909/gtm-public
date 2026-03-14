@@ -161,3 +161,55 @@ class WorkspaceInvitation(models.Model):
     def is_expired(self):
         from django.utils import timezone
         return timezone.now() > self.expires_at
+
+
+class WorkspaceActivityEvent(models.Model):
+    """Lightweight workspace activity log for collaboration visibility."""
+
+    EVENT_CHOICES = [
+        ('task_created', 'Task created'),
+        ('task_moved', 'Task moved'),
+        ('task_deleted', 'Task deleted'),
+        ('comment_added', 'Comment added'),
+        ('comment_deleted', 'Comment deleted'),
+        ('resource_created', 'Resource created'),
+        ('resource_updated', 'Resource updated'),
+        ('resource_deleted', 'Resource deleted'),
+    ]
+
+    workspace = models.ForeignKey(
+        Workspace,
+        on_delete=models.CASCADE,
+        related_name='activity_events',
+    )
+    session = models.ForeignKey(
+        'AssessmentSession',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='workspace_activity_events',
+    )
+    actor = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='workspace_activity_events',
+    )
+    event_type = models.CharField(max_length=32, choices=EVENT_CHOICES)
+    summary = models.CharField(max_length=255)
+    object_type = models.CharField(max_length=32, blank=True, default='')
+    object_id = models.CharField(max_length=64, blank=True, default='')
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['workspace', '-created_at']),
+            models.Index(fields=['event_type', '-created_at']),
+            models.Index(fields=['actor', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.workspace.name}: {self.summary}"

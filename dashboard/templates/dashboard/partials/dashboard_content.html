@@ -314,9 +314,14 @@
                                         class="cursor-pointer px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm transition-colors">
                                     Add Metric
                                 </button>
-                                <a href="{{ gap_report_url }}" class="text-sm text-purple-600 font-semibold hover:underline" target="_blank">View full report <span aria-hidden="true">↗</span></a>
+                                <a href="{{ gap_report_url }}"
+                                   hx-get="{{ gap_report_url }}"
+                                   hx-target="#main-content"
+                                   hx-push-url="true"
+                                   class="text-sm text-purple-600 font-semibold hover:underline">View full report <span aria-hidden="true">↗</span></a>
                             </div>
                         </div>
+                        {% include 'dashboard/partials/gap_suggestions_panel.html' with gap_suggestions=gap_suggestions latest_completed_session=latest_completed_gap_session current_workspace=current_workspace %}
                         {% include 'dashboard/partials/gap_analysis_table.html' %}
                     </div>
 
@@ -467,20 +472,14 @@
             <span class="inline-block bg-pink-100 text-pink-600 rounded-full p-2 mr-2">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8a9 9 0 100-18 9 9 0 000 18z" /></svg>
             </span>
-            Recent Chat Messages
+            Recent Agent Actions
         </h3>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {% for chat in recent_chats %}
-            <div class="bg-gray-50 rounded-lg p-4 flex flex-col gap-2 shadow-sm border border-gray-200">
-                <div class="flex items-center gap-2">
-                    <span class="font-semibold text-pink-700">{{ chat.message }}</span>
-                    <span class="text-xs text-gray-500 ml-auto">{{ chat.created_at|date:'Y-m-d H:i' }}</span>
-                </div>
-                <div class="text-xs text-gray-400">→ {{ chat.response|truncatechars:80 }}</div>
-            </div>
-            {% empty %}
-            <div class="text-gray-400 italic">No chat messages found.</div>
-            {% endfor %}
+        <div id="recent-agent-actions-panel"
+             hx-get="{% url 'refresh_recent_agent_actions' %}"
+             hx-include="#workspace-selector"
+             hx-trigger="load, every 25s, refreshAgentActions from:body"
+             hx-swap="innerHTML">
+            {% include 'dashboard/partials/recent_agent_actions_panel.html' with recent_agent_actions=recent_agent_actions %}
         </div>
     </div>
 </div>

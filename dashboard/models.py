@@ -69,6 +69,58 @@ class GapAnalysisMetric(models.Model):
     def metric_field_name(self):
         return self.METRIC_FIELD_MAPPING.get(self.metric)
 
+
+class GapAnalysisSuggestion(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending Review'),
+        ('accepted', 'Accepted'),
+        ('rejected', 'Rejected'),
+    ]
+
+    category = models.CharField(max_length=100, choices=GapAnalysisMetric.CATEGORY_CHOICES)
+    metric = models.CharField(max_length=100, choices=GapAnalysisMetric.METRIC_CHOICES)
+    current = models.FloatField(default=0)
+    target = models.FloatField()
+    priority = models.CharField(max_length=10, choices=GapAnalysisMetric.PRIORITY_CHOICES)
+    recommendation = models.TextField()
+    rationale = models.TextField(blank=True, default='')
+    confidence = models.PositiveSmallIntegerField(default=70)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+
+    session = models.ForeignKey(
+        AssessmentSession,
+        on_delete=models.CASCADE,
+        related_name='gap_suggestions',
+        null=True,
+        blank=True,
+    )
+    workspace = models.ForeignKey(
+        Workspace,
+        on_delete=models.CASCADE,
+        related_name='gap_suggestions',
+        null=True,
+        blank=True,
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='gap_suggestions',
+    )
+    source_payload = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', '-created_at']),
+            models.Index(fields=['workspace', 'status']),
+            models.Index(fields=['user', 'status']),
+        ]
+
+    def __str__(self):
+        return f"{self.metric} ({self.status})"
+
 class Resource(models.Model):
     """
     A shared document or link within a workspace.

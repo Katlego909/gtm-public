@@ -1,4 +1,5 @@
 {% extends "gtm/base.html" %}
+{% load get_item %}
 {% block content %}
 
 <style>
@@ -8,9 +9,9 @@
     overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
   }
   .rating-label {
-    display:inline-block; padding:0.75rem 1rem; border:2px solid #e5e7eb;
+    display:flex; align-items:center; justify-content:center; width:100%; padding:0.75rem 1rem; border:2px solid #e5e7eb;
     border-radius:0.75rem; background:#fff; color:#374151; cursor:pointer;
-    transition:all .2s ease; font-weight:500; min-width:3rem; text-align:center;
+    transition:all .2s ease; font-weight:500; text-align:center;
   }
   .rating-label:hover { 
     border-color:#6366f1; 
@@ -90,11 +91,36 @@
         <span>
           Rate each statement from <strong>1 (No/Poor)</strong> to <strong>5 (Best-in-class)</strong>.
           <button type="button" class="ml-2 text-indigo-600 hover:text-indigo-800 underline decoration-dotted font-medium" 
-                  onclick="alert('{{ legend|escapejs }}')" title="{{ legend }}">
+                  onclick="openLegendModal()">
             What does 1–5 mean?
           </button>
         </span>
       </p>
+    </div>
+
+    <!-- Score Guide Modal -->
+    <div id="legend-modal" class="fixed inset-0 z-50 hidden" aria-hidden="true">
+      <div class="absolute inset-0 bg-black/40" onclick="closeLegendModal()"></div>
+      <div class="relative mx-auto mt-24 w-[92%] max-w-lg rounded-2xl bg-white shadow-2xl border border-gray-200">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+          <h3 class="text-lg font-bold text-gray-900">How scoring works</h3>
+          <button type="button" class="h-8 w-8 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700" onclick="closeLegendModal()" aria-label="Close score guide">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="px-5 py-4 text-sm text-gray-700 leading-relaxed">
+          <ul class="space-y-2">
+            <li><span class="font-semibold text-red-600">1</span>: No / Not in place</li>
+            <li><span class="font-semibold text-orange-600">2</span>: Ad-hoc / Rarely</li>
+            <li><span class="font-semibold text-yellow-600">3</span>: In progress / Sometimes</li>
+            <li><span class="font-semibold text-blue-600">4</span>: Consistent / Often</li>
+            <li><span class="font-semibold text-green-600">5</span>: Best-in-class / Always</li>
+          </ul>
+        </div>
+        <div class="px-5 py-4 border-t border-gray-200 flex justify-end">
+          <button type="button" onclick="closeLegendModal()" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition">Got it</button>
+        </div>
+      </div>
     </div>
 
     <!-- Questions Form -->
@@ -111,12 +137,42 @@
       {% for field in form %}
         {% if '_context_note' not in field.name %}
         <div class="question-item bg-gray-50 rounded-xl p-6 border border-gray-200 hover:border-indigo-300 transition">
-          <label class="block text-base font-semibold text-gray-800 mb-4 flex items-start gap-2">
-            <i class="fas fa-chevron-right text-indigo-600 mt-1 text-sm"></i>
+          {% with guide=question_guidance|get_item:field.name %}
+          <label class="block text-base font-semibold text-gray-800 mb-4">
             <span>{{ field.label }}</span>
           </label>
 
-          <div class="flex flex-wrap gap-3">
+          {% if guide %}
+          <div class="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/70 p-4">
+            <p class="text-sm font-semibold text-indigo-900">Quick tip: <span class="font-normal text-gray-800">{{ guide.quick_help }}</span></p>
+
+            <details class="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
+              <summary class="cursor-pointer text-xs font-semibold uppercase tracking-wide text-gray-700">
+                Need more guidance?
+              </summary>
+              <div class="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-gray-700">
+                <div>
+                  <p class="font-semibold text-gray-800 mb-1">How to answer</p>
+                  <ul class="space-y-1 list-disc pl-4">
+                    <li>{{ guide.how_to_answer }}</li>
+                    <li>If exact data is missing, use your best team estimate and explain it in the note.</li>
+                  </ul>
+                </div>
+                <div>
+                  <p class="font-semibold text-gray-800 mb-1">Who can help</p>
+                  <p>{{ guide.who_to_ask }}</p>
+                  <p class="mt-2 text-[11px] text-gray-500">Tip: You can answer now and refine later.</p>
+                </div>
+              </div>
+              <div class="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                <p class="text-[11px] font-semibold uppercase tracking-wide text-amber-800">Why this matters</p>
+                <p class="mt-1 text-xs text-gray-700 leading-relaxed">{{ guide.why_this_matters }}</p>
+              </div>
+            </details>
+          </div>
+          {% endif %}
+
+          <div class="grid w-full grid-cols-5 gap-3">
             {% for i in "12345" %}
               <input
                 class="rating-input sr-only"
@@ -132,40 +188,80 @@
           </div>
 
           <!-- Rating Guide -->
-          <div class="mt-4 pt-4 border-t border-gray-200">
-            <div class="grid grid-cols-5 gap-2 text-xs text-gray-600">
+          <div class="mt-3">
+            <div class="grid w-full grid-cols-5 gap-3 text-xs text-gray-600">
               <div class="text-center">
-                <span class="block font-semibold text-red-600">1</span>
                 <span class="block text-gray-500">Poor</span>
               </div>
               <div class="text-center">
-                <span class="block font-semibold text-orange-600">2</span>
                 <span class="block text-gray-500">Fair</span>
               </div>
               <div class="text-center">
-                <span class="block font-semibold text-yellow-600">3</span>
                 <span class="block text-gray-500">Good</span>
               </div>
               <div class="text-center">
-                <span class="block font-semibold text-blue-600">4</span>
                 <span class="block text-gray-500">Very Good</span>
               </div>
               <div class="text-center">
-                <span class="block font-semibold text-green-600">5</span>
                 <span class="block text-gray-500">Excellent</span>
               </div>
             </div>
           </div>
 
           <!-- Context Note Textbox -->
-          <div class="mt-6">
-            <label class="block text-sm font-medium text-gray-700 mb-2">Please provide more info on this</label>
+          <div class="mt-4 rounded-lg border border-gray-200 bg-white p-3">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Add context for your score (optional)</label>
+            {% if guide %}
+            <div class="mb-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-gray-600">Example note</p>
+              <p class="mt-1 text-xs text-gray-600">{{ guide.example_note }}</p>
+            </div>
+            {% endif %}
             {% for f in form %}
               {% if f.name == field.name|add:'_context_note' %}
                 {{ f }}
               {% endif %}
             {% endfor %}
+
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+              <div class="inline-flex overflow-hidden rounded-md border border-indigo-200 bg-indigo-50">
+              <button type="button"
+                      class="px-2.5 py-1.5 text-xs text-indigo-700 hover:bg-indigo-100 transition border-r border-indigo-200"
+                      onclick="enhanceContextNote('{{ field.name|escapejs }}', '{{ field.label|escapejs }}', 'summarize', this)">
+                Summarize
+              </button>
+              <button type="button"
+                      class="px-2.5 py-1.5 text-xs text-indigo-700 hover:bg-indigo-100 transition border-r border-indigo-200"
+                      onclick="enhanceContextNote('{{ field.name|escapejs }}', '{{ field.label|escapejs }}', 'rewrite', this)">
+                Rewrite
+              </button>
+              <button type="button"
+                      class="px-2.5 py-1.5 text-xs text-indigo-700 hover:bg-indigo-100 transition"
+                      onclick="enhanceContextNote('{{ field.name|escapejs }}', '{{ field.label|escapejs }}', 'specific', this)">
+                Make specific
+              </button>
+              </div>
+              <span id="{{ field.name }}_ai_status" class="text-xs text-gray-500 hidden"></span>
+            </div>
+
+            <div id="{{ field.name }}_ai_preview" class="mt-2 hidden rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2">
+              <p class="text-[11px] font-semibold uppercase tracking-wide text-indigo-700">AI suggestion</p>
+              <p id="{{ field.name }}_ai_preview_text" class="mt-1 text-xs text-gray-700"></p>
+              <div class="mt-2 flex items-center gap-2">
+                <button type="button"
+                        class="px-2.5 py-1.5 text-xs rounded-md bg-indigo-600 text-white hover:bg-indigo-700 transition"
+                        onclick="applyContextSuggestion('{{ field.name|escapejs }}')">
+                  Use this text
+                </button>
+                <button type="button"
+                        class="px-2.5 py-1.5 text-xs rounded-md border border-gray-300 text-gray-700 hover:bg-gray-100 transition"
+                        onclick="dismissContextSuggestion('{{ field.name|escapejs }}')">
+                  Dismiss
+                </button>
+              </div>
+            </div>
           </div>
+          {% endwith %}
         </div>
         {% endif %}
       {% endfor %}
@@ -224,6 +320,123 @@
 </style>
 
 <script>
+  const contextAiEndpoint = "{% url 'gtm:rewrite_context_note' session.uuid %}";
+
+  function getContextTextarea(fieldName) {
+    return document.querySelector(`textarea[name="${fieldName}_context_note"]`);
+  }
+
+  function setContextStatus(fieldName, text, isError) {
+    const statusEl = document.getElementById(`${fieldName}_ai_status`);
+    if (!statusEl) return;
+    statusEl.classList.remove('hidden', 'text-gray-500', 'text-red-600', 'text-indigo-700');
+    statusEl.classList.add(isError ? 'text-red-600' : 'text-indigo-700');
+    statusEl.textContent = text;
+  }
+
+  function clearContextStatus(fieldName) {
+    const statusEl = document.getElementById(`${fieldName}_ai_status`);
+    if (!statusEl) return;
+    statusEl.classList.add('hidden');
+    statusEl.textContent = '';
+  }
+
+  function showContextSuggestion(fieldName, text) {
+    const box = document.getElementById(`${fieldName}_ai_preview`);
+    const body = document.getElementById(`${fieldName}_ai_preview_text`);
+    if (!box || !body) return;
+    body.textContent = text;
+    box.classList.remove('hidden');
+  }
+
+  function dismissContextSuggestion(fieldName) {
+    const box = document.getElementById(`${fieldName}_ai_preview`);
+    if (box) box.classList.add('hidden');
+    clearContextStatus(fieldName);
+  }
+
+  function applyContextSuggestion(fieldName) {
+    const textarea = getContextTextarea(fieldName);
+    const previewTextEl = document.getElementById(`${fieldName}_ai_preview_text`);
+    if (!textarea || !previewTextEl) return;
+    textarea.value = previewTextEl.textContent || '';
+    dismissContextSuggestion(fieldName);
+  }
+
+  async function enhanceContextNote(fieldName, questionText, mode, buttonEl) {
+    const textarea = getContextTextarea(fieldName);
+    if (!textarea) return;
+
+    const noteText = (textarea.value || '').trim();
+    if (!noteText) {
+      setContextStatus(fieldName, 'Type a note first, then use AI.', true);
+      return;
+    }
+
+    clearContextStatus(fieldName);
+    setContextStatus(fieldName, 'AI is rewriting your note...', false);
+
+    const originalText = buttonEl ? buttonEl.textContent : '';
+    if (buttonEl) {
+      buttonEl.disabled = true;
+      buttonEl.textContent = 'Working...';
+    }
+
+    try {
+      const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+      const response = await fetch(contextAiEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrfToken,
+        },
+        body: JSON.stringify({
+          mode,
+          note_text: noteText,
+          question_text: questionText,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        setContextStatus(fieldName, data.error || 'Could not rewrite note right now.', true);
+        return;
+      }
+
+      showContextSuggestion(fieldName, data.rewritten_text || '');
+      setContextStatus(fieldName, 'Suggestion ready. Review and apply if it looks right.', false);
+    } catch (error) {
+      setContextStatus(fieldName, 'Could not reach AI service. Try again.', true);
+    } finally {
+      if (buttonEl) {
+        buttonEl.disabled = false;
+        buttonEl.textContent = originalText;
+      }
+    }
+  }
+
+  function openLegendModal() {
+    const modal = document.getElementById('legend-modal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeLegendModal() {
+    const modal = document.getElementById('legend-modal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+
+  document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape') {
+      closeLegendModal();
+    }
+  });
+
   // Use HTMX beforeRequest event to show loading state without blocking submission
   document.body.addEventListener('htmx:beforeRequest', function(event) {
     // Check if this is the assessment form being submitted

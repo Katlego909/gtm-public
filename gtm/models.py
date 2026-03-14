@@ -23,6 +23,7 @@ class Question(models.Model):
     text = models.TextField()
     weight = models.FloatField(default=1.0)  # per-question weight (e.g., 1.2)
     diagnostic_note = models.CharField(max_length=200, blank=True)
+    ai_metadata = models.JSONField(default=dict, blank=True, encoder=DjangoJSONEncoder)
     def __str__(self): return f"{self.id_code} – {self.text[:60]}"
 
 class AssessmentSession(models.Model):

@@ -343,21 +343,13 @@
         <div class="p-6 border-b border-gray-100">
             <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider">Notifications</h3>
         </div>
-        <div class="p-4 space-y-4 overflow-y-auto">
-            <div class="p-4 rounded-xl bg-red-50 border border-red-100 flex gap-3">
-                <div class="mt-1 w-2 h-2 rounded-full bg-red-500 flex-shrink-0"></div>
-                <div>
-                    <h4 class="text-sm font-bold text-gray-900">Subscription Expiring</h4>
-                    <p class="text-xs text-gray-600 mt-1 leading-relaxed">Your plan expires in 3 days.</p>
-                </div>
-            </div>
-             <div class="p-4 rounded-xl bg-yellow-50 border border-yellow-100 flex gap-3">
-                <div class="mt-1 w-2 h-2 rounded-full bg-yellow-500 flex-shrink-0"></div>
-                <div>
-                    <h4 class="text-sm font-bold text-gray-900">Pending Reviews</h4>
-                    <p class="text-xs text-gray-600 mt-1 leading-relaxed">You have <span id="sidebar-pending-count">{{ pending_items }}</span> items waiting.</p>
-                </div>
-            </div>
+        <div id="sidebar-notifications-panel"
+             class="p-4 overflow-y-auto"
+             hx-get="{% url 'notifications_panel' %}"
+             hx-include="#workspace-selector"
+             hx-trigger="load, refreshNotifications from:body"
+             hx-swap="innerHTML">
+            <div class="text-xs text-gray-500">Loading notifications...</div>
         </div>
     </aside>
 
@@ -501,6 +493,18 @@
         showDashboardToast(payload.message || 'Action completed.', payload.level || 'info');
     });
 
+    document.addEventListener('htmx:afterRequest', function(evt) {
+        const requestEl = evt.detail && evt.detail.elt ? evt.detail.elt : null;
+        const verb = ((evt.detail && evt.detail.requestConfig && evt.detail.requestConfig.verb) || 'get').toLowerCase();
+        if (!evt.detail.successful || !requestEl) return;
+        // Prevent feedback loops from GET-based live panels (polling/auto-refresh).
+        if (verb === 'get') return;
+        if (requestEl.closest('#main-content')) {
+            htmx.trigger(document.body, 'refreshNotifications');
+            htmx.trigger(document.body, 'refreshAgentActions');
+        }
+    });
+
     (function () {
         const launcher = document.getElementById('global-agent-launcher');
         const panel = document.getElementById('global-agent-panel');
@@ -637,6 +641,19 @@
                     return;
                 }
                 appendMessage(data.response || 'Done.', false);
+                if (data.intent === 'dashboard_action' && window.htmx) {
+                    htmx.trigger(document.body, 'refreshNotifications');
+                    htmx.trigger(document.body, 'refreshAgentActions');
+                    const actionItemsContainer = document.getElementById('action-items-container');
+                    if (actionItemsContainer) {
+                        const workspace = currentWorkspaceId();
+                        const qs = workspace ? `?workspace=${encodeURIComponent(workspace)}` : '';
+                        htmx.ajax('GET', `/dashboard/refresh-action-items/${qs}`, {
+                            target: '#action-items-container',
+                            swap: 'outerHTML',
+                        });
+                    }
+                }
             } catch (error) {
                 appendMessage('Error: Could not reach the agent service.', false);
             } finally {
