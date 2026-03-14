@@ -1,13 +1,13 @@
 {% extends "gtm/base.html" %}
 {% block content %}
 
-<div class="max-w-4xl mx-auto">
+<div class="app-shell max-w-4xl">
   <!-- Page Header -->
-  <div class="mb-8 text-center">
-    <h1 class="text-4xl font-bold mb-3 text-indigo-600">
+  <div class="app-page-header text-center">
+    <h1 class="app-page-title">
       Start Your GTM Assessment
     </h1>
-    <p class="text-gray-600 text-lg">
+    <p class="app-page-subtitle max-w-2xl mx-auto">
       Tell us about your company to get personalized insights and recommendations
     </p>
   </div>
@@ -19,13 +19,13 @@
         hx-select="#main-content"
         hx-swap="innerHTML swap:200ms"
         hx-push-url="true"
-        class="bg-white rounded-2xl shadow-lg border border-gray-200 p-8 space-y-6">
+        class="app-card p-8 space-y-8 md:p-10">
     {% csrf_token %}
 
     <!-- Company Basics Section -->
     <div class="space-y-4">
-      <div class="flex items-center gap-3 mb-4">
-        <div class="h-10 w-10 bg-indigo-600 rounded-lg flex items-center justify-center">
+      <div class="app-section-header">
+        <div class="app-icon-badge app-icon-badge--solid">
           <i class="fas fa-building text-white"></i>
         </div>
         <h2 class="text-xl font-bold text-gray-900">Company Information</h2>
@@ -35,7 +35,7 @@
         <label class="block text-sm font-semibold text-gray-700 mb-2">
           <i class="fas fa-briefcase text-indigo-600 mr-2"></i>Company Name <span class="text-red-500">*</span>
         </label>
-        <input required name="company_name" class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition" placeholder="Acme Inc.">
+        <input required name="company_name" class="app-input" placeholder="Acme Inc.">
       </div>
 
       <div class="grid md:grid-cols-2 gap-4">
@@ -43,21 +43,21 @@
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             <i class="fas fa-industry text-blue-600 mr-2"></i>Industry
           </label>
-          <input name="industry" class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition" placeholder="SaaS, Fintech, Healthcare, etc.">
+          <input name="industry" class="app-input" placeholder="SaaS, Fintech, Healthcare, etc.">
         </div>
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             <i class="fas fa-globe text-green-600 mr-2"></i>Website
           </label>
-          <input type="url" name="website" class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition" placeholder="https://example.com">
+          <input type="url" name="website" class="app-input" placeholder="https://example.com">
         </div>
       </div>
     </div>
 
     <!-- Contact Section -->
     <div class="space-y-4 pt-6 border-t border-gray-200">
-      <div class="flex items-center gap-3 mb-4">
-        <div class="h-10 w-10 bg-indigo-600 rounded-lg flex items-center justify-center">
+      <div class="app-section-header">
+        <div class="app-icon-badge app-icon-badge--solid">
           <i class="fas fa-user text-white"></i>
         </div>
         <h2 class="text-xl font-bold text-gray-900">Contact Details</h2>
@@ -68,19 +68,19 @@
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             <i class="fas fa-user-circle text-indigo-600 mr-2"></i>Contact Name
           </label>
-          <input name="contact_name" class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition" placeholder="John Doe">
+          <input name="contact_name" class="app-input" placeholder="John Doe">
         </div>
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             <i class="fas fa-envelope text-blue-600 mr-2"></i>Work Email
           </label>
-          <input type="email" name="contact_email" class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition" placeholder="john@example.com">
+          <input type="email" name="contact_email" class="app-input" placeholder="john@example.com">
         </div>
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             <i class="fas fa-id-badge text-green-600 mr-2"></i>Role / Title
           </label>
-          <input name="contact_role" class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition" placeholder="Head of Growth">
+          <input name="contact_role" class="app-input" placeholder="Head of Growth">
         </div>
       </div>
 
@@ -89,13 +89,13 @@
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             <i class="fas fa-phone text-orange-600 mr-2"></i>Phone
           </label>
-          <input type="tel" name="phone" class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition" placeholder="+1 (555) 000-0000">
+          <input type="tel" name="phone" class="app-input" placeholder="+1 (555) 000-0000">
         </div>
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             <i class="fas fa-users text-indigo-600 mr-2"></i>Company Size
           </label>
-          <select name="company_size" class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition">
+          <select name="company_size" class="app-select">
             <option value="">Select size</option>
             <option value="1-10">1-10 employees</option>
             <option value="11-50">11-50 employees</option>
@@ -108,7 +108,7 @@
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             <i class="fas fa-dollar-sign text-green-600 mr-2"></i>Revenue Range
           </label>
-          <select name="revenue_range" class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition">
+          <select name="revenue_range" class="app-select">
             <option value="">Select range</option>
             <option value="<$1M">Less than $1M</option>
             <option value="$1-5M">$1M - $5M</option>
@@ -124,21 +124,21 @@
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             <i class="fas fa-map-marker-alt text-red-600 mr-2"></i>Country
           </label>
-          <input name="country" class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition" placeholder="United States">
+          <input name="country" class="app-input" placeholder="United States">
         </div>
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             <i class="fas fa-database text-blue-600 mr-2"></i>CRM
           </label>
-          <input name="crm" class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition" placeholder="HubSpot, Salesforce, etc.">
+          <input name="crm" class="app-input" placeholder="HubSpot, Salesforce, etc.">
         </div>
       </div>
     </div>
 
     <!-- Additional Notes -->
     <div class="space-y-4 pt-6 border-t border-gray-200">
-      <div class="flex items-center gap-3 mb-4">
-        <div class="h-10 w-10 bg-indigo-600 rounded-lg flex items-center justify-center">
+      <div class="app-section-header">
+        <div class="app-icon-badge app-icon-badge--solid">
           <i class="fas fa-sticky-note text-white"></i>
         </div>
         <h2 class="text-xl font-bold text-gray-900">Additional Information</h2>
@@ -148,7 +148,7 @@
         <label class="block text-sm font-semibold text-gray-700 mb-2">
           <i class="fas fa-comment-dots text-indigo-600 mr-2"></i>Notes (optional)
         </label>
-        <textarea name="notes" rows="4" class="w-full border-2 border-gray-300 rounded-xl px-4 py-3 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition" placeholder="Share any specific goals, challenges, or context about your GTM strategy..."></textarea>
+        <textarea name="notes" rows="4" class="app-textarea" placeholder="Share any specific goals, challenges, or context about your GTM strategy..."></textarea>
       </div>
     </div>
 
@@ -159,7 +159,7 @@
 
     <!-- Submit Button -->
     <div class="pt-6 border-t border-gray-200">
-      <button type="submit" class="w-full bg-indigo-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-indigo-700 hover:shadow-xl transition transform hover:scale-105 flex items-center justify-center gap-3">
+      <button type="submit" class="app-primary-button w-full px-8 py-4 text-lg">
         <i class="fas fa-rocket"></i>
         Begin Assessment
         <i class="fas fa-arrow-right"></i>
@@ -173,22 +173,22 @@
 
   <!-- Info Cards -->
   <div class="grid md:grid-cols-3 gap-4 mt-8">
-    <div class="bg-indigo-50 rounded-xl p-6 border border-indigo-200">
-      <div class="h-12 w-12 bg-indigo-600 rounded-lg flex items-center justify-center mb-3">
+    <div class="app-accent-panel p-6">
+      <div class="app-icon-badge app-icon-badge--solid h-12 w-12 mb-3 rounded-lg">
         <i class="fas fa-clock text-white text-xl"></i>
       </div>
       <h3 class="font-bold text-gray-900 mb-1">10 Minutes</h3>
       <p class="text-sm text-gray-600">Quick assessment that fits your schedule</p>
     </div>
-    <div class="bg-indigo-50 rounded-xl p-6 border border-indigo-200">
-      <div class="h-12 w-12 bg-indigo-600 rounded-lg flex items-center justify-center mb-3">
+    <div class="app-accent-panel p-6">
+      <div class="app-icon-badge app-icon-badge--solid h-12 w-12 mb-3 rounded-lg">
         <i class="fas fa-brain text-white text-xl"></i>
       </div>
       <h3 class="font-bold text-gray-900 mb-1">AI-Powered</h3>
       <p class="text-sm text-gray-600">Personalized insights from advanced AI</p>
     </div>
-    <div class="bg-indigo-50 rounded-xl p-6 border border-indigo-200">
-      <div class="h-12 w-12 bg-indigo-600 rounded-lg flex items-center justify-center mb-3">
+    <div class="app-accent-panel p-6">
+      <div class="app-icon-badge app-icon-badge--solid h-12 w-12 mb-3 rounded-lg">
         <i class="fas fa-file-pdf text-white text-xl"></i>
       </div>
       <h3 class="font-bold text-gray-900 mb-1">Full Report</h3>

@@ -9,22 +9,20 @@
     overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
   }
   .rating-label {
-    display:flex; align-items:center; justify-content:center; width:100%; padding:0.75rem 1rem; border:2px solid #e5e7eb;
-    border-radius:0.75rem; background:#fff; color:#374151; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; width:100%; padding:0.75rem 1rem; border:1px solid #d1d5db;
+    border-radius:0.875rem; background:#fff; color:#374151; cursor:pointer;
     transition:all .2s ease; font-weight:500; text-align:center;
   }
   .rating-label:hover { 
-    border-color:#6366f1; 
-    background:#f0f9ff;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    border-color:#818cf8; 
+    background:#eef2ff;
   }
   /* Turn label into a selected pill when its radio is checked */
   .rating-input:checked + .rating-label { 
-    background: linear-gradient(135deg, #6366f1 0%, #3b82f6 100%);
+    background: #4f46e5;
     color:#fff; 
-    border-color:#6366f1;
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+    border-color:#4f46e5;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.24);
   }
   
   @keyframes slideInUp {
@@ -50,12 +48,12 @@
   .question-item:nth-child(5) { animation-delay: 0.5s; }
 </style>
 
-<div class="max-w-4xl mx-auto">
+<div class="app-shell max-w-4xl">
   <!-- Progress Header -->
   <div class="mb-8">
     <div class="flex items-center justify-between mb-3">
       <div class="flex items-center gap-3">
-        <div class="h-12 w-12 bg-indigo-600 rounded-xl flex items-center justify-center">
+        <div class="app-icon-badge app-icon-badge--solid h-12 w-12 rounded-xl">
           <i class="fas fa-clipboard-check text-white text-xl"></i>
         </div>
         <div>
@@ -70,18 +68,18 @@
     </div>
     
     <!-- Progress Bar -->
-    <div class="w-full bg-gray-200 rounded-full h-3 shadow-inner overflow-hidden">
-      <div class="bg-indigo-600 h-3 rounded-full transition-all duration-500 shadow-lg" 
+    <div class="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+      <div class="bg-indigo-600 h-2 rounded-full transition-all duration-500" 
            style="width: {{ progress_pct }}%"></div>
     </div>
   </div>
 
   <!-- Main Content Card -->
-  <div class="bg-white rounded-2xl shadow-xl border border-gray-200 p-8 md:p-10">
+  <div class="app-card p-8 md:p-10">
     <!-- Category Header -->
     <div class="mb-8 pb-6 border-b border-gray-200">
       <div class="flex items-center gap-3 mb-3">
-        <div class="h-10 w-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+        <div class="app-icon-badge">
           <i class="fas fa-folder-open text-indigo-600"></i>
         </div>
         <h2 class="text-2xl font-bold text-gray-900">{{ category.name }}</h2>
@@ -118,7 +116,7 @@
           </ul>
         </div>
         <div class="px-5 py-4 border-t border-gray-200 flex justify-end">
-          <button type="button" onclick="closeLegendModal()" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition">Got it</button>
+          <button type="button" onclick="closeLegendModal()" class="app-primary-button px-4 py-2 text-sm">Got it</button>
         </div>
       </div>
     </div>
@@ -136,14 +134,14 @@
 
       {% for field in form %}
         {% if '_context_note' not in field.name %}
-        <div class="question-item bg-gray-50 rounded-xl p-6 border border-gray-200 hover:border-indigo-300 transition">
+        <div class="question-item app-card-soft p-6 transition-colors hover:border-indigo-200">
           {% with guide=question_guidance|get_item:field.name %}
           <label class="block text-base font-semibold text-gray-800 mb-4">
             <span>{{ field.label }}</span>
           </label>
 
           {% if guide %}
-          <div class="mb-4 rounded-xl border border-indigo-100 bg-indigo-50/70 p-4">
+          <div class="app-muted-note mb-4 p-4">
             <p class="text-sm font-semibold text-indigo-900">Quick tip: <span class="font-normal text-gray-800">{{ guide.quick_help }}</span></p>
 
             <details class="mt-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
@@ -249,7 +247,7 @@
               <p id="{{ field.name }}_ai_preview_text" class="mt-1 text-xs text-gray-700"></p>
               <div class="mt-2 flex items-center gap-2">
                 <button type="button"
-                        class="px-2.5 py-1.5 text-xs rounded-md bg-indigo-600 text-white hover:bg-indigo-700 transition"
+                        class="app-primary-button px-2.5 py-1.5 text-xs rounded-md"
                         onclick="applyContextSuggestion('{{ field.name|escapejs }}')">
                   Use this text
                 </button>
@@ -275,14 +273,14 @@
              hx-select="#main-content"
              hx-swap="innerHTML swap:200ms"
              hx-push-url="true"
-             class="px-6 py-3 border-2 border-gray-300 rounded-xl font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition flex items-center gap-2">
+             class="app-secondary-button px-6 py-3 flex items-center gap-2">
             <i class="fas fa-arrow-left"></i>
             Back
           </a>
         {% endif %}
         <button type="submit" 
                 id="submitBtn"
-                class="flex-1 px-8 py-4 rounded-xl bg-indigo-600 text-white font-bold text-lg hover:bg-indigo-700 hover:shadow-xl transition transform hover:scale-105 flex items-center justify-center gap-3">
+                class="app-primary-button flex-1 px-8 py-4 text-lg">
           {% if step == total_steps %}
             <i class="fas fa-check-circle" id="submitIcon"></i>
             <span id="submitText">Finish Assessment</span>
@@ -296,9 +294,9 @@
   </div>
 
   <!-- Help Card -->
-  <div class="mt-6 bg-indigo-50 rounded-xl p-6 border border-indigo-200">
+  <div class="mt-6 app-accent-panel p-6">
     <div class="flex items-start gap-4">
-      <div class="h-12 w-12 bg-indigo-600 rounded-lg flex items-center justify-center shrink-0">
+      <div class="app-icon-badge app-icon-badge--solid h-12 w-12 rounded-lg shrink-0">
         <i class="fas fa-lightbulb text-white text-xl"></i>
       </div>
       <div>

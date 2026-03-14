@@ -30,6 +30,16 @@
     :root {
       --font-body: 'Inter', sans-serif;
       --font-heading: 'Inter', sans-serif;
+      --accent-50: #eef2ff;
+      --accent-100: #e0e7ff;
+      --accent-200: #c7d2fe;
+      --accent-300: #a5b4fc;
+      --accent-400: #818cf8;
+      --accent-500: #6366f1;
+      --accent-600: #4f46e5;
+      --accent-700: #4338ca;
+      --accent-800: #3730a3;
+      --accent-900: #312e81;
     }
 
     body {
@@ -42,11 +52,160 @@
       font-family: var(--font-heading);
       letter-spacing: -0.02em;
     }
+
+    .app-shell {
+      max-width: 72rem;
+      margin: 0 auto;
+    }
+
+    .app-page-header {
+      margin-bottom: 2rem;
+    }
+
+    .app-page-title {
+      font-size: 2.25rem;
+      line-height: 1.15;
+      font-weight: 700;
+      color: var(--accent-600);
+    }
+
+    .app-page-subtitle {
+      margin-top: 0.5rem;
+      font-size: 1rem;
+      line-height: 1.6;
+      color: #6b7280;
+    }
+
+    .app-card {
+      background: #ffffff;
+      border: 1px solid #f3f4f6;
+      border-radius: 1rem;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    }
+
+    .app-card-soft {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 1rem;
+    }
+
+    .app-accent-panel {
+      background: #eef2ff;
+      border: 1px solid #e0e7ff;
+      border-radius: 1rem;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    }
+
+    .app-section-header {
+      display: flex;
+      align-items: center;
+      gap: 0.875rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .app-icon-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 0.75rem;
+      background: var(--accent-100);
+      color: var(--accent-600);
+    }
+
+    .app-icon-badge--solid {
+      background: var(--accent-600);
+      color: #ffffff;
+    }
+
+    .app-primary-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.625rem;
+      border-radius: 0.75rem;
+      background: var(--accent-600);
+      color: #ffffff;
+      font-weight: 500;
+      transition: background-color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    }
+
+    .app-primary-button:hover {
+      background: var(--accent-700);
+    }
+
+    .app-secondary-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.625rem;
+      border-radius: 0.75rem;
+      border: 1px solid #d1d5db;
+      background: #ffffff;
+      color: #374151;
+      font-weight: 500;
+      transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    }
+
+    .app-secondary-button:hover {
+      background: #f9fafb;
+      border-color: var(--accent-500);
+      color: var(--accent-600);
+    }
+
+    .app-input,
+    .app-select,
+    .app-textarea {
+      width: 100%;
+      border: 1px solid #d1d5db;
+      border-radius: 0.75rem;
+      background: #ffffff;
+      color: #111827;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+    }
+
+    .app-input,
+    .app-select {
+      padding: 0.875rem 1rem;
+    }
+
+    .app-textarea {
+      padding: 0.875rem 1rem;
+      min-height: 7rem;
+      resize: vertical;
+    }
+
+    .app-input:focus,
+    .app-select:focus,
+    .app-textarea:focus {
+      outline: none;
+      border-color: var(--accent-400);
+      box-shadow: 0 0 0 4px rgba(227, 220, 251, 0.75);
+    }
+
+    .app-muted-note {
+      border: 1px solid var(--accent-100);
+      background: rgba(238, 242, 255, 0.75);
+      border-radius: 1rem;
+    }
+
+    .app-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
   </style>
 
   {% comment %} {% tailwind_css %} {% endcomment %}
 </head>
-<body class="bg-gray-50 text-gray-900">
+<body class="bg-slate-50 text-gray-900">
   <!-- Modern Navigation Bar -->
   <nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-lg border-b border-gray-200 shadow-sm">
     <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
