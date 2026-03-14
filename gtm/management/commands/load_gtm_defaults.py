@@ -58,9 +58,9 @@ QUESTIONS: Dict[str, List[Dict]] = {
     "Demand": [
         {
             "id_code": "DEM-ICP-01",
-            "text": "We maintain a documented Ideal Customer Profile (ICP) with explicit inclusion and exclusion criteria, reviewed quarterly.",
+            "text": "We have a simple written profile of our ideal customer, including who is a strong fit and who is not, and we review it every quarter so all teams stay aligned.",
             "weight": 1.25,
-            "diagnostic_note": "Without a living ICP, pipeline quality drifts and teams optimize for volume over fit.",
+            "diagnostic_note": "If this is unclear, teams chase more leads instead of the right leads.",
             "ai_metadata": {
                 "pillar": "Demand",
                 "dimension": "ICP Clarity",
@@ -74,9 +74,9 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEM-FIT-02",
-            "text": "At least 60% of inbound leads match ICP criteria based on objective qualification fields.",
+            "text": "At least 6 out of 10 new inbound leads match our ideal customer profile, and we can verify this with clear qualification fields in our CRM.",
             "weight": 1.2,
-            "diagnostic_note": "Low ICP fit indicates message-channel mismatch and inflates CAC with poor-conversion leads.",
+            "diagnostic_note": "If lead fit is low, spend goes up and conversion goes down.",
             "ai_metadata": {
                 "pillar": "Demand",
                 "dimension": "Lead Quality",
@@ -90,9 +90,9 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEM-MSG-03",
-            "text": "Our core value proposition is tested by segment and reflected consistently across website, outbound, and sales assets.",
+            "text": "Our core value message is easy to understand, tested with each target segment, and used consistently across our website, outbound messages, and sales materials.",
             "weight": 1.15,
-            "diagnostic_note": "Inconsistent messaging creates conversion drag across the full funnel.",
+            "diagnostic_note": "If the message is inconsistent, fewer buyers move forward.",
             "ai_metadata": {
                 "pillar": "Demand",
                 "dimension": "Positioning",
@@ -106,9 +106,9 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEM-CHN-04",
-            "text": "We have a documented channel mix with target CAC and pipeline contribution by channel, reviewed monthly.",
+            "text": "We have a clear channel plan that shows expected customer acquisition cost and pipeline contribution for each channel, and we review performance every month.",
             "weight": 1.1,
-            "diagnostic_note": "Lack of channel economics causes random spend and poor compounding in demand generation.",
+            "diagnostic_note": "Without this, channel spend becomes guesswork.",
             "ai_metadata": {
                 "pillar": "Demand",
                 "dimension": "Channel Strategy",
@@ -122,9 +122,9 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEM-ATT-05",
-            "text": "We can attribute pipeline and revenue using first-touch and influenced-touch reporting with acceptable data quality.",
+            "text": "We can clearly see which channel first brought a lead in and which channels later influenced the deal, using reporting data we trust.",
             "weight": 1.2,
-            "diagnostic_note": "Attribution blind spots prevent confident budget allocation and channel scaling decisions.",
+            "diagnostic_note": "Without clear attribution, it is hard to know where to invest.",
             "ai_metadata": {
                 "pillar": "Demand",
                 "dimension": "Attribution",
@@ -138,9 +138,9 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEM-CNT-06",
-            "text": "We run a consistent content or outbound cadence tied to target accounts and measurable pipeline goals.",
+            "text": "We run content or outbound work on a regular schedule, not randomly, and each activity is tied to target accounts and clear pipeline goals.",
             "weight": 1.0,
-            "diagnostic_note": "Irregular execution limits demand predictability and slows learning loops.",
+            "diagnostic_note": "If execution is irregular, pipeline becomes harder to predict.",
             "ai_metadata": {
                 "pillar": "Demand",
                 "dimension": "Execution Cadence",
@@ -156,9 +156,9 @@ QUESTIONS: Dict[str, List[Dict]] = {
     "Conversion": [
         {
             "id_code": "CON-SLA-01",
-            "text": "We enforce a speed-to-lead SLA by source and track median first-response time weekly.",
+            "text": "We set clear response-time targets for new leads by source, and we check every week how quickly reps reply so high-intent leads are not lost.",
             "weight": 1.2,
-            "diagnostic_note": "Slow response time directly reduces meeting rates and win probability.",
+            "diagnostic_note": "Slow replies reduce meetings and close rates.",
             "ai_metadata": {
                 "pillar": "Conversion",
                 "dimension": "Speed to Lead",
@@ -172,9 +172,9 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "CON-QLF-02",
-            "text": "Qualification uses a standardized framework with required CRM fields before opportunities are advanced.",
+            "text": "We use one shared qualification checklist for all leads, and required CRM fields must be completed before an opportunity can move to the next stage.",
             "weight": 1.15,
-            "diagnostic_note": "Weak qualification clogs pipeline with low-probability deals and distorts forecasting.",
+            "diagnostic_note": "Weak qualification fills pipeline with poor-fit deals.",
             "ai_metadata": {
                 "pillar": "Conversion",
                 "dimension": "Qualification",
@@ -188,9 +188,9 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "CON-STG-03",
-            "text": "Pipeline stage definitions are objective, and stage conversion rates are reviewed with sales leadership every month.",
+            "text": "Each pipeline stage has clear entry and exit rules, and sales leaders review stage-to-stage conversion rates monthly to spot bottlenecks early.",
             "weight": 1.1,
-            "diagnostic_note": "Subjective stage progression inflates pipeline health and undermines forecast trust.",
+            "diagnostic_note": "If stage rules are unclear, forecasts become unreliable.",
             "ai_metadata": {
                 "pillar": "Conversion",
                 "dimension": "Pipeline Hygiene",
@@ -204,9 +204,9 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "CON-OBJ-04",
-            "text": "Top objections and competitive risks are codified in a playbook and reinforced through coaching.",
+            "text": "We keep a simple playbook of common buyer objections and competitor risks, and managers coach the team on it so responses stay consistent.",
             "weight": 1.0,
-            "diagnostic_note": "Without objection intelligence, reps improvise and conversion becomes rep-dependent.",
+            "diagnostic_note": "Without this, reps answer objections inconsistently.",
             "ai_metadata": {
                 "pillar": "Conversion",
                 "dimension": "Deal Enablement",
@@ -220,9 +220,9 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "CON-WNL-05",
-            "text": "Win-loss reasons are captured in structured fields and turned into monthly process experiments.",
+            "text": "We capture why deals are won or lost in structured fields, then use those patterns in a monthly review to run focused improvement experiments.",
             "weight": 1.1,
-            "diagnostic_note": "No win-loss loop means recurring deal blockers remain unresolved.",
+            "diagnostic_note": "If win/loss reasons are not tracked, the same problems repeat.",
             "ai_metadata": {
                 "pillar": "Conversion",
                 "dimension": "Win-Loss Learning",
@@ -236,9 +236,9 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "CON-PGE-06",
-            "text": "Key conversion pages and forms are tested with hypothesis-driven experiments and tracked for lift.",
+            "text": "We run regular tests on key conversion pages and forms, using clear hypotheses and success metrics, and we track whether results improve.",
             "weight": 1.0,
-            "diagnostic_note": "Static funnels fail to improve as buyer behavior changes.",
+            "diagnostic_note": "Without regular tests, conversion pages get stale.",
             "ai_metadata": {
                 "pillar": "Conversion",
                 "dimension": "Funnel Optimization",
@@ -254,9 +254,9 @@ QUESTIONS: Dict[str, List[Dict]] = {
     "Delivery": [
         {
             "id_code": "DEL-TTV-01",
-            "text": "We measure and actively reduce time-to-first-value (TTV) for new customers by segment.",
+            "text": "We track how long it takes new customers to get their first real value, by segment, and we actively work to shorten that time.",
             "weight": 1.2,
-            "diagnostic_note": "Long TTV increases churn risk before value perception is established.",
+            "diagnostic_note": "If first value takes too long, churn risk rises.",
             "ai_metadata": {
                 "pillar": "Delivery",
                 "dimension": "Time to Value",
@@ -270,9 +270,9 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEL-ONB-02",
-            "text": "Onboarding has clear milestones, owners, and completion SLAs that are tracked in a shared system.",
+            "text": "Our onboarding process has clear milestones, clear owners, and realistic completion targets, and progress is tracked in one shared system.",
             "weight": 1.1,
-            "diagnostic_note": "Unstructured onboarding creates inconsistent activation and support burden.",
+            "diagnostic_note": "Poor onboarding slows activation and increases support load.",
             "ai_metadata": {
                 "pillar": "Delivery",
                 "dimension": "Onboarding Discipline",
@@ -286,9 +286,9 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEL-HLT-03",
-            "text": "Customer health is scored using usage, engagement, and support signals, with proactive playbooks for at-risk accounts.",
+            "text": "We score customer health using product usage, engagement, and support signals, and we use clear playbooks to act early on at-risk accounts.",
             "weight": 1.15,
-            "diagnostic_note": "Without health signals, churn is detected too late for recovery.",
+            "diagnostic_note": "Without health signals, risk is found too late.",
             "ai_metadata": {
                 "pillar": "Delivery",
                 "dimension": "Health Monitoring",
@@ -302,9 +302,9 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEL-RET-04",
-            "text": "Gross and net retention are reviewed monthly by cohort, with specific interventions for declining segments.",
+            "text": "We review gross and net retention by cohort every month, and we launch targeted actions quickly when any segment starts to decline.",
             "weight": 1.2,
-            "diagnostic_note": "Retention blind spots erode growth and hide delivery experience issues.",
+            "diagnostic_note": "If retention drops go unseen, growth slows quietly.",
             "ai_metadata": {
                 "pillar": "Delivery",
                 "dimension": "Retention",
@@ -318,9 +318,9 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEL-QBR-05",
-            "text": "High-value customers receive regular business reviews tied to outcomes, roadmap alignment, and expansion opportunities.",
+            "text": "Our high-value customers receive regular business reviews focused on outcomes, roadmap alignment, and practical expansion opportunities.",
             "weight": 1.0,
-            "diagnostic_note": "No strategic customer cadence weakens expansion and long-term account stability.",
+            "diagnostic_note": "Without regular reviews, expansion opportunities are missed.",
             "ai_metadata": {
                 "pillar": "Delivery",
                 "dimension": "Success Governance",
@@ -334,9 +334,9 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEL-ADV-06",
-            "text": "We systematically capture customer proof points (quotes, case studies, references) after validated value outcomes.",
+            "text": "After customers achieve clear value, we consistently capture proof points like quotes, case studies, and references to support future selling.",
             "weight": 0.95,
-            "diagnostic_note": "Weak advocacy capture reduces trust signals and limits conversion leverage.",
+            "diagnostic_note": "If proof points are not captured, future buyers trust you less.",
             "ai_metadata": {
                 "pillar": "Delivery",
                 "dimension": "Advocacy",

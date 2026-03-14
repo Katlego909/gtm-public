@@ -89,57 +89,57 @@ def _build_question_guidance(question: Question) -> dict:
     q_text = (question.text or "").lower()
 
     evidence_hint_map = {
-        "system-data": "Use what your systems show: CRM reports, dashboards, or tracked metrics.",
-        "quantitative": "Use real numbers from the last 30 to 90 days instead of a gut feel.",
-        "qualitative": "Use team knowledge and documented process notes if hard metrics are not available.",
+        "system-data": "Use system data: CRM, dashboards, or tracked metrics.",
+        "quantitative": "Use recent numbers, not guesses.",
+        "qualitative": "Use team knowledge and written process notes.",
     }
     role_hint_map = {
-        "marketing": "You may need input from marketing or demand generation owners.",
-        "sales": "You may need input from sales leadership or frontline reps.",
-        "cs": "You may need input from customer success or account management.",
-        "revops": "You may need input from RevOps/data owners for accurate reporting.",
-        "founder": "Leadership context may be needed for strategy and prioritization.",
+        "marketing": "Ask marketing or demand generation.",
+        "sales": "Ask sales managers or reps.",
+        "cs": "Ask customer success or account managers.",
+        "revops": "Ask RevOps or data owners.",
+        "founder": "Ask leadership for strategy context.",
     }
 
     horizon_hint_map = {
-        "current": "Score based on your current process today.",
-        "30d": "Use evidence from the last 30 days where possible.",
-        "90d": "Use evidence from the last 90 days where possible.",
-        "12m": "Use longer-term trend evidence (up to 12 months) where relevant.",
+        "current": "Score your process as it is today.",
+        "30d": "Use data from the last 30 days.",
+        "90d": "Use data from the last 90 days.",
+        "12m": "Use trend data from the last 12 months.",
     }
 
-    quick_help = f"{horizon_hint_map.get(time_horizon, horizon_hint_map['current'])} Keep your score practical, not aspirational."
+    quick_help = f"{horizon_hint_map.get(time_horizon, horizon_hint_map['current'])} Score what is true, not ideal."
 
     # Keep examples specific to the type of question so users can mirror the format.
     if "icp" in dimension or "ideal customer" in q_text:
-        example_note = "We updated our ICP in January and now require industry, company size, and buyer role fields on every lead."
+        example_note = "We updated our ICP and now require industry, company size, and buyer role on each lead."
     elif "attribution" in dimension or "utm" in q_text or "source" in q_text:
-        example_note = "Only 62% of leads have complete source tagging; paid social and referrals are often marked as direct."
+        example_note = "Only 62% of leads have full source tags; paid social and referrals are often marked direct."
     elif "speed to lead" in dimension or "response" in q_text:
-        example_note = "Median first response is 9 hours for web leads and 2 days for email leads; no SLA alerts exist yet."
+        example_note = "Median first response is 9 hours for web leads and 2 days for email leads; no SLA alerts yet."
     elif "qualification" in dimension or "qualif" in q_text:
-        example_note = "Reps use different qualification criteria; only budget and timeline are captured consistently in CRM."
+        example_note = "Reps use different qualification rules; only budget and timeline are captured consistently."
     elif "pipeline" in dimension or "stage" in q_text:
-        example_note = "Stage definitions are unclear and opportunities are moved forward without documented exit criteria."
+        example_note = "Stage definitions are unclear, so opportunities move forward without clear exit rules."
     elif "win-loss" in dimension or "win" in q_text or "loss" in q_text:
-        example_note = "Closed-lost reasons are mostly free text, so we cannot reliably see top loss patterns month to month."
+        example_note = "Closed-lost reasons are mostly free text, so we cannot track top loss patterns clearly."
     elif "time to value" in dimension or "ttv" in q_text:
-        example_note = "Time to first value averages 28 days and varies widely by segment due to inconsistent onboarding steps."
+        example_note = "Time to first value averages 28 days and varies by segment because onboarding is inconsistent."
     elif "retention" in dimension or "renew" in q_text:
-        example_note = "We review renewals quarterly, but churn reasons are not tracked by segment so interventions are reactive."
+        example_note = "We review renewals quarterly, but churn reasons are not tracked by segment, so actions are reactive."
     elif "health" in dimension or "customer health" in q_text:
         example_note = "We do not have a formal health score; risk is identified manually from support tickets and low usage."
     elif "advocacy" in dimension or "testimonial" in q_text or "review" in q_text:
-        example_note = "We request testimonials informally, so only a few customer quotes were captured in the last quarter."
+        example_note = "We request testimonials informally, so only a few quotes were captured last quarter."
     else:
-        example_note = "Our process exists but is inconsistent across teams, and we do not review this metric on a fixed cadence yet."
+        example_note = "Our process exists but is inconsistent across teams, and this metric is not reviewed regularly."
 
     return {
         "plain_question": _expand_gtm_jargon(question.text),
         "quick_help": quick_help,
-        "why_this_matters": question.diagnostic_note or "This helps identify where GTM execution is blocking growth.",
+        "why_this_matters": _expand_gtm_jargon(question.diagnostic_note) or "This shows where execution is blocking growth.",
         "how_to_answer": evidence_hint_map.get(evidence_type, evidence_hint_map["qualitative"]),
-        "who_to_ask": role_hint_map.get(owner_role, "Ask the teammate closest to this part of your GTM process."),
+        "who_to_ask": role_hint_map.get(owner_role, "Ask the teammate closest to this process."),
         "example_note": example_note,
     }
 
