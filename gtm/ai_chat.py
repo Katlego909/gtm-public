@@ -9,10 +9,11 @@ Supports commands, queries, and contextual help.
 import logging
 import json
 import re
+from collections import Counter
 from typing import Dict, Any, Optional, List
 from django.conf import settings
 from django.shortcuts import get_object_or_404
-from .models import AssessmentSession, ResultSnapshot, Response, Question, Category, ActionItem
+from .models import AssessmentSession, ResultSnapshot, Response, Question, Category, ActionItem, ChatMessage
 from .views import _compute_scores, _band_for_score
 from .agent_services import build_execution_plan, review_action_items
 from .utils_logging import log_ai_error
@@ -89,7 +90,7 @@ INTENTS = {
         "quarter", "next.*month"
     ],
     "export_report": [
-        "export", "download", "send", "email", "pdf", "report"
+        "export", "download", "send.*report", "email.*report", "pdf report", "download.*pdf"
     ],
     "schedule_meeting": [
         "schedule", "meeting", "book", "calendar", "google meet", "zoom",
@@ -112,6 +113,123 @@ def detect_intent(message: str) -> str:
                 return intent
     
     return "general_chat"
+
+
+ATTACHMENT_CONTENT_QUERY_PATTERNS = [
+    r"what.*in.*pdf",
+    r"what.*in.*file",
+    r"summari[sz]e.*pdf",
+    r"summari[sz]e.*file",
+    r"extract.*from.*pdf",
+    r"extract.*from.*file",
+    r"review.*attachment",
+    r"analy[sz]e.*attachment",
+]
+
+EXPLICIT_ASSESSMENT_QUERY_PATTERNS = [
+    r"\bscore\b",
+    r"\bassessment\b",
+    r"\bstage\b",
+    r"\bplaybook\b",
+    r"\baction item\b",
+]
+
+
+def _tokenize_for_match(text: str) -> List[str]:
+    return [token for token in re.findall(r"[a-z0-9]{3,}", (text or "").lower())]
+
+
+def _get_recent_attachment_context(session: AssessmentSession, max_items: int = 8) -> str:
+    """Build lightweight context from recent attachment excerpts for follow-up questions."""
+    recent_chats = ChatMessage.objects.filter(session=session).order_by('-created_at')[:30]
+    parts: List[str] = []
+    seen_signatures = set()
+
+    for chat in recent_chats:
+        for item in (chat.attachments or []):
+            name = str(item.get('name') or 'attachment').strip()
+            excerpt = str(item.get('excerpt') or '').strip()
+            if not excerpt:
+                continue
+            signature = f"{name}:{excerpt[:120]}"
+            if signature in seen_signatures:
+                continue
+            seen_signatures.add(signature)
+            parts.append(f"Attachment: {name}\nExtracted content excerpt:\n{excerpt}")
+            if len(parts) >= max_items:
+                return "\n\n---\n\n".join(parts)
+
+    return "\n\n---\n\n".join(parts)
+
+
+def _select_relevant_attachment_sections(
+    message: str,
+    attachment_context: str,
+    max_sections: int = 4,
+    max_total_chars: int = 5000,
+) -> str:
+    """Select attachment sections relevant to the user query using lightweight lexical scoring."""
+    context_text = (attachment_context or '').strip()
+    if not context_text:
+        return ''
+
+    sections = [section.strip() for section in context_text.split("\n\n---\n\n") if section.strip()]
+    if not sections:
+        return ''
+
+    query_tokens = _tokenize_for_match(message)
+    token_weights = Counter(query_tokens)
+
+    scored_sections = []
+    for index, section in enumerate(sections):
+        section_tokens = set(_tokenize_for_match(section))
+        overlap_score = sum(token_weights[token] for token in section_tokens if token in token_weights)
+        scored_sections.append((overlap_score, -index, section))
+
+    scored_sections.sort(reverse=True)
+    picked: List[str] = []
+    total_len = 0
+    for score, _inv_idx, section in scored_sections:
+        if len(picked) >= max_sections:
+            break
+        # If no lexical overlap at all, keep only the first section as fallback context.
+        if score <= 0 and picked:
+            continue
+        remaining = max_total_chars - total_len
+        if remaining <= 0:
+            break
+        clipped = section[:remaining]
+        picked.append(clipped)
+        total_len += len(clipped)
+
+    if not picked:
+        return sections[0][:max_total_chars]
+    return "\n\n---\n\n".join(picked)
+
+
+def should_force_attachment_general_chat(
+    message: str,
+    intent: str,
+    supplemental_context: str,
+) -> bool:
+    """Use general chat when a file question should be answered from attachment context."""
+    if not (supplemental_context or "").strip():
+        return False
+
+    message_lower = (message or "").lower().strip()
+    if any(re.search(pattern, message_lower) for pattern in ATTACHMENT_CONTENT_QUERY_PATTERNS):
+        return True
+
+    # If a file is attached and user asks directly about "pdf" or "file" content,
+    # avoid accidental export intent routing.
+    if intent == "export_report" and any(token in message_lower for token in ["pdf", "file", "attachment"]):
+        return True
+
+    if any(re.search(pattern, message_lower) for pattern in EXPLICIT_ASSESSMENT_QUERY_PATTERNS):
+        return False
+
+    # With attachment context present, default to general chat for non-explicit assessment queries.
+    return intent not in {"execution_plan", "review_action_items", "schedule_meeting"}
 
 # ================================================================
 # CONTEXT BUILDER
@@ -481,7 +599,12 @@ _Need a different time? Just let me know what works best for you._
 # ================================================================
 # AI-POWERED GENERAL CHAT
 # ================================================================
-def handle_general_chat(session: AssessmentSession, context: Dict, message: str) -> str:
+def handle_general_chat(
+    session: AssessmentSession,
+    context: Dict,
+    message: str,
+    supplemental_context: str = "",
+) -> str:
     """Use Gemini for general conversational queries with full context awareness"""
     model = _init_gemini_chat()
     
@@ -503,6 +626,8 @@ def handle_general_chat(session: AssessmentSession, context: Dict, message: str)
     
     # Build a rich system prompt with COMPLETE context, including user-provided context notes
     context_notes_text = "\n".join(context.get('context_notes', []))
+    has_attachment_context = bool((supplemental_context or '').strip())
+
     system_prompt = f"""You are an expert Go-To-Market consultant directly assisting {context['company_name']} in the {context['industry']} industry.
 
 CRITICAL: You have COMPLETE access to their assessment data. NEVER say you don't know or can't access information. Always answer using the data provided below.
@@ -536,6 +661,9 @@ AI Playbook Available: {"Yes" if context['has_playbook'] else "No"}
 === USER-PROVIDED CONTEXT NOTES ===
 {context_notes_text if context_notes_text else 'No extra context provided.'}
 
+=== ATTACHMENT CONTEXT (EXTRACTED) ===
+{supplemental_context if supplemental_context else 'No file or image attachments were provided for this message.'}
+
 === YOUR INSTRUCTIONS ===
 1. ALWAYS answer questions using the specific data above
 2. If asked about company name, industry, scores, etc. - provide the EXACT information from above
@@ -544,6 +672,8 @@ AI Playbook Available: {"Yes" if context['has_playbook'] else "No"}
 5. Keep responses under 250 words unless more detail is needed
 6. Use markdown formatting (bold, bullets, headings)
 7. NEVER say "I don't have access" or "I can't see" - you have ALL the data above
+8. If attachment context is provided and the user asks about files/documents/PDFs, prioritize attachment context first and answer from it.
+9. For file questions, do not default to assessment-only answers when attachment context contains relevant information.
 
 === USER'S QUESTION ===
 {message}
@@ -603,12 +733,24 @@ Provide a helpful, specific answer using the assessment data above:"""
             return f"**Quick 30-60-90 Day Plan:**\n\n**Days 1-30:** Focus on {context['weakest_categories'][0]['name']}\n**Days 31-60:** Build systems and track metrics\n**Days 61-90:** Optimize and scale\n\n**Goal:** Increase your score from {context['overall_score']} to {min(100, int(context['overall_score']) + 15)} points!"
         
         # Default fallback with actual data
+        if has_attachment_context:
+            preview = supplemental_context.strip()[:900]
+            return (
+                "I could not complete full analysis right now, but here is extracted file context I can already use:\n\n"
+                f"{preview}"
+            )
+
         return f"I'm currently experiencing high demand (AI quota limit). Here's what I can tell you:\n\n**Your GTM Score:** {context['overall_score']}/100\n**Stage:** {context['stage']}\n**Top Priority:** Improve {context['weakest_categories'][0]['name']} (scored {context['weakest_categories'][0]['score']}/5)\n\nTry: 'show scores', 'weakest areas', 'recommendations', or 'roadmap'"
 
 # ================================================================
 # MAIN CHAT HANDLER
 # ================================================================
-def process_chat_message(session_id: str, message: str, user=None) -> Dict[str, Any]:
+def process_chat_message(
+    session_id: str,
+    message: str,
+    user=None,
+    supplemental_context: str = "",
+) -> Dict[str, Any]:
     """
     Main entry point for processing chat messages
     
@@ -618,12 +760,23 @@ def process_chat_message(session_id: str, message: str, user=None) -> Dict[str, 
     try:
         # Get session
         session = get_object_or_404(AssessmentSession, uuid=session_id)
+
+        recent_attachment_context = _get_recent_attachment_context(session)
+        merged_attachment_context = "\n\n---\n\n".join(
+            part for part in [supplemental_context.strip(), recent_attachment_context.strip()] if part
+        )
+        relevant_attachment_context = _select_relevant_attachment_sections(
+            message=message,
+            attachment_context=merged_attachment_context,
+        )
         
         # Build context
         context = build_session_context(session)
         
         # Detect intent
         intent = detect_intent(message)
+        if should_force_attachment_general_chat(message, intent, relevant_attachment_context):
+            intent = "general_chat"
         
         # Route to appropriate handler
         # For specific structured requests, use handlers
@@ -642,7 +795,12 @@ def process_chat_message(session_id: str, message: str, user=None) -> Dict[str, 
             response_text = handler_map[intent](session, context)
         else:
             # Use AI for all conversational queries (weakest areas, recommendations, roadmap, general chat, etc.)
-            response_text = handle_general_chat(session, context, message)
+            response_text = handle_general_chat(
+                session,
+                context,
+                message,
+                supplemental_context=relevant_attachment_context,
+            )
         
         return {
             "success": True,

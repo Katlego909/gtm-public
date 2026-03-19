@@ -39,6 +39,7 @@ protobuf==5.29.5
 psycopg2==2.9.11
 pyasn1==0.6.1
 pyasn1_modules==0.4.2
+pypdf==5.4.0
 pydantic==2.12.3
 pydantic_core==2.41.4
 Pygments==2.19.2

@@ -5,10 +5,15 @@ Dashboard views for GTM Validator
 
 import datetime
 import json
+import mimetypes
 import markdown
+import os
 import re
 import uuid
 import logging
+from io import BytesIO
+from pathlib import Path
+from typing import Any, Dict, List, Tuple
 
 from django.shortcuts import get_object_or_404, render, redirect
 from django.db import models
@@ -22,6 +27,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib import messages
 from django.core.mail import send_mail
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.template.loader import render_to_string
 from django.utils.text import slugify
 from django.urls import reverse
@@ -45,9 +52,207 @@ from .utils import calculate_gap_metric_display_properties
 
 logger = logging.getLogger(__name__)
 
+AGENT_ATTACHMENT_MAX_FILES = 4
+AGENT_ATTACHMENT_MAX_BYTES = 6 * 1024 * 1024
+AGENT_ATTACHMENT_TEXT_LIMIT = 6000
+AGENT_ATTACHMENT_EXCERPT_LIMIT = 600
+AGENT_ALLOWED_EXTENSIONS = {
+    '.txt', '.md', '.csv', '.json', '.log', '.xml', '.yaml', '.yml',
+    '.pdf', '.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp',
+}
+AGENT_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp'}
+
+
+def _normalize_content_type(uploaded_file) -> str:
+    guessed, _ = mimetypes.guess_type(uploaded_file.name or '')
+    return (uploaded_file.content_type or guessed or '').lower()
+
+
+def _extract_pdf_text(file_bytes: bytes) -> str:
+    """Extract text from PDF bytes when pypdf is available."""
+    try:
+        from pypdf import PdfReader
+    except Exception:
+        return ''
+
+    text_parts: List[str] = []
+    try:
+        reader = PdfReader(BytesIO(file_bytes))
+        for page in reader.pages[:8]:
+            page_text = page.extract_text() or ''
+            if page_text:
+                text_parts.append(page_text)
+            if sum(len(part) for part in text_parts) >= AGENT_ATTACHMENT_TEXT_LIMIT:
+                break
+    except Exception:
+        return ''
+
+    return '\n'.join(text_parts).strip()[:AGENT_ATTACHMENT_TEXT_LIMIT]
+
+
+def _extract_pdf_text_with_ai(file_bytes: bytes) -> str:
+    """Fallback PDF text extraction through Gemini when parser extraction is unavailable."""
+    try:
+        from gtm.ai_chat import _init_gemini_chat
+    except Exception:
+        return ''
+
+    model = _init_gemini_chat()
+    if not model:
+        return ''
+
+    try:
+        response = model.generate_content([
+            "Extract all readable text from this PDF document. Return plain text only.",
+            {
+                "mime_type": "application/pdf",
+                "data": file_bytes,
+            },
+        ])
+        extracted = (getattr(response, 'text', '') or '').strip()
+        return extracted[:AGENT_ATTACHMENT_TEXT_LIMIT]
+    except Exception:
+        return ''
+
+
+def _extract_image_text_with_ai(file_bytes: bytes) -> str:
+    """Use Gemini vision to OCR meaningful text from image attachments."""
+    try:
+        from PIL import Image
+        from gtm.ai_chat import _init_gemini_chat
+    except Exception:
+        return ''
+
+    model = _init_gemini_chat()
+    if not model:
+        return ''
+
+    try:
+        image = Image.open(BytesIO(file_bytes))
+        response = model.generate_content([
+            (
+                "Extract all readable text from this image. "
+                "Return plain text only, preserving important headings and bullet points."
+            ),
+            image,
+        ])
+        extracted = (getattr(response, 'text', '') or '').strip()
+        return extracted[:AGENT_ATTACHMENT_TEXT_LIMIT]
+    except Exception:
+        return ''
+
+
+def _extract_attachment_text(uploaded_file, file_bytes: bytes) -> Tuple[str, str]:
+    """Return extracted text and extraction status for an uploaded attachment."""
+    suffix = Path(uploaded_file.name or '').suffix.lower()
+    content_type = _normalize_content_type(uploaded_file)
+
+    if content_type.startswith('text/') or suffix in {'.txt', '.md', '.csv', '.json', '.log', '.xml', '.yaml', '.yml'}:
+        text = file_bytes.decode('utf-8', errors='ignore').strip()
+        return text[:AGENT_ATTACHMENT_TEXT_LIMIT], 'text_extracted'
+
+    if suffix == '.pdf' or content_type == 'application/pdf':
+        pdf_text = _extract_pdf_text(file_bytes)
+        if pdf_text:
+            return pdf_text, 'pdf_extracted'
+        pdf_text_ai = _extract_pdf_text_with_ai(file_bytes)
+        if pdf_text_ai:
+            return pdf_text_ai, 'pdf_ai_extracted'
+        return '', 'pdf_parse_unavailable'
+
+    if suffix in AGENT_IMAGE_EXTENSIONS or content_type.startswith('image/'):
+        image_text = _extract_image_text_with_ai(file_bytes)
+        if image_text:
+            return image_text, 'image_ocr_extracted'
+        return '', 'image_ocr_unavailable'
+
+    return '', 'unsupported_for_extraction'
+
+
+def _save_agent_attachment(uploaded_file, file_bytes: bytes) -> Tuple[str, str]:
+    suffix = Path(uploaded_file.name or '').suffix.lower()
+    stem = slugify(Path(uploaded_file.name or '').stem) or 'attachment'
+    stamp = timezone.now().strftime('%Y/%m')
+    filename = f"{uuid.uuid4().hex}_{stem[:60]}{suffix}"
+    storage_path = os.path.join('agent_uploads', stamp, filename).replace('\\\\', '/')
+    saved_path = default_storage.save(storage_path, ContentFile(file_bytes))
+    file_url = default_storage.url(saved_path)
+    return saved_path, file_url
+
+
+def _process_agent_attachments(uploaded_files) -> Tuple[List[Dict[str, Any]], str, List[str]]:
+    """Validate, persist, and extract text context from uploaded files."""
+    attachments: List[Dict[str, Any]] = []
+    context_parts: List[str] = []
+    warnings: List[str] = []
+
+    files = list(uploaded_files or [])
+    if len(files) > AGENT_ATTACHMENT_MAX_FILES:
+        warnings.append(f"Only the first {AGENT_ATTACHMENT_MAX_FILES} attachments were processed.")
+        files = files[:AGENT_ATTACHMENT_MAX_FILES]
+
+    for uploaded_file in files:
+        file_name = uploaded_file.name or 'attachment'
+        suffix = Path(file_name).suffix.lower()
+        content_type = _normalize_content_type(uploaded_file)
+
+        if suffix not in AGENT_ALLOWED_EXTENSIONS:
+            warnings.append(f"Unsupported file type skipped: {file_name}")
+            continue
+
+        if uploaded_file.size and uploaded_file.size > AGENT_ATTACHMENT_MAX_BYTES:
+            warnings.append(f"File exceeds 6 MB limit and was skipped: {file_name}")
+            continue
+
+        file_bytes = uploaded_file.read() or b''
+        uploaded_file.seek(0)
+        if not file_bytes:
+            warnings.append(f"Empty file skipped: {file_name}")
+            continue
+
+        extracted_text, extraction_status = _extract_attachment_text(uploaded_file, file_bytes)
+        saved_path, file_url = _save_agent_attachment(uploaded_file, file_bytes)
+
+        excerpt = extracted_text[:AGENT_ATTACHMENT_EXCERPT_LIMIT] if extracted_text else ''
+        attachments.append(
+            {
+                'name': file_name,
+                'content_type': content_type,
+                'size': uploaded_file.size or len(file_bytes),
+                'path': saved_path,
+                'url': file_url,
+                'extraction_status': extraction_status,
+                'excerpt': excerpt,
+            }
+        )
+
+        if extracted_text:
+            context_parts.append(
+                f"Attachment: {file_name}\nExtracted content:\n{extracted_text[:AGENT_ATTACHMENT_TEXT_LIMIT]}"
+            )
+        else:
+            context_parts.append(
+                f"Attachment: {file_name}\nNo extractable text was available ({extraction_status})."
+            )
+
+    return attachments, '\n\n---\n\n'.join(context_parts), warnings
+
 # ================================================================
 # RESOURCE LIBRARY VIEWS
 # ================================================================
+
+
+def _md(text: str) -> str:
+    """Convert markdown text to HTML, pre-processing to ensure lists render correctly."""
+    if not text:
+        return ''
+    # Insert blank line before any line that starts a list item (* - + or numbered)
+    # if the preceding line is not already blank. Python-markdown requires a blank
+    # line before a list block to detect it properly.
+    text = re.sub(r'(?m)(?<=\S)\n([ \t]*(?:[*\-+]|\d+\.) )', r'\n\n\1', text)
+    # Also ensure blank line after a heading line (### ...) before the next content
+    text = re.sub(r'(?m)(^#{1,6} .+)\n(?!\n)', r'\1\n\n', text)
+    return markdown.markdown(text, extensions=['extra', 'nl2br', 'sane_lists'])
 
 
 def log_workspace_activity(workspace, actor, event_type, summary, object_type='', object_id='', metadata=None, session=None):
@@ -1600,7 +1805,10 @@ def agent_hub(request):
     dashboard_agent_history = []
     if dashboard_agent_session:
         history_qs = ChatMessage.objects.filter(session=dashboard_agent_session).order_by('-created_at')[:50]
-        dashboard_agent_history = list(reversed(history_qs))
+        chats = list(reversed(history_qs))
+        for chat in chats:
+            chat.response_html = _md(chat.response or '')
+        dashboard_agent_history = chats
 
     context = {
         'current_workspace': current_workspace,
@@ -1909,7 +2117,10 @@ def dashboard(request):
             if dashboard_agent_session:
                 dashboard_agent_prompts = get_suggested_prompts(dashboard_agent_session)
                 history_qs = ChatMessage.objects.filter(session=dashboard_agent_session).order_by('-created_at')[:30]
-                dashboard_agent_history = list(reversed(history_qs))
+                chats = list(reversed(history_qs))
+                for chat in chats:
+                    chat.response_html = _md(chat.response or '')
+                dashboard_agent_history = chats
 
     # Convert markdown notes to HTML for all relevant items
     def convert_notes(items):
@@ -2011,13 +2222,20 @@ def dashboard(request):
 @login_required
 def dashboard_agent_api(request):
     """Run the GTM agent inline from the dashboard without navigating to chat."""
-    try:
-        data = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({"success": False, "error": "Invalid JSON"}, status=400)
+    content_type = (request.content_type or '').lower()
+    uploaded_files = []
+    if 'multipart/form-data' in content_type:
+        session_id = str(request.POST.get('session_id', '')).strip()
+        message = (request.POST.get('message') or '').strip()
+        uploaded_files = request.FILES.getlist('attachments')
+    else:
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({"success": False, "error": "Invalid JSON"}, status=400)
 
-    session_id = str(data.get('session_id', '')).strip()
-    message = (data.get('message') or '').strip()
+        session_id = str(data.get('session_id', '')).strip()
+        message = (data.get('message') or '').strip()
 
     if not session_id:
         return JsonResponse({"success": False, "error": "Select an assessment first."}, status=400)
@@ -2038,6 +2256,8 @@ def dashboard_agent_api(request):
     elif session.user_id != request.user.id:
         return JsonResponse({"success": False, "error": "You do not have access to that assessment."}, status=403)
 
+    attachments, attachment_context, attachment_warnings = _process_agent_attachments(uploaded_files)
+
     action_result = _run_dashboard_action_command(request, session, current_workspace, message)
     if action_result:
         ChatMessage.objects.create(
@@ -2045,14 +2265,19 @@ def dashboard_agent_api(request):
             user=request.user,
             message=message,
             response=action_result.get("response", ""),
+            attachments=attachments,
             intent=action_result.get("intent", "dashboard_action"),
         )
+        action_result["uploaded_attachments"] = attachments
+        if attachment_warnings:
+            action_result["attachment_warnings"] = attachment_warnings
         return JsonResponse(action_result, status=200)
 
     result = process_chat_message(
         session_id=str(session.uuid),
         message=message,
         user=request.user,
+        supplemental_context=attachment_context,
     )
 
     if result.get("success"):
@@ -2061,10 +2286,52 @@ def dashboard_agent_api(request):
             user=request.user,
             message=message,
             response=result.get("response", ""),
+            attachments=attachments,
             intent=result.get("intent", ""),
         )
+        result["response_html"] = _md(result.get("response", ""))
+        result["uploaded_attachments"] = attachments
+        if attachment_warnings:
+            result["attachment_warnings"] = attachment_warnings
 
     return JsonResponse(result, status=200 if result.get("success") else 500)
+
+
+@require_http_methods(["POST"])
+@login_required
+def dashboard_agent_clear_api(request):
+    """Clear dashboard agent chat history for a selected assessment session."""
+    content_type = (request.content_type or '').lower()
+    if 'multipart/form-data' in content_type:
+        session_id = str(request.POST.get('session_id', '')).strip()
+    else:
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({"success": False, "error": "Invalid JSON"}, status=400)
+        session_id = str(data.get('session_id', '')).strip()
+
+    if not session_id:
+        return JsonResponse({"success": False, "error": "Select an assessment first."}, status=400)
+
+    try:
+        session = AssessmentSession.objects.get(pk=session_id)
+    except AssessmentSession.DoesNotExist:
+        return JsonResponse({"success": False, "error": "Assessment session not found."}, status=404)
+
+    workspace_id = request.GET.get('workspace') or request.session.get('current_workspace_id')
+    if workspace_id:
+        if str(session.workspace_id) != str(workspace_id):
+            return JsonResponse({"success": False, "error": "That assessment is not in the current workspace."}, status=403)
+    elif session.user_id != request.user.id:
+        return JsonResponse({"success": False, "error": "You do not have access to that assessment."}, status=403)
+
+    deleted_count, _ = ChatMessage.objects.filter(session=session).delete()
+    return JsonResponse({
+        "success": True,
+        "deleted_count": deleted_count,
+        "message": "Chat history cleared.",
+    })
 
 
 @require_http_methods(["GET"])
@@ -2123,6 +2390,8 @@ def dashboard_agent_context_api(request):
             history.append({
                 'message': chat.message,
                 'response': chat.response,
+                'response_html': _md(chat.response or ''),
+                'attachments': chat.attachments or [],
                 'intent': chat.intent,
                 'created_at': chat.created_at.isoformat(),
             })

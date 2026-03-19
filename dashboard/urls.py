@@ -6,6 +6,7 @@ urlpatterns = [
     path('notifications/panel/', views.notifications_panel, name='notifications_panel'),
     path('agent/', views.agent_hub, name='agent_hub'),
     path('agent/chat/', views.dashboard_agent_api, name='dashboard_agent_api'),
+    path('agent/clear/', views.dashboard_agent_clear_api, name='dashboard_agent_clear_api'),
     path('agent/context/', views.dashboard_agent_context_api, name='dashboard_agent_context_api'),
     path('tasks/', views.tasks_board, name='tasks_board'),
     path('workspace/hub/', views.workspace_hub, name='workspace_hub'),

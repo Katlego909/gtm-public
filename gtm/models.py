@@ -229,6 +229,7 @@ class ChatMessage(models.Model):
     )
     message = models.TextField()  
     response = models.TextField()  
+    attachments = models.JSONField(default=list, blank=True)
     intent = models.CharField(max_length=50, blank=True)  
     created_at = models.DateTimeField(auto_now_add=True)
     

@@ -17,6 +17,23 @@
     <style>
         body { font-family: 'Inter', sans-serif; }
 
+        .agent-bubble h1,.agent-bubble h2,.agent-bubble h3,.agent-bubble h4 {
+            font-weight: 700; color: #1e293b; margin-top: 1.1rem; margin-bottom: 0.35rem; line-height: 1.3;
+        }
+        .agent-bubble h1 { font-size: 1.05rem; }
+        .agent-bubble h2 { font-size: 1rem; }
+        .agent-bubble h3 { font-size: 0.95rem; border-bottom: 1px solid #e0e7ff; padding-bottom: 0.2rem; }
+        .agent-bubble h4 { font-size: 0.875rem; }
+        .agent-bubble p  { margin-bottom: 0.6rem; line-height: 1.55; }
+        .agent-bubble ul,.agent-bubble ol { padding-left: 1.4rem; margin-bottom: 0.6rem; }
+        .agent-bubble ul { list-style-type: disc; }
+        .agent-bubble ol { list-style-type: decimal; }
+        .agent-bubble li { margin-bottom: 0.3rem; line-height: 1.5; }
+        .agent-bubble strong { font-weight: 600; color: #111827; }
+        .agent-bubble hr { border: none; border-top: 1px solid #e0e7ff; margin: 0.75rem 0; }
+        .agent-bubble *:first-child { margin-top: 0; }
+        .agent-bubble *:last-child  { margin-bottom: 0; }
+
         /* Custom scrollbar */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -332,9 +349,13 @@
             <div id="global-agent-messages" class="flex-1 overflow-y-auto p-3 space-y-3 bg-slate-50"></div>
 
             <form id="global-agent-form" class="p-3 border-t border-gray-200 bg-white flex gap-2">
+                <input id="global-agent-files" type="file" class="hidden" multiple accept=".txt,.md,.csv,.json,.log,.xml,.yaml,.yml,.pdf,image/*" />
+                <button id="global-agent-attach" type="button" class="px-3 py-2.5 rounded-xl border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50 transition">Attach</button>
                 <input id="global-agent-input" type="text" placeholder="Ask the agent anything..." class="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-indigo-500" />
                 <button id="global-agent-send" type="submit" class="px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition">Send</button>
+                <button id="global-agent-clear" type="button" class="px-3 py-2.5 rounded-xl border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50 transition">Clear</button>
             </form>
+            <p id="global-agent-files-hint" class="px-3 pb-3 text-xs text-gray-500 hidden"></p>
         </section>
     </div>
 
@@ -515,9 +536,12 @@
         const sessionSelect = document.getElementById('global-agent-session');
         const form = document.getElementById('global-agent-form');
         const input = document.getElementById('global-agent-input');
+        const filesInput = document.getElementById('global-agent-files');
+        const attachBtn = document.getElementById('global-agent-attach');
+        const clearBtn = document.getElementById('global-agent-clear');
         const sendBtn = document.getElementById('global-agent-send');
 
-        if (!launcher || !panel || !messagesEl || !sessionSelect || !form || !input || !sendBtn) return;
+        if (!launcher || !panel || !messagesEl || !sessionSelect || !form || !input || !sendBtn || !filesInput || !attachBtn || !clearBtn) return;
 
         let contextLoaded = false;
 
@@ -535,17 +559,40 @@
             return params.get('workspace') || '';
         }
 
-        function appendMessage(text, isUser) {
-            const safe = String(text || '')
-                .replaceAll('&', '&amp;')
-                .replaceAll('<', '&lt;')
-                .replaceAll('>', '&gt;');
+        function updateGlobalAgentFileHint() {
+            const hint = document.getElementById('global-agent-files-hint');
+            if (!hint) return;
+            const names = Array.from(filesInput.files || []).map(function (file) { return file.name; }).filter(Boolean);
+            if (!names.length) {
+                hint.textContent = '';
+                hint.classList.add('hidden');
+                return;
+            }
+            hint.textContent = `Attached: ${names.join(', ')}`;
+            hint.classList.remove('hidden');
+        }
 
+        function appendMessage(text, isUser, responseHtml) {
             const row = document.createElement('div');
             row.className = isUser ? 'flex justify-end' : 'flex justify-start';
-            row.innerHTML = isUser
-                ? `<div class="bg-gray-900 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm max-w-[85%] whitespace-pre-wrap">${safe}</div>`
-                : `<div class="bg-indigo-50 border border-indigo-100 text-gray-700 rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm max-w-[85%] whitespace-pre-wrap">${safe}</div>`;
+
+            if (isUser) {
+                const safe = String(text || '')
+                    .replaceAll('&', '&amp;')
+                    .replaceAll('<', '&lt;')
+                    .replaceAll('>', '&gt;');
+                row.innerHTML = `<div class="bg-gray-900 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm max-w-[85%] whitespace-pre-wrap">${safe}</div>`;
+            } else {
+                const bubble = document.createElement('div');
+                bubble.className = 'agent-bubble bg-indigo-50 border border-indigo-100 text-gray-700 rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm max-w-[85%]';
+                if (responseHtml) {
+                    bubble.innerHTML = responseHtml;
+                } else {
+                    bubble.textContent = text || '';
+                }
+                row.appendChild(bubble);
+            }
+
             messagesEl.appendChild(row);
             messagesEl.scrollTop = messagesEl.scrollHeight;
         }
@@ -559,7 +606,7 @@
 
             history.forEach(function (entry) {
                 if (entry.message) appendMessage(entry.message, true);
-                if (entry.response) appendMessage(entry.response, false);
+                if (entry.response) appendMessage(entry.response, false, entry.response_html || '');
             });
         }
 
@@ -622,26 +669,44 @@
             input.value = '';
             input.disabled = true;
             sendBtn.disabled = true;
+            attachBtn.disabled = true;
 
             try {
                 const workspace = currentWorkspaceId();
                 const qs = workspace ? `?workspace=${encodeURIComponent(workspace)}` : '';
-                const response = await fetch(`/dashboard/agent/chat/${qs}`, {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRFToken': getCookie('csrftoken') || '',
-                    },
-                    body: JSON.stringify({ session_id: sessionId, message }),
-                });
+                const files = Array.from(filesInput.files || []);
+                let response;
+                if (files.length) {
+                    const formData = new FormData();
+                    formData.append('session_id', sessionId);
+                    formData.append('message', message);
+                    files.forEach(function (file) { formData.append('attachments', file); });
+                    response = await fetch(`/dashboard/agent/chat/${qs}`, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'X-CSRFToken': getCookie('csrftoken') || '',
+                        },
+                        body: formData,
+                    });
+                } else {
+                    response = await fetch(`/dashboard/agent/chat/${qs}`, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': getCookie('csrftoken') || '',
+                        },
+                        body: JSON.stringify({ session_id: sessionId, message }),
+                    });
+                }
 
                 const data = await response.json();
                 if (!response.ok || !data.success) {
                     appendMessage(`Error: ${data.error || 'Agent request failed.'}`, false);
                     return;
                 }
-                appendMessage(data.response || 'Done.', false);
+                appendMessage(data.response || 'Done.', false, data.response_html || '');
                 if (data.intent === 'dashboard_action' && window.htmx) {
                     htmx.trigger(document.body, 'refreshNotifications');
                     htmx.trigger(document.body, 'refreshAgentActions');
@@ -660,7 +725,84 @@
             } finally {
                 input.disabled = false;
                 sendBtn.disabled = false;
+                attachBtn.disabled = false;
+                filesInput.value = '';
+                updateGlobalAgentFileHint();
                 input.focus();
+            }
+        }
+
+        async function clearMessages() {
+            const sessionId = sessionSelect.value;
+            if (!sessionId) {
+                showDashboardToast('Select an assessment context first.', 'warning');
+                return;
+            }
+
+            const modalContent = document.getElementById('modal-content');
+            if (!modalContent || typeof window.openModal !== 'function' || typeof window.closeModal !== 'function') {
+                const shouldClear = window.confirm('Clear chat history for this assessment context?');
+                if (!shouldClear) return;
+                await executeGlobalAgentClear(sessionId);
+                return;
+            }
+
+            modalContent.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+                    <div class="px-6 py-5 border-b border-gray-100">
+                        <h3 class="text-lg font-semibold text-gray-900">Clear Chat History</h3>
+                        <p class="mt-2 text-sm text-gray-600">This will remove all messages for this assessment context.</p>
+                    </div>
+                    <div class="px-6 py-4 flex justify-end gap-3">
+                        <button type="button" id="global-agent-clear-cancel" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
+                        <button type="button" id="global-agent-clear-confirm" class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition">Clear Chat</button>
+                    </div>
+                </div>
+            `;
+
+            const cancelBtn = document.getElementById('global-agent-clear-cancel');
+            const confirmBtn = document.getElementById('global-agent-clear-confirm');
+            if (!cancelBtn || !confirmBtn) return;
+
+            cancelBtn.addEventListener('click', function () {
+                window.closeModal();
+            }, { once: true });
+
+            confirmBtn.addEventListener('click', async function () {
+                window.closeModal();
+                await executeGlobalAgentClear(sessionId);
+            }, { once: true });
+
+            window.openModal();
+        }
+
+        async function executeGlobalAgentClear(sessionId) {
+            clearBtn.disabled = true;
+            try {
+                const workspace = currentWorkspaceId();
+                const qs = workspace ? `?workspace=${encodeURIComponent(workspace)}` : '';
+                const response = await fetch(`/dashboard/agent/clear/${qs}`, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken') || '',
+                    },
+                    body: JSON.stringify({ session_id: sessionId }),
+                });
+
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    showDashboardToast(data.error || 'Could not clear chat history.', 'error');
+                    return;
+                }
+
+                messagesEl.innerHTML = '';
+                appendMessage('Hi, I am your dashboard agent. Ask me anything about your GTM work.', false);
+            } catch (error) {
+                showDashboardToast('Could not clear chat history.', 'error');
+            } finally {
+                clearBtn.disabled = false;
             }
         }
 
@@ -696,6 +838,18 @@
             const message = input.value.trim();
             if (!message) return;
             sendMessage(message);
+        });
+
+        attachBtn.addEventListener('click', function () {
+            filesInput.click();
+        });
+
+        filesInput.addEventListener('change', function () {
+            updateGlobalAgentFileHint();
+        });
+
+        clearBtn.addEventListener('click', function () {
+            clearMessages();
         });
 
         sessionSelect.addEventListener('change', function () {

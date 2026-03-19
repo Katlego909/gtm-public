@@ -1,3 +1,25 @@
+<style>
+.agent-bubble h1,.agent-bubble h2,.agent-bubble h3,.agent-bubble h4 {
+    font-weight: 700;
+    color: #1e293b;
+    margin-top: 1.1rem;
+    margin-bottom: 0.35rem;
+    line-height: 1.3;
+}
+.agent-bubble h1 { font-size: 1.05rem; }
+.agent-bubble h2 { font-size: 1rem; }
+.agent-bubble h3 { font-size: 0.95rem; border-bottom: 1px solid #e0e7ff; padding-bottom: 0.2rem; }
+.agent-bubble h4 { font-size: 0.875rem; }
+.agent-bubble p  { margin-bottom: 0.6rem; line-height: 1.55; }
+.agent-bubble ul,.agent-bubble ol { padding-left: 1.4rem; margin-bottom: 0.6rem; }
+.agent-bubble ul { list-style-type: disc; }
+.agent-bubble ol { list-style-type: decimal; }
+.agent-bubble li { margin-bottom: 0.3rem; line-height: 1.5; }
+.agent-bubble strong { font-weight: 600; color: #111827; }
+.agent-bubble hr { border: none; border-top: 1px solid #e0e7ff; margin: 0.75rem 0; }
+.agent-bubble *:first-child { margin-top: 0; }
+.agent-bubble *:last-child  { margin-bottom: 0; }
+</style>
 <div class="p-6 md:p-8 h-full overflow-y-auto">
     <div class="max-w-7xl mx-auto">
         <div class="mb-6">
@@ -57,18 +79,12 @@
                         <div class="bg-gray-900 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm max-w-3xl whitespace-pre-wrap">{{ chat.message }}</div>
                     </div>
                     <div class="flex items-start gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shrink-0 text-white shadow-md">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
-                        </div>
-                        <div class="bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl whitespace-pre-wrap">{{ chat.response }}</div>
+                        <div class="agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl">{{ chat.response_html|safe }}</div>
                     </div>
                     {% endfor %}
 
                     {% if not dashboard_agent_history %}
                     <div class="flex items-start gap-3">
-                        <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shrink-0 text-white shadow-md">
-                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
-                        </div>
                         <div class="bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl">
                             Ask about this assessment, build an action plan, or review the current execution backlog.
                         </div>
@@ -77,11 +93,29 @@
                 </div>
                 <form id="dashboard-agent-form" class="border-t border-gray-200 bg-white p-4 flex gap-3">
                     {% csrf_token %}
+                    <input id="dashboard-agent-files" type="file" class="hidden" multiple accept=".txt,.md,.csv,.json,.log,.xml,.yaml,.yml,.pdf,image/*">
+                    <button id="dashboard-agent-attach" type="button" class="px-3 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition flex items-center justify-center" aria-label="Attach file">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l7.071-7.071a4 4 0 00-5.657-5.657l-7.071 7.07a6 6 0 108.485 8.486L19 13" />
+                        </svg>
+                        <span class="sr-only">Attach</span>
+                    </button>
                     <input id="dashboard-agent-input" type="text" placeholder="Ask the GTM agent anything about this assessment..." class="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-indigo-500 focus:ring-indigo-500">
-                    <button id="dashboard-agent-send" type="submit" class="px-5 py-3 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
-                        Send
+                    <button id="dashboard-agent-send" type="submit" class="px-5 py-3 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center" aria-label="Send message">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M22 2L11 13" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M22 2L15 22L11 13L2 9L22 2Z" />
+                        </svg>
+                        <span class="sr-only">Send</span>
+                    </button>
+                    <button id="dashboard-agent-clear" type="button" class="px-4 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition flex items-center justify-center" aria-label="Clear chat">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" />
+                        </svg>
+                        <span class="sr-only">Clear</span>
                     </button>
                 </form>
+                <p id="dashboard-agent-files-hint" class="px-4 pb-3 text-xs text-gray-500 hidden"></p>
             </section>
         </div>
         {% else %}
@@ -94,7 +128,7 @@
 </div>
 
 <script>
-function appendDashboardAgentMessage(message, isUser) {
+function appendDashboardAgentMessage(message, isUser, responseHtml) {
     const container = document.getElementById('dashboard-agent-messages');
     if (!container) return;
 
@@ -111,12 +145,15 @@ function appendDashboardAgentMessage(message, isUser) {
             <div class="bg-gray-900 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm max-w-3xl whitespace-pre-wrap">${safeMessage}</div>
         `;
     } else {
-        wrapper.innerHTML = `
-            <div class="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shrink-0 text-white shadow-md">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>
-            </div>
-            <div class="bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl whitespace-pre-wrap">${safeMessage}</div>
-        `;
+        const bubble = document.createElement('div');
+        bubble.className = 'agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl';
+        if (responseHtml) {
+            bubble.innerHTML = responseHtml;
+        } else {
+            bubble.textContent = message || '';
+        }
+        wrapper.innerHTML = ``;
+        wrapper.appendChild(bubble);
     }
 
     container.appendChild(wrapper);
@@ -126,11 +163,14 @@ function appendDashboardAgentMessage(message, isUser) {
 async function sendDashboardAgentMessage(message) {
     const input = document.getElementById('dashboard-agent-input');
     const button = document.getElementById('dashboard-agent-send');
+    const attachButton = document.getElementById('dashboard-agent-attach');
+    const fileInput = document.getElementById('dashboard-agent-files');
     const sessionSelect = document.getElementById('dashboard-agent-session');
-    if (!input || !button || !sessionSelect) return;
+    if (!input || !button || !sessionSelect || !fileInput || !attachButton) return;
 
     const sessionId = sessionSelect.value;
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
+    const files = Array.from(fileInput.files || []);
     if (!sessionId) {
         appendDashboardAgentMessage('Select an assessment first.', false);
         return;
@@ -140,23 +180,39 @@ async function sendDashboardAgentMessage(message) {
     input.value = '';
     input.disabled = true;
     button.disabled = true;
+    attachButton.disabled = true;
 
     try {
         const agentApiUrl = `/dashboard/agent/chat/${window.location.search || ''}`;
-        const response = await fetch(agentApiUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken,
-            },
-            body: JSON.stringify({
-                session_id: sessionId,
-                message: message,
-            }),
-        });
+        let response;
+        if (files.length) {
+            const formData = new FormData();
+            formData.append('session_id', sessionId);
+            formData.append('message', message);
+            files.forEach(file => formData.append('attachments', file));
+            response = await fetch(agentApiUrl, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                },
+                body: formData,
+            });
+        } else {
+            response = await fetch(agentApiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken,
+                },
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    message: message,
+                }),
+            });
+        }
 
         const data = await response.json();
-        appendDashboardAgentMessage(data.success ? data.response : `Error: ${data.error || 'Unknown error'}`, false);
+        appendDashboardAgentMessage(data.success ? data.response : `Error: ${data.error || 'Unknown error'}`, false, data.response_html || '');
 
         if (data.success && data.intent === 'dashboard_action' && window.htmx) {
             htmx.trigger(document.body, 'refreshNotifications');
@@ -175,8 +231,100 @@ async function sendDashboardAgentMessage(message) {
     } finally {
         input.disabled = false;
         button.disabled = false;
+        attachButton.disabled = false;
+        fileInput.value = '';
+        updateDashboardAgentFileHint(fileInput);
         input.focus();
     }
+}
+
+async function clearDashboardAgentMessages() {
+    const sessionSelect = document.getElementById('dashboard-agent-session');
+    const container = document.getElementById('dashboard-agent-messages');
+    const clearButton = document.getElementById('dashboard-agent-clear');
+    if (!sessionSelect || !container || !clearButton) return;
+
+    const sessionId = sessionSelect.value;
+    if (!sessionId) {
+        appendDashboardAgentMessage('Select an assessment first.', false);
+        return;
+    }
+
+    const modalContent = document.getElementById('modal-content');
+    if (!modalContent || typeof window.openModal !== 'function' || typeof window.closeModal !== 'function') {
+        const shouldClear = window.confirm('Clear chat history for this assessment context?');
+        if (!shouldClear) return;
+        await executeDashboardAgentClear(sessionId, clearButton, container);
+        return;
+    }
+
+    modalContent.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-semibold text-gray-900">Clear Chat History</h3>
+                <p class="mt-2 text-sm text-gray-600">This will remove all messages for this assessment context.</p>
+            </div>
+            <div class="px-6 py-4 flex justify-end gap-3">
+                <button type="button" id="dashboard-agent-clear-cancel" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
+                <button type="button" id="dashboard-agent-clear-confirm" class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition">Clear Chat</button>
+            </div>
+        </div>
+    `;
+
+    const cancelBtn = document.getElementById('dashboard-agent-clear-cancel');
+    const confirmBtn = document.getElementById('dashboard-agent-clear-confirm');
+    if (!cancelBtn || !confirmBtn) return;
+
+    cancelBtn.addEventListener('click', function() {
+        window.closeModal();
+    }, { once: true });
+
+    confirmBtn.addEventListener('click', async function() {
+        window.closeModal();
+        await executeDashboardAgentClear(sessionId, clearButton, container);
+    }, { once: true });
+
+    window.openModal();
+}
+
+async function executeDashboardAgentClear(sessionId, clearButton, container) {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
+    clearButton.disabled = true;
+    try {
+        const response = await fetch(`/dashboard/agent/clear/${window.location.search || ''}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken,
+            },
+            body: JSON.stringify({ session_id: sessionId }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.success) {
+            appendDashboardAgentMessage(`Error: ${data.error || 'Could not clear chat history.'}`, false);
+            return;
+        }
+
+        container.innerHTML = '';
+        appendDashboardAgentMessage('Ask about this assessment, build an action plan, or review the current execution backlog.', false);
+    } catch (error) {
+        appendDashboardAgentMessage('Error: Could not clear chat history.', false);
+    } finally {
+        clearButton.disabled = false;
+    }
+}
+
+function updateDashboardAgentFileHint(fileInput) {
+    const hint = document.getElementById('dashboard-agent-files-hint');
+    if (!hint || !fileInput) return;
+    const names = Array.from(fileInput.files || []).map(file => file.name).filter(Boolean);
+    if (!names.length) {
+        hint.textContent = '';
+        hint.classList.add('hidden');
+        return;
+    }
+    hint.textContent = `Attached: ${names.join(', ')}`;
+    hint.classList.remove('hidden');
 }
 
 function sendDashboardAgentPrompt(prompt) {
@@ -197,6 +345,9 @@ function onDashboardAgentSessionChange(sessionId) {
 function initDashboardAgent() {
     const agentForm = document.getElementById('dashboard-agent-form');
     const agentInput = document.getElementById('dashboard-agent-input');
+    const fileInput = document.getElementById('dashboard-agent-files');
+    const attachButton = document.getElementById('dashboard-agent-attach');
+    const clearButton = document.getElementById('dashboard-agent-clear');
     const container = document.getElementById('dashboard-agent-messages');
     if (!agentForm || !agentInput || agentForm.dataset.initialized === 'true') return;
 
@@ -208,6 +359,19 @@ function initDashboardAgent() {
         if (!message) return;
         sendDashboardAgentMessage(message);
     });
+
+    if (attachButton && fileInput) {
+        attachButton.addEventListener('click', function() {
+            fileInput.click();
+        });
+        fileInput.addEventListener('change', function() {
+            updateDashboardAgentFileHint(fileInput);
+        });
+    }
+
+    if (clearButton) {
+        clearButton.addEventListener('click', clearDashboardAgentMessages);
+    }
 
     if (container) {
         container.scrollTop = container.scrollHeight;
