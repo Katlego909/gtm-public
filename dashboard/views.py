@@ -3032,62 +3032,84 @@ def delete_action_item_comment(request, comment_id):
     return JsonResponse({'success': True})
 
 
+
 @login_required
 def create_workspace_dashboard(request):
-    """Create workspace from dashboard and return updated dashboard view."""
+    """Create workspace from dashboard and return modal partial for HTMX."""
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
         if name:
             workspace = Workspace.create_for_user(name=name, user=request.user)
-            # Redirect to dashboard with new workspace selected
-            return redirect(f'/dashboard/?workspace={workspace.id}')
-        
-    return redirect('/dashboard/')
+            # On success, trigger dashboard refresh or close modal via HTMX
+            return render(request, 'dashboard/partials/workspace_create_modal.html', {
+                'success': True,
+                'workspace': workspace,
+            })
+        # If error, re-render modal with error message
+        return render(request, 'dashboard/partials/workspace_create_modal.html', {
+            'error': 'Workspace name is required',
+        })
+    # On GET, render the modal partial
+    return render(request, 'dashboard/partials/workspace_create_modal.html')
 
 
 @login_required
+
 def invite_to_workspace(request, workspace_id):
-    """Handle team invitations from the dashboard."""
+    """Handle team invitations from the dashboard via HTMX modal."""
     workspace = get_object_or_404(Workspace, id=workspace_id)
     dashboard_url = f'/dashboard/?workspace={workspace_id}'
 
     # Permission check
     membership = WorkspaceMembership.objects.filter(workspace=workspace, user=request.user).first()
     if not membership or membership.role not in ['admin', 'manager']:
-        messages.error(request, "You don't have permission to invite members.")
-        return redirect(dashboard_url)
+        return render(request, 'dashboard/partials/error_modal.html', {
+            'error': "You don't have permission to invite members."
+        })
 
+    error = None
+    success = False
+    email = ''
+    role = 'contributor'
     if request.method == 'POST':
         email = request.POST.get('email', '').strip()
         role = request.POST.get('role', 'contributor')
 
         if not email:
-            messages.error(request, 'Email address is required.')
-            return redirect(dashboard_url)
+            error = 'Email address is required.'
+        elif WorkspaceInvitation.objects.filter(workspace=workspace, email__iexact=email, accepted_at__isnull=True).exists():
+            error = f'An invitation to {email} is already pending.'
+        elif WorkspaceMembership.objects.filter(workspace=workspace, user__email__iexact=email).exists():
+            error = f'{email} is already a member of this workspace.'
+        else:
+            invitation = WorkspaceInvitation.objects.create(
+                workspace=workspace,
+                email=email,
+                role=role,
+                invited_by=request.user,
+            )
+            try:
+                from gtm.utils_email import send_workspace_invitation_email
+                send_workspace_invitation_email(invitation, request)
+                success = True
+            except Exception as e:
+                invitation.delete()
+                error = f'Failed to send invitation email: {e}'
 
-        # Prevent duplicate pending invitations
-        if WorkspaceInvitation.objects.filter(workspace=workspace, email__iexact=email, accepted_at__isnull=True).exists():
-            messages.warning(request, f'An invitation to {email} is already pending.')
-            return redirect(dashboard_url)
-
-        # Check if already a member
-        if WorkspaceMembership.objects.filter(workspace=workspace, user__email__iexact=email).exists():
-            messages.warning(request, f'{email} is already a member of this workspace.')
-            return redirect(dashboard_url)
-
-        invitation = WorkspaceInvitation.objects.create(
-            workspace=workspace,
-            email=email,
-            role=role,
-            invited_by=request.user,
-        )
-
-        try:
-            from gtm.utils_email import send_workspace_invitation_email
-            send_workspace_invitation_email(invitation, request)
-            messages.success(request, f'Invitation sent successfully to {email}!')
-        except Exception as e:
-            invitation.delete()
-            messages.error(request, f'Failed to send invitation email: {e}')
-
-    return redirect(dashboard_url)
+    if success:
+        return render(request, 'dashboard/partials/invite_member_modal.html', {
+            'success': True,
+            'workspace': workspace,
+        })
+    response = render(request, 'dashboard/partials/invite_member_modal.html', {
+        'workspace': workspace,
+        'error': error,
+        'email': email,
+        'role': role,
+    })
+    if error and request.htmx:
+        # Show error toast using HX-Trigger
+        response['HX-Trigger'] = json.dumps({
+            'resourceToast': {'message': error, 'level': 'error'}
+        })
+    return response

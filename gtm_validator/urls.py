@@ -7,6 +7,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('accounts/', include('allauth.urls')),
     path('', include('gtm.urls', namespace='gtm')),
+    path('workspace/', include(('gtm.urls_workspace', 'workspace'), namespace='workspace')),
     path("__reload__/", include("django_browser_reload.urls")),
     path('dashboard/', include('dashboard.urls')),
 ]
