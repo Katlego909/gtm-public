@@ -349,11 +349,24 @@
             <div id="global-agent-messages" class="flex-1 overflow-y-auto p-3 space-y-3 bg-slate-50"></div>
 
             <form id="global-agent-form" class="p-3 border-t border-gray-200 bg-white flex gap-2">
-                <input id="global-agent-files" type="file" class="hidden" multiple accept=".txt,.md,.csv,.json,.log,.xml,.yaml,.yml,.pdf,image/*" />
-                <button id="global-agent-attach" type="button" class="px-3 py-2.5 rounded-xl border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50 transition">Attach</button>
-                <input id="global-agent-input" type="text" placeholder="Ask the agent anything..." class="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                <button id="global-agent-send" type="submit" class="px-4 py-2.5 rounded-xl bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition">Send</button>
-                <button id="global-agent-clear" type="button" class="px-3 py-2.5 rounded-xl border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50 transition">Clear</button>
+                                <input id="global-agent-files" type="file" class="hidden" multiple accept=".txt,.md,.csv,.json,.log,.xml,.yaml,.yml,.pdf,image/*" />
+                                <button id="global-agent-attach" type="button" class="px-3 py-2.5 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition flex items-center justify-center" aria-label="Attach">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l7.071-7.071a4 4 0 00-5.657-5.657l-7.071 7.07a6 6 0 108.485 8.486L19 13" />
+                                    </svg>
+                                </button>
+                                <input id="global-agent-input" type="text" placeholder="Ask the agent anything..." class="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                                <button id="global-agent-send" type="submit" class="px-4 py-2.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition flex items-center justify-center" aria-label="Send">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M22 2L11 13" />
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M22 2L15 22L11 13L2 9L22 2Z" />
+                                    </svg>
+                                </button>
+                                <button id="global-agent-clear" type="button" class="px-3 py-2.5 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition flex items-center justify-center" aria-label="Clear">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </button>
             </form>
             <p id="global-agent-files-hint" class="px-3 pb-3 text-xs text-gray-500 hidden"></p>
         </section>
