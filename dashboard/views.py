@@ -1,3 +1,4 @@
+from .analytics import get_dashboard_context
 # dashboard/views.py
 """
 Dashboard views for GTM Validator
@@ -52,190 +53,21 @@ from .utils import calculate_gap_metric_display_properties
 
 logger = logging.getLogger(__name__)
 
-AGENT_ATTACHMENT_MAX_FILES = 4
-AGENT_ATTACHMENT_MAX_BYTES = 6 * 1024 * 1024
-AGENT_ATTACHMENT_TEXT_LIMIT = 6000
-AGENT_ATTACHMENT_EXCERPT_LIMIT = 600
-AGENT_ALLOWED_EXTENSIONS = {
-    '.txt', '.md', '.csv', '.json', '.log', '.xml', '.yaml', '.yml',
-    '.pdf', '.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp',
-}
-AGENT_IMAGE_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.webp', '.gif', '.bmp'}
-
-
-def _normalize_content_type(uploaded_file) -> str:
-    guessed, _ = mimetypes.guess_type(uploaded_file.name or '')
-    return (uploaded_file.content_type or guessed or '').lower()
-
-
-def _extract_pdf_text(file_bytes: bytes) -> str:
-    """Extract text from PDF bytes when pypdf is available."""
-    try:
-        from pypdf import PdfReader
-    except Exception:
-        return ''
-
-    text_parts: List[str] = []
-    try:
-        reader = PdfReader(BytesIO(file_bytes))
-        for page in reader.pages[:8]:
-            page_text = page.extract_text() or ''
-            if page_text:
-                text_parts.append(page_text)
-            if sum(len(part) for part in text_parts) >= AGENT_ATTACHMENT_TEXT_LIMIT:
-                break
-    except Exception:
-        return ''
-
-    return '\n'.join(text_parts).strip()[:AGENT_ATTACHMENT_TEXT_LIMIT]
-
-
-def _extract_pdf_text_with_ai(file_bytes: bytes) -> str:
-    """Fallback PDF text extraction through Gemini when parser extraction is unavailable."""
-    try:
-        from gtm.ai_chat import _init_gemini_chat
-    except Exception:
-        return ''
-
-    model = _init_gemini_chat()
-    if not model:
-        return ''
-
-    try:
-        response = model.generate_content([
-            "Extract all readable text from this PDF document. Return plain text only.",
-            {
-                "mime_type": "application/pdf",
-                "data": file_bytes,
-            },
-        ])
-        extracted = (getattr(response, 'text', '') or '').strip()
-        return extracted[:AGENT_ATTACHMENT_TEXT_LIMIT]
-    except Exception:
-        return ''
-
-
-def _extract_image_text_with_ai(file_bytes: bytes) -> str:
-    """Use Gemini vision to OCR meaningful text from image attachments."""
-    try:
-        from PIL import Image
-        from gtm.ai_chat import _init_gemini_chat
-    except Exception:
-        return ''
-
-    model = _init_gemini_chat()
-    if not model:
-        return ''
-
-    try:
-        image = Image.open(BytesIO(file_bytes))
-        response = model.generate_content([
-            (
-                "Extract all readable text from this image. "
-                "Return plain text only, preserving important headings and bullet points."
-            ),
-            image,
-        ])
-        extracted = (getattr(response, 'text', '') or '').strip()
-        return extracted[:AGENT_ATTACHMENT_TEXT_LIMIT]
-    except Exception:
-        return ''
-
-
-def _extract_attachment_text(uploaded_file, file_bytes: bytes) -> Tuple[str, str]:
-    """Return extracted text and extraction status for an uploaded attachment."""
-    suffix = Path(uploaded_file.name or '').suffix.lower()
-    content_type = _normalize_content_type(uploaded_file)
-
-    if content_type.startswith('text/') or suffix in {'.txt', '.md', '.csv', '.json', '.log', '.xml', '.yaml', '.yml'}:
-        text = file_bytes.decode('utf-8', errors='ignore').strip()
-        return text[:AGENT_ATTACHMENT_TEXT_LIMIT], 'text_extracted'
-
-    if suffix == '.pdf' or content_type == 'application/pdf':
-        pdf_text = _extract_pdf_text(file_bytes)
-        if pdf_text:
-            return pdf_text, 'pdf_extracted'
-        pdf_text_ai = _extract_pdf_text_with_ai(file_bytes)
-        if pdf_text_ai:
-            return pdf_text_ai, 'pdf_ai_extracted'
-        return '', 'pdf_parse_unavailable'
-
-    if suffix in AGENT_IMAGE_EXTENSIONS or content_type.startswith('image/'):
-        image_text = _extract_image_text_with_ai(file_bytes)
-        if image_text:
-            return image_text, 'image_ocr_extracted'
-        return '', 'image_ocr_unavailable'
-
-    return '', 'unsupported_for_extraction'
-
-
-def _save_agent_attachment(uploaded_file, file_bytes: bytes) -> Tuple[str, str]:
-    suffix = Path(uploaded_file.name or '').suffix.lower()
-    stem = slugify(Path(uploaded_file.name or '').stem) or 'attachment'
-    stamp = timezone.now().strftime('%Y/%m')
-    filename = f"{uuid.uuid4().hex}_{stem[:60]}{suffix}"
-    storage_path = os.path.join('agent_uploads', stamp, filename).replace('\\\\', '/')
-    saved_path = default_storage.save(storage_path, ContentFile(file_bytes))
-    file_url = default_storage.url(saved_path)
-    return saved_path, file_url
-
-
-def _process_agent_attachments(uploaded_files) -> Tuple[List[Dict[str, Any]], str, List[str]]:
-    """Validate, persist, and extract text context from uploaded files."""
-    attachments: List[Dict[str, Any]] = []
-    context_parts: List[str] = []
-    warnings: List[str] = []
-
-    files = list(uploaded_files or [])
-    if len(files) > AGENT_ATTACHMENT_MAX_FILES:
-        warnings.append(f"Only the first {AGENT_ATTACHMENT_MAX_FILES} attachments were processed.")
-        files = files[:AGENT_ATTACHMENT_MAX_FILES]
-
-    for uploaded_file in files:
-        file_name = uploaded_file.name or 'attachment'
-        suffix = Path(file_name).suffix.lower()
-        content_type = _normalize_content_type(uploaded_file)
-
-        if suffix not in AGENT_ALLOWED_EXTENSIONS:
-            warnings.append(f"Unsupported file type skipped: {file_name}")
-            continue
-
-        if uploaded_file.size and uploaded_file.size > AGENT_ATTACHMENT_MAX_BYTES:
-            warnings.append(f"File exceeds 6 MB limit and was skipped: {file_name}")
-            continue
-
-        file_bytes = uploaded_file.read() or b''
-        uploaded_file.seek(0)
-        if not file_bytes:
-            warnings.append(f"Empty file skipped: {file_name}")
-            continue
-
-        extracted_text, extraction_status = _extract_attachment_text(uploaded_file, file_bytes)
-        saved_path, file_url = _save_agent_attachment(uploaded_file, file_bytes)
-
-        excerpt = extracted_text[:AGENT_ATTACHMENT_EXCERPT_LIMIT] if extracted_text else ''
-        attachments.append(
-            {
-                'name': file_name,
-                'content_type': content_type,
-                'size': uploaded_file.size or len(file_bytes),
-                'path': saved_path,
-                'url': file_url,
-                'extraction_status': extraction_status,
-                'excerpt': excerpt,
-            }
-        )
-
-        if extracted_text:
-            context_parts.append(
-                f"Attachment: {file_name}\nExtracted content:\n{extracted_text[:AGENT_ATTACHMENT_TEXT_LIMIT]}"
-            )
-        else:
-            context_parts.append(
-                f"Attachment: {file_name}\nNo extractable text was available ({extraction_status})."
-            )
-
-    return attachments, '\n\n---\n\n'.join(context_parts), warnings
+from .document_processors import (
+    AGENT_ATTACHMENT_MAX_FILES,
+    AGENT_ATTACHMENT_MAX_BYTES,
+    AGENT_ATTACHMENT_TEXT_LIMIT,
+    AGENT_ATTACHMENT_EXCERPT_LIMIT,
+    AGENT_ALLOWED_EXTENSIONS,
+    AGENT_IMAGE_EXTENSIONS,
+    _normalize_content_type,
+    _extract_pdf_text,
+    _extract_pdf_text_with_ai,
+    _extract_image_text_with_ai,
+    _extract_attachment_text,
+    _save_agent_attachment,
+    _process_agent_attachments,
+)
 
 # ================================================================
 # RESOURCE LIBRARY VIEWS
@@ -255,395 +87,19 @@ def _md(text: str) -> str:
     return markdown.markdown(text, extensions=['extra', 'nl2br', 'sane_lists'])
 
 
-def log_workspace_activity(workspace, actor, event_type, summary, object_type='', object_id='', metadata=None, session=None):
-    """Create a workspace activity event if workspace context is available."""
-    if not workspace:
-        return
-    WorkspaceActivityEvent.objects.create(
-        workspace=workspace,
-        session=session,
-        actor=actor if getattr(actor, 'is_authenticated', False) else None,
-        event_type=event_type,
-        summary=summary,
-        object_type=object_type or '',
-        object_id=str(object_id) if object_id else '',
-        metadata=metadata or {},
-    )
+from .parsers import (
+    log_workspace_activity,
+    _extract_create_task_command,
+    _normalize_task_status,
+    _extract_move_task_command,
+    _extract_delete_task_command,
+    _extract_comment_task_command,
+    _resolve_assignee,
+    _task_command_queryset,
+    _resolve_task_for_command,
+    _run_dashboard_action_command,
+)
 
-
-def _extract_create_task_command(message):
-    """Parse simple dashboard action commands like: add a task called "X" and assign to Y."""
-    if not message:
-        return None
-
-    text = message.strip()
-
-    quoted_pattern = re.compile(
-        r"^(?:add|create)\s+(?:a\s+)?task(?:\s+(?:called|named))?\s+[\"'](?P<title>[^\"']+)[\"'](?:\s+and\s+assign(?:\s+it)?\s+to\s+(?P<assignee>.+))?$",
-        re.IGNORECASE,
-    )
-    plain_pattern = re.compile(
-        r"^(?:add|create)\s+(?:a\s+)?task(?:\s+(?:called|named))?\s+(?P<title>[^\n,.]+?)(?:\s+and\s+assign(?:\s+it)?\s+to\s+(?P<assignee>[^\n,.]+))?$",
-        re.IGNORECASE,
-    )
-
-    match = quoted_pattern.match(text) or plain_pattern.match(text)
-    if not match:
-        return None
-
-    title = (match.group('title') or '').strip().strip('"\'')
-    assignee = (match.group('assignee') or '').strip().strip('"\'')
-    if not title:
-        return None
-
-    return {
-        'action': 'create_task',
-        'title': title[:240],
-        'assignee': assignee,
-    }
-
-
-def _normalize_task_status(raw_status):
-    if not raw_status:
-        return None
-    cleaned = raw_status.strip().lower().replace('-', ' ').replace('_', ' ')
-    mapping = {
-        'todo': 'todo',
-        'to do': 'todo',
-        'backlog': 'todo',
-        'doing': 'doing',
-        'in progress': 'doing',
-        'progress': 'doing',
-        'done': 'done',
-        'complete': 'done',
-        'completed': 'done',
-        'finish': 'done',
-        'finished': 'done',
-    }
-    return mapping.get(cleaned)
-
-
-def _extract_move_task_command(message):
-    if not message:
-        return None
-    text = message.strip()
-
-    patterns = [
-        re.compile(
-            r"^(?:move|set|update|change)\s+task\s+(?P<target>.+?)\s+(?:to|as)\s+(?P<status>todo|to do|doing|in progress|done|complete|completed|finished)$",
-            re.IGNORECASE,
-        ),
-        re.compile(
-            r"^(?:move|set|update|change)\s+[\"'](?P<target>[^\"']+)[\"']\s+(?:to|as)\s+(?P<status>todo|to do|doing|in progress|done|complete|completed|finished)$",
-            re.IGNORECASE,
-        ),
-        re.compile(
-            r"^(?:mark)\s+task\s+(?P<target>.+?)\s+(?:as\s+)?(?P<status>done|complete|completed|finished|doing|in progress|todo|to do)$",
-            re.IGNORECASE,
-        ),
-    ]
-
-    match = None
-    for pattern in patterns:
-        match = pattern.match(text)
-        if match:
-            break
-    if not match:
-        return None
-
-    status = _normalize_task_status(match.group('status'))
-    target = (match.group('target') or '').strip().strip('"\'')
-    if not target or not status:
-        return None
-
-    return {
-        'action': 'move_task',
-        'target': target,
-        'status': status,
-    }
-
-
-def _extract_delete_task_command(message):
-    if not message:
-        return None
-    text = message.strip()
-
-    patterns = [
-        re.compile(r"^(?:delete|remove)\s+task\s+[\"'](?P<target>[^\"']+)[\"']$", re.IGNORECASE),
-        re.compile(r"^(?:delete|remove)\s+task\s+(?P<target>.+)$", re.IGNORECASE),
-    ]
-    match = None
-    for pattern in patterns:
-        match = pattern.match(text)
-        if match:
-            break
-    if not match:
-        return None
-
-    target = (match.group('target') or '').strip().strip('"\'')
-    return {'action': 'delete_task', 'target': target} if target else None
-
-
-def _extract_comment_task_command(message):
-    if not message:
-        return None
-    text = message.strip()
-
-    patterns = [
-        re.compile(
-            r"^(?:add\s+)?comment\s+(?:on|to)\s+task\s+(?P<target>.+?)\s*:\s*(?P<comment>.+)$",
-            re.IGNORECASE,
-        ),
-        re.compile(
-            r"^(?:add\s+)?comment\s+[\"'](?P<comment>[^\"']+)[\"']\s+(?:on|to)\s+task\s+(?P<target>.+)$",
-            re.IGNORECASE,
-        ),
-        re.compile(
-            r"^(?:add\s+)?note\s+(?:on|to)\s+task\s+(?P<target>.+?)\s*:\s*(?P<comment>.+)$",
-            re.IGNORECASE,
-        ),
-    ]
-    match = None
-    for pattern in patterns:
-        match = pattern.match(text)
-        if match:
-            break
-    if not match:
-        return None
-
-    target = (match.group('target') or '').strip().strip('"\'')
-    comment = (match.group('comment') or '').strip().strip('"\'')
-    if not target or not comment:
-        return None
-
-    return {
-        'action': 'comment_task',
-        'target': target,
-        'comment': comment[:500],
-    }
-
-
-def _resolve_assignee(current_workspace, assignee_text):
-    """Resolve assignee name/email to a user in the current workspace."""
-    if not current_workspace or not assignee_text:
-        return None
-
-    candidate = assignee_text.strip()
-    memberships = WorkspaceMembership.objects.filter(
-        workspace=current_workspace,
-        is_active=True,
-    ).select_related('user')
-
-    for membership in memberships:
-        user = membership.user
-        full_name = (user.get_full_name() or '').strip().lower()
-        username = (user.username or '').strip().lower()
-        email = (user.email or '').strip().lower()
-        check = candidate.lower()
-        if check in {full_name, username, email}:
-            return user
-
-    matches = memberships.filter(
-        models.Q(user__first_name__icontains=candidate)
-        | models.Q(user__last_name__icontains=candidate)
-        | models.Q(user__username__icontains=candidate)
-        | models.Q(user__email__icontains=candidate)
-    )
-    membership = matches.first()
-    return membership.user if membership else None
-
-
-def _task_command_queryset(request, session, current_workspace):
-    if current_workspace:
-        return ActionItem.objects.filter(workspace=current_workspace)
-    return ActionItem.objects.filter(
-        workspace__isnull=True,
-        session__user=request.user,
-    )
-
-
-def _resolve_task_for_command(request, session, current_workspace, target):
-    """Resolve a task by id or title within current workspace/personal scope."""
-    base_qs = _task_command_queryset(request, session, current_workspace)
-    token = (target or '').strip().strip('"\'')
-    if not token:
-        return None
-
-    if token.isdigit():
-        return base_qs.filter(pk=int(token)).first()
-
-    by_exact = base_qs.filter(note__iexact=token).order_by('-updated_at')
-    if by_exact.exists():
-        return by_exact.first()
-
-    session_first = base_qs.filter(session=session, note__icontains=token).order_by('-updated_at')
-    if session_first.exists():
-        return session_first.first()
-
-    return base_qs.filter(note__icontains=token).order_by('-updated_at').first()
-
-
-def _run_dashboard_action_command(request, session, current_workspace, message):
-    """Execute deterministic dashboard commands before free-form AI chat."""
-    cmd = (
-        _extract_create_task_command(message)
-        or _extract_move_task_command(message)
-        or _extract_delete_task_command(message)
-        or _extract_comment_task_command(message)
-    )
-    if not cmd:
-        return None
-
-    actor_name = request.user.get_full_name() or request.user.username
-
-    if cmd['action'] == 'create_task':
-        assigned_user = _resolve_assignee(current_workspace, cmd['assignee'])
-        item = ActionItem.objects.create(
-            session=session,
-            workspace=current_workspace,
-            note=cmd['title'],
-            status='todo',
-            created_by=request.user,
-            assigned_to=assigned_user,
-            owner=(assigned_user.get_full_name() if assigned_user else actor_name),
-        )
-
-        assignee_text = assigned_user.get_full_name() or assigned_user.username if assigned_user else None
-        if current_workspace:
-            summary = (
-                f"{actor_name} created task '{item.note}'"
-                + (f" and assigned it to {assignee_text}." if assignee_text else ".")
-            )
-            log_workspace_activity(
-                current_workspace,
-                request.user,
-                'task_created',
-                summary,
-                object_type='action_item',
-                object_id=item.id,
-                metadata={'source': 'dashboard_agent', 'assigned_to': assignee_text or ''},
-                session=item.session,
-            )
-
-        if cmd['assignee'] and not assigned_user and current_workspace:
-            response_text = (
-                f"✅ Task created: **{item.note}** (To do).\n"
-                f"I could not find **{cmd['assignee']}** in this workspace, so it is currently unassigned."
-            )
-        elif assignee_text:
-            response_text = f"✅ Task created: **{item.note}** and assigned to **{assignee_text}**."
-        else:
-            response_text = f"✅ Task created: **{item.note}** (To do)."
-
-        return {
-            'success': True,
-            'response': response_text,
-            'intent': 'dashboard_action',
-            'action': {
-                'type': 'create_task',
-                'task_id': item.id,
-                'assigned_to': assignee_text,
-            }
-        }
-
-    task = _resolve_task_for_command(request, session, current_workspace, cmd.get('target'))
-    if not task:
-        return {
-            'success': True,
-            'response': "I could not find that task in your current workspace context. Try using the task ID or exact title.",
-            'intent': 'dashboard_action',
-            'action': {'type': 'not_found'},
-        }
-
-    if cmd['action'] == 'move_task':
-        if current_workspace:
-            membership = WorkspaceMembership.objects.filter(
-                user=request.user,
-                workspace=current_workspace,
-                is_active=True,
-            ).first()
-            if not membership or not membership.can_assign_tasks:
-                return {
-                    'success': True,
-                    'response': "You do not have permission to move tasks in this workspace.",
-                    'intent': 'dashboard_action',
-                    'action': {'type': 'permission_denied'},
-                }
-
-        task.status = cmd['status']
-        task.save(update_fields=['status', 'updated_at'])
-
-        if current_workspace:
-            log_workspace_activity(
-                current_workspace,
-                request.user,
-                'task_moved',
-                f"{actor_name} moved task '{task.note[:80]}' to {task.get_status_display()}.",
-                object_type='action_item',
-                object_id=task.id,
-                metadata={'source': 'dashboard_agent', 'status': task.status},
-                session=task.session,
-            )
-
-        return {
-            'success': True,
-            'response': f"✅ Moved **{task.note}** to **{task.get_status_display()}**.",
-            'intent': 'dashboard_action',
-            'action': {'type': 'move_task', 'task_id': task.id, 'status': task.status},
-        }
-
-    if cmd['action'] == 'delete_task':
-        task_id = task.id
-        task_note = task.note
-        task_session = task.session
-        task.delete()
-
-        if current_workspace:
-            log_workspace_activity(
-                current_workspace,
-                request.user,
-                'task_deleted',
-                f"{actor_name} deleted task '{task_note[:80]}'.",
-                object_type='action_item',
-                object_id=task_id,
-                metadata={'source': 'dashboard_agent'},
-                session=task_session,
-            )
-
-        return {
-            'success': True,
-            'response': f"🗑️ Deleted task **{task_note}**.",
-            'intent': 'dashboard_action',
-            'action': {'type': 'delete_task', 'task_id': task_id},
-        }
-
-    if cmd['action'] == 'comment_task':
-        comment = ActionItemComment.objects.create(
-            action_item=task,
-            user=request.user,
-            text=cmd['comment'],
-        )
-
-        if current_workspace:
-            log_workspace_activity(
-                current_workspace,
-                request.user,
-                'comment_added',
-                f"{actor_name} commented on task '{task.note[:80]}'.",
-                object_type='action_item',
-                object_id=task.id,
-                metadata={'source': 'dashboard_agent', 'comment_id': str(comment.id)},
-                session=task.session,
-            )
-
-        return {
-            'success': True,
-            'response': f"💬 Added comment to **{task.note}**.",
-            'intent': 'dashboard_action',
-            'action': {'type': 'comment_task', 'task_id': task.id, 'comment_id': str(comment.id)},
-        }
-
-    return None
 
 
 def _resolve_dashboard_workspace(request):
@@ -1333,6 +789,7 @@ def add_edit_resource(request, pk=None):
                 response = refresh_resources(request)
                 response['HX-Trigger'] = json.dumps({
                     'closeModal': True,
+                    'workspaceUpdated': True,
                     'resourceToast': {
                         'message': f"Resource {action_label} successfully.",
                         'level': 'success'
@@ -1873,344 +1330,7 @@ def dashboard(request):
             if orphaned_items.exists():
                 orphaned_items.update(workspace=current_workspace)
     
-    # Filter data by workspace if selected
-    if current_workspace:
-        # Workspace-scoped data
-        assessments_qs = AssessmentSession.objects.filter(workspace=current_workspace)
-        action_items_qs = ActionItem.objects.filter(workspace=current_workspace).select_related('assigned_to', 'session')
-    else:
-        # Fallback to user's data (legacy support)
-        assessments_qs = AssessmentSession.objects.filter(user=request.user) if request.user.is_authenticated else AssessmentSession.objects.none()
-        action_items_qs = ActionItem.objects.filter(session__user=request.user).select_related('assigned_to', 'session') if request.user.is_authenticated else ActionItem.objects.none()
-
-    # Recent validator results for dashboard
-    if current_workspace:
-        validator_results = ResultSnapshot.objects.filter(session__workspace=current_workspace).select_related('session', 'band').order_by('-created_at')[:10]
-    else:
-        validator_results = ResultSnapshot.objects.filter(session__user=request.user).select_related('session', 'band').order_by('-created_at')[:10] if request.user.is_authenticated else []
-
-    # Weekly Activity: Sessions, Items Created, Items Completed per day (last 7 days)
-    today = timezone.now().date()
-    days = [(today - datetime.timedelta(days=i)) for i in range(6, -1, -1)]
-    weekly_activity = []
-    for day in days:
-        sessions = assessments_qs.filter(created_at__date=day).count()
-        items_created = action_items_qs.filter(created_at__date=day).count()
-        if 'completed_at' in [f.name for f in ActionItem._meta.fields]:
-            items_completed = action_items_qs.filter(status='done', completed_at__date=day).count()
-        else:
-            items_completed = action_items_qs.filter(status='done', created_at__date=day).count()
-        weekly_activity.append({
-            'date': day.strftime('%Y-%m-%d'),
-            'label': day.strftime('%a'),
-            'sessions': sessions,
-            'items_created': items_created,
-            'items_completed': items_completed
-        })
-
-    # KPIs with percentage changes (now workspace-scoped)
-    total_sessions = assessments_qs.count()
-    completed_items = action_items_qs.filter(status='done').count()
-    pending_items = action_items_qs.exclude(status='done').count()
-    
-    # Calculate percentage changes (compare this week vs last week)
-    this_week_start = today - datetime.timedelta(days=today.weekday())
-    last_week_start = this_week_start - datetime.timedelta(days=7)
-    last_week_end = this_week_start - datetime.timedelta(days=1)
-    
-    # Sessions this week vs last week (workspace-scoped)
-    this_week_sessions = assessments_qs.filter(
-        created_at__date__gte=this_week_start
-    ).count()
-    last_week_sessions = assessments_qs.filter(
-        created_at__date__gte=last_week_start,
-        created_at__date__lte=last_week_end
-    ).count()
-    
-    # Calculate percentage change for sessions
-    sessions_change = 0
-    sessions_change_positive = True
-    sessions_has_meaningful_change = False
-    if last_week_sessions > 0:
-        sessions_change = round(((this_week_sessions - last_week_sessions) / last_week_sessions) * 100)
-        sessions_change_positive = sessions_change >= 0
-        sessions_has_meaningful_change = sessions_change != 0
-    # Don't show percentage for 0 -> anything transitions
-    
-    # Completed items this week vs last week (workspace-scoped)
-    # Use updated_at so moving an existing task to Done this week is counted.
-    this_week_completed = action_items_qs.filter(
-        status='done',
-        updated_at__date__gte=this_week_start
-    ).count()
-    last_week_completed = action_items_qs.filter(
-        status='done',
-        updated_at__date__gte=last_week_start,
-        updated_at__date__lte=last_week_end
-    ).count()
-    
-    # Calculate percentage change for completed items
-    completed_change = 0
-    completed_change_positive = True
-    completed_has_meaningful_change = False
-    if last_week_completed > 0:
-        completed_change = round(((this_week_completed - last_week_completed) / last_week_completed) * 100)
-        completed_change_positive = completed_change >= 0
-        completed_has_meaningful_change = completed_change != 0
-    elif this_week_completed > 0:
-        # Zero-baseline transition: show visible movement instead of "No change this week".
-        completed_change = 100
-        completed_change_positive = True
-        completed_has_meaningful_change = True
-    # Otherwise both weeks are zero -> no meaningful change.
-        
-    # Pending items this week vs last week (workspace-scoped)
-    this_week_pending = action_items_qs.filter(
-        status__in=['todo', 'doing'], 
-        created_at__date__gte=this_week_start
-    ).count()
-    last_week_pending = action_items_qs.filter(
-        status__in=['todo', 'doing'],
-        created_at__date__gte=last_week_start,
-        created_at__date__lte=last_week_end
-    ).count()
-    
-    # Calculate percentage change for pending items (negative is good)
-    pending_change = 0
-    pending_change_positive = False  # For pending items, decrease is positive
-    pending_has_meaningful_change = False
-    if last_week_pending > 0:
-        raw_change = ((this_week_pending - last_week_pending) / last_week_pending) * 100
-        pending_change = round(abs(raw_change))
-        pending_change_positive = raw_change < 0  # Decrease in pending is good
-        pending_has_meaningful_change = pending_change != 0
-    recent_items = action_items_qs.order_by('-created_at')[:8]
-
-    # Chart data: Sessions per day (last 7 days) - workspace-scoped
-    sessions_per_day = [assessments_qs.filter(created_at__date=day).count() for day in days]
-    days_labels = [day.strftime('%a') for day in days]
-
-    # Status breakdown for donut chart
-    status_breakdown = {
-        'completed': completed_items,
-        'pending': pending_items
-    }
-
-    # Top action items by status (workspace-scoped)
-    top_todo = action_items_qs.filter(status='todo').order_by('due_date')
-    top_doing = action_items_qs.filter(status='doing').order_by('due_date')
-    top_done = action_items_qs.filter(status='done').order_by('-created_at')
-
-    # Tool recommendations: only show if there are assessments in workspace
-    if assessments_qs.exists():
-        top_tools_qs = ToolRecommendation.objects.all()[:5]
-        top_tools = []
-        for tool in top_tools_qs:
-            if tool.tools:
-                tool.tools_list = [t.strip().lower().title() for t in tool.tools.split(',')]
-            else:
-                tool.tools_list = []
-            top_tools.append(tool)
-    else:
-        top_tools = []
-
-    # Insights (from ResultSnapshot.ai_playbook) - WORKSPACE-SCOPED
-    if current_workspace:
-        insights_qs = ResultSnapshot.objects.filter(
-            session__workspace=current_workspace
-        ).exclude(ai_playbook="").order_by('-created_at')[:5]
-    else:
-        insights_qs = ResultSnapshot.objects.filter(
-            session__user=request.user
-        ).exclude(ai_playbook="").order_by('-created_at')[:5] if request.user.is_authenticated else ResultSnapshot.objects.none()
-    
-    insights = []
-    for insight in insights_qs:
-        insight.playbook_html = markdown.markdown(insight.ai_playbook or "")
-        insights.append(insight)
-
-    # Recent chat messages - WORKSPACE-SCOPED
-    if current_workspace:
-        recent_chats_qs = ChatMessage.objects.filter(
-            session__workspace=current_workspace
-        )
-    else:
-        recent_chats_qs = ChatMessage.objects.filter(
-            session__user=request.user
-        ) if request.user.is_authenticated else ChatMessage.objects.none()
-
-    recent_agent_actions = _collect_recent_action_feed(request, current_workspace, max_items=6)
-
-    # GTM Assessment History & Trends (workspace-scoped)
-    assessment_history = []
-    assessment_stats = None
-    score_trend_data = {'labels': [], 'scores': []}
-    agent_session_options = []
-    dashboard_agent_session = None
-    dashboard_agent_prompts = []
-    dashboard_agent_history = []
-    
-    if request.user.is_authenticated:
-        # Get completed assessments for the workspace (or user if no workspace)
-        completed_sessions = assessments_qs.filter(
-            is_completed=True
-        ).order_by('-created_at')[:10]
-        
-        all_scores = []
-        for session in completed_sessions:
-            cat_scores, overall = _compute_scores(session)
-            band = _band_for_score(overall)
-            assessment_history.append({
-                'session': session,
-                'uuid': session.uuid,
-                'company_name': session.company_name or 'Unnamed',
-                'industry': session.industry or 'N/A',
-                'overall_score': round(overall, 1),
-                'band_stage': band.stage if band else 'Unknown',
-                'created_at': session.created_at,
-            })
-            all_scores.append(overall)
-        
-        # Calculate statistics
-        if all_scores:
-            total_assessments = len(all_scores)
-            avg_score = sum(all_scores) / len(all_scores)
-            improvement = 0
-            if len(all_scores) >= 2:
-                improvement = all_scores[0] - all_scores[-1]  # Latest - First
-            
-            assessment_stats = {
-                'total': total_assessments,
-                'average': round(avg_score, 1),
-                'improvement': round(improvement, 1),
-                'latest_score': round(all_scores[0], 1) if all_scores else 0,
-            }
-            
-            # Prepare trend chart data (reverse to show chronological order)
-            score_trend_data = {
-                'labels': [s['created_at'].strftime('%m/%d') for s in reversed(assessment_history)],
-                'scores': list(reversed(all_scores))
-            }
-
-        agent_session_options = [
-            {
-                'uuid': str(session.uuid),
-                'label': f"{session.company_name or 'Unnamed'} • {session.created_at.strftime('%b %d, %Y')}",
-            }
-            for session in completed_sessions
-        ]
-        if not agent_session_options:
-            agent_session_options = [
-                {
-                    'uuid': str(session.uuid),
-                    'label': f"{session.company_name or 'Unnamed'} • {session.created_at.strftime('%b %d, %Y')}",
-                }
-                for session in assessments_qs.order_by('-created_at')[:10]
-            ]
-
-        if agent_session_options:
-            if agent_session_id and any(option['uuid'] == agent_session_id for option in agent_session_options):
-                dashboard_agent_session = assessments_qs.filter(uuid=agent_session_id).first()
-            if not dashboard_agent_session:
-                dashboard_agent_session = assessments_qs.filter(uuid=agent_session_options[0]['uuid']).first()
-
-            if dashboard_agent_session:
-                dashboard_agent_prompts = get_suggested_prompts(dashboard_agent_session)
-                history_qs = ChatMessage.objects.filter(session=dashboard_agent_session).order_by('-created_at')[:30]
-                chats = list(reversed(history_qs))
-                for chat in chats:
-                    chat.response_html = _md(chat.response or '')
-                dashboard_agent_history = chats
-
-    # Convert markdown notes to HTML for all relevant items
-    def convert_notes(items):
-        for item in items:
-            item.note_html = markdown.markdown(item.note or "")
-        return items
-
-    recent_items = convert_notes(list(recent_items))
-
-    # Channel analytics for donut chart
-    channels = Channel.objects.all()
-    analytics_qs = ChannelAnalytics.objects.filter(date=today)
-    total_revenue = sum(a.revenue for a in analytics_qs)
-    channel_data = []
-    for channel in channels:
-        analytics = analytics_qs.filter(channel=channel).first()
-        if analytics and total_revenue > 0:
-            percent = (analytics.revenue / total_revenue) * 100
-            channel_data.append({
-                "name": channel.name,
-                "percent": round(percent, 2),
-                "change": analytics.change,
-                "color": channel.color,
-            })
-
-    # --- Gap Analysis Logic --- (workspace-scoped)
-    if current_workspace:
-        gap_analysis = GapAnalysisMetric.objects.filter(
-            workspace=current_workspace
-        ).order_by('category', 'priority')
-        latest_completed_gap_session = AssessmentSession.objects.filter(
-            workspace=current_workspace,
-            is_completed=True,
-        ).order_by('-created_at').first()
-    else:
-        gap_analysis = GapAnalysisMetric.objects.filter(
-            user=request.user, workspace__isnull=True
-        ).order_by('category', 'priority') if request.user.is_authenticated else GapAnalysisMetric.objects.none()
-        latest_completed_gap_session = AssessmentSession.objects.filter(
-            user=request.user,
-            is_completed=True,
-        ).order_by('-created_at').first() if request.user.is_authenticated else None
-    for metric in gap_analysis:
-        calculate_gap_metric_display_properties(metric)
-
-    gap_suggestions = _load_pending_gap_suggestions(request, current_workspace) if request.user.is_authenticated else []
-
-    if current_workspace:
-        gap_report_url = f"{reverse('gap_report')}?workspace={current_workspace.id}"
-    else:
-        gap_report_url = reverse('gap_report')
-    
-    context = {
-        'total_sessions': total_sessions,
-        'completed_items': completed_items,
-        'pending_items': pending_items,
-        'sessions_change': sessions_change,
-        'sessions_change_positive': sessions_change_positive,
-        'sessions_has_meaningful_change': sessions_has_meaningful_change,
-        'completed_change': completed_change,
-        'completed_change_positive': completed_change_positive,
-        'completed_has_meaningful_change': completed_has_meaningful_change,
-        'pending_change': pending_change,
-        'pending_change_positive': pending_change_positive,
-        'pending_has_meaningful_change': pending_has_meaningful_change,
-        'recent_items': recent_items,
-        'sessions_per_day': sessions_per_day,
-        'days_labels': days_labels,
-        'status_breakdown': status_breakdown,
-        'top_tools': top_tools,
-        'insights': insights,
-        'recent_agent_actions': recent_agent_actions,
-        'weekly_activity': weekly_activity,
-        'validator_results': validator_results,
-        'channel_data': channel_data,
-        'gap_analysis': gap_analysis,
-        'gap_suggestions': gap_suggestions,
-        'latest_completed_gap_session': latest_completed_gap_session,
-        'gap_report_url': gap_report_url,
-        'assessment_history': assessment_history,
-        'assessment_stats': assessment_stats,
-        'score_trend_data': score_trend_data,
-        'agent_session_options': agent_session_options,
-        'dashboard_agent_session': dashboard_agent_session,
-        'dashboard_agent_prompts': dashboard_agent_prompts,
-        'dashboard_agent_history': dashboard_agent_history,
-        # Workspace context
-        'current_workspace': current_workspace,
-        'user_workspaces': user_workspaces,
-    }
+    context = get_dashboard_context(request, current_workspace, user_workspaces, agent_session_id)
 
     if request.htmx:
         return render(request, 'dashboard/partials/dashboard_content.html', context)
@@ -2570,7 +1690,7 @@ def refresh_action_items(request):
         memberships = WorkspaceMembership.objects.filter(user=request.user).select_related('workspace')
         user_workspaces = [m.workspace for m in memberships]
         try:
-            current_workspace = next(w for w in user_workspaces if str(w.id) == workspace_id)
+            current_workspace = next(w for w in user_workspaces if str(w.id) == str(workspace_id))
         except StopIteration:
             current_workspace = None
     
@@ -2803,9 +1923,13 @@ def move_action_item(request, pk, new_status):
             item = get_object_or_404(ActionItem, pk=pk, session__user=request.user, workspace__isnull=True)
         
         if new_status in ['todo', 'doing', 'done']:
+            if new_status == 'done' and item.status != 'done':
+                from django.utils import timezone
+                item.completed_at = timezone.now()
+            elif new_status != 'done':
+                item.completed_at = None
             item.status = new_status
             item.save()
-
             log_workspace_activity(
                 current_workspace,
                 request.user,
@@ -3097,10 +2221,16 @@ def invite_to_workspace(request, workspace_id):
                 error = f'Failed to send invitation email: {e}'
 
     if success:
-        return render(request, 'dashboard/partials/invite_member_modal.html', {
+        response = render(request, 'dashboard/partials/invite_member_modal.html', {
             'success': True,
             'workspace': workspace,
         })
+        # Trigger background refresh of the hub
+        response['HX-Trigger'] = json.dumps({
+            'workspaceUpdated': True,
+            'resourceToast': {'message': f'Invitation sent to {email}', 'level': 'success'}
+        })
+        return response
     response = render(request, 'dashboard/partials/invite_member_modal.html', {
         'workspace': workspace,
         'error': error,

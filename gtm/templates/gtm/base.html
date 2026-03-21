@@ -416,6 +416,17 @@
     });
   </script>
 
+  <!-- HTMX Modal -->
+  <div id="modal" class="hidden fixed inset-0 z-[1050] overflow-y-auto">
+      <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+          <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeModal()"></div>
+          <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+          <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div id="modal-content"></div>
+          </div>
+      </div>
+  </div>
+
   <main class="max-w-6xl mx-auto px-4 py-8">
     <div id="main-content">
       {% block content %}{% endblock %}
@@ -474,6 +485,31 @@
 
   <!-- Global HTMX Event Handler for Chart Initialization -->
   <script>
+    // Modal functions
+    function openModal() {
+        document.getElementById('modal').classList.remove('hidden');
+    }
+    window.openModal = openModal;
+
+    function closeModal() {
+        document.getElementById('modal').classList.add('hidden');
+        document.getElementById('modal-content').innerHTML = '';
+    }
+    window.closeModal = closeModal;
+
+    // Close modal after HTMX form submission from modal
+    document.addEventListener('htmx:afterRequest', function(evt) {
+        if (evt.detail.successful && evt.detail.elt.closest('#modal')) {
+            if (evt.detail.elt.hasAttribute('data-hx-sustain')) return;
+            closeModal();
+        }
+    });
+
+    // Listen for closeModal trigger from server
+    document.body.addEventListener('closeModal', function() {
+        closeModal();
+    });
+
     // Re-initialize any charts after HTMX swaps content
     document.body.addEventListener('htmx:afterSwap', function(evt) {
       // Scroll to top of page after content swap

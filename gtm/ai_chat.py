@@ -14,6 +14,7 @@ from typing import Dict, Any, Optional, List
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 from .models import AssessmentSession, ResultSnapshot, Response, Question, Category, ActionItem, ChatMessage
+from dashboard.models import Resource
 from .views import _compute_scores, _band_for_score
 from .agent_services import build_execution_plan, review_action_items
 from .utils_logging import log_ai_error
@@ -272,6 +273,19 @@ def build_session_context(session: AssessmentSession) -> Dict[str, Any]:
     for resp in Response.objects.filter(session=session).exclude(context_note="").select_related('question'):
         context_notes.append(f"{resp.question.text}: {resp.context_note}")
 
+    # Workspace Resources
+    workspace_resources = []
+    if session.workspace:
+        from dashboard.models import Resource
+        resources = Resource.objects.filter(workspace=session.workspace)
+        for res in resources:
+            workspace_resources.append({
+                "name": res.name,
+                "type": res.get_resource_type_display(),
+                "category": res.get_category_display(),
+                "description": res.description or "No description provided."
+            })
+
     context = {
         "company_name": session.company_name or "your company",
         "industry": session.industry or "your industry",
@@ -304,6 +318,7 @@ def build_session_context(session: AssessmentSession) -> Dict[str, Any]:
         "action_items": action_summary,
         "has_playbook": bool(snap and snap.ai_playbook),
         "context_notes": context_notes,
+        "workspace_resources": workspace_resources,
     }
     return context
 
@@ -663,6 +678,10 @@ AI Playbook Available: {"Yes" if context['has_playbook'] else "No"}
 
 === ATTACHMENT CONTEXT (EXTRACTED) ===
 {supplemental_context if supplemental_context else 'No file or image attachments were provided for this message.'}
+
+=== WORKSPACE RESOURCE LIBRARY ===
+Below are internal documents, sales decks, and planning links available in this workspace. Refer to these when providing recommendations.
+{json.dumps(context.get('workspace_resources', []), indent=2)}
 
 === YOUR INSTRUCTIONS ===
 1. ALWAYS answer questions using the specific data above

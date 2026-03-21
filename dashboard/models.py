@@ -168,5 +168,23 @@ class Resource(models.Model):
             return 'link'
         if self.file:
             import os
-            return os.path.splitext(self.file.name)[1].lower().replace('.', '')
-        return 'file'
+            _, ext = os.path.splitext(self.file.name)
+            return ext.lower().replace('.', '')
+        return 'unknown'
+
+class AIResourceRecommendation(models.Model):
+    """
+    Links a GTM AssessmentSession to a recommended Resource from the workspace library,
+    based on AI analyzing the Assessment's weakest categories.
+    """
+    session = models.ForeignKey(AssessmentSession, on_delete=models.CASCADE, related_name="ai_resource_matches")
+    resource = models.ForeignKey(Resource, on_delete=models.CASCADE, related_name="ai_recommendations")
+    rationale = models.CharField(max_length=255, help_text="Short explanation of why this resource was recommended by AI")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('session', 'resource')
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Recommendation: {self.resource.name} for {self.session.uuid}"

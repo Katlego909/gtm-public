@@ -1,5 +1,7 @@
 // theme/static/js/dashboard-charts.js
 function initializeDashboardCharts(chartData) {
+    // Bail out if called without data (e.g. from afterSwap on non-dashboard pages)
+    if (!chartData || typeof chartData !== 'object') return;
     // --- Chart Configuration ---
     Chart.defaults.font.family = "'Inter', sans-serif";
     Chart.defaults.color = '#64748b';

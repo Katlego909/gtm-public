@@ -189,18 +189,7 @@
     <!-- Sidebar Backdrop -->
     <div id="sidebarBackdrop" class="hidden md:hidden fixed inset-0 z-30 bg-black bg-opacity-50 opacity-0 transition-opacity duration-300" onclick="toggleSidebar()"></div>
 
-    <!-- HTMX Modal -->
-    <div id="modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
-        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeModal()"></div>
 
-            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-
-            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                <div id="modal-content"></div>
-            </div>
-        </div>
-    </div>
 
     <aside id="sidebar" class="sidebar-transition fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 transform -translate-x-full md:relative md:translate-x-0 shadow-2xl md:shadow-none mt-16 md:mt-0">
         
@@ -449,11 +438,10 @@
         evt.detail.headers['X-Requested-With'] = 'XMLHttpRequest';
     });
 
-    // Re-initialize charts after HTMX swaps
+    // Re-initialize charts after HTMX swaps — only when chart canvases are present
     if (window.htmx) {
         htmx.on('htmx:afterSwap', function(evt) {
-            // Trigger chart initialization if the function exists
-            if (typeof window.initializeDashboardCharts === 'function') {
+            if (typeof window.initializeDashboardCharts === 'function' && document.querySelector('canvas')) {
                 setTimeout(() => window.initializeDashboardCharts(), 100);
             }
         });
@@ -481,6 +469,8 @@
     // Close modal after HTMX form submission from modal
     document.addEventListener('htmx:afterRequest', function(evt) {
         if (evt.detail.successful && evt.detail.elt.closest('#modal')) {
+            // If the element has data-hx-sustain, don't close automatically
+            if (evt.detail.elt.hasAttribute('data-hx-sustain')) return;
             closeModal();
         }
     });
@@ -878,5 +868,17 @@
     })();
     </script>
     {% block extra_js %}{% endblock %}
+    <!-- HTMX Modal -->
+    <div id="modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeModal()"></div>
+
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div id="modal-content"></div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

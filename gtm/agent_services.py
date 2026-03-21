@@ -110,6 +110,21 @@ def build_execution_plan(
         if len(suggested_items) >= limit:
             break
 
+    # 🔹 ADDED: Integrate AI Resource Recommendations as Action Items
+    from dashboard.models import AIResourceRecommendation
+    resource_recs = AIResourceRecommendation.objects.filter(session=session).select_related('resource')[:2]
+    for rec in resource_recs:
+        task_note = f"Review {rec.resource.name} ({rec.resource.get_category_display()}): {rec.rationale}"
+        task_key = task_note.lower()
+        if task_key not in existing_notes:
+            suggested_items.insert(0, {  # Priority 1: Review resources
+                "note": task_note,
+                "question": None, # Not tied to a single question
+                "response": None,
+                "due_date": base_due_date + timedelta(days=2), # Urgent win
+            })
+            existing_notes.add(task_key)
+
     if persist:
         for item in suggested_items:
             created_items.append(

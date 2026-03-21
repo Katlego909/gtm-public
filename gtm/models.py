@@ -1,7 +1,6 @@
 from django.db import models
 import uuid
 from django.conf import settings
-from django.contrib.postgres.fields import ArrayField 
 from django.core.serializers.json import DjangoJSONEncoder
 
 # Import workspace models so Django can find them
@@ -142,6 +141,7 @@ class ActionItem(models.Model):
     
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="todo")
     due_date = models.DateField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -210,6 +210,7 @@ class ResultSnapshot(models.Model):
     referrer       = models.CharField(max_length=200, blank=True, default="")
     report_sent = models.BooleanField(default=False)
     ai_playbook = models.TextField(blank=True, default="")
+    ai_risk_status = models.CharField(max_length=20, blank=True, default="")
 
     def __str__(self):
         return f"Snapshot for {self.session.uuid} – {self.overall}/100"

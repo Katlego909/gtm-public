@@ -273,12 +273,11 @@ You are a Go-To-Market strategy consultant.
 
 Create a **personalized 30-day GTM improvement playbook** for the company below.
 
-Include:
-- A short diagnostic summary (tone: helpful, professional)
-- Top 3 priority areas to focus on
-- 4-week action plan with weekly objectives
-- Success metrics (quantifiable goals)
-- Optional tool or process recommendations (if relevant)
+Respond ONLY with a valid, raw JSON object (do not include markdown codeblocks around the JSON, just the JSON string).
+Ensure the JSON has the following exact keys:
+1. "markdown_playbook": A comprehensive markdown string containing: A diagnostic summary, Top priority areas, a 4-week action plan, and success metrics.
+2. "risk_status": A single string value of either "High", "Medium", or "Low" representing the company's maturity risk.
+3. "learning_topics": An array of up to 3 short strings representing specific GTM concepts the company needs to learn/improve based on their weaknesses.
 
 Company: {data['company_name']}
 Industry: {data['industry']}
@@ -321,20 +320,51 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
                 response = model.generate_content(prompt)
                 text = response.text.strip()
                 if text:
-                    final_playbook_text = text
-                    # Log token usage
-                    if hasattr(response, 'usage_metadata'):
-                        usage = response.usage_metadata
-                        total_tokens = usage.total_token_count
-                        logger.info(
-                            f"✅ AI playbook generated for {snapshot.company_name} | "
-                            f"Tokens: {usage.prompt_token_count} input + {usage.candidates_token_count} output = {total_tokens} total"
-                        )
-                        # Track usage against quotas
-                        if MONITORING_AVAILABLE:
-                            AIUsageTracker.log_usage(total_tokens, 'playbook')
-                    else:
-                        logger.info(f"✅ AI playbook generated for {snapshot.company_name}")
+                    import json
+                    try:
+                        if text.startswith('```json'):
+                            text = text[7:-3].strip()
+                        elif text.startswith('```'):
+                            text = text[3:-3].strip()
+                        
+                        parsed = json.loads(text)
+                        final_playbook_text = parsed.get("markdown_playbook", "")
+                        snapshot.ai_risk_status = parsed.get("risk_status", "")
+                        
+                        topics = parsed.get("learning_topics", [])
+                        if topics and getattr(snapshot.session, 'workspace', None):
+                            from dashboard.models import Resource, AIResourceRecommendation
+                            from django.db.models import Q
+                            query = Q()
+                            for t in topics:
+                                query |= Q(name__icontains=t) | Q(description__icontains=t)
+                            
+                            matches = Resource.objects.filter(workspace=snapshot.session.workspace).filter(query).distinct()[:3]
+                            for r in matches:
+                                AIResourceRecommendation.objects.get_or_create(
+                                    session=snapshot.session,
+                                    resource=r,
+                                    defaults={'rationale': f"Recommended learning topic based on AI analysis"}
+                                )
+                    except Exception as json_err:
+                        # Fallback if json decoding fails
+                        logger.error(f"Failed to parse JSON for {snapshot.company_name}: {json_err}. Defaulting to raw text.")
+                        final_playbook_text = text
+                    
+                    if final_playbook_text:
+                        # Log token usage
+                        if hasattr(response, 'usage_metadata'):
+                            usage = response.usage_metadata
+                            total_tokens = usage.total_token_count
+                            logger.info(
+                                f"✅ AI playbook generated for {snapshot.company_name} | "
+                                f"Tokens: {usage.prompt_token_count} input + {usage.candidates_token_count} output = {total_tokens} total"
+                            )
+                            # Track usage against quotas
+                            if MONITORING_AVAILABLE:
+                                AIUsageTracker.log_usage(total_tokens, 'playbook')
+                        else:
+                            logger.info(f"✅ AI playbook generated for {snapshot.company_name}")
             except Exception as e:
                 if _is_quota_error(e):
                     _set_quota_cooldown(_extract_retry_delay_seconds(e))
@@ -370,7 +400,7 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
             
         # 🌟 CONSOLIDATED SAVE: Persist the final content once
         snapshot.ai_playbook = final_playbook_text
-        snapshot.save(update_fields=["ai_playbook"])
+        snapshot.save(update_fields=["ai_playbook", "ai_risk_status"])
 
         return final_playbook_text
     finally:
@@ -394,27 +424,26 @@ def _build_diagnostic_prompt(session: AssessmentSession, question: Question, sco
     quick_win_if_low = ai_metadata.get("quick_win_if_low") or "N/A"
     
     # Score severity mapping
-    severity = {1: "Critical Failure", 2: "Serious Gap", 3: "Improvement Needed"}.get(score, "Low Priority")
+    if score >= 4:
+        severity = {4: "Strong Foundation", 5: "Exceptional Performance"}.get(score, "Success")
+        task_desc = f"explain WHY this is a strategic strength for {company_name} and how it provides a competitive advantage. Focus on why this specific standard is a critical pillar for a GTM strategy at the {stage} stage."
+    else:
+        severity = {1: "Critical Failure", 2: "Serious Gap", 3: "Improvement Needed"}.get(score, "Low Priority")
+        task_desc = f"explain the **immediate risk** or **consequence** of this low score in the context of the {industry} industry and {stage} stage. Focus on the 'WHY this matters now' and the potential impact of inaction."
 
     prompt = f"""
-You are a highly experienced Go-To-Market consultant. Your task is to provide a brief, actionable diagnostic insight for a single low-scoring area.
+You are a highly experienced Go-To-Market consultant. Your task is to provide a brief, actionable insight for a company assessment area.
 
 Company Context:
 - Company Name: {company_name}
 - Industry: {industry}
 - GTM Stage: {stage}
-- Question ID: {question.id_code}
 - Question Text: {question.text}
-- User Score: {score}/5.0 (Severity: {severity})
-- Static Note (for context only): {question.diagnostic_note or 'N/A'}
-- Question Intent: {question_intent}
-- Evidence Hint: {evidence_hint}
-- Risk If Low: {risk_if_low}
-- Quick Win If Low: {quick_win_if_low}
+- User Score: {score}/5.0 (Status: {severity})
 
-Task: Generate a single, concise paragraph (max 5 sentences) that explains the **immediate risk** or **consequence** of this low score in the context of the company's industry and stage. Do NOT provide a full action plan; keep the focus on the "WHY this matters now."
+Task: {task_desc}
 
-Respond in clean, professional prose.
+Keep it to a single, concise paragraph (max 3-4 sentences). Respond in clean, professional prose.
     """.strip()
 
     return prompt
@@ -428,9 +457,9 @@ def generate_diagnostic_insight(response: Response) -> str:
     Returns the generated text.
     """
     
-    # Only generate for low scores (1 or 2) where the insight is critical
-    if response.score > 3:
-        return "" 
+    # Generate for all scores in weakest_questions now to ensure AI Insights are always present
+    # if response.score > 3:
+    #    return "" 
         
     model = _init_gemini()
     if not model or _quota_cooldown_active() or not _request_budget_available():

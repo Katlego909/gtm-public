@@ -125,6 +125,7 @@
                 dragClass: 'shadow-2xl',
                 handle: '.bg-white', // The card itself is draggable
                 filter: '.border-dashed, button, a, input, textarea, form', // Keep interactive controls clickable
+                preventOnFilter: false, // MUST BE FALSE for inputs to gain focus!
                 delayOnTouchOnly: true,
                 delay: 120,
                 onEnd: function(evt) {
