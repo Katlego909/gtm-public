@@ -11,12 +11,12 @@ from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
-# Gemini Free Tier Limits (as of Nov 2024)
+# Vertex AI Enterprise Tier Limits (Conservative Estimates)
 FREE_TIER_LIMITS = {
-    'requests_per_minute': 15,
-    'requests_per_day': 1500,
-    'tokens_per_minute': 1_000_000,
-    'tokens_per_day': 50_000_000,  # Estimated
+    'requests_per_minute': 60,
+    'requests_per_day': 2000,
+    'tokens_per_minute': 10_000_000,
+    'tokens_per_day': 200_000_000,
 }
 
 class AIUsageTracker:

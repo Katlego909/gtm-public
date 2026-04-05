@@ -15,6 +15,7 @@ from django.utils.html import strip_tags
 from .models import ResultSnapshot, RecommendationBand, AssessmentSession, Question, Response
 from .utils_logging import log_ai_error
 import re
+import json
 import markdown as md
 from django.utils.safestring import mark_safe
 
@@ -24,6 +25,31 @@ AI_QUOTA_COOLDOWN_CACHE_KEY = "gtm:ai:gemini:quota_cooldown_until"
 AI_REQUEST_COUNTER_CACHE_KEY = "gtm:ai:gemini:req_count:60s"
 AI_LOCK_TTL_SECONDS = 120
 AI_REQUEST_WINDOW_SECONDS = 60
+
+
+def _clean_json_response(text: str) -> str:
+    """
+    Cleans AI-generated text to ensure it's a valid JSON string.
+    Handles markdown code blocks and common formatting quirks.
+    """
+    if not text:
+        return ""
+    
+    # 1. Remove Markdown code labels and strip spaces
+    # Standard ```json label
+    text = re.sub(r'^```json\s*', '', text.strip(), flags=re.MULTILINE | re.IGNORECASE)
+    # Generic ``` label
+    text = re.sub(r'^```\s*', '', text, flags=re.MULTILINE)
+    # Closing ```
+    text = re.sub(r'\s*```$', '', text, flags=re.MULTILINE)
+    
+    # 2. Extract the first { and last } to ignore any conversational chatter
+    start = text.find('{')
+    end = text.rfind('}')
+    if start != -1 and end != -1:
+        text = text[start:end+1]
+    
+    return text.strip()
 
 
 def _is_quota_error(error: Exception) -> bool:
@@ -69,28 +95,17 @@ def _acquire_lock(lock_key: str, ttl_seconds: int = AI_LOCK_TTL_SECONDS) -> bool
     """Acquire a cache lock to avoid duplicate concurrent AI calls."""
     return cache.add(lock_key, "1", timeout=ttl_seconds)
 
+def _request_budget_available() -> bool:
+    """Vertex AI enterprise quota is much higher; using more relaxed budget."""
+    return True # Removed strict 4 RPM gate for Vertex AI
+
 
 def _release_lock(lock_key: str):
     """Release a previously acquired cache lock."""
     cache.delete(lock_key)
 
 
-def _request_budget_available() -> bool:
-    """Simple process-safe request budget gate to stay under free-tier RPM limits."""
-    max_requests = int(getattr(settings, "GEMINI_MAX_REQUESTS_PER_MINUTE", 4))
-
-    if cache.add(AI_REQUEST_COUNTER_CACHE_KEY, 1, timeout=AI_REQUEST_WINDOW_SECONDS):
-        return True
-
-    try:
-        current = cache.incr(AI_REQUEST_COUNTER_CACHE_KEY)
-    except ValueError:
-        cache.set(AI_REQUEST_COUNTER_CACHE_KEY, 1, timeout=AI_REQUEST_WINDOW_SECONDS)
-        return True
-
-    return current <= max_requests
-
-# Import AI usage tracker
+# Metadata and monitoring tools
 try:
     from .utils_ai_monitoring import AIUsageTracker
     MONITORING_AVAILABLE = True
@@ -100,12 +115,32 @@ except ImportError:
 def _normalize_ai_playbook_markdown(playbook_text: str) -> str:
     """
     Normalizes and cleans AI-generated markdown text for consistent rendering.
-    Assumes Gemini’s mixed formatting.
+    Handles both raw markdown and JSON-wrapped strings.
     """
     if not playbook_text:
         return ""
 
-    src = playbook_text.replace("\r\n", "\n").strip()
+    src = playbook_text.strip()
+
+    # 🛠️ JSON DETECTION (Last Line of Defense)
+    # If the text looks like it might contain a JSON object with our key
+    if "markdown_playbook" in src:
+        try:
+            # Try to extract and clean the JSON part
+            potential_json = _clean_json_response(src)
+            parsed = json.loads(potential_json)
+            if isinstance(parsed, dict) and "markdown_playbook" in parsed:
+                src = parsed["markdown_playbook"]
+        except (json.JSONDecodeError, Exception):
+            # Regex fallback: extract content of "markdown_playbook" key
+            # Standard: "markdown_playbook": "content"
+            # We look for the start and then capture everything until a delimiter OR the end of string
+            match = re.search(r'["\']markdown_playbook["\']\s*:\s*["\'](.*?)(?:["\']\s*,\s*["\']|["\']\s*}|$)', src, re.DOTALL)
+            if match:
+                src = match.group(1)
+
+    # Ensure literal \n from LLM/JSON artifacts are converted to real newlines
+    src = src.replace('\\n', '\n').replace('\\"', '"').replace("\r\n", "\n").strip()
 
     # 1️⃣ Convert inline " * " separators into proper bullet lines
     src = re.sub(r"\s\*\s+", "\n- ", src)
@@ -215,29 +250,32 @@ def _extract_tasks_from_playbook_regex(playbook_text: str) -> list:
 
 
 # ================================================================
-# TRY IMPORTING GEMINI CLIENT (SAFE IMPORT)
+# UNIFIED GENAI CLIENT (GCP VERTEX AI)
 # ================================================================
 try:
-    import google.generativeai as genai
-    GEMINI_AVAILABLE = True
+    from google import genai
+    from google.genai import types
+    GENAI_AVAILABLE = True
 except ImportError:
-    GEMINI_AVAILABLE = False
-    logger.warning("Gemini client not installed — AI playbook generation disabled.")
+    GENAI_AVAILABLE = False
+    logger.warning("google-genai client not installed — AI services disabled.")
 
-
-# ================================================================
-# INITIALIZE GEMINI CONFIG (SAFE)
-# ================================================================
-def _init_gemini():
-    """Safely initialize Gemini with API key if available."""
-    api_key = getattr(settings, "GEMINI_API_KEY", None)
-    if not GEMINI_AVAILABLE or not api_key:
+def _get_client():
+    """Initializes and returns the Unified Google GenAI client for Vertex AI."""
+    project_id = getattr(settings, "GCP_PROJECT_ID", None)
+    location = getattr(settings, "GCP_LOCATION", "us-central1")
+    
+    if not GENAI_AVAILABLE or not project_id:
         return None
     try:
-        genai.configure(api_key=api_key)
-        return genai.GenerativeModel("gemini-2.5-flash")
+        # The unified SDK uses vertexai=True to signal Enterprise backend
+        return genai.Client(
+            vertexai=True,
+            project=project_id,
+            location=location
+        )
     except Exception as e:
-        log_ai_error("Gemini initialization", e, service="google", model="gemini-2.5-flash")
+        log_ai_error("GenAI Client Initialization", e, service="google-genai")
         return None
 
 
@@ -312,25 +350,25 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
         return (snapshot.ai_playbook or "").strip()
 
     try:
-        # ---- 1️⃣ Attempt Gemini generation
-        model = _init_gemini()
-        if model and not _quota_cooldown_active() and _request_budget_available():
+        # ---- 1️⃣ Attempt Unified Gemini generation
+        client = _get_client()
+        if client and not _quota_cooldown_active() and _request_budget_available():
             prompt = _build_prompt(snapshot)
+            model_id = "gemini-2.5-flash"
             try:
-                response = model.generate_content(prompt)
+                response = client.models.generate_content(
+                    model=model_id,
+                    contents=prompt
+                )
                 text = response.text.strip()
                 if text:
-                    import json
                     try:
-                        if text.startswith('```json'):
-                            text = text[7:-3].strip()
-                        elif text.startswith('```'):
-                            text = text[3:-3].strip()
-                        
+                        text = _clean_json_response(text)
                         parsed = json.loads(text)
                         final_playbook_text = parsed.get("markdown_playbook", "")
-                        snapshot.ai_risk_status = parsed.get("risk_status", "")
+                        snapshot.ai_risk_status = parsed.get("risk_status", "Low")
                         
+                        # Process resources...
                         topics = parsed.get("learning_topics", [])
                         if topics and getattr(snapshot.session, 'workspace', None):
                             from dashboard.models import Resource, AIResourceRecommendation
@@ -347,9 +385,31 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
                                     defaults={'rationale': f"Recommended learning topic based on AI analysis"}
                                 )
                     except Exception as json_err:
-                        # Fallback if json decoding fails
-                        logger.error(f"Failed to parse JSON for {snapshot.company_name}: {json_err}. Defaulting to raw text.")
-                        final_playbook_text = text
+                        # 🚨 REPORT RESCUE: If JSON fails, manually extract the playbook content
+                        logger.error(f"Failed to parse JSON for {snapshot.company_name}: {json_err}. Rescuing playbook text.")
+                        
+                        # Try to find the markdown_playbook value using regex
+                        # We use [\"\'] to handle both single and double quotes from AI
+                        match = re.search(r'["\']markdown_playbook["\']\s*:\s*["\'](.*?)(?=["\']\s*,\s*["\']|["\']\s*})', text, re.DOTALL)
+                        
+                        if match:
+                            # Clean up the rescued text (fix escapes)
+                            rescuing = match.group(1)
+                            rescuing = rescuing.replace('\\n', '\n').replace('\\"', '"').replace("\\'", "'")
+                            final_playbook_text = rescuing.strip()
+                        elif "# " in text:
+                            # If no match but it looks like markdown, just strip any json-like prefix
+                            # Find first # (Markdown header)
+                            start_of_md = text.find("# ")
+                            if start_of_md != -1:
+                                final_playbook_text = text[start_of_md:].replace('\\n', '\n').strip()
+                                # Also strip a trailing quote if present
+                                if final_playbook_text.endswith('"') or final_playbook_text.endswith("'"):
+                                    final_playbook_text = final_playbook_text[:-1]
+                            else:
+                                final_playbook_text = text
+                        else:
+                            final_playbook_text = text
                     
                     if final_playbook_text:
                         # Log token usage
@@ -371,8 +431,8 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
                 log_ai_error(
                     "Playbook generation",
                     e,
-                    service="google",
-                    model="gemini-2.5-flash",
+                    service="google-genai",
+                    model=model_id,
                     prompt=prompt,
                     extra={"snapshot_id": snapshot.id},
                 )
@@ -461,9 +521,9 @@ def generate_diagnostic_insight(response: Response) -> str:
     # if response.score > 3:
     #    return "" 
         
-    model = _init_gemini()
-    if not model or _quota_cooldown_active() or not _request_budget_available():
-        logger.warning("Gemini client unavailable for diagnostic insight.")
+    client = _get_client()
+    if not client or _quota_cooldown_active() or not _request_budget_available():
+        logger.warning("GenAI client unavailable for diagnostic insight.")
         fallback = response.question.diagnostic_note or ""
         if fallback and not response.ai_insight:
             response.ai_insight = fallback
@@ -477,9 +537,13 @@ def generate_diagnostic_insight(response: Response) -> str:
     try:
         prompt = _build_diagnostic_prompt(response.session, response.question, response.score)
         text = ""
+        model_id = "gemini-2.5-flash"
         try:
-            # Use model to generate content
-            ai_response = model.generate_content(prompt)
+            # Use unified client to generate content
+            ai_response = client.models.generate_content(
+                model=model_id,
+                contents=prompt
+            )
             text = ai_response.text.strip()
             
             if text:
@@ -487,28 +551,23 @@ def generate_diagnostic_insight(response: Response) -> str:
                 response.ai_insight = text
                 response.save(update_fields=["ai_insight"])
                 
-                # Log token usage
+                # Log usage if metadata is present
                 if hasattr(ai_response, 'usage_metadata'):
                     usage = ai_response.usage_metadata
                     total_tokens = usage.total_token_count
-                    logger.info(
-                        f"✅ Diagnostic insight for {response.question.id_code} | "
-                        f"Tokens: {total_tokens}"
-                    )
-                    # Track usage against quotas
                     if MONITORING_AVAILABLE:
                         AIUsageTracker.log_usage(total_tokens, 'diagnostic')
-                else:
-                    logger.info(f"✅ Diagnostic insight generated for {response.question.id_code}")
+                
+                logger.info(f"✅ Diagnostic insight generated for {response.question.id_code}")
                 
         except Exception as e:
             if _is_quota_error(e):
                 _set_quota_cooldown(_extract_retry_delay_seconds(e))
-            log_ai_error(
+                log_ai_error(
                 "Diagnostic insight generation",
                 e,
-                service="google",
-                model="gemini-2.5-flash",
+                service="google-genai",
+                model=model_id,
                 prompt=prompt,
                 extra={"response_id": response.id},
             )
@@ -530,10 +589,11 @@ def generate_concise_action_items(playbook_text: str) -> list:
     Extracts and summarizes actionable items from the playbook text using AI.
     Returns a list of concise action strings.
     """
-    model = _init_gemini()
-    if not model or _quota_cooldown_active() or not _request_budget_available():
+    client = _get_client()
+    if not client or _quota_cooldown_active() or not _request_budget_available():
         return []
 
+    model_id = "gemini-2.5-flash"
     prompt = f"""
     Extract the key action items from the following GTM playbook text.
     Summarize each action item into a concise, actionable sentence (max 15 words).
@@ -545,10 +605,13 @@ def generate_concise_action_items(playbook_text: str) -> list:
     """
 
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model=model_id,
+            contents=prompt
+        )
         text = response.text.strip()
         # Split by newlines and filter empty lines
-        actions = [line.strip() for line in text.split('\\n') if line.strip()]
+        actions = [line.strip() for line in text.split('\n') if line.strip()]
         
         # Log usage
         if hasattr(response, 'usage_metadata'):
@@ -564,8 +627,8 @@ def generate_concise_action_items(playbook_text: str) -> list:
         log_ai_error(
             "Action item extraction",
             e,
-            service="google",
-            model="gemini-2.5-flash",
+            service="google-genai",
+            model=model_id,
             prompt=prompt,
         )
         return []
@@ -604,10 +667,11 @@ def rewrite_context_note_with_ai(note_text: str, question_text: str = "", mode: 
     if not source:
         return ""
 
-    model = _init_gemini()
-    if not model or _quota_cooldown_active() or not _request_budget_available():
+    client = _get_client()
+    if not client or _quota_cooldown_active() or not _request_budget_available():
         return _fallback_rewrite_context_note(source, mode)
 
+    model_id = "gemini-2.5-flash"
     mode_instruction = {
         "rewrite": "Rewrite the note in clearer plain English while preserving meaning.",
         "summarize": "Summarize the note into one short clear sentence.",
@@ -632,7 +696,10 @@ User note:
 """.strip()
 
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model=model_id,
+            contents=prompt
+        )
         text = (getattr(response, "text", "") or "").strip()
         if not text:
             return _fallback_rewrite_context_note(source, mode)
@@ -644,8 +711,8 @@ User note:
         log_ai_error(
             "Context note rewrite",
             e,
-            service="google",
-            model="gemini-2.5-flash",
+            service="google-genai",
+            model=model_id,
             prompt=prompt,
         )
         return _fallback_rewrite_context_note(source, mode)

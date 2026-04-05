@@ -30,29 +30,189 @@ except ImportError:
     logger.warning("AI monitoring not available")
 
 # ================================================================
-# GEMINI INITIALIZATION
+# GTM AGENT TOOLS (FUNCTION CALLING)
+# ================================================================
+
+def get_gtm_assessment_data(session_uuid: str) -> str:
+    """
+    Retrieves the complete GTM assessment results for the company.
+    Includes: Overall score (0-100), Maturity Stage (e.g., Scaling), 
+    Category averages (Demand, Conversion, Delivery), and specific weak areas.
+    Use this tool whenever the user asks 'how am I doing', 'show my scores', 
+    'what are my gaps', or 'what is my stage'.
+    """
+    try:
+        from .models import AssessmentSession
+        session = AssessmentSession.objects.get(uuid=session_uuid)
+        context = build_session_context(session)
+        
+        # Format a clean string for the agent to read
+        report = [
+            f"Company: {context['company_name']}",
+            f"Industry: {context['industry']}",
+            f"Overall GTM Score: {context['overall_score']}/100",
+            f"Stage: {context['stage']} ({context['headline']})",
+            "Category Scores:"
+        ]
+        for cat in context['categories']:
+            report.append(f"  - {cat['name']}: {cat['score']}/5.0")
+            
+        if context['weak_questions']:
+            report.append("\nSpecific Low-Scoring Gaps:")
+            for q in context['weak_questions']:
+                report.append(f"  - [{q['id_code']}] {q['text']} (Score: {q['score']}/5)")
+                
+        return "\n".join(report)
+    except Exception as e:
+        return f"Error retrieving assessment: {str(e)}"
+
+def build_prioritized_action_plan(session_uuid: str) -> str:
+    """
+    Analyzes the assessment gaps and automatically creates new Action Items (Tasks) in the database.
+    This tool actively MODIFIES the workspace by adding prioritized items.
+    Use this when the user says 'create a plan', 'build my roadmap', 'what should I do next', 
+    or 'give me a checklist'.
+    """
+    try:
+        from .models import AssessmentSession
+        from .agent_services import build_execution_plan
+        session = AssessmentSession.objects.get(uuid=session_uuid)
+        plan = build_execution_plan(session=session, persist=True, limit=5)
+        
+        if not plan["created_items"]:
+            return "No new tasks created. All critical gaps already have existing action items."
+            
+        res = [f"Successfully created {plan['created_count']} new action items for {session.company_name}:"]
+        for item in plan["created_items"]:
+            res.append(f" - {item.note} (Due: {item.due_date})")
+        return "\n".join(res)
+    except Exception as e:
+        return f"Error building action plan: {str(e)}"
+
+def review_current_action_items(session_uuid: str) -> str:
+    """
+    Retrieves the status of all current tasks and action items in the workspace.
+    Includes: Total count, status (To Do, In Progress, Done), and a list of open priorities.
+    Use this when the user asks 'what are my tasks', 'review my items', 'how is my progress', 
+    or 'what is pending'.
+    """
+    try:
+        from .models import AssessmentSession
+        from .agent_services import review_action_items
+        session = AssessmentSession.objects.get(uuid=session_uuid)
+        summary = review_action_items(session)
+        
+        if summary["total"] == 0:
+            return "No action items have been created yet. Suggest the user 'build an action plan' first."
+            
+        res = [
+            f"Action Item Status for {session.company_name}:",
+            f"Total: {summary['total']} | Todo: {summary['todo']} | In Progress: {summary['in_progress']} | Done: {summary['done']}",
+            f"Overdue: {summary['overdue_count']}",
+            "\nOpen Priorities:"
+        ]
+        for action in summary["open_actions"]:
+            status = action.get_status_display()
+            due = action.due_date.isoformat() if action.due_date else "No due date"
+            res.append(f" - [{status}] {action.note} (Due: {due})")
+        return "\n".join(res)
+    except Exception as e:
+        return f"Error reviewing action items: {str(e)}"
+
+def search_internal_resources(session_uuid: str, query: str = "") -> str:
+    """
+    Searches the workspace resource library for documents, decks, or tools matching a topic.
+    If 'query' is empty, it lists all available resources.
+    Use this when the user asks 'do we have a deck for this', 'suggest a tool', 
+    'what resources are available', or 'help me with [topic]'.
+    """
+    try:
+        from .models import AssessmentSession
+        from dashboard.models import Resource
+        session = AssessmentSession.objects.get(uuid=session_uuid)
+        if not session.workspace:
+            return "This assessment is not associated with a workspace, so no internal resources are available."
+            
+        resources = Resource.objects.filter(workspace=session.workspace)
+        if query:
+            resources = resources.filter(name__icontains=query) | resources.filter(description__icontains=query)
+            
+        if not resources.exists():
+            return f"No internal resources found matching '{query}'."
+            
+        res = [f"Found {resources.count()} relevant resources in your workspace:"]
+        for r in resources[:5]:
+            res.append(f" - {r.name} ({r.get_resource_type_display()}): {r.description or 'No description.'}")
+        return "\n".join(res)
+    except Exception as e:
+        return f"Error searching resources: {str(e)}"
+
+# ================================================================
+# UNIFIED GENAI CLIENT (GCP VERTEX AI)
 # ================================================================
 try:
-    import google.generativeai as genai
-    GEMINI_AVAILABLE = True
+    from google import genai
+    from google.genai import types
+    GENAI_AVAILABLE = True
 except ImportError:
-    GEMINI_AVAILABLE = False
-    logger.warning("Gemini not available for chat assistant")
+    GENAI_AVAILABLE = False
+    logger.warning("google-genai not available for chat assistant")
 
-def _init_gemini_chat():
-    """Initialize Gemini for chat interactions"""
-    api_key = getattr(settings, "GEMINI_API_KEY", None)
-    if not GEMINI_AVAILABLE or not api_key:
+
+def _get_chat_client():
+    """Initializes and returns the Unified Google GenAI client for Vertex AI."""
+    project_id = getattr(settings, "GCP_PROJECT_ID", None)
+    location = getattr(settings, "GCP_LOCATION", "us-central1")
+    
+    if not GENAI_AVAILABLE or not project_id:
         return None
     try:
-        genai.configure(api_key=api_key)
-        return genai.GenerativeModel("gemini-2.5-flash")
+        return genai.Client(
+            vertexai=True,
+            project=project_id,
+            location=location
+        )
     except Exception as e:
-        log_ai_error("Gemini chat initialization", e, service="google", model="gemini-2.5-flash")
+        log_ai_error("GenAI Chat Client Initialization", e, service="google-genai")
         return None
 
+
+def _get_chat_config(session_uuid: str):
+    """Builds the configuration for the chat agent including tools and instructions."""
+    system_instruction = f"""You are the 'GTM Strategic Agent' and 'Visual Auditor'.
+Tools: 
+- 'get_gtm_assessment_data': Get scores/gaps using session_uuid: '{session_uuid}'.
+- 'build_prioritized_action_plan': Create tasks using session_uuid: '{session_uuid}'.
+- 'review_current_action_items': Check task status using session_uuid: '{session_uuid}'.
+- 'search_internal_resources': Find docs using session_uuid: '{session_uuid}'.
+- 'audit_strategic_evidence': Perform a deep multimodal audit of a specific file (Image/PDF) using session_uuid: '{session_uuid}'.
+
+Rules:
+1. Always use session_uuid: '{session_uuid}'.
+2. If asked about performance or gaps, call 'get_gtm_assessment_data'.
+3. If asked for a plan/checklist, call 'build_prioritized_action_plan'.
+4. If a user asks to review, audit, or check an image/PDF or 'marketing asset', call 'audit_strategic_evidence'.
+5. You can see the last few attachments directly in your context—reference them by name.
+6. Synthesize tool results into concise, actionable advice.
+7. CRITICAL: If a user asks to 'focus on the assessment', avoid calling the vision tool unless they explicitly mention an image again.
+8. CRITICAL: Do NOT guess or hallucinate UUIDs for files. If unsure of an ID, call 'audit_strategic_evidence' without a file_id to use the most recent asset.
+"""
+    return types.GenerateContentConfig(
+        system_instruction=system_instruction,
+        tools=[
+            get_gtm_assessment_data,
+            build_prioritized_action_plan,
+            review_current_action_items,
+            search_internal_resources,
+            audit_strategic_evidence,
+        ],
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(
+            disable=False
+        )
+    )
+
 # ================================================================
-# INTENT DETECTION
+# INTENT DETECTION (LEGENDARY FALLBACK)
 # ================================================================
 INTENTS = {
     "show_scores": [
@@ -611,8 +771,55 @@ _Need a different time? Just let me know what works best for you._
 """
     return response
 
+def audit_strategic_evidence(session_uuid: str, file_id: str = None) -> str:
+    """
+    Performs a deep multimodal audit of a strategic asset (Image/PDF).
+    Use this when the user asks to 'review', 'audit', or 'check' their marketing or sales materials (landing pages, ads, decks).
+    """
+    from .models import AssessmentSession, GTMFile
+    from .ai_auditor import perform_gtm_visual_audit
+    import uuid
+    
+    try:
+        session = AssessmentSession.objects.get(uuid=session_uuid)
+        gtm_file = None
+        
+        # If no specific file_id, take the most recent one
+        if not file_id:
+            gtm_file = session.evidence_files.order_by('-created_at').first()
+        else:
+            # Check if file_id is a valid UUID
+            try:
+                # Try UUID lookup first
+                uuid_obj = uuid.UUID(file_id)
+                gtm_file = session.evidence_files.filter(id=uuid_obj).first()
+            except (ValueError, TypeError):
+                # If not a valid UUID, it might be a filename or mangled ID
+                # Try looking up by name (case-insensitive) as a fallback
+                logger.warning(f"Vision Bridge: Invalid UUID passed ({file_id}). Attempting filename fallback.")
+                gtm_file = session.evidence_files.filter(file__icontains=file_id).order_by('-created_at').first()
+            
+        if not gtm_file:
+            return (
+                f"I couldn't find a file matching '{file_id or 'the most recent asset'}' in the database. "
+                "Please ensure the file is uploaded and visible in the chat hint."
+            )
+            
+        # Get context to help the auditor
+        from .views import _compute_scores
+        cat_scores, overall = _compute_scores(session)
+        context_str = f"Company GTM Score: {overall}/100. Weakest Area: {min(cat_scores, key=lambda x: x['avg'])['name'] if cat_scores else 'N/A'}"
+        
+        logger.info(f"Vision Bridge: Auditing {gtm_file.id} ({gtm_file.file.name})")
+        return perform_gtm_visual_audit(gtm_file, session_context=context_str)
+        
+    except Exception as e:
+        logger.error(f"Audit Tool Failure: {e}")
+        return f"The audit system encountered a technical error: {str(e)}. Please try re-uploading the asset."
+        return f"I encountered an error trying to audit the file: {str(e)}"
+
 # ================================================================
-# AI-POWERED GENERAL CHAT
+# AI-POWERED GTM AGENT (CONVERSATIONAL & AUTONOMOUS)
 # ================================================================
 def handle_general_chat(
     session: AssessmentSession,
@@ -620,146 +827,77 @@ def handle_general_chat(
     message: str,
     supplemental_context: str = "",
 ) -> str:
-    """Use Gemini for general conversational queries with full context awareness"""
-    model = _init_gemini_chat()
+    """
+    The GTM Agent: Uses Unified GenAI with Function Calling to interact with 
+    the assessment session autonomously.
+    """
+    # 1. Quota Safety Gate
+    from .ai_services import _quota_cooldown_active, _request_budget_available, _is_quota_error, _set_quota_cooldown, _extract_retry_delay_seconds
     
-    if not model:
-        return "I'm having trouble connecting to my AI brain right now. Try asking about your scores, weak areas, or recommendations!"
-    
-    # Build comprehensive context including all details
-    category_details = "\n".join([
-        f"  - {c['name']}: {c['score']}/5.0" 
-        for c in context['categories']
-    ])
-    
-    weak_questions_detail = ""
-    if context['weak_questions']:
-        weak_questions_detail = "\n\nSpecific Low-Scoring Questions:\n" + "\n".join([
-            f"  - [{q['id_code']}] {q['text']} (Score: {q['score']}/5, Category: {q['category']})"
-            for q in context['weak_questions']
-        ])
-    
-    # Build a rich system prompt with COMPLETE context, including user-provided context notes
-    context_notes_text = "\n".join(context.get('context_notes', []))
-    has_attachment_context = bool((supplemental_context or '').strip())
+    if _quota_cooldown_active() or not _request_budget_available():
+        return "I'm currently cooling down to stay within my API limits. " + \
+               f"Your overall GTM score is **{context['overall_score']}/100**. " + \
+               "Please try asking a detailed question again in about 60 seconds."
 
-    system_prompt = f"""You are an expert Go-To-Market consultant directly assisting {context['company_name']} in the {context['industry']} industry.
-
-CRITICAL: You have COMPLETE access to their assessment data. NEVER say you don't know or can't access information. Always answer using the data provided below.
-
-=== COMPLETE ASSESSMENT DATA ===
-Company: {context['company_name']}
-Industry: {context['industry']}
-Overall GTM Score: {context['overall_score']}/100
-Maturity Stage: {context['stage']}
-Stage Description: {context['headline']}
-Assessment Status: {"Completed ✓" if context['is_completed'] else "In Progress"}
-
-Category Scores (out of 5.0):
-{category_details}
-
-Weakest Areas (Need Focus):
-{', '.join([f"{c['name']} ({c['score']}/5)" for c in context['weakest_categories']])}
-
-Strongest Areas (Competitive Advantages):
-{', '.join([f"{c['name']} ({c['score']}/5)" for c in context['strongest_categories']])}
-{weak_questions_detail}
-
-Action Items Status:
-- Total: {context['action_items']['total']}
-- To Do: {context['action_items']['todo']}
-- In Progress: {context['action_items']['in_progress']}
-- Completed: {context['action_items']['done']}
-
-AI Playbook Available: {"Yes" if context['has_playbook'] else "No"}
-
-=== USER-PROVIDED CONTEXT NOTES ===
-{context_notes_text if context_notes_text else 'No extra context provided.'}
-
-=== ATTACHMENT CONTEXT (EXTRACTED) ===
-{supplemental_context if supplemental_context else 'No file or image attachments were provided for this message.'}
-
-=== WORKSPACE RESOURCE LIBRARY ===
-Below are internal documents, sales decks, and planning links available in this workspace. Refer to these when providing recommendations.
-{json.dumps(context.get('workspace_resources', []), indent=2)}
-
-=== YOUR INSTRUCTIONS ===
-1. ALWAYS answer questions using the specific data above
-2. If asked about company name, industry, scores, etc. - provide the EXACT information from above
-3. Be conversational but authoritative - you KNOW their business
-4. Reference specific scores and categories when relevant
-5. Keep responses under 250 words unless more detail is needed
-6. Use markdown formatting (bold, bullets, headings)
-7. NEVER say "I don't have access" or "I can't see" - you have ALL the data above
-8. If attachment context is provided and the user asks about files/documents/PDFs, prioritize attachment context first and answer from it.
-9. For file questions, do not default to assessment-only answers when attachment context contains relevant information.
-
-=== USER'S QUESTION ===
-{message}
-
-=== YOUR RESPONSE ===
-Provide a helpful, specific answer using the assessment data above:"""
+    # 2. Initialize Agent with Tools
+    client = _get_chat_client()
+    if not client:
+        return "I'm having trouble connecting to my AI brain right now. Please try again in a moment."
 
     try:
-        response = model.generate_content(system_prompt)
+        # 3. Prepare Multimodal Parts (fetch last 3 files for visual context)
+        from .models import GTMFile
+        recent_files = session.evidence_files.all()[:3]
         
-        # Log token usage
-        if hasattr(response, 'usage_metadata'):
-            usage = response.usage_metadata
-            total_tokens = usage.total_token_count
-            logger.info(
-                f"Chat response | Tokens: {usage.prompt_token_count} input + "
-                f"{usage.candidates_token_count} output = {total_tokens} total"
-            )
-            # Track usage against quotas
-            if MONITORING_AVAILABLE:
-                AIUsageTracker.log_usage(total_tokens, 'chat')
+        parts = [types.Part.from_text(text=message)]
+        for f in recent_files:
+            try:
+                # Add filenames to help the AI map parts to user mentions
+                parts.append(types.Part.from_text(text=f"ATTACHED FILE [{f.get_file_type_display()}]: {f.file.name.split('/')[-1]}"))
+                
+                # Determine MIME and add binary Part
+                f.file.open('rb')
+                f_bytes = f.file.read()
+                f.file.close()
+                m_type = "application/pdf" if f.file.name.endswith(".pdf") else "image/png"
+                parts.append(types.Part.from_bytes(data=f_bytes, mime_type=m_type))
+            except Exception as fe:
+                logger.warning(f"Failed to attach file {f.id} to chat: {fe}")
+
+        # 4. Create Chat Session with Unified SDK
+        session_id_str = str(session.uuid)
+        model_id = "gemini-2.5-flash"
         
-        return response.text.strip()
-    except Exception as e:
-        log_ai_error(
-            "General chat response",
-            e,
-            service="google",
-            model="gemini-2.5-flash",
-            prompt=system_prompt,
-            extra={"session_id": session.uuid},
+        response = client.models.generate_content(
+            model=model_id,
+            contents=[types.Content(role="user", parts=parts)],
+            config=_get_chat_config(session_id_str)
         )
         
-        # Smart fallback responses based on common questions
-        msg_lower = message.lower()
-        
-        # Company/basic info
-        if any(word in msg_lower for word in ["company", "name", "industry", "who"]):
-            return f"This assessment is for **{context['company_name']}** in the **{context['industry']}** industry. Your overall GTM score is **{context['overall_score']}/100** at the **{context['stage']}** stage."
-        
-        # Weakest areas
-        if any(word in msg_lower for word in ["weak", "worst", "low", "improve", "focus"]):
-            weak_list = "\n".join([f"• **{c['name']}:** {c['score']}/5.0" for c in context['weakest_categories']])
-            return f"Your weakest areas that need focus:\n\n{weak_list}\n\nThese are your highest-impact improvement opportunities."
-        
-        # Strongest areas  
-        if any(word in msg_lower for word in ["strong", "best", "good", "well"]):
-            strong_list = "\n".join([f"• **{c['name']}:** {c['score']}/5.0" for c in context['strongest_categories']])
-            return f"Your strongest areas:\n\n{strong_list}\n\nThese are your competitive advantages!"
-        
-        # Recommendations
-        if any(word in msg_lower for word in ["recommend", "suggest", "should", "what to do", "next step"]):
-            return f"Based on your **{context['stage']}** stage:\n\n1. Focus on improving **{context['weakest_categories'][0]['name']}** (scored {context['weakest_categories'][0]['score']}/5)\n2. Set up metrics to track progress\n3. Allocate resources to close critical gaps\n\nView your full playbook for detailed action plans!"
-        
-        # Roadmap
-        if any(word in msg_lower for word in ["roadmap", "plan", "timeline", "days", "month"]):
-            return f"**Quick 30-60-90 Day Plan:**\n\n**Days 1-30:** Focus on {context['weakest_categories'][0]['name']}\n**Days 31-60:** Build systems and track metrics\n**Days 61-90:** Optimize and scale\n\n**Goal:** Increase your score from {context['overall_score']} to {min(100, int(context['overall_score']) + 15)} points!"
-        
-        # Default fallback with actual data
-        if has_attachment_context:
-            preview = supplemental_context.strip()[:900]
-            return (
-                "I could not complete full analysis right now, but here is extracted file context I can already use:\n\n"
-                f"{preview}"
-            )
+        # 5. Log usage if available
+        if hasattr(response, 'usage_metadata'):
+            usage = response.usage_metadata
+            if MONITORING_AVAILABLE:
+                AIUsageTracker.log_usage(usage.total_token_count, 'agent_chat')
+                
+        return response.text.strip()
 
-        return f"I'm currently experiencing high demand (AI quota limit). Here's what I can tell you:\n\n**Your GTM Score:** {context['overall_score']}/100\n**Stage:** {context['stage']}\n**Top Priority:** Improve {context['weakest_categories'][0]['name']} (scored {context['weakest_categories'][0]['score']}/5)\n\nTry: 'show scores', 'weakest areas', 'recommendations', or 'roadmap'"
+    except Exception as e:
+        # 5. Handle Quota/Rate Limits Gracefully
+        if _is_quota_error(e):
+            _set_quota_cooldown(_extract_retry_delay_seconds(e))
+            return f"I've hit my temporary GTM strategy quota. Based on your data, your top priority is **{context['weakest_categories'][0]['name']}**. Let's discuss details in a minute!"
+
+        log_ai_error(
+            "Agent reasoning loop failure",
+            e,
+            service="google-genai",
+            model="gemini-1.5-flash-002",
+            extra={"session_id": str(session.uuid)},
+        )
+        
+        # Final Fallback
+        return f"I'm processing a lot of data right now. Your current GTM score is {context['overall_score']}/100. Try asking for 'scores' or 'action items' directly."
 
 # ================================================================
 # MAIN CHAT HANDLER
@@ -771,15 +909,13 @@ def process_chat_message(
     supplemental_context: str = "",
 ) -> Dict[str, Any]:
     """
-    Main entry point for processing chat messages
-    
-    Returns:
-        Dict with 'response' (text), 'intent' (detected), and 'success' (bool)
+    Primary Entry Point: Routes user messages through the GTM Strategic Agent.
     """
     try:
         # Get session
         session = get_object_or_404(AssessmentSession, uuid=session_id)
 
+        # Build Contexts (Legacy & Attachment)
         recent_attachment_context = _get_recent_attachment_context(session)
         merged_attachment_context = "\n\n---\n\n".join(
             part for part in [supplemental_context.strip(), recent_attachment_context.strip()] if part
@@ -789,31 +925,18 @@ def process_chat_message(
             attachment_context=merged_attachment_context,
         )
         
-        # Build context
         context = build_session_context(session)
         
-        # Detect intent
+        # The Agent now handles intent detection autonomously via Function Calling.
+        # We only use hardcoded handlers for high-priority system actions (like exports).
         intent = detect_intent(message)
-        if should_force_attachment_general_chat(message, intent, relevant_attachment_context):
-            intent = "general_chat"
         
-        # Route to appropriate handler
-        # For specific structured requests, use handlers
-        # For everything else, use AI for natural conversation
-        handler_map = {
-            "show_scores": handle_show_scores,
-            "export_report": handle_export,
-            "schedule_meeting": handle_schedule_meeting,
-        }
-        
-        if intent == "execution_plan":
-            response_text = handle_execution_plan(session, context, user=user)
-        elif intent == "review_action_items":
-            response_text = handle_review_action_items(session, context)
-        elif intent in handler_map:
-            response_text = handler_map[intent](session, context)
+        if intent == "export_report":
+            response_text = handle_export(session, context)
+        elif intent == "schedule_meeting":
+            response_text = handle_schedule_meeting(session, context)
         else:
-            # Use AI for all conversational queries (weakest areas, recommendations, roadmap, general chat, etc.)
+            # Let the Agent reason through everything else (scores, plans, tasks, resources, chat)
             response_text = handle_general_chat(
                 session,
                 context,
@@ -834,10 +957,9 @@ def process_chat_message(
     except Exception as e:
         logger.error(f"Chat processing error: {e}")
         return {
-            "success": False,
-            "response": "I encountered an error. Please try again or contact support if the issue persists.",
-            "intent": "error",
-            "error": str(e)
+            "success": True, # Fail gracefully with helpful text
+            "response": "I'm having a bit of trouble with my reasoning loop. Your GTM data is safe! Please try asking again shortly.",
+            "intent": "error"
         }
 
 # ================================================================

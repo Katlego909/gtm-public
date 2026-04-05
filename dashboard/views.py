@@ -42,6 +42,7 @@ from gtm.models import (
     ToolRecommendation,
     ResultSnapshot,
     ChatMessage,
+    GTMFile,
 )
 from gtm.models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation, WorkspaceActivityEvent
 from gtm.ai_chat import get_suggested_prompts, process_chat_message
@@ -1148,7 +1149,9 @@ def workspace_hub(request):
     }
 
     if request.htmx:
-        return render(request, 'dashboard/partials/workspace_hub_content.html', context)
+        response = render(request, 'dashboard/partials/workspace_hub_content.html', context)
+        response['HX-Trigger'] = 'refreshNotifications, refreshAgentActions'
+        return response
     return render(request, 'dashboard/workspace_hub.html', context)
 
 @vary_on_headers('HX-Request')
@@ -1200,7 +1203,9 @@ def tasks_board(request):
     }
 
     if request.htmx:
-        return render(request, 'dashboard/partials/tasks_content.html', context)
+        response = render(request, 'dashboard/partials/tasks_content.html', context)
+        response['HX-Trigger'] = 'refreshNotifications, refreshAgentActions'
+        return response
     return render(request, 'dashboard/tasks.html', context)
 
 
@@ -1279,7 +1284,9 @@ def agent_hub(request):
     }
 
     if request.htmx:
-        return render(request, 'dashboard/partials/agent_content.html', context)
+        response = render(request, 'dashboard/partials/agent_content.html', context)
+        response['HX-Trigger'] = 'refreshNotifications, refreshAgentActions'
+        return response
     return render(request, 'dashboard/agent.html', context)
 
 @vary_on_headers('HX-Request')
@@ -1333,7 +1340,9 @@ def dashboard(request):
     context = get_dashboard_context(request, current_workspace, user_workspaces, agent_session_id)
 
     if request.htmx:
-        return render(request, 'dashboard/partials/dashboard_content.html', context)
+        response = render(request, 'dashboard/partials/dashboard_content.html', context)
+        response['HX-Trigger'] = 'refreshNotifications, refreshAgentActions'
+        return response
 
     return render(request, 'dashboard/home.html', context)
 
@@ -1347,6 +1356,7 @@ def dashboard_agent_api(request):
     if 'multipart/form-data' in content_type:
         session_id = str(request.POST.get('session_id', '')).strip()
         message = (request.POST.get('message') or '').strip()
+        file_type = (request.POST.get('file_type') or 'other').strip()
         uploaded_files = request.FILES.getlist('attachments')
     else:
         try:
@@ -1356,6 +1366,7 @@ def dashboard_agent_api(request):
 
         session_id = str(data.get('session_id', '')).strip()
         message = (data.get('message') or '').strip()
+        file_type = (data.get('file_type') or 'other').strip()
 
     if not session_id:
         return JsonResponse({"success": False, "error": "Select an assessment first."}, status=400)
@@ -1377,6 +1388,32 @@ def dashboard_agent_api(request):
         return JsonResponse({"success": False, "error": "You do not have access to that assessment."}, status=403)
 
     attachments, attachment_context, attachment_warnings = _process_agent_attachments(uploaded_files)
+
+    # 🔹 [VISION BRIDGE] Save strategic evidence files to GTMFile
+    for uploaded_file in uploaded_files:
+        suffix = Path(uploaded_file.name or '').suffix.lower()
+        # If it's an image or PDF, it's potential strategic evidence
+        if suffix in AGENT_IMAGE_EXTENSIONS or suffix == '.pdf':
+            try:
+                # Create the GTMFile record
+                gtm_file = GTMFile.objects.create(
+                    session=session,
+                    file=uploaded_file,
+                    file_type=file_type
+                )
+                
+                # Trigger asynchronous audit in a background thread
+                from gtm.ai_auditor import audit_strategic_evidence_async
+                import threading
+                threading.Thread(
+                    target=audit_strategic_evidence_async,
+                    args=(gtm_file.id,),
+                    daemon=True
+                ).start()
+                
+                logger.info(f"Vision Bridge: Saved {uploaded_file.name} as GTMFile {gtm_file.id}")
+            except Exception as e:
+                logger.error(f"Vision Bridge: Failed to save {uploaded_file.name}: {e}")
 
     action_result = _run_dashboard_action_command(request, session, current_workspace, message)
     if action_result:
@@ -1446,7 +1483,9 @@ def dashboard_agent_clear_api(request):
     elif session.user_id != request.user.id:
         return JsonResponse({"success": False, "error": "You do not have access to that assessment."}, status=403)
 
+    # 🔹 [DEEP CLEAR] Wipe chat messages AND strategic evidence files
     deleted_count, _ = ChatMessage.objects.filter(session=session).delete()
+    session.evidence_files.all().delete()
     return JsonResponse({
         "success": True,
         "deleted_count": deleted_count,

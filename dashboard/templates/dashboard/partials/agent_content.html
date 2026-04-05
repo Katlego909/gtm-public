@@ -94,6 +94,13 @@
                 <form id="dashboard-agent-form" class="border-t border-gray-200 bg-white p-4 flex gap-3">
                     {% csrf_token %}
                     <input id="dashboard-agent-files" type="file" class="hidden" multiple accept=".txt,.md,.csv,.json,.log,.xml,.yaml,.yml,.pdf,image/*">
+                    <select id="dashboard-agent-file-type" title="Asset Type" class="px-2 py-3 rounded-xl border border-gray-300 bg-white text-xs font-semibold text-gray-700 hover:border-indigo-300 focus:ring-indigo-500 transition cursor-pointer">
+                        <option value="other">General Asset</option>
+                        <option value="landing_page">🌐 Landing Page</option>
+                        <option value="ad_creative">🎨 Ad Creative</option>
+                        <option value="sales_deck">📊 Sales Deck</option>
+                        <option value="marketing_copy">✍️ Marketing Copy</option>
+                    </select>
                     <button id="dashboard-agent-attach" type="button" class="px-3 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition flex items-center justify-center" aria-label="Attach file">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l7.071-7.071a4 4 0 00-5.657-5.657l-7.071 7.07a6 6 0 108.485 8.486L19 13" />
@@ -165,10 +172,12 @@ async function sendDashboardAgentMessage(message) {
     const button = document.getElementById('dashboard-agent-send');
     const attachButton = document.getElementById('dashboard-agent-attach');
     const fileInput = document.getElementById('dashboard-agent-files');
+    const fileType = document.getElementById('dashboard-agent-file-type');
     const sessionSelect = document.getElementById('dashboard-agent-session');
-    if (!input || !button || !sessionSelect || !fileInput || !attachButton) return;
+    if (!input || !button || !sessionSelect || !fileInput || !attachButton || !fileType) return;
 
     const sessionId = sessionSelect.value;
+    const selectedFileType = fileType.value || 'other';
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
     const files = Array.from(fileInput.files || []);
     if (!sessionId) {
@@ -206,6 +215,7 @@ async function sendDashboardAgentMessage(message) {
             const formData = new FormData();
             formData.append('session_id', sessionId);
             formData.append('message', message);
+            formData.append('file_type', selectedFileType);
             files.forEach(file => formData.append('attachments', file));
             response = await fetch(agentApiUrl, {
                 method: 'POST',
@@ -224,6 +234,7 @@ async function sendDashboardAgentMessage(message) {
                 body: JSON.stringify({
                     session_id: sessionId,
                     message: message,
+                    file_type: selectedFileType,
                 }),
             });
         }
@@ -345,6 +356,10 @@ function updateDashboardAgentFileHint(fileInput) {
         return;
     }
     hint.textContent = `Attached: ${names.join(', ')}`;
+    hint.innerHTML = `<span class="inline-flex items-center gap-1.5 px-2 py-1 bg-indigo-50 text-indigo-700 rounded-md border border-indigo-100 font-medium animate-pulse">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+        Vision Active: ${names.join(', ')}
+    </span>`;
     hint.classList.remove('hidden');
 }
 

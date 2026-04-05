@@ -239,3 +239,54 @@ class ChatMessage(models.Model):
     
     def __str__(self):
         return f"Chat {self.session.uuid} at {self.created_at}"
+
+
+class GTMFile(models.Model):
+    """
+    Strategic Evidence uploaded by the user to be audited by the GTM Agent.
+    Supports Image (Landing Pages/Ads) and PDF (Sales Decks/Strategy).
+    """
+    FILE_TYPES = [
+        ('landing_page', 'Landing Page Screenshot'),
+        ('ad_creative', 'Ad Creative Asset'),
+        ('sales_deck', 'Sales Deck / Strategy PDF'),
+        ('other', 'Other Strategic Evidence'),
+    ]
+    
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session = models.ForeignKey(
+        AssessmentSession, 
+        on_delete=models.CASCADE, 
+        related_name="evidence_files"
+    )
+    
+    file = models.FileField(
+        upload_to="gtm/evidence/%Y/%m/%d/",
+        max_length=255
+    )
+    file_type = models.CharField(
+        max_length=40, 
+        choices=FILE_TYPES, 
+        default='other'
+    )
+    
+    # 🤖 AI STRATEGIC AUDIT
+    ai_audit_notes = models.TextField(
+        blank=True, 
+        default="",
+        help_text="The AI Auditor's critique of this visual/document asset."
+    )
+    ai_audit_score_modifier = models.IntegerField(
+        default=0,
+        help_text="Suggested impact on the GTM score (-5 to +5) based on evidence."
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "GTM Strategic Evidence"
+        verbose_name_plural = "GTM Strategic Evidence"
+
+    def __str__(self):
+        return f"{self.get_file_type_display()} - {self.session.uuid}"

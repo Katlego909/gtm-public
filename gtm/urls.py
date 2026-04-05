@@ -24,9 +24,10 @@ urlpatterns = [
     path("actions/update/<int:action_id>/", views.action_update, name="action_update"),
     path("actions/delete/<int:action_id>/", views.action_delete, name="action_delete"),
     
-    # AI Chat Assistant
+    # AI Chat & Multimodal
     path("chat/<uuid:session_id>/", views.chat_view, name="chat"),
     path("api/chat/<uuid:session_id>/", views.chat_api, name="chat_api"),
+    path("evidence/upload/<uuid:session_id>/", views.upload_strategic_evidence, name="upload_evidence"),
     
     # User Profile & Auth
     path("profile/", views.profile, name="profile"),

@@ -785,6 +785,65 @@ def history(request):
     return render(request, "gtm/history.html", {"rows": rows, "is_htmx": _is_htmx(request)})
 
 
+@login_required
+@require_POST
+def upload_strategic_evidence(request, session_id):
+    """
+    Handles file uploads (Images/PDFs) for strategic GTM audits.
+    """
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        return JsonResponse({"success": False, "error": "Access denied."}, status=403)
+        
+    if 'file' not in request.FILES:
+        return JsonResponse({"success": False, "error": "No file uploaded."}, status=400)
+        
+    uploaded_file = request.FILES['file']
+    file_type = request.POST.get('file_type', 'other')
+    
+    # Basic size limit (5MB)
+    if uploaded_file.size > 5 * 1024 * 1024:
+        return JsonResponse({"success": False, "error": "File too large (max 5MB)."}, status=400)
+    
+    try:
+        from .models import GTMFile
+        gtm_file = GTMFile.objects.create(
+            session=session,
+            file=uploaded_file,
+            file_type=file_type
+        )
+        
+        # 🤖 TRIGGER ASYNC INITIAL AUDIT
+        # This caches the result so the chat agent doesn't have to wait for a 10s API call
+        from .ai_auditor import perform_gtm_visual_audit
+        from threading import Thread
+        
+        # Build context for the audit
+        cat_scores, overall = _compute_scores(session)
+        band = _band_for_score(overall)
+        context_str = f"Company GTM Score: {overall}/100. Stage: {band.stage if band else 'N/A'}"
+        
+        def run_initial_audit(file_id, ctx):
+            try:
+                from .models import GTMFile
+                from .ai_auditor import perform_gtm_visual_audit
+                f = GTMFile.objects.get(id=file_id)
+                perform_gtm_visual_audit(f, session_context=ctx)
+            except Exception as e:
+                log_error("Initial Audit Background Failure", e)
+                
+        Thread(target=run_initial_audit, args=(gtm_file.id, context_str), daemon=True).start()
+        
+        return JsonResponse({
+            "success": True,
+            "message": f"Successfully uploaded {gtm_file.get_file_type_display()}. Audit in progress...",
+            "file_id": str(gtm_file.id)
+        })
+        
+    except Exception as e:
+        log_error("Evidence Upload Failure", e)
+        return JsonResponse({"success": False, "error": "Could not upload file."}, status=500)
+
 @require_POST
 @require_session_ownership
 def cancel_assessment(request, session, session_id):

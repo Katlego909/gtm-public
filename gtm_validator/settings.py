@@ -195,6 +195,9 @@ if os.getenv("EMAIL_CONSOLE", "").lower() == "true":
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
     
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "")
+GCP_LOCATION = os.getenv("GCP_LOCATION", "us-central1")
+GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
 
 AUTHENTICATION_BACKENDS = [
 
