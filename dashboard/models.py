@@ -139,6 +139,14 @@ class Resource(models.Model):
         ('other', 'Other'),
     ]
 
+    AUDIT_STATUS_CHOICES = [
+        ('none', 'Not Audited'),
+        ('pending', 'Awaiting Audit'),
+        ('auditing', 'Auditing…'),
+        ('complete', 'Audit Complete'),
+        ('failed', 'Audit Failed'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name="resources")
     name = models.CharField(max_length=255)
@@ -155,6 +163,19 @@ class Resource(models.Model):
     uploaded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="uploaded_resources")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    # 🤖 AI STRATEGIC AUDIT fields
+    audit_status = models.CharField(max_length=10, choices=AUDIT_STATUS_CHOICES, default='none')
+    ai_audit_summary = models.TextField(blank=True, default="")
+    ai_score_modifier = models.IntegerField(
+        default=0,
+        help_text="Advisory score impact (−5 to +5) suggested by the AI auditor."
+    )
+    ai_audit_at = models.DateTimeField(null=True, blank=True)
+    gtm_categories = models.JSONField(
+        default=list, blank=True,
+        help_text="List of GTM categories this asset most impacts."
+    )
 
     class Meta:
         ordering = ['-created_at']
@@ -188,3 +209,49 @@ class AIResourceRecommendation(models.Model):
 
     def __str__(self):
         return f"Recommendation: {self.resource.name} for {self.session.uuid}"
+
+
+class Notification(models.Model):
+    """
+    User-specific actionable alerts for tasks, invites, and AI insights.
+    Unlike ActivityEvents, these are meant to be 'cleared' by the user.
+    """
+    LEVEL_CHOICES = [
+        ('success', 'Success'),
+        ('info', 'Information'),
+        ('warning', 'Warning'),
+        ('danger', 'Urgent'),
+    ]
+    
+    TYPE_CHOICES = [
+        ('task', 'Task Assignment'),
+        ('task_status', 'Task Status Update'),
+        ('invite', 'Workspace Invitation'),
+        ('ai_report', 'AI Report Ready'),
+        ('system', 'System Message'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notifications")
+    sender = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="sent_notifications")
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, null=True, blank=True, related_name="notifications")
+    
+    level = models.CharField(max_length=10, choices=LEVEL_CHOICES, default='info')
+    notification_type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='system')
+    
+    title = models.CharField(max_length=120)
+    message = models.TextField()
+    link = models.CharField(max_length=255, blank=True, default="")
+    
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['recipient', 'is_read', '-created_at']),
+            models.Index(fields=['workspace', 'is_read']),
+        ]
+
+    def __str__(self):
+        return f"{self.title} for {self.recipient.username}"

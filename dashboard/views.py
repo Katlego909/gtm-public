@@ -47,7 +47,8 @@ from gtm.models import (
 from gtm.models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation, WorkspaceActivityEvent
 from gtm.ai_chat import get_suggested_prompts, process_chat_message
 from gtm.decorators import workspace_permission_required, workspace_admin_required, workspace_member_required
-from dashboard.models import Channel, ChannelAnalytics, GapAnalysisMetric, GapAnalysisSuggestion, Resource
+from dashboard.models import Channel, ChannelAnalytics, GapAnalysisMetric, GapAnalysisSuggestion, Resource, Notification
+from dashboard.utils_notifications import send_notification
 from .forms import GapAnalysisMetricForm, ActionItemForm, UserProfileForm, ResourceForm
 from gtm.views import _compute_scores, _band_for_score
 from .utils import calculate_gap_metric_display_properties
@@ -741,6 +742,84 @@ def notifications_panel(request):
     context = _build_sidebar_notifications_context(request, current_workspace)
     return render(request, 'dashboard/partials/notifications_panel.html', context)
 
+
+# ================================================================
+# STRATEGIC ASSET LIBRARY VIEWS
+# ================================================================
+
+@login_required
+@vary_on_headers('HX-Request')
+def asset_library(request):
+    """Full-page Strategic Asset Library — shows all auditable workspace resources."""
+    current_workspace, user_workspaces = _resolve_dashboard_workspace(request)
+
+    if current_workspace:
+        resources = Resource.objects.filter(workspace=current_workspace).order_by('category', '-created_at')
+    else:
+        resources = Resource.objects.none()
+
+    # Compute audit summary stats
+    total = resources.count()
+    audited = resources.filter(audit_status='complete').count()
+    pending = resources.filter(audit_status__in=['pending', 'auditing']).count()
+
+    context = {
+        'current_workspace': current_workspace,
+        'user_workspaces': user_workspaces,
+        'resources': resources,
+        'total_assets': total,
+        'audited_assets': audited,
+        'pending_audits': pending,
+        'page_title': 'Asset Library',
+    }
+
+    if request.htmx:
+        return render(request, 'dashboard/partials/asset_library_content.html', context)
+    return render(request, 'dashboard/asset_library.html', context)
+
+
+@require_http_methods(["POST"])
+@login_required
+def trigger_asset_audit(request, pk):
+    """Fires an async AI audit for a single workspace Resource."""
+    current_workspace, _ = _resolve_dashboard_workspace(request)
+    resource = get_object_or_404(Resource, pk=pk, workspace=current_workspace)
+
+    if resource.resource_type != 'file' or not resource.file:
+        return JsonResponse({'error': 'This asset cannot be audited (not a file).'}, status=400)
+
+    if resource.audit_status == 'auditing':
+        return JsonResponse({'status': 'already_auditing'}, status=200)
+
+    # Mark as pending, then fire background thread
+    resource.audit_status = 'pending'
+    resource.save(update_fields=['audit_status'])
+
+    from gtm.ai_auditor import audit_resource_async
+    audit_resource_async(resource.pk)
+
+    # Return the "auditing" card state via HTMX
+    return render(request, 'dashboard/partials/asset_card.html', {
+        'resource': resource,
+        'current_workspace': current_workspace,
+    })
+
+
+@require_http_methods(["GET"])
+@login_required
+def asset_audit_result(request, pk):
+    """Polling endpoint — returns the current audit state for a single resource card."""
+    current_workspace, _ = _resolve_dashboard_workspace(request)
+    resource = get_object_or_404(Resource, pk=pk, workspace=current_workspace)
+    # Refresh from DB to get latest audit_status
+    resource.refresh_from_db()
+
+    return render(request, 'dashboard/partials/asset_card.html', {
+        'resource': resource,
+        'current_workspace': current_workspace,
+    })
+
+
 @workspace_member_required('session')
 def refresh_resources(request):
     """Returns the updated resources list - workspace-aware."""
@@ -1338,6 +1417,16 @@ def dashboard(request):
                 orphaned_items.update(workspace=current_workspace)
     
     context = get_dashboard_context(request, current_workspace, user_workspaces, agent_session_id)
+    
+    # Check for onboarding flow (new user with 0 workspaces)
+    if request.user.is_authenticated and not user_workspaces:
+        context['show_onboarding'] = True
+
+    # Asset Library stats for the snapshot widget
+    if current_workspace:
+        context['audited_asset_count'] = Resource.objects.filter(
+            workspace=current_workspace, audit_status='complete'
+        ).count()
 
     if request.htmx:
         response = render(request, 'dashboard/partials/dashboard_content.html', context)
@@ -1821,6 +1910,19 @@ def add_edit_action_item(request, pk=None):
                     object_id=instance.id,
                     session=instance.session,
                 )
+                
+                # 🔔 Notify assignee
+                if instance.assigned_to and instance.assigned_to != request.user:
+                    send_notification(
+                        recipient=instance.assigned_to,
+                        sender=request.user,
+                        workspace=current_workspace,
+                        notification_type='task',
+                        level='info',
+                        title="New Task Assigned",
+                        message=f"You have been assigned a new task: {instance.note[:50]}...",
+                        link=f"/dashboard/tasks/?workspace={current_workspace.id if current_workspace else ''}"
+                    )
 
             # Return the updated action items board
             if request.htmx:
@@ -2201,15 +2303,24 @@ def create_workspace_dashboard(request):
     """Create workspace from dashboard and return modal partial for HTMX."""
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
+        is_onboarding = request.POST.get('onboarding') == 'true'
+        
         if name:
             workspace = Workspace.create_for_user(name=name, user=request.user)
             # On success, trigger dashboard refresh or close modal via HTMX
+            if is_onboarding:
+                return render(request, 'dashboard/partials/onboarding_overlay.html', {
+                    'success': True,
+                    'workspace': workspace,
+                })
+            
             return render(request, 'dashboard/partials/workspace_create_modal.html', {
                 'success': True,
                 'workspace': workspace,
             })
         # If error, re-render modal with error message
-        return render(request, 'dashboard/partials/workspace_create_modal.html', {
+        template = 'dashboard/partials/onboarding_overlay.html' if is_onboarding else 'dashboard/partials/workspace_create_modal.html'
+        return render(request, template, {
             'error': 'Workspace name is required',
         })
     # On GET, render the modal partial

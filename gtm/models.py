@@ -245,6 +245,8 @@ class GTMFile(models.Model):
     """
     Strategic Evidence uploaded by the user to be audited by the GTM Agent.
     Supports Image (Landing Pages/Ads) and PDF (Sales Decks/Strategy).
+    Can be attached to an AssessmentSession directly or uploaded to a Workspace
+    via the Strategic Asset Library.
     """
     FILE_TYPES = [
         ('landing_page', 'Landing Page Screenshot'),
@@ -252,12 +254,28 @@ class GTMFile(models.Model):
         ('sales_deck', 'Sales Deck / Strategy PDF'),
         ('other', 'Other Strategic Evidence'),
     ]
+
+    AUDIT_STATUS_CHOICES = [
+        ('none', 'Not Audited'),
+        ('pending', 'Awaiting Audit'),
+        ('auditing', 'Auditing…'),
+        ('complete', 'Audit Complete'),
+        ('failed', 'Audit Failed'),
+    ]
     
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     session = models.ForeignKey(
         AssessmentSession, 
         on_delete=models.CASCADE, 
-        related_name="evidence_files"
+        related_name="evidence_files",
+        null=True, blank=True,
+    )
+    workspace = models.ForeignKey(
+        'Workspace',
+        on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name="gtm_files",
+        help_text="Optional: workspace-level evidence (used by the Asset Library)"
     )
     
     file = models.FileField(
@@ -268,6 +286,9 @@ class GTMFile(models.Model):
         max_length=40, 
         choices=FILE_TYPES, 
         default='other'
+    )
+    audit_status = models.CharField(
+        max_length=10, choices=AUDIT_STATUS_CHOICES, default='none'
     )
     
     # 🤖 AI STRATEGIC AUDIT
@@ -289,4 +310,4 @@ class GTMFile(models.Model):
         verbose_name_plural = "GTM Strategic Evidence"
 
     def __str__(self):
-        return f"{self.get_file_type_display()} - {self.session.uuid}"
+        return f"{self.get_file_type_display()} - {self.session_id or self.workspace_id}"

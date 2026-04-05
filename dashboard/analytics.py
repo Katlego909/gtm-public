@@ -295,12 +295,23 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
             })
 
     # --- Gap Analysis Logic --- (workspace-scoped)
+    gap_analysis = GapAnalysisMetric.objects.none()
+    latest_completed_gap_session = None
+
     if current_workspace:
         gap_analysis = GapAnalysisMetric.objects.filter(
             workspace=current_workspace
         ).order_by('category', 'priority')
         latest_completed_gap_session = AssessmentSession.objects.filter(
             workspace=current_workspace,
+            is_completed=True,
+        ).order_by('-created_at').first()
+    elif request.user.is_authenticated:
+        gap_analysis = GapAnalysisMetric.objects.filter(
+            user=request.user, workspace__isnull=True
+        ).order_by('category', 'priority')
+        latest_completed_gap_session = AssessmentSession.objects.filter(
+            user=request.user,
             is_completed=True,
         ).order_by('-created_at').first()
 
@@ -310,14 +321,7 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
     ai_resource_recommendations = []
     if latest_completed_gap_session:
         ai_resource_recommendations = list(latest_completed_gap_session.ai_resource_matches.all().select_related('resource'))
-    else:
-        gap_analysis = GapAnalysisMetric.objects.filter(
-            user=request.user, workspace__isnull=True
-        ).order_by('category', 'priority') if request.user.is_authenticated else GapAnalysisMetric.objects.none()
-        latest_completed_gap_session = AssessmentSession.objects.filter(
-            user=request.user,
-            is_completed=True,
-        ).order_by('-created_at').first() if request.user.is_authenticated else None
+
     for metric in gap_analysis:
         calculate_gap_metric_display_properties(metric)
 

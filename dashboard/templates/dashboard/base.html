@@ -254,6 +254,18 @@
                 </svg>
                 <span class="sidebar-text">Workspace</span>
             </a>
+            <a href="{% url 'asset_library' %}"
+               hx-get="{% url 'asset_library' %}"
+               hx-target="#main-content"
+               hx-push-url="true"
+               class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+               title="Asset Library">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                </svg>
+                <span class="sidebar-text">Asset Library</span>
+                <span class="ml-auto sidebar-text text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-gradient-to-r from-indigo-500 to-purple-500 text-white tracking-wide">AI</span>
+            </a>
                 <a href="/dashboard/agent/" 
                     hx-get="/dashboard/agent/" 
                hx-target="#main-content" 
@@ -436,7 +448,18 @@
     document.addEventListener('htmx:configRequest', function(evt) {
         // Mark the request as HTMX for server detection
         evt.detail.headers['X-Requested-With'] = 'XMLHttpRequest';
+
+        // Add CSRF token for non-GET requests
+        if (evt.detail.verb !== 'get') {
+            const csrfToken = document.cookie.split('; ')
+                .find(row => row.startsWith('csrftoken='))
+                ?.split('=')[1];
+            if (csrfToken) {
+                evt.detail.headers['X-CSRFToken'] = csrfToken;
+            }
+        }
     });
+
 
     // Re-initialize charts after HTMX swaps — only when chart canvases are present
     if (window.htmx) {

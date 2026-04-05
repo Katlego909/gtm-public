@@ -57,4 +57,9 @@ urlpatterns = [
     path('resources/add/', views.add_edit_resource, name='add_resource'),
     path('resources/<uuid:pk>/edit/', views.add_edit_resource, name='edit_resource'),
     path('resources/<uuid:pk>/delete/', views.delete_resource, name='delete_resource'),
+
+    # Strategic Asset Library
+    path('assets/', views.asset_library, name='asset_library'),
+    path('assets/<uuid:pk>/audit/', views.trigger_asset_audit, name='trigger_asset_audit'),
+    path('assets/<uuid:pk>/audit-result/', views.asset_audit_result, name='asset_audit_result'),
 ]
