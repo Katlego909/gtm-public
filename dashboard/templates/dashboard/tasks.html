@@ -1,0 +1,19 @@
+{% extends 'dashboard/base.html' %}
+{% load static %}
+
+{% block title %}Tasks & Execution{% endblock %}
+
+{% block content %}
+    {% include 'dashboard/partials/tasks_content.html' %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Kanban initialization if needed
+    document.body.addEventListener('htmx:afterSwap', function(event) {
+        if (event.detail.target.id === 'main-content') {
+            // Re-init any task specific JS here
+        }
+    });
+</script>
+{% endblock %}

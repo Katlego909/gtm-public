@@ -1,0 +1,14 @@
+<div class="p-8 text-center">
+    <div class="flex justify-center mb-4">
+        <div class="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v.01M12 9v3m9.364 3.364A9 9 0 113.636 5.636a9 9 0 0117.728 9.728z"/>
+            </svg>
+        </div>
+    </div>
+    <h2 class="text-xl font-bold mb-2 text-red-600">{{ title|default:"Access Denied" }}</h2>
+    <p class="text-gray-600 mb-6">{{ message|default:"You don't have permission to perform this action." }}</p>
+    <button type="button" onclick="closeModal()" class="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
+        Got it
+    </button>
+</div>

@@ -14,7 +14,7 @@ from django.utils.safestring import mark_safe
 import markdown as md
 import math
 import re
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib.units import cm
@@ -26,12 +26,18 @@ from django.db import transaction
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout
 from django.db.models import Avg
+from django.conf import settings
+from django.core.cache import cache
 from functools import wraps
-
-from django.shortcuts import get_object_or_404
-from .utils_pdf import render_gtm_report_pdf_response
-
-from .ai_services import generate_playbook_with_gemini, generate_diagnostic_insight
+from .utils import transfer_firmographics_to_snapshot, _client_id
+from .ai_services import (
+    generate_playbook_with_gemini,
+    generate_diagnostic_insight,
+    _normalize_ai_playbook_markdown,
+    rewrite_context_note_with_ai,
+)
+from .forms import StartAssessmentForm # Added import
+from .services import (_expand_gtm_jargon, _build_question_guidance, _kickoff_playbook_generation, _log_access_denied, safe_get_session_or_403, _format_band_actions_markdown, _paginated_questions, _category_step_map, _first_incomplete_step, _compute_scores, _band_for_score, _is_session_complete, _save_snapshot)
 
 LEGEND = {
     1: "No / Not in place",
@@ -43,10 +49,6 @@ LEGEND = {
 
 # ---------- helpers ----------
 
-def _client_id(request):
-    """Extract client ID from cookie for anonymous user tracking."""
-    return request.COOKIES.get("gtm_client", "")
-
 def _is_htmx(request):
     """Check if request is from HTMX."""
     return request.headers.get('HX-Request') == 'true'
@@ -57,26 +59,30 @@ def _get_template(request, base_template, partial_template=None):
         return partial_template
     return base_template
 
+
+
+
+
+
+
 def require_session_ownership(view_func):
     """
-    Decorator to enforce session ownership.
-    Checks if authenticated user owns the session or if anonymous client ID matches.
+    Decorator to enforce authenticated session access.
+    Uses centralized workspace-aware session authorization.
     """
     @wraps(view_func)
     def wrapper(request, session_id, *args, **kwargs):
-        session = get_object_or_404(AssessmentSession, pk=session_id)
-        
-        # Check ownership
-        if request.user.is_authenticated:
-            if session.user != request.user:
-                messages.error(request, "Access denied.")
-                return redirect("gtm:history")
-        elif session.owner_client_id != _client_id(request):
+        if not request.user.is_authenticated:
+            messages.error(request, "Please sign in to continue.")
+            return redirect("account_login")
+
+        session, is_authorized = safe_get_session_or_403(request, session_id)
+        if not is_authorized:
             messages.error(request, "Access denied.")
             return redirect("gtm:history")
         
-        # Pass session to view to avoid re-querying
-        return view_func(request, session, *args, **kwargs)
+        # Pass both session object and session_id to preserve wrapped view signatures.
+        return view_func(request, session, session_id, *args, **kwargs)
     return wrapper
 
 def require_action_ownership(view_func):
@@ -87,108 +93,33 @@ def require_action_ownership(view_func):
     @wraps(view_func)
     def wrapper(request, action_id, *args, **kwargs):
         action = get_object_or_404(ActionItem, pk=action_id)
-        
-        # Check ownership via session
-        if request.user.is_authenticated:
-            if action.session.user != request.user:
-                messages.error(request, "Access denied.")
-                return redirect("gtm:history")
-        elif action.session.owner_client_id != _client_id(request):
+
+        if not request.user.is_authenticated:
+            messages.error(request, "Please sign in to continue.")
+            return redirect("account_login")
+
+        if not action.session:
+            messages.error(request, "Invalid action item.")
+            return redirect("gtm:history")
+
+        _, is_authorized = safe_get_session_or_403(request, action.session_id)
+        if not is_authorized:
             messages.error(request, "Access denied.")
             return redirect("gtm:history")
-        
-        # Pass action to view to avoid re-querying
-        return view_func(request, action, *args, **kwargs)
+
+        # Pass both action and action_id to view for correct signature
+        return view_func(request, action, action_id, *args, **kwargs)
     return wrapper
 
-def _format_band_actions_markdown(markdown_text):
-    """
-    Centralized markdown formatting for band actions.
-    Applies consistent formatting rules across all views.
-    """
-    if not markdown_text:
-        return ""
+
+
+
+
+
     
-    # Replace heading keywords with bold markdown
-    actions_md = markdown_text.replace("Action Plan:", "**Action Plan**")
-    actions_md = actions_md.replace("Recommended Tools:", "**Recommended Tools**")
-    
-    # Force blank line before bullets for proper rendering
-    actions_md = re.sub(r"\n-\s*", "\n\n• ", actions_md)
-    
-    # Clean up excessive newlines
-    actions_md = re.sub(r"\n{3,}", "\n\n", actions_md).strip()
-    
-    # Render markdown to HTML
-    try:
-        return mark_safe(md.markdown(actions_md, extensions=["extra", "sane_lists"]))
-    except Exception:
-        # Fallback to simple line break conversion
-        return mark_safe(actions_md.replace("\n", "<br>"))
 
-def _paginated_questions():
-    """Return a list of steps, each = list[Question]. One category per step."""
-    return [list(cat.questions.all().order_by("id"))
-            for cat in Category.objects.all().order_by("id")]
-    
-def _category_step_map():
-    """Map category id → step number (1-based) for deep-linking to the wizard."""
-    return {cat.id: idx + 1 for idx, cat in enumerate(Category.objects.all().order_by("id"))}    
 
-def _first_incomplete_step(session):
-    steps = _paginated_questions()
-    for idx, qs in enumerate(steps, start=1):
-        answered = Response.objects.filter(session=session, question__in=qs).count()
-        if answered < len(qs):
-            return idx
-    return max(1, len(steps))  # all answered → last step
 
-def _compute_scores(session: AssessmentSession):
-    # 1. Fetch all category weights and map to ID for overall calculation
-    all_cats = Category.objects.all().order_by("id")
-    total_w = sum(c.weight for c in all_cats) or 1.0
-    cat_weight_map = {c.id: c.weight for c in all_cats}
-    cat_name_map = {c.id: c.name for c in all_cats}
-
-    # 2. Use a single efficient query to get category-level weighted scores
-    #    (Groups responses by category and calculates the weighted average per group)
-    category_results = (
-        Response.objects
-        .filter(session=session)
-        .values('question__category_id')
-        .annotate(
-            total_weighted_score=Sum(F('score') * F('question__weight')),
-            total_weight=Sum('question__weight')
-        )
-        .order_by('question__category_id')
-    )
-
-    cat_scores = []
-    overall = 0.0
-    
-    # Pre-populate with all categories (in case some have no responses)
-    scores_by_id = {c.id: {"category": c, "avg": 0.0} for c in all_cats}
-
-    for row in category_results:
-        cat_id = row['question__category_id']
-        num = row['total_weighted_score']
-        den = row['total_weight']
-        avg = num / den if den else 0.0
-        
-        # Update the structure with the calculated average
-        scores_by_id[cat_id].update({"avg": avg})
-        
-        # Calculate overall contribution
-        weight = cat_weight_map.get(cat_id, 0)
-        overall += (avg / 5.0) * (weight / total_w) * 100.0
-        
-    # Convert the map back to a list of scores
-    cat_scores = list(scores_by_id.values())
-
-    return cat_scores, overall
-
-def _band_for_score(score):
-    return RecommendationBand.objects.filter(min_score__lte=score, max_score__gte=score).first()
 
 def _remember_session(request, sess_uuid):
     request.session.setdefault("gtm_sessions", [])
@@ -196,164 +127,123 @@ def _remember_session(request, sess_uuid):
         request.session["gtm_sessions"].append(str(sess_uuid))
         request.session.modified = True       
 
-def _is_session_complete(session: AssessmentSession) -> bool:
-    total_q = Question.objects.count()
-    if total_q == 0:
-        return False
-    answered_q = (Response.objects
-                  .filter(session=session)
-                  .values("question_id").distinct().count())
-    return answered_q == total_q
 
-def _save_snapshot(session, cat_scores, overall, band, labels, values):
-    with transaction.atomic():
-        snap, _ = ResultSnapshot.objects.update_or_create(
-            session=session,
-            defaults={
-                "overall": round(overall, 1),
-                "band": band,
-                "band_stage": (band.stage if band else ""),
-                "band_headline": (band.headline if band else ""),
-                "category_breakdown": [
-                    {"category": c["category"].name, "avg": round(c["avg"], 2)}
-                    for c in cat_scores
-                ],
-                "radar_labels": labels,
-                "radar_values": values,
-
-                # firmographics copied from the session
-                "company_name": session.company_name or "",
-                "industry": session.industry or "",
-                "website": getattr(session, "website", "") or "",
-                "contact_name": getattr(session, "contact_name", "") or "",
-                "contact_email": getattr(session, "contact_email", "") or "",
-                "contact_role": getattr(session, "contact_role", "") or "",
-                "phone": getattr(session, "phone", "") or "",
-                "company_size": getattr(session, "company_size", "") or "",
-                "revenue_range": getattr(session, "revenue_range", "") or "",
-                "country": getattr(session, "country", "") or "",
-                "crm": getattr(session, "crm", "") or "",
-                "utm_source": getattr(session, "utm_source", "") or "",
-                "utm_medium": getattr(session, "utm_medium", "") or "",
-                "utm_campaign": getattr(session, "utm_campaign", "") or "",
-                "referrer": getattr(session, "referrer", "") or "",
-            }
-        )
-    return snap
         
 # ---------- Views ----------
 
 def landing(request):
+    # If user is authenticated and has workspace memberships, redirect to dashboard
+    if request.user.is_authenticated:
+        from .models_workspace import WorkspaceMembership
+        user_memberships = WorkspaceMembership.objects.filter(user=request.user, is_active=True)
+        if user_memberships.exists():
+            # User has workspace access, redirect to dashboard
+            first_workspace = user_memberships.first().workspace
+            return redirect(f'/dashboard/?workspace={first_workspace.id}')
+    
     return render(request, "gtm/landing.html")
 
 @login_required
 def start_assessment(request):
-    # Identify the anonymous "user" via your gtm_client cookie
-    cid = _client_id(request)  # already defined in your file
-
     # 0) Redirect to the most recent incomplete assessment instead of creating duplicates
     existing_incomplete = AssessmentSession.objects.filter(
-        owner_client_id=cid, is_completed=False
+        user=request.user,
+        is_completed=False,
     ).order_by("-created_at").first()
     if existing_incomplete:
         messages.info(request, "You have an unfinished assessment. Resuming it now.")
         return redirect("gtm:resume", session_id=existing_incomplete.uuid)
 
-    # 1) Daily cap (per browser/client)
-    MAX_ASSESSMENTS_PER_DAY = 3
+    # 1) Daily cap (per authenticated user)
     today = timezone.now().date()
-    daily_count = AssessmentSession.objects.filter(
-        owner_client_id=cid,
-        created_at__date=today
-    ).count()
-    if daily_count >= MAX_ASSESSMENTS_PER_DAY:
+    max_assessments_per_day = getattr(settings, "MAX_ASSESSMENTS_PER_DAY", 3)
+    daily_count = AssessmentSession.objects.filter(user=request.user, created_at__date=today).count()
+    if daily_count >= max_assessments_per_day:
         messages.error(
             request,
             "Daily limit reached. Please try again tomorrow or contact us for extended access."
         )
         return redirect("gtm:history")
 
-    # 2) Cooldown (time between new assessments)
-    MIN_SECONDS_BETWEEN_ASSESSMENTS = 5 * 60  # 5 minutes
-    last_session = AssessmentSession.objects.filter(
-        owner_client_id=cid
-    ).order_by("-created_at").first()
+    # 2) Cooldown (time between new assessments per authenticated user)
+    min_seconds_between_assessments = getattr(settings, "MIN_SECONDS_BETWEEN_ASSESSMENTS", 5 * 60)
+    last_session = AssessmentSession.objects.filter(user=request.user).order_by("-created_at").first()
     if last_session:
         seconds_since_last = (timezone.now() - last_session.created_at).total_seconds()
-        if seconds_since_last < MIN_SECONDS_BETWEEN_ASSESSMENTS:
-            wait_left = int(MIN_SECONDS_BETWEEN_ASSESSMENTS - seconds_since_last)
-            minutes_left = max(1, wait_left // 60)
-            messages.warning(
-                request,
-                f"Please wait about {minutes_left} minute(s) before starting another assessment."
-            )
-            return redirect("gtm:history")
+        in_cooldown = seconds_since_last < min_seconds_between_assessments
+        minutes_left = max(1, int((min_seconds_between_assessments - seconds_since_last) // 60)) if in_cooldown else 0
+    else:
+        in_cooldown = False
+        minutes_left = 0
+
+    if in_cooldown:
+        messages.warning(
+            request,
+            f"Please wait about {minutes_left} minute(s) before starting another assessment."
+        )
+        return redirect("gtm:history")
 
     if request.method == "POST":
-        company  = request.POST.get("company_name", "")
-        industry = request.POST.get("industry", "")
+        form = StartAssessmentForm(request.POST)
+        if form.is_valid():
+            session = form.save(commit=False)
+            session.user = request.user if request.user.is_authenticated else None
+            session.owner_client_id = _client_id(request)
+            
+            # Associate with current workspace if available
+            if hasattr(request, 'workspace') and request.workspace:
+                session.workspace = request.workspace
+            
+            # Handle referrer separately as it comes from request.META, not directly from form POST data
+            session.referrer = request.META.get("HTTP_REFERER", "")
+            session.save()
+            
+            return redirect("gtm:resume", session_id=session.uuid)
+        else:
+            # If form is invalid, re-render the page with errors
+            return render(request, "gtm/start.html", {
+                "form": form,
+                "is_htmx": _is_htmx(request)
+            })
 
-        # 🔹 new fields (optional)
-        website       = request.POST.get("website", "")
-        contact_name  = request.POST.get("contact_name", "")
-        contact_email = request.POST.get("contact_email", "")
-        contact_role  = request.POST.get("contact_role", "")
-        phone         = request.POST.get("phone", "")
-        company_size  = request.POST.get("company_size", "")
-        revenue_range = request.POST.get("revenue_range", "")
-        country       = request.POST.get("country", "")
-        crm           = request.POST.get("crm", "")
-        notes         = request.POST.get("notes", "")
-
-        # acquisition (helpful if you add hidden inputs from querystring)
-        utm_source   = request.POST.get("utm_source", "")
-        utm_medium   = request.POST.get("utm_medium", "")
-        utm_campaign = request.POST.get("utm_campaign", "")
-        referrer     = request.META.get("HTTP_REFERER", "")
-
-        session = AssessmentSession.objects.create(
-            company_name=company,
-            industry=industry,
-            website=website,
-            contact_name=contact_name,
-            contact_email=contact_email,
-            contact_role=contact_role,
-            phone=phone,
-            company_size=company_size,
-            revenue_range=revenue_range,
-            country=country,
-            crm=crm,
-            notes=notes,
-            utm_source=utm_source,
-            utm_medium=utm_medium,
-            utm_campaign=utm_campaign,
-            referrer=referrer,
-            user=request.user if request.user.is_authenticated else None,
-            owner_client_id=_client_id(request),
-        )
-        
-        return redirect("gtm:resume", session_id=session.uuid)
-
-    return render(request, "gtm/start.html", {"is_htmx": _is_htmx(request)})
+    else: # GET request
+        form = StartAssessmentForm(initial={
+            "utm_source": request.GET.get("utm_source", ""),
+            "utm_medium": request.GET.get("utm_medium", ""),
+            "utm_campaign": request.GET.get("utm_campaign", ""),
+            # Referrer is set in save, but can be pre-filled from GET if desired
+            "referrer": request.GET.get("referrer", ""),
+        })
+    return render(request, "gtm/start.html", {"form": form, "is_htmx": _is_htmx(request)})
 
 
+@login_required
 def resume_assessment(request, session_id):
-    session = get_object_or_404(AssessmentSession, pk=session_id)
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        messages.error(request, "Access denied.")
+        return redirect("gtm:history")
+
     step = _first_incomplete_step(session)
     session.current_step = step
     session.save(update_fields=["current_step"])
     return redirect("gtm:assessment_step", session_id=session.uuid, step=step)
 
+@login_required
 def resume_latest(request):
-    cid = _client_id(request)
-    s = AssessmentSession.objects.filter(owner_client_id=cid, is_completed=False).order_by("-created_at").first()
+    s = AssessmentSession.objects.filter(user=request.user, is_completed=False).order_by("-created_at").first()
     if not s:
         return redirect("gtm:start")
     step = _first_incomplete_step(s)
     return redirect("gtm:assessment_step", session_id=s.uuid, step=step)
 
+@login_required
 def assessment_step(request, session_id, step: int):
-    session = get_object_or_404(AssessmentSession, pk=session_id)
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        messages.error(request, "Access denied.")
+        return redirect("gtm:history")
+
     steps = _paginated_questions()
     total_steps = len(steps)
     if total_steps == 0:
@@ -366,8 +256,11 @@ def assessment_step(request, session_id, step: int):
         return redirect("gtm:assessment_step", session_id=session.uuid, step=required_step)
 
     questions = steps[step - 1]
+    question_guidance = {q.id_code: _build_question_guidance(q) for q in questions}
 
     # Build a dynamic form with one integer field per question (1..5)
+    context_fields = {}
+    from django import forms
     class StepForm(Form):
         pass
     for q in questions:
@@ -377,59 +270,55 @@ def assessment_step(request, session_id, step: int):
             required=True,
             label=q.text
         )
+        StepForm.base_fields[f"{q.id_code}_context_note"] = forms.CharField(
+            widget=forms.Textarea(attrs={"class": "w-full border rounded px-3 py-2 text-sm", "rows": 3, "placeholder": "Please provide more info on this"}),
+            required=False,
+            label="Please provide more info on this"
+        )
 
     # Pre-fill if answers exist
     initial = {}
-    existing = {r.question_id: r.score
-                for r in Response.objects.filter(session=session, question__in=questions)}
+    existing = {r.question_id: r for r in Response.objects.filter(session=session, question__in=questions)}
     for q in questions:
         if q.id in existing:
-            initial[q.id_code] = existing[q.id]
+            initial[q.id_code] = existing[q.id].score
+            initial[f"{q.id_code}_context_note"] = existing[q.id].context_note
 
     if request.method == "POST":
         form = StepForm(request.POST, initial=initial)
         if form.is_valid():
-            # Collect responses that need AI insights
             low_score_responses = []
-            
             # save/update answers for this step
             for q in questions:
                 score = form.cleaned_data[q.id_code]
-                
-                # Use update_or_create to get the Response instance
+                context_note = form.cleaned_data.get(f"{q.id_code}_context_note", "")
                 response_instance, created = Response.objects.update_or_create(
-                    session=session, question=q, defaults={"score": score}
+                    session=session, question=q, defaults={"score": score, "context_note": context_note}
                 )
-                
-                # Track low-scoring responses for AI insight generation
                 if response_instance.score <= 2:
                     low_score_responses.append(response_instance)
-            
-            # ----------------------------------------------------
-            # 🔧 OPTIMIZATION: Compute scores and save snapshot ONCE after all responses
-            # ----------------------------------------------------
-            cat_scores, overall = _compute_scores(session)
-            band = _band_for_score(overall)
-            
-            # Re-calculate radar data (as required by _save_snapshot)
-            labels = [c["category"].name for c in cat_scores]
-            values = [round(c["avg"], 2) for c in cat_scores]
-            
-            # Save the snapshot now so 'session.snapshot' is current
-            _save_snapshot(session, cat_scores, overall, band, labels, values)
-            # ----------------------------------------------------
-            
-            # update progress + completion flag (data-driven)
+
+            # Transition to next step
             next_step = step + 1
             session.current_step = min(next_step, total_steps)
             session.is_completed = _is_session_complete(session)
-            # The firmographics were already saved in _save_snapshot, so we only need
-            # to save the step/completion flags.
-            session.save(update_fields=["current_step", "is_completed"])
+            
+            # Ensure workspace association is set
+            if hasattr(request, 'workspace') and request.workspace and not session.workspace:
+                session.workspace = request.workspace
+            
+            session.save(update_fields=["current_step", "is_completed", "workspace"])
 
             if next_step > total_steps:
                 return redirect("gtm:results", session_id=session.uuid)
             
+            # For non-final steps, we still compute score for the progress bar or snapshot
+            cat_scores, overall = _compute_scores(session)
+            band = _band_for_score(overall)
+            labels = [c["category"].name for c in cat_scores]
+            values = [round(c["avg"], 2) for c in cat_scores]
+            _save_snapshot(session, cat_scores, overall, band, labels, values)
+
             return redirect("gtm:assessment_step", session_id=session.uuid, step=next_step)
     else:
         form = StepForm(initial=initial)
@@ -442,10 +331,55 @@ def assessment_step(request, session_id, step: int):
         "progress_pct": progress_pct, "legend": mark_safe(legend_html),
         "category": questions[0].category if questions else None,
         "is_htmx": _is_htmx(request),
+        "context_fields": context_fields,
+        "question_guidance": question_guidance,
+    })
+
+
+@login_required
+@require_POST
+def rewrite_context_note(request, session_id):
+    """Rewrite/summarize a context note and return preview text without persisting it."""
+    import json
+
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        return JsonResponse({"success": False, "error": "Access denied."}, status=403)
+
+    try:
+        payload = json.loads(request.body or "{}")
+    except json.JSONDecodeError:
+        return JsonResponse({"success": False, "error": "Invalid JSON payload."}, status=400)
+
+    note_text = (payload.get("note_text") or "").strip()
+    question_text = (payload.get("question_text") or "").strip()
+    mode = (payload.get("mode") or "rewrite").strip().lower()
+
+    if not note_text:
+        return JsonResponse({"success": False, "error": "Please add some text first."}, status=400)
+
+    rewritten = rewrite_context_note_with_ai(note_text=note_text, question_text=question_text, mode=mode)
+    if not rewritten:
+        return JsonResponse({"success": False, "error": "Could not rewrite note right now."}, status=500)
+
+    return JsonResponse({
+        "success": True,
+        "rewritten_text": rewritten,
+        "mode": mode,
     })
 
 def results(request, session_id):
-    session = get_object_or_404(AssessmentSession, pk=session_id)
+    # Access control: ensure user owns or is in session's workspace
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Access denied to this session.")
+    
+    # Ensure workspace association if missing
+    if hasattr(request, 'workspace') and request.workspace and not session.workspace:
+        session.workspace = request.workspace
+        session.save(update_fields=["workspace"])
+    
     cat_scores, overall = _compute_scores(session)
     band = _band_for_score(overall)
 
@@ -459,11 +393,21 @@ def results(request, session_id):
         it["step"] = step_map.get(it["category"].id)
 
     all_rows = []
-    for q in Question.objects.all():
-        r = Response.objects.filter(session=session, question=q).first()
+    questions = list(Question.objects.select_related("category").all())
+    responses_by_question_id = {
+        r.question_id: r
+        for r in Response.objects.filter(
+            session=session,
+            question__in=questions,
+        ).select_related("question__category")
+    }
+
+    for q in questions:
+        r = responses_by_question_id.get(q.id)
         if r:
             all_rows.append({
                 "question": q,
+                "response_id": r.id,
                 "score": r.score,
                 "weighted": r.score * q.weight,
                 "note": q.diagnostic_note or "",
@@ -477,14 +421,32 @@ def results(request, session_id):
     values = [round(c["avg"], 2) for c in cat_scores]
 
     # -----------------------------
-    # 🧩 Tool Recommendations Logic
+    # 🧩 Tool Recommendations Logic (Optimized to prevent N+1)
     # -----------------------------
     recommendations = []
+    
+    # 1. Collect unique categories from weakest_questions
+    weakest_category_ids = set()
+    for w in weakest_questions:
+        weakest_category_ids.add(w["question"].category.id)
+
+    # 2. Fetch all ToolRecommendation objects for these categories in one query
+    #    Prefetch the category to avoid N+1 when accessing m.category.id later if needed
+    all_tool_recommendations = ToolRecommendation.objects.filter(
+        category__id__in=list(weakest_category_ids)
+    ).select_related('category') # select_related for accessing category name later efficiently
+
+    # 3. Perform keyword matching in Python
+    tools_by_category = {}
+    for tool in all_tool_recommendations:
+        tools_by_category.setdefault(tool.category_id, []).append(tool)
+
     for w in weakest_questions:
         q_text = (w["question"].text or "").lower()
         q_note = (w.get("note") or "").lower()
-        cat = w["question"].category
-        for m in ToolRecommendation.objects.filter(category=cat):
+        
+        # Filter through prefetched recommendations for the current question's category only.
+        for m in tools_by_category.get(w["question"].category_id, []):
             kw = (m.keyword or "").lower()
             if kw and (kw in q_text or kw in q_note):
                 recommendations.append(m)
@@ -510,12 +472,9 @@ def results(request, session_id):
         for cat in weak_categories:
             if len(recommendations) >= 5:
                 break
-            # Get tools from this category not already in recommendations
-            fallback_tools = ToolRecommendation.objects.filter(
-                category=cat
-            ).exclude(id__in=[r.id for r in recommendations])[:2]
-            
-            for tool in fallback_tools:
+
+            # Reuse prefetched tools for fallback; avoid per-category DB queries.
+            for tool in tools_by_category.get(cat.id, []):
                 if tool.id not in seen:
                     seen.add(tool.id)
                     recommendations.append(tool)
@@ -538,34 +497,50 @@ def results(request, session_id):
     # -----------------------------
     # 🤖 Generate AI insights for low-scoring questions (if not already generated)
     # -----------------------------
+    # Prefetch all relevant responses for weakest questions to avoid N+1
+    weakest_question_ids = [q_data["question"].id for q_data in weakest_questions]
+    
+    # Fetch responses and map question_id to response manually as question_id is not unique for in_bulk()
+    responses_qs = Response.objects.filter(
+        session=session,
+        question__id__in=weakest_question_ids
+    ).select_related('question') # select_related to avoid N+1 when accessing response.question later
+    
+    responses_by_question_id = {r.question.id: r for r in responses_qs}
+
     for q_data in weakest_questions:
-        if not q_data.get("ai_insight"):
-            try:
-                # Get the response object
-                response = Response.objects.filter(
-                    session=session,
-                    question=q_data["question"]
-                ).first()
-                if response and response.score <= 2:
-                    generate_diagnostic_insight(response)
-                    # Refresh the insight
-                    response.refresh_from_db()
-                    q_data["ai_insight"] = response.ai_insight
-            except Exception as e:
-                log_error("Diagnostic Insight Generation", e, {"qid": q_data["question"].id_code})
+        # Use prefetched response if available
+        response = responses_by_question_id.get(q_data["question"].id)
+        
+        if response:
+            if not response.ai_insight:
+                # 🤖 TRIGGER ASYNC GENERATION
+                try:
+                    from threading import Thread
+                    # Capture response ID to avoid closure issues
+                    rid = response.id
+                    def gen_diagnostic_async(resp_id):
+                        try:
+                            from .models import Response
+                            from .ai_services import generate_diagnostic_insight
+                            r = Response.objects.get(id=resp_id)
+                            generate_diagnostic_insight(r)
+                        except Exception as e:
+                            log_error("Async Diagnostic Gen", e)
+                    
+                    Thread(target=gen_diagnostic_async, args=(rid,), daemon=True).start()
+                    q_data["ai_insight_loading"] = True
+                except Exception as e:
+                    log_error("Diagnostic Thread creation", e)
+            else:
+                q_data["ai_insight"] = response.ai_insight
+
     
     # -----------------------------
-    # 🤖 Trigger AI playbook generation immediately (blocking for now)
+    # 🤖 Trigger AI playbook generation in background (non-blocking)
     # -----------------------------
     if snap and not (snap.ai_playbook or "").strip():
-        try:
-            ai_md = generate_playbook_with_gemini(snap)
-            if ai_md and ai_md.strip():
-                snap.ai_playbook = ai_md.strip()
-                snap.save(update_fields=["ai_playbook"])
-        except Exception as e:
-            log_error("AI Playbook Generation", e, {"session_id": str(session.uuid)})
-            # Continue rendering even if AI fails
+        _kickoff_playbook_generation(snap, session_id=session.uuid)
 
     return render(request, "gtm/results.html", {
         "session": session,
@@ -580,11 +555,70 @@ def results(request, session_id):
         "weakest_questions": weakest_questions,
         "recommendations": recommendations,
         "is_htmx": _is_htmx(request),
+        "snap": snap,
+    })
+
+def playbook_status(request, session_id):
+    """Checks if AI playbook is ready. Returns button partials for polling."""
+    # Access control: ensure user owns or is in session's workspace
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Access denied to this session.")
+    snap = getattr(session, "snapshot", None) or ResultSnapshot.objects.filter(session=session).first()
+    
+    if snap and (snap.ai_playbook or "").strip():
+        # Playbook is ready! Return the actual button to view it.
+        return render(request, "gtm/partials/playbook_ready_button.html", {"session": session})
+
+    if snap:
+        _kickoff_playbook_generation(snap, session_id=session.uuid)
+    
+    # Still generating. Return the loading state.
+    return render(request, "gtm/partials/playbook_loading_button.html", {"session": session})
+
+
+def playbook_content_status(request, session_id):
+    """Return only the playbook content panel for incremental HTMX polling."""
+    # Access control: ensure user owns or is in session's workspace
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Access denied to this session.")
+    snap = getattr(session, "snapshot", None) or ResultSnapshot.objects.filter(session=session).first()
+
+    playbook_ready = bool(snap and (snap.ai_playbook or "").strip())
+    ai_playbook_html = ""
+
+    if playbook_ready:
+        src = _normalize_ai_playbook_markdown(snap.ai_playbook)
+        ai_playbook_html = md.markdown(src, extensions=["extra", "sane_lists", "toc"])
+        return render(request, "gtm/partials/playbook_content_status.html", {
+            "session": session,
+            "playbook_ready": True,
+            "playbook_loading": False,
+            "ai_playbook_html": mark_safe(ai_playbook_html),
+        })
+
+    # Ensure generation remains non-blocking while polling.
+    if snap:
+        _kickoff_playbook_generation(snap, session_id=session.uuid)
+
+    return render(request, "gtm/partials/playbook_content_status.html", {
+        "session": session,
+        "playbook_ready": False,
+        "playbook_loading": bool(snap),
+        "ai_playbook_html": "",
     })
 
 # Playbook
 def playbook(request, session_id):
-    session = get_object_or_404(AssessmentSession, pk=session_id)
+    # Access control: ensure user owns or is in session's workspace
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Access denied to this session.")
+    
     cat_scores, overall = _compute_scores(session)
     band = _band_for_score(overall)
     cat_sorted = sorted(cat_scores, key=lambda x: x["avg"])
@@ -602,49 +636,35 @@ def playbook(request, session_id):
     # Ensure we actually have a snapshot even if user skips Results page
     snap = getattr(session, "snapshot", None) or ResultSnapshot.objects.filter(session=session).first()
 
-    # (Optional) Generate if empty - blocking to ensure it's ready when user arrives
-    if snap and not (snap.ai_playbook or "").strip():
-        try:
-            ai_md_src = generate_playbook_with_gemini(snap)
-            if ai_md_src and ai_md_src.strip():
-                snap.ai_playbook = ai_md_src.strip()
-                snap.save(update_fields=["ai_playbook"])
-        except Exception as e:
-            log_error("AI Playbook (lazy) Generation", e, {"session_id": str(session.uuid)})
-
+    # (Optional) Generate if empty - NON-BLOCKING to prevent page hangs
+    needs_generation = snap and not (snap.ai_playbook or "").strip()
+    
+    # Trigger background generation if needed (non-blocking)
+    if needs_generation:
+        _kickoff_playbook_generation(snap, session_id=session.uuid)
+    
+    playbook_ready = False
+    playbook_loading = bool(needs_generation)
     ai_playbook_html = ""
     try:
         if snap and getattr(snap, "ai_playbook", ""):
-            # ✅ Normalize Gemini’s mixed formatting BEFORE Markdown
-            src = snap.ai_playbook.replace("\r\n", "\n").strip()
-
-            # 1️⃣ Convert inline " * " separators into proper bullet lines
-            src = re.sub(r"\s\*\s+", "\n- ", src)
-
-            # 2️⃣ Make "Week X:" style lines into Markdown headings for consistency
-            src = re.sub(r"(?m)^(Week\s+\d+:[^\n]*)$", r"### \1", src)
-
-            # 3️⃣ Add blank lines before list, numbered, and heading items for proper block rendering
-            src = re.sub(r"(?m)(?<!\n)\n(?=(?:- |\d+\. |#{1,6}\s))", "\n\n", src)
-
-            # 4️⃣ Clean up extra spaces/newlines
-            src = re.sub(r"[ \t]+\n", "\n", src)
-            src = re.sub(r"\n{3,}", "\n\n", src)
-
-            # ✅ Render clean Markdown
+            src = _normalize_ai_playbook_markdown(snap.ai_playbook)
             ai_playbook_html = md.markdown(
                 src,
                 extensions=["extra", "sane_lists", "toc"]  # 'extra' already includes tables
             )
-        else:
-            ai_playbook_html = ""
+            playbook_ready = True
     except Exception as e:
         log_error("AI Playbook rendering", e, {"session_id": str(session.uuid)})
-        ai_playbook_html = "<p class='text-red-600'>⚠️ Could not render AI playbook content. Check logs.</p>"
+        ai_playbook_html = ""
+        playbook_ready = False
+        playbook_loading = False
 
-    # -----------------------------
+    # Note: Action items are now created explicitly via the "build my action plan" agent command.
+    # This prevents duplicate auto-creation and gives users explicit control over task generation.
+
     # Render Template
-    # -----------------------------
+    # ----
     return render(request, "gtm/playbook.html", {
         "session": session,
         "overall": round(overall, 1),
@@ -653,53 +673,185 @@ def playbook(request, session_id):
         "cat_sorted": cat_sorted,
         "band_actions_html": band_actions_html,
         "ai_playbook_html": mark_safe(ai_playbook_html),
+        "playbook_ready": playbook_ready,
+        "playbook_loading": playbook_loading,
         "is_htmx": _is_htmx(request),
     })
 
 
+def insight_status(request, session_id, response_id):
+    """Return only one insight block so the results page updates without full-page refresh."""
+    # Access control: ensure user owns or is in session's workspace
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Access denied to this session.")
+    
+    response = get_object_or_404(Response.objects.select_related("question"), pk=response_id, session=session)
+
+    if not (response.ai_insight or "").strip():
+        try:
+            from threading import Thread
+
+            def gen_diagnostic_async(resp_id):
+                try:
+                    from .models import Response
+                    from .ai_services import generate_diagnostic_insight
+                    r = Response.objects.get(id=resp_id)
+                    generate_diagnostic_insight(r)
+                except Exception as e:
+                    log_error("Async Diagnostic Gen (poll)", e)
+
+            Thread(target=gen_diagnostic_async, args=(response.id,), daemon=True).start()
+        except Exception as e:
+            log_error("Diagnostic poll thread creation", e)
+
+    # Refresh model state after potential async kickoff fallback writes.
+    response.refresh_from_db(fields=["ai_insight"])
+
+    return render(request, "gtm/partials/insight_status.html", {
+        "session": session,
+        "response": response,
+    })
+
+
 def download_report_pdf(request, session_id):
-    session = get_object_or_404(AssessmentSession, pk=session_id)
+    # Access control: ensure user owns or is in session's workspace
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Access denied to this session.")
+    
     cat_scores, overall = _compute_scores(session)
     band = _band_for_score(overall)
     return render_gtm_report_pdf_response(session=session, cat_scores=cat_scores, overall=overall, band=band)
 
+@login_required
 def history(request):
-    
-    if request.user.is_authenticated:
-        qs = AssessmentSession.objects.filter(user=request.user)
-    else:
-        cid = _client_id(request)
-        # 🚨 IMPROVEMENT: Fetch snapshot and band info in one go
-        qs = AssessmentSession.objects.filter(owner_client_id=cid).order_by("-created_at")
+    qs = AssessmentSession.objects.filter(user=request.user).order_by("-created_at")
         
     # Use select_related to minimize queries
     qs = qs.select_related('snapshot__band')
     
     rows = []
+    sessions_needing_score_computation = []
+
     for s in qs:
-        # 🚨 IMPROVEMENT: Use snapshot data if available (for completed sessions)
         snap = getattr(s, 'snapshot', None)
         if snap:
             overall = snap.overall
             band = snap.band
         elif s.is_completed:
-            # Fallback for completed sessions without a snapshot (rare)
-            cat_scores, overall = _compute_scores(s)
-            band = _band_for_score(overall)
+            sessions_needing_score_computation.append(s)
+            overall = None # Will be computed later
+            band = None # Will be computed later
         else:
             overall = None
             band = None
             
         rows.append({"session": s, "overall": (round(overall,1) if overall is not None else None), "band": band})
-        
-    # Remove the old loop that called _compute_scores(s) if you use the above logic.
-    # The original loop in history was:
-    # for s in qs:
-    #     cat_scores, overall = _compute_scores(s) if s.is_completed else ([], None)
-    #     band = _band_for_score(overall) if overall is not None else None
-    #     rows.append({"session": s, "overall": (round(overall,1) if overall is not None else None), "band": band})
 
+    # Batch prefetch responses for sessions needing score computation
+    if sessions_needing_score_computation:
+        session_ids_needing_comp = [s.uuid for s in sessions_needing_score_computation]
+        # Prefetch all responses and their related questions and categories
+        responses_qs = Response.objects.filter(
+            session_id__in=session_ids_needing_comp
+        ).select_related('question__category')
+        
+        # Organize responses by session for efficient lookup
+        responses_by_session = {}
+        for r in responses_qs:
+            responses_by_session.setdefault(r.session_id, []).append(r)
+        
+        # Re-iterate through rows to fill in computed scores and bands
+        for row in rows:
+            s = row['session']
+            if s.is_completed and not getattr(s, 'snapshot', None):
+                # Now _compute_scores can use the prefetched responses
+                # Note: _compute_scores needs to be adapted to accept preloaded responses
+                # or ensure its internal queries don't hit DB if data is already there.
+                # For now, we assume _compute_scores is efficient enough per session given prefetched data.
+                # A more thorough change would modify _compute_scores to take `responses_qs` directly.
+                cat_scores, overall = _compute_scores(s) # This will still query categories, but responses are prefetched
+                band = _band_for_score(overall)
+                row['overall'] = round(overall, 1) if overall is not None else None
+                row['band'] = band
+        
     return render(request, "gtm/history.html", {"rows": rows, "is_htmx": _is_htmx(request)})
+
+
+@login_required
+@require_POST
+def upload_strategic_evidence(request, session_id):
+    """
+    Handles file uploads (Images/PDFs) for strategic GTM audits.
+    """
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        return JsonResponse({"success": False, "error": "Access denied."}, status=403)
+        
+    if 'file' not in request.FILES:
+        return JsonResponse({"success": False, "error": "No file uploaded."}, status=400)
+        
+    uploaded_file = request.FILES['file']
+    file_type = request.POST.get('file_type', 'other')
+    
+    # Basic size limit (5MB)
+    if uploaded_file.size > 5 * 1024 * 1024:
+        return JsonResponse({"success": False, "error": "File too large (max 5MB)."}, status=400)
+    
+    try:
+        from .models import GTMFile
+        gtm_file = GTMFile.objects.create(
+            session=session,
+            file=uploaded_file,
+            file_type=file_type
+        )
+        
+        # 🤖 TRIGGER ASYNC INITIAL AUDIT
+        # This caches the result so the chat agent doesn't have to wait for a 10s API call
+        from .ai_auditor import perform_gtm_visual_audit
+        from threading import Thread
+        
+        # Build context for the audit
+        cat_scores, overall = _compute_scores(session)
+        band = _band_for_score(overall)
+        context_str = f"Company GTM Score: {overall}/100. Stage: {band.stage if band else 'N/A'}"
+        
+        def run_initial_audit(file_id, ctx):
+            try:
+                from .models import GTMFile
+                from .ai_auditor import perform_gtm_visual_audit
+                f = GTMFile.objects.get(id=file_id)
+                perform_gtm_visual_audit(f, session_context=ctx)
+            except Exception as e:
+                log_error("Initial Audit Background Failure", e)
+                
+        Thread(target=run_initial_audit, args=(gtm_file.id, context_str), daemon=True).start()
+        
+        return JsonResponse({
+            "success": True,
+            "message": f"Successfully uploaded {gtm_file.get_file_type_display()}. Audit in progress...",
+            "file_id": str(gtm_file.id)
+        })
+        
+    except Exception as e:
+        log_error("Evidence Upload Failure", e)
+        return JsonResponse({"success": False, "error": "Could not upload file."}, status=500)
+
+@require_POST
+@require_session_ownership
+def cancel_assessment(request, session, session_id):
+    """Cancel an in-progress assessment and remove it from history."""
+    if session.is_completed:
+        messages.warning(request, "Completed assessments cannot be canceled.")
+        return redirect("gtm:history")
+
+    company_label = session.company_name or "this assessment"
+    session.delete()
+    messages.success(request, f"Canceled {company_label}.")
+    return redirect("gtm:history")
 
 
 @require_POST
@@ -713,7 +865,8 @@ def action_add(request, session, session_id):
         ActionItem.objects.create(
             session=session,
             question=Question.objects.filter(id=question_id).first() if question_id else None,
-            note=note
+            note=note,
+            created_by=request.user
         )
     return redirect("gtm:playbook", session_id=session.uuid)
 
@@ -761,14 +914,17 @@ def action_delete(request, action, action_id):
 # ================================================================
 # AI CHAT ASSISTANT
 # ================================================================
-from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
 from .ai_chat import process_chat_message, get_suggested_prompts
 from .models import ChatMessage
 
 def chat_view(request, session_id):
     """Render the chat interface page"""
-    session = get_object_or_404(AssessmentSession, pk=session_id)
+    # Access control: ensure user owns or is in session's workspace
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Access denied to this session.")
     
     # Get chat history
     chat_history = ChatMessage.objects.filter(session=session).order_by('created_at')[:50]
@@ -789,25 +945,31 @@ def chat_api(request, session_id):
     import json
     
     try:
-        session = get_object_or_404(AssessmentSession, pk=session_id)
-        
+        # Access control: ensure user owns or is in session's workspace
+        session, is_authorized = safe_get_session_or_403(request, session_id)
+        if not is_authorized:
+            return JsonResponse({
+                "success": False,
+                "error": "Access denied to this session."
+            }, status=403)
+
         # Parse JSON body
         data = json.loads(request.body)
         message = data.get("message", "").strip()
-        
+
         if not message:
             return JsonResponse({
                 "success": False,
                 "error": "Message cannot be empty"
             }, status=400)
-        
+
         # Process the message
         result = process_chat_message(
             session_id=str(session_id),
             message=message,
             user=request.user if request.user.is_authenticated else None
         )
-        
+
         # Save to database
         if result.get("success"):
             ChatMessage.objects.create(
@@ -817,9 +979,9 @@ def chat_api(request, session_id):
                 response=result.get("response", ""),
                 intent=result.get("intent", "")
             )
-        
+
         return JsonResponse(result)
-        
+
     except json.JSONDecodeError:
         return JsonResponse({
             "success": False,

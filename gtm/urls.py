@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from . import views
 
 app_name = "gtm"
@@ -9,22 +9,31 @@ urlpatterns = [
     path("resume/<uuid:session_id>/", views.resume_assessment, name="resume"),
     path("resume/latest/", views.resume_latest, name="resume_latest"),
     path("assessment/<uuid:session_id>/<int:step>/", views.assessment_step, name="assessment_step"),
+    path("assessment/<uuid:session_id>/rewrite-context-note/", views.rewrite_context_note, name="rewrite_context_note"),
     path("results/<uuid:session_id>/", views.results, name="results"),
+    path("results/<uuid:session_id>/insight/<int:response_id>/", views.insight_status, name="insight_status"),
     path("playbook/<uuid:session_id>/", views.playbook, name="playbook"),
+    path("playbook-status/<uuid:session_id>/", views.playbook_status, name="playbook_status"),
+    path("playbook-content-status/<uuid:session_id>/", views.playbook_content_status, name="playbook_content_status"),
     path("download/<uuid:session_id>/", views.download_report_pdf, name="download"),
     path("history/", views.history, name="history"),
+    path("cancel/<uuid:session_id>/", views.cancel_assessment, name="cancel_assessment"),
     
     path("actions/add/<uuid:session_id>/", views.action_add, name="action_add"),
     path("actions/toggle/<int:action_id>/", views.action_toggle, name="action_toggle"),
     path("actions/update/<int:action_id>/", views.action_update, name="action_update"),
     path("actions/delete/<int:action_id>/", views.action_delete, name="action_delete"),
     
-    # AI Chat Assistant
+    # AI Chat & Multimodal
     path("chat/<uuid:session_id>/", views.chat_view, name="chat"),
     path("api/chat/<uuid:session_id>/", views.chat_api, name="chat_api"),
+    path("evidence/upload/<uuid:session_id>/", views.upload_strategic_evidence, name="upload_evidence"),
     
     # User Profile & Auth
     path("profile/", views.profile, name="profile"),
     path("logout/", views.logout_view, name="logout"),
+    
+    # Workspace management
+    path("workspace/", include('gtm.urls_workspace')),
 
 ]

@@ -1,0 +1,25 @@
+<tr id="actionitem-row-{{ item.id }}" class="hover:bg-gray-50 transition-colors group">
+    <td class="px-6 py-4 font-medium text-gray-900">
+        <div class="flex items-center gap-2">
+            <div>{{ item.note_html|safe }}</div>
+            <button type="button" class="text-xs px-2 py-1 rounded bg-indigo-100 text-indigo-700 font-semibold" 
+                hx-get="/dashboard/actionitem/{{ item.id }}/modal/" 
+                hx-target="#modal-edit" 
+                hx-swap="innerHTML">
+                Edit
+            </button>
+        </div>
+    </td>
+    <td class="px-6 py-4">
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-transparent">
+            {{ item.get_status_display }}
+        </span>
+    </td>
+    <td class="px-6 py-4 text-gray-600">
+        <div class="flex items-center gap-2">
+            <div class="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">{{ item.owner|first }}</div>
+            <span>{{ item.owner }}</span>
+        </div>
+    </td>
+    <td class="px-6 py-4 text-gray-500 font-mono">{{ item.due_date|date:'Y-m-d' }}</td>
+</tr>

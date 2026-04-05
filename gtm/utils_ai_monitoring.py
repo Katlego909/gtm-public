@@ -11,12 +11,12 @@ from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
-# Gemini Free Tier Limits (as of Nov 2024)
+# Vertex AI Enterprise Tier Limits (Conservative Estimates)
 FREE_TIER_LIMITS = {
-    'requests_per_minute': 15,
-    'requests_per_day': 1500,
-    'tokens_per_minute': 1_000_000,
-    'tokens_per_day': 50_000_000,  # Estimated
+    'requests_per_minute': 60,
+    'requests_per_day': 2000,
+    'tokens_per_minute': 10_000_000,
+    'tokens_per_day': 200_000_000,
 }
 
 class AIUsageTracker:
@@ -37,17 +37,21 @@ class AIUsageTracker:
         minute_key = f"{cls.CACHE_PREFIX}:minute:{now.strftime('%Y%m%d%H%M')}"
         day_key = f"{cls.CACHE_PREFIX}:day:{now.strftime('%Y%m%d')}"
         
-        # Increment counters
-        minute_requests = cache.get(f"{minute_key}:requests", 0) + 1
-        minute_tokens = cache.get(f"{minute_key}:tokens", 0) + tokens_used
-        day_requests = cache.get(f"{day_key}:requests", 0) + 1
-        day_tokens = cache.get(f"{day_key}:tokens", 0) + tokens_used
-        
-        # Store with expiration
-        cache.set(f"{minute_key}:requests", minute_requests, 60)
-        cache.set(f"{minute_key}:tokens", minute_tokens, 60)
-        cache.set(f"{day_key}:requests", day_requests, 86400)
-        cache.set(f"{day_key}:tokens", day_tokens, 86400)
+        # Helper for atomic increment with fallback
+        def safe_incr(key, amount, timeout):
+            try:
+                # Attempt atomic increment
+                return cache.incr(key, amount)
+            except (ValueError, KeyError):
+                # Key doesn't exist, set initial value
+                cache.set(key, amount, timeout)
+                return amount
+
+        # Increment counters atomically
+        minute_requests = safe_incr(f"{minute_key}:requests", 1, 60)
+        minute_tokens = safe_incr(f"{minute_key}:tokens", tokens_used, 60)
+        day_requests = safe_incr(f"{day_key}:requests", 1, 86400)
+        day_tokens = safe_incr(f"{day_key}:tokens", tokens_used, 86400)
         
         # Log current usage
         logger.info(

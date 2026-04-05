@@ -51,98 +51,302 @@ CATEGORIES: List[Tuple[str, float]] = [
 
 # ────────────────────────────────────────────────────────────────────────────────
 # 2) QUESTIONS
-#    id_code is the stable key — do not reuse the same id_code for different ideas.
-#    Each statement should be easy for a non-marketer to understand.
+#    id_code is a stable semantic key (e.g., DEM-ICP-01, CON-SLA-01, DEL-TTV-01).
+#    Keep these ids stable over time to preserve analytics continuity.
 # ────────────────────────────────────────────────────────────────────────────────
 QUESTIONS: Dict[str, List[Dict]] = {
     "Demand": [
         {
-            "id_code": "D1",
-            "text": "We clearly describe the type of customer we serve (industry, size, and buyer role).",
+            "id_code": "DEM-ICP-01",
+            "text": "We have a simple written profile of our ideal customer, including who is a strong fit and who is not, and we review it every quarter so all teams stay aligned.",
+            "weight": 1.25,
+            "diagnostic_note": "If this is unclear, teams chase more leads instead of the right leads.",
+            "ai_metadata": {
+                "pillar": "Demand",
+                "dimension": "ICP Clarity",
+                "question_type": "process",
+                "evidence_type": "qualitative",
+                "time_horizon": "90d",
+                "owner_role": "marketing",
+                "maturity_stage": "foundation",
+                "quick_win_if_low": "Define ICP inclusion/exclusion criteria and publish one-page version for all revenue teams.",
+            },
+        },
+        {
+            "id_code": "DEM-FIT-02",
+            "text": "At least 6 out of 10 new inbound leads match our ideal customer profile, and we can verify this with clear qualification fields in our CRM.",
             "weight": 1.2,
-            "diagnostic_note": "If this is unclear, it’s hard to focus efforts. Write it down in one paragraph so anyone on the team can repeat it.",
+            "diagnostic_note": "If lead fit is low, spend goes up and conversion goes down.",
+            "ai_metadata": {
+                "pillar": "Demand",
+                "dimension": "Lead Quality",
+                "question_type": "outcome",
+                "evidence_type": "quantitative",
+                "time_horizon": "90d",
+                "owner_role": "revops",
+                "maturity_stage": "repeatable",
+                "quick_win_if_low": "Add ICP-fit fields to lead capture and review weekly fit-rate by source.",
+            },
         },
         {
-            "id_code": "D2",
-            "text": "Our main message explains the problem we solve and the outcome customers get, in simple words.",
-            "weight": 1.2,
-            "diagnostic_note": "Aim for a short sentence a new visitor can understand in five seconds.",
+            "id_code": "DEM-MSG-03",
+            "text": "Our core value message is easy to understand, tested with each target segment, and used consistently across our website, outbound messages, and sales materials.",
+            "weight": 1.15,
+            "diagnostic_note": "If the message is inconsistent, fewer buyers move forward.",
+            "ai_metadata": {
+                "pillar": "Demand",
+                "dimension": "Positioning",
+                "question_type": "diagnostic",
+                "evidence_type": "qualitative",
+                "time_horizon": "current",
+                "owner_role": "marketing",
+                "maturity_stage": "repeatable",
+                "quick_win_if_low": "Create a segment message map and align homepage hero, outbound opener, and one-pager language.",
+            },
         },
         {
-            "id_code": "D3",
-            "text": "We run ongoing marketing that regularly puts us in front of potential customers.",
-            "weight": 1.0,
-            "diagnostic_note": "Examples: a weekly post schedule, a small ad budget, a newsletter, or regular outreach.",
-        },
-        {
-            "id_code": "D4",
-            "text": "We can see where our leads come from (for example: search, social, ads, partners).",
-            "weight": 1.0,
-            "diagnostic_note": "Basic tracking helps you decide what to keep, stop, or improve.",
-        },
-        {
-            "id_code": "D5",
-            "text": "We bring in enough new visitors or inquiries to meet our goals.",
+            "id_code": "DEM-CHN-04",
+            "text": "We have a clear channel plan that shows expected customer acquisition cost and pipeline contribution for each channel, and we review performance every month.",
             "weight": 1.1,
-            "diagnostic_note": "Set a monthly target and review it. If traffic is low, focus on a few consistent channels.",
+            "diagnostic_note": "Without this, channel spend becomes guesswork.",
+            "ai_metadata": {
+                "pillar": "Demand",
+                "dimension": "Channel Strategy",
+                "question_type": "process",
+                "evidence_type": "system-data",
+                "time_horizon": "30d",
+                "owner_role": "revops",
+                "maturity_stage": "repeatable",
+                "quick_win_if_low": "Define one scorecard with spend, leads, qualified pipeline, and CAC by channel.",
+            },
+        },
+        {
+            "id_code": "DEM-ATT-05",
+            "text": "We can clearly see which channel first brought a lead in and which channels later influenced the deal, using reporting data we trust.",
+            "weight": 1.2,
+            "diagnostic_note": "Without clear attribution, it is hard to know where to invest.",
+            "ai_metadata": {
+                "pillar": "Demand",
+                "dimension": "Attribution",
+                "question_type": "evidence",
+                "evidence_type": "system-data",
+                "time_horizon": "90d",
+                "owner_role": "revops",
+                "maturity_stage": "optimized",
+                "quick_win_if_low": "Standardize UTM governance and enforce campaign-source completeness in CRM.",
+            },
+        },
+        {
+            "id_code": "DEM-CNT-06",
+            "text": "We run content or outbound work on a regular schedule, not randomly, and each activity is tied to target accounts and clear pipeline goals.",
+            "weight": 1.0,
+            "diagnostic_note": "If execution is irregular, pipeline becomes harder to predict.",
+            "ai_metadata": {
+                "pillar": "Demand",
+                "dimension": "Execution Cadence",
+                "question_type": "process",
+                "evidence_type": "quantitative",
+                "time_horizon": "30d",
+                "owner_role": "marketing",
+                "maturity_stage": "foundation",
+                "quick_win_if_low": "Commit to a weekly campaign cadence with one KPI owner per motion.",
+            },
         },
     ],
     "Conversion": [
         {
-            "id_code": "C1",
-            "text": "We reply to new leads quickly and set clear response time expectations.",
+            "id_code": "CON-SLA-01",
+            "text": "We set clear response-time targets for new leads by source, and we check every week how quickly reps reply so high-intent leads are not lost.",
+            "weight": 1.2,
+            "diagnostic_note": "Slow replies reduce meetings and close rates.",
+            "ai_metadata": {
+                "pillar": "Conversion",
+                "dimension": "Speed to Lead",
+                "question_type": "outcome",
+                "evidence_type": "quantitative",
+                "time_horizon": "30d",
+                "owner_role": "sales",
+                "maturity_stage": "repeatable",
+                "quick_win_if_low": "Set source-based SLA targets and trigger alerts for breaches.",
+            },
+        },
+        {
+            "id_code": "CON-QLF-02",
+            "text": "We use one shared qualification checklist for all leads, and required CRM fields must be completed before an opportunity can move to the next stage.",
+            "weight": 1.15,
+            "diagnostic_note": "Weak qualification fills pipeline with poor-fit deals.",
+            "ai_metadata": {
+                "pillar": "Conversion",
+                "dimension": "Qualification",
+                "question_type": "process",
+                "evidence_type": "system-data",
+                "time_horizon": "current",
+                "owner_role": "revops",
+                "maturity_stage": "repeatable",
+                "quick_win_if_low": "Make qualification fields mandatory at stage transition and audit weekly.",
+            },
+        },
+        {
+            "id_code": "CON-STG-03",
+            "text": "Each pipeline stage has clear entry and exit rules, and sales leaders review stage-to-stage conversion rates monthly to spot bottlenecks early.",
             "weight": 1.1,
-            "diagnostic_note": "Fast replies often win deals. Even a friendly auto-reply with next steps helps.",
+            "diagnostic_note": "If stage rules are unclear, forecasts become unreliable.",
+            "ai_metadata": {
+                "pillar": "Conversion",
+                "dimension": "Pipeline Hygiene",
+                "question_type": "evidence",
+                "evidence_type": "system-data",
+                "time_horizon": "30d",
+                "owner_role": "sales",
+                "maturity_stage": "optimized",
+                "quick_win_if_low": "Define stage exit criteria and report stage-to-stage conversion by segment.",
+            },
         },
         {
-            "id_code": "C2",
-            "text": "We use a simple, repeatable way to decide if a lead is a good fit.",
+            "id_code": "CON-OBJ-04",
+            "text": "We keep a simple playbook of common buyer objections and competitor risks, and managers coach the team on it so responses stay consistent.",
             "weight": 1.0,
-            "diagnostic_note": "Pick 3–5 questions that define fit (budget, need, timing, decision maker) and use them every time.",
+            "diagnostic_note": "Without this, reps answer objections inconsistently.",
+            "ai_metadata": {
+                "pillar": "Conversion",
+                "dimension": "Deal Enablement",
+                "question_type": "diagnostic",
+                "evidence_type": "qualitative",
+                "time_horizon": "90d",
+                "owner_role": "sales",
+                "maturity_stage": "foundation",
+                "quick_win_if_low": "Document top five objections with approved responses and examples.",
+            },
         },
         {
-            "id_code": "C3",
-            "text": "Our landing pages or forms turn a good share of visitors into inquiries or trials.",
+            "id_code": "CON-WNL-05",
+            "text": "We capture why deals are won or lost in structured fields, then use those patterns in a monthly review to run focused improvement experiments.",
             "weight": 1.1,
-            "diagnostic_note": "Track your current rate and test small changes: headline, proof, layout, or shorter forms.",
+            "diagnostic_note": "If win/loss reasons are not tracked, the same problems repeat.",
+            "ai_metadata": {
+                "pillar": "Conversion",
+                "dimension": "Win-Loss Learning",
+                "question_type": "evidence",
+                "evidence_type": "system-data",
+                "time_horizon": "30d",
+                "owner_role": "revops",
+                "maturity_stage": "optimized",
+                "quick_win_if_low": "Add mandatory closed-lost reason taxonomy and run a monthly improvement retro.",
+            },
         },
         {
-            "id_code": "C4",
-            "text": "We have sales materials ready (short deck, one-pager, a few short customer quotes).",
+            "id_code": "CON-PGE-06",
+            "text": "We run regular tests on key conversion pages and forms, using clear hypotheses and success metrics, and we track whether results improve.",
             "weight": 1.0,
-            "diagnostic_note": "Keep them easy to find and up to date so everyone shares the same message.",
-        },
-        {
-            "id_code": "C5",
-            "text": "We record why we win or lose deals and use this to improve each month.",
-            "weight": 1.0,
-            "diagnostic_note": "Write down the top reasons and pick one small fix to try next month.",
+            "diagnostic_note": "Without regular tests, conversion pages get stale.",
+            "ai_metadata": {
+                "pillar": "Conversion",
+                "dimension": "Funnel Optimization",
+                "question_type": "process",
+                "evidence_type": "quantitative",
+                "time_horizon": "90d",
+                "owner_role": "marketing",
+                "maturity_stage": "repeatable",
+                "quick_win_if_low": "Launch one monthly A/B test on a high-traffic conversion page.",
+            },
         },
     ],
     "Delivery": [
         {
-            "id_code": "L1",
-            "text": "New customers get started smoothly with a simple, repeatable onboarding.",
-            "weight": 1.0,
-            "diagnostic_note": "List the steps, assign owners, and send a welcome email with what to expect.",
+            "id_code": "DEL-TTV-01",
+            "text": "We track how long it takes new customers to get their first real value, by segment, and we actively work to shorten that time.",
+            "weight": 1.2,
+            "diagnostic_note": "If first value takes too long, churn risk rises.",
+            "ai_metadata": {
+                "pillar": "Delivery",
+                "dimension": "Time to Value",
+                "question_type": "outcome",
+                "evidence_type": "quantitative",
+                "time_horizon": "30d",
+                "owner_role": "cs",
+                "maturity_stage": "optimized",
+                "quick_win_if_low": "Define TTV milestone events and create a weekly exception report.",
+            },
         },
         {
-            "id_code": "L2",
-            "text": "We ask customers for feedback (like a quick rating) and act on what we learn.",
-            "weight": 1.0,
-            "diagnostic_note": "A short survey after onboarding or after delivery is often enough to spot patterns.",
+            "id_code": "DEL-ONB-02",
+            "text": "Our onboarding process has clear milestones, clear owners, and realistic completion targets, and progress is tracked in one shared system.",
+            "weight": 1.1,
+            "diagnostic_note": "Poor onboarding slows activation and increases support load.",
+            "ai_metadata": {
+                "pillar": "Delivery",
+                "dimension": "Onboarding Discipline",
+                "question_type": "process",
+                "evidence_type": "system-data",
+                "time_horizon": "current",
+                "owner_role": "cs",
+                "maturity_stage": "repeatable",
+                "quick_win_if_low": "Publish milestone checklist with owner and due date for every new account.",
+            },
         },
         {
-            "id_code": "L3",
-            "text": "We have a clear way to keep customers coming back or renewing.",
-            "weight": 1.0,
-            "diagnostic_note": "Examples: a check-in schedule, a renewal reminder, or a small loyalty perk.",
+            "id_code": "DEL-HLT-03",
+            "text": "We score customer health using product usage, engagement, and support signals, and we use clear playbooks to act early on at-risk accounts.",
+            "weight": 1.15,
+            "diagnostic_note": "Without health signals, risk is found too late.",
+            "ai_metadata": {
+                "pillar": "Delivery",
+                "dimension": "Health Monitoring",
+                "question_type": "evidence",
+                "evidence_type": "system-data",
+                "time_horizon": "30d",
+                "owner_role": "cs",
+                "maturity_stage": "optimized",
+                "quick_win_if_low": "Define a simple red-amber-green health model and trigger follow-up tasks automatically.",
+            },
         },
         {
-            "id_code": "L4",
-            "text": "We collect and share short customer quotes or reviews.",
+            "id_code": "DEL-RET-04",
+            "text": "We review gross and net retention by cohort every month, and we launch targeted actions quickly when any segment starts to decline.",
+            "weight": 1.2,
+            "diagnostic_note": "If retention drops go unseen, growth slows quietly.",
+            "ai_metadata": {
+                "pillar": "Delivery",
+                "dimension": "Retention",
+                "question_type": "outcome",
+                "evidence_type": "quantitative",
+                "time_horizon": "90d",
+                "owner_role": "revops",
+                "maturity_stage": "optimized",
+                "quick_win_if_low": "Track retention by segment and launch targeted save motions for highest-risk cohort.",
+            },
+        },
+        {
+            "id_code": "DEL-QBR-05",
+            "text": "Our high-value customers receive regular business reviews focused on outcomes, roadmap alignment, and practical expansion opportunities.",
             "weight": 1.0,
-            "diagnostic_note": "Ask after a good outcome. Even one or two lines help future buyers trust you.",
+            "diagnostic_note": "Without regular reviews, expansion opportunities are missed.",
+            "ai_metadata": {
+                "pillar": "Delivery",
+                "dimension": "Success Governance",
+                "question_type": "process",
+                "evidence_type": "qualitative",
+                "time_horizon": "90d",
+                "owner_role": "cs",
+                "maturity_stage": "repeatable",
+                "quick_win_if_low": "Establish quarterly review cadence for top-tier accounts with defined agenda.",
+            },
+        },
+        {
+            "id_code": "DEL-ADV-06",
+            "text": "After customers achieve clear value, we consistently capture proof points like quotes, case studies, and references to support future selling.",
+            "weight": 0.95,
+            "diagnostic_note": "If proof points are not captured, future buyers trust you less.",
+            "ai_metadata": {
+                "pillar": "Delivery",
+                "dimension": "Advocacy",
+                "question_type": "evidence",
+                "evidence_type": "qualitative",
+                "time_horizon": "30d",
+                "owner_role": "marketing",
+                "maturity_stage": "foundation",
+                "quick_win_if_low": "Trigger testimonial request at successful milestone completion.",
+            },
         },
     ],
 }
@@ -237,6 +441,24 @@ TOOL_RECS: List[Tuple[str, str, str, str, str]] = [
     ("Delivery", "reviews", "Ask for short quotes when things go well.", "Form link or review site", ""),
 ]
 
+# Legacy short IDs kept for backward-compatibility migration.
+LEGACY_ID_CODE_MAP: Dict[str, str] = {
+    "D1": "DEM-ICP-01",
+    "D2": "DEM-MSG-03",
+    "D3": "DEM-CNT-06",
+    "D4": "DEM-ATT-05",
+    "D5": "DEM-CHN-04",
+    "C1": "CON-SLA-01",
+    "C2": "CON-QLF-02",
+    "C3": "CON-PGE-06",
+    "C4": "CON-OBJ-04",
+    "C5": "CON-WNL-05",
+    "L1": "DEL-ONB-02",
+    "L2": "DEL-HLT-03",
+    "L3": "DEL-RET-04",
+    "L4": "DEL-ADV-06",
+}
+
 # ────────────────────────────────────────────────────────────────────────────────
 # Helpers
 # ────────────────────────────────────────────────────────────────────────────────
@@ -259,16 +481,51 @@ def _ensure_categories() -> Dict[str, Category]:
         out[name] = obj
     return out
 
+
+def _derive_question_ai_metadata(cat_name: str, row: Dict) -> Dict[str, str]:
+    """Generate lightweight AI metadata so prompts can remain structured and stable."""
+    intent_map = {
+        "Demand": "Validate predictable demand generation and audience-message clarity.",
+        "Conversion": "Validate lead handling discipline and conversion process repeatability.",
+        "Delivery": "Validate post-sale execution quality, retention, and social proof capture.",
+    }
+    note = (row.get("diagnostic_note") or "").strip()
+    fallback_quick_win = "Define one repeatable weekly action, assign ownership, and review outcomes."
+    return {
+        "intent": intent_map.get(cat_name, "Validate GTM execution quality for this area."),
+        "evidence_hint": f"Look for concrete process evidence related to question {row.get('id_code', '')}.",
+        "risk_if_low": note or "Low maturity in this area can reduce pipeline quality and execution consistency.",
+        "quick_win_if_low": note or fallback_quick_win,
+    }
+
+
+def _migrate_legacy_question_ids(dry: bool) -> None:
+    """Rename legacy question IDs in place to semantic IDs without breaking existing FKs."""
+    if dry:
+        return
+
+    for legacy_id, semantic_id in LEGACY_ID_CODE_MAP.items():
+        legacy_q = Question.objects.filter(id_code=legacy_id).first()
+        if not legacy_q:
+            continue
+        # If semantic ID already exists, keep both rows untouched to avoid collisions.
+        if Question.objects.filter(id_code=semantic_id).exists():
+            continue
+        legacy_q.id_code = semantic_id
+        legacy_q.save(update_fields=["id_code"])
+
 def _upsert_questions(cat_map: Dict[str, Category], dry: bool) -> UpsertCounts:
     counts = UpsertCounts()
     for cat_name, items in QUESTIONS.items():
         category = cat_map[cat_name]
         for row in items:
+            ai_metadata = row.get("ai_metadata") or _derive_question_ai_metadata(cat_name, row)
             defaults = {
                 "category": category,
                 "text": row["text"],
                 "weight": row.get("weight", 1.0),
                 "diagnostic_note": row.get("diagnostic_note", ""),
+                "ai_metadata": ai_metadata,
             }
             if dry:
                 counts.updated += 1
@@ -333,6 +590,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING("No database changes will be made."))
 
         cat_map = _ensure_categories()
+        _migrate_legacy_question_ids(dry=dry)
 
         if dry:
             q_counts = _upsert_questions(cat_map, dry=True)

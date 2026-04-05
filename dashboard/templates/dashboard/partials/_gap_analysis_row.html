@@ -1,0 +1,29 @@
+<tr id="gap-metric-{{ gap.id }}">
+    <td class="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{{ gap.category }}</td>
+    <td class="px-4 py-3 text-gray-700 whitespace-nowrap">{{ gap.metric }}</td>
+    <td class="px-4 py-3 text-gray-700 whitespace-nowrap">{{ gap.current }}</td>
+    <td class="px-4 py-3 text-gray-700 whitespace-nowrap">{{ gap.target }}</td>
+    <td class="px-4 py-3 whitespace-nowrap">
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ gap.gap_class }}">{{ gap.gap_percent }}</span>
+    </td>
+    <td class="px-4 py-3 whitespace-nowrap">
+        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ gap.priority_class }}">
+            {{ gap.priority_icon }} {{ gap.get_priority_display }}
+        </span>
+    </td>
+    <td class="px-4 py-3 text-gray-700 min-w-[300px]">{{ gap.recommendation }}</td>
+    <td class="px-4 py-3 whitespace-nowrap">
+        <div class="flex items-center justify-center gap-4">
+            <button type="button"
+                    hx-get="{% url 'edit_gap_metric' pk=gap.id %}" 
+                    hx-target="#modal-content" 
+                    onclick="openModal()"
+                    class="cursor-pointer text-sm font-medium text-green-600 hover:text-green-800 bg-transparent border-0 p-0">Edit</button>
+            <button type="button"
+                    hx-get="{% url 'delete_gap_metric' pk=gap.id %}" 
+                    hx-target="#gap-metric-{{ gap.id }}" 
+                    hx-swap="outerHTML"
+                    class="cursor-pointer text-sm font-medium text-red-600 hover:text-red-800 bg-transparent border-0 p-0">Delete</button>
+        </div>
+    </td>
+</tr>

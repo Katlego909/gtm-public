@@ -1,0 +1,76 @@
+{% extends 'gtm/base.html' %}
+
+{% block title %}Join Workspace{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-16">
+    <div class="bg-white rounded-xl border border-indigo-100 p-8 text-center">
+        <div class="mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-full mb-4">
+                <svg class="w-8 h-8 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                          d="M17 20h5v-2a3 3 0 00-5.916-.75M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.916-.75M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+            </div>
+            <h1 class="text-3xl font-bold text-indigo-900 mb-2">Join Workspace</h1>
+            <p class="text-gray-600">You've been invited to collaborate</p>
+        </div>
+
+        <div class="bg-gray-50 rounded-lg p-6 mb-8">
+            <h2 class="text-xl font-semibold text-gray-900 mb-2">{{ invitation.workspace.name }}</h2>
+            <p class="text-gray-600 mb-4">
+                Invited by {{ invitation.invited_by.get_full_name|default:invitation.invited_by.username }}
+            </p>
+            <div class="inline-flex items-center gap-2">
+                <span class="text-sm text-gray-500">Your role:</span>
+                <span class="text-sm px-3 py-1 rounded-full
+                    {% if invitation.role == 'admin' %}bg-indigo-100 text-indigo-700
+                    {% elif invitation.role == 'manager' %}bg-blue-100 text-blue-700
+                    {% elif invitation.role == 'funti3r_consultant' %}bg-purple-100 text-purple-700
+                    {% else %}bg-gray-100 text-gray-700{% endif %}">
+                    {{ invitation.get_role_display }}
+                </span>
+            </div>
+        </div>
+
+        <form method="post" class="space-y-6">
+            {% csrf_token %}
+            
+            <div class="text-left bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 class="font-medium text-blue-900 mb-2">What you'll get access to:</h3>
+                <ul class="text-sm text-blue-800 space-y-1">
+                    <li>• View and collaborate on assessments</li>
+                    <li>• Manage action items and track progress</li>
+                    <li>• Communicate with team members</li>
+                    {% if invitation.role in 'admin,manager' %}
+                        <li>• Invite additional team members</li>
+                    {% endif %}
+                    {% if invitation.role == 'funti3r_consultant' %}
+                        <li>• Access consultant-level insights and tools</li>
+                    {% endif %}
+                </ul>
+            </div>
+
+            <div class="flex gap-4">
+                <button 
+                    type="submit"
+                    class="flex-1 bg-indigo-600 text-white px-6 py-3 rounded-lg hover:bg-indigo-700 font-medium"
+                >
+                    Accept Invitation
+                </button>
+                
+                <a 
+                    href="{% url 'gtm:workspace:list' %}"
+                    class="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 font-medium text-center"
+                >
+                    Maybe Later
+                </a>
+            </div>
+        </form>
+
+        <p class="text-xs text-gray-500 mt-6">
+            This invitation expires on {{ invitation.expires_at|date:"M d, Y" }}
+        </p>
+    </div>
+</div>
+{% endblock %}

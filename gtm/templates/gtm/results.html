@@ -35,7 +35,7 @@
 
 <!-- Page Header -->
 <div class="mb-6 sm:mb-8 text-center fade-in-up px-4">
-  <h1 class="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2 bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent">
+  <h1 class="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2 text-indigo-600">
     GTM Assessment Report
   </h1>
   <p class="text-lg sm:text-xl text-gray-600 break-words">{{ session.company_name|default:"Your Company" }}</p>
@@ -75,13 +75,15 @@
 
         <div class="relative w-full overflow-hidden" style="height: 280px; max-width: 100%;">
             <canvas id="radar" class="w-full h-full"></canvas>
+            {{ labels|json_script:"js-radar-labels" }}
+            {{ values|json_script:"js-radar-values" }}
         </div>
     </div>
 
     <div class="bg-white rounded-2xl sm:rounded-3xl shadow-xl p-4 sm:p-6 lg:p-8 border border-gray-100 chart-card fade-in-up stagger-2">
         <!-- Header with icon -->
         <div class="flex items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6 pb-4 sm:pb-5 border-b border-gray-200">
-            <div class="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-500 shadow-lg flex-shrink-0">
+            <div class="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-indigo-600 shadow-lg flex-shrink-0">
                 <svg class="w-6 h-6 sm:w-7 sm:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
@@ -102,11 +104,11 @@
                     </div>
                     <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden shadow-inner">
                         <div class="h-3 rounded-full transition-all duration-500 relative
-                            {% if c.avg >= 4 %}bg-gradient-to-r from-green-400 to-green-600
-                            {% elif c.avg >= 3 %}bg-gradient-to-r from-indigo-400 to-indigo-600
-                            {% elif c.avg >= 2 %}bg-gradient-to-r from-yellow-400 to-orange-500
-                            {% else %}bg-gradient-to-r from-red-400 to-red-600{% endif %}" 
-                            style="width: calc({{ c.avg|floatformat:2 }} / 5 * 100%);">
+                            {% if c.avg >= 4 %}bg-indigo-600
+                            {% elif c.avg >= 3 %}bg-indigo-600
+                            {% elif c.avg >= 2 %}bg-indigo-600
+                            {% else %}bg-indigo-600{% endif %}" 
+                            style="width: {{ c.pct }}%;">
                             <div class="absolute inset-0 bg-white opacity-20 animate-pulse"></div>
                         </div>
                     </div>
@@ -119,8 +121,8 @@
 
 
 {% if band %}
-<div class="mt-6 sm:mt-8 bg-gradient-to-br from-indigo-700 to-indigo-900 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 shadow-2xl text-white fade-in-up stagger-3 relative overflow-hidden mx-2 sm:mx-0">
-    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-10 transform -skew-x-12 animate-pulse"></div>
+<div class="mt-6 sm:mt-8 bg-indigo-600 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 shadow-2xl text-white fade-in-up stagger-3 relative overflow-hidden mx-2 sm:mx-0">
+    <div class="absolute inset-0 bg-white opacity-10 transform -skew-x-12 animate-pulse"></div>
     <div class="relative z-10">
     <div class="flex flex-col gap-4 sm:gap-6">
         <div>
@@ -130,22 +132,23 @@
                 Ready for the plan? Click below to access your full AI-generated 30-day playbook with weekly action items and success metrics.
             </p>
         </div>
+
+          <a href="{% url 'gtm:chat' session.uuid %}?prompt=action-plan"
+             hx-get="{% url 'gtm:chat' session.uuid %}?prompt=action-plan"
+             hx-target="#main-content"
+             hx-select="#main-content"
+             hx-swap="innerHTML swap:200ms"
+             hx-push-url="true"
+             class="inline-flex items-center justify-center px-4 sm:px-6 py-3 rounded-xl bg-white text-indigo-700 text-sm sm:text-base font-bold shadow-lg hover:bg-indigo-50 transition w-full sm:w-fit">
+            Run Execution Agent
+          </a>
         
-        <div class="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3">
-            <a href="{% url 'gtm:playbook' session.uuid %}" 
-               hx-get="{% url 'gtm:playbook' session.uuid %}" 
-               hx-target="#main-content" 
-               hx-select="#main-content"
-               hx-swap="innerHTML swap:200ms" 
-               hx-push-url="true"
-               class="inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-white text-indigo-700 font-bold shadow-lg hover:bg-gray-100 transition text-sm sm:text-base whitespace-nowrap">
-                <span class="hidden sm:inline">View 30-Day Playbook →</span>
-                <span class="sm:hidden">View Playbook →</span>
-            </a>
-            <a href="{% url 'gtm:download' session.uuid %}" class="inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl border border-indigo-300 text-white hover:bg-indigo-600 transition text-sm sm:text-base whitespace-nowrap">
-                <i class="fas fa-download mr-2"></i>
-                <span>Download PDF</span>
-            </a>
+        <div id="playbook-header-action">
+            {% if snap and snap.ai_playbook %}
+                {% include "gtm/partials/playbook_ready_button.html" %}
+            {% else %}
+                {% include "gtm/partials/playbook_loading_button.html" %}
+            {% endif %}
         </div>
     </div>
     </div>
@@ -156,7 +159,7 @@
     <div class="bg-white rounded-3xl shadow-xl p-8 mt-6 border border-gray-100 fade-in-up">
         <!-- Header with icon -->
         <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
-            <div class="flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-500 shadow-lg flex-shrink-0">
+            <div class="flex items-center justify-center w-14 h-14 rounded-xl bg-indigo-600 shadow-lg flex-shrink-0">
                 <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                 </svg>
@@ -186,7 +189,7 @@
     <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 chart-card fade-in-up">
         <!-- Header with icon -->
         <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
-            <div class="flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-500 shadow-lg flex-shrink-0">
+            <div class="flex items-center justify-center w-14 h-14 rounded-xl bg-indigo-600 shadow-lg flex-shrink-0">
                 <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                 </svg>
@@ -222,7 +225,7 @@
     <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 chart-card fade-in-up">
         <!-- Header with icon -->
         <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
-            <div class="flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-500 shadow-lg flex-shrink-0">
+            <div class="flex items-center justify-center w-14 h-14 rounded-xl bg-indigo-600 shadow-lg flex-shrink-0">
                 <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -254,14 +257,18 @@
 <div class="bg-white rounded-3xl shadow-xl p-8 mt-6 chart-card fade-in-up">
   <!-- Header with icon -->
   <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
-      <div class="flex items-center justify-center w-14 h-14 rounded-xl bg-gradient-to-br from-indigo-600 to-blue-500 shadow-lg flex-shrink-0">
+      <div class="flex items-center justify-center w-14 h-14 rounded-xl bg-indigo-600 shadow-lg flex-shrink-0">
           <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
       </div>
       <div>
-          <h4 class="text-2xl font-bold text-gray-900 mb-1">Weakest Questions & Insights</h4>
-          <p class="text-sm text-gray-600">Areas where you scored lowest with personalized AI insights</p>
+          <h4 class="text-2xl font-bold text-gray-900 mb-1">
+            {% if overall >= 90 %}Key Insights & Core Strengths{% else %}Weakest Questions & Insights{% endif %}
+          </h4>
+          <p class="text-sm text-gray-600">
+            {% if overall >= 90 %}Analysis of your top GTM pillars with personalized AI insights{% else %}Areas where you scored lowest with personalized AI insights{% endif %}
+          </p>
       </div>
   </div>
   
@@ -270,7 +277,10 @@
       <li class="border rounded-xl p-4 hover:shadow-lg transition">
         <div class="flex items-center justify-between mb-2">
             <div class="font-medium text-lg text-indigo-700 break-words">{{ q.question.category.name }} • {{ q.question.id_code }}</div>
-            <div class="text-xl font-semibold {% if q.score <= 2 %}text-red-600{% else %}text-gray-600{% endif %} shrink-0">{{ q.score }}/5</div>
+            <div class="text-xl font-semibold 
+              {% if q.score <= 2 %}text-red-600
+              {% elif q.score >= 4 %}text-green-600
+              {% else %}text-yellow-600{% endif %} shrink-0">{{ q.score }}/5</div>
         </div>
         <p class="text-sm mt-1 mb-3 break-words">{{ q.question.text }}</p>
 
@@ -278,16 +288,32 @@
             <p class="text-xs text-gray-500 mt-1 break-words">Diagnostic: {{ q.note }}</p>
         {% endif %}
 
-        {% comment %} AI INSIGHT (Styled for visibility) {% endcomment %}
-        {% if q.ai_insight %}
-          <div class="mt-3 p-3 bg-red-50 border-l-4 border-red-500 rounded text-sm shadow-inner overflow-hidden">
-            <div class="flex items-center mb-1">
-                <span class="text-lg mr-2" role="img" aria-label="lightbulb">💡</span>
-                <span class="font-semibold text-red-700">AI Insight:</span>
+        {% comment %} AI INSIGHT (Styled for visibility with Async Loading) {% endcomment %}
+        <div id="insight-{{ q.question.id_code }}">
+          {% if q.ai_insight %}
+            <div class="mt-3 p-3 rounded text-sm shadow-inner overflow-hidden border-l-4
+              {% if q.score >= 4 %}bg-green-50 border-green-500
+              {% elif q.score == 3 %}bg-yellow-50 border-yellow-400
+              {% else %}bg-red-50 border-red-500{% endif %}">
+              <div class="flex items-center mb-1">
+                  <span class="text-lg mr-2" role="img" aria-label="lightbulb">💡</span>
+                  <span class="font-semibold {% if q.score >= 4 %}text-green-700{% elif q.score == 3 %}text-yellow-700{% else %}text-red-700{% endif %}">
+                    AI Insight:
+                  </span>
+              </div>
+              <p class="text-gray-800 mt-1 leading-snug break-words">{{ q.ai_insight }}</p>
             </div>
-            <p class="text-gray-800 mt-1 leading-snug break-words">{{ q.ai_insight }}</p>
-          </div>
-        {% endif %}
+          {% elif q.ai_insight_loading and q.response_id %}
+            <div class="mt-3 p-3 bg-gray-50 border-l-4 border-indigo-400 rounded text-sm shadow-inner flex items-center gap-3 animate-pulse"
+                 hx-get="{% url 'gtm:insight_status' session.uuid q.response_id %}"
+                 hx-trigger="load, every 3s"
+                 hx-target="#insight-{{ q.question.id_code }}"
+                 hx-swap="outerHTML">
+              <div class="animate-spin h-4 w-4 border-2 border-indigo-500 border-t-transparent rounded-full"></div>
+              <span class="text-gray-600 italic">AI is analyzing this area...</span>
+            </div>
+          {% endif %}
+        </div>
         
         <div class="mt-4 flex flex-wrap items-center gap-2 border-t pt-3">
           <a href="{% url 'gtm:assessment_step' session.uuid q.step %}" class="px-3 py-1.5 rounded border border-indigo-600 text-indigo-600 text-sm hover:bg-indigo-50 shrink-0">Fix this item</a>
@@ -307,19 +333,43 @@
        hx-select="#main-content"
        hx-swap="innerHTML swap:200ms" 
        hx-push-url="true"
-       class="flex-1 sm:flex-none inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-500 text-white text-sm sm:text-base font-semibold hover:shadow-xl transition transform hover:scale-105 gap-2">
+       class="flex-1 sm:flex-none inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-indigo-600 text-white text-sm sm:text-base font-semibold hover:shadow-xl transition transform hover:scale-105 gap-2">
       <svg class="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
       </svg>
       <span>Ask AI Assistant</span>
     </a>
-    <a href="{% url 'gtm:playbook' session.uuid %}" 
-       hx-get="{% url 'gtm:playbook' session.uuid %}" 
-       hx-target="#main-content" 
+
+    <a href="{% url 'gtm:chat' session.uuid %}?prompt=action-plan"
+       hx-get="{% url 'gtm:chat' session.uuid %}?prompt=action-plan"
+       hx-target="#main-content"
        hx-select="#main-content"
-       hx-swap="innerHTML swap:200ms" 
+       hx-swap="innerHTML swap:200ms"
        hx-push-url="true"
-       class="flex-1 sm:flex-none inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-gray-900 text-white text-sm sm:text-base font-semibold hover:bg-gray-800 transition">View Playbook</a>
+       class="flex-1 sm:flex-none inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-white border-2 border-indigo-200 text-indigo-700 text-sm sm:text-base font-semibold hover:bg-indigo-50 transition">
+      Run Execution Agent
+    </a>
+    
+    <div id="playbook-footer-action" class="flex-1 sm:flex-none">
+        {% if snap and snap.ai_playbook %}
+            <a href="{% url 'gtm:playbook' session.uuid %}" 
+               hx-get="{% url 'gtm:playbook' session.uuid %}" 
+               hx-target="#main-content" 
+               hx-select="#main-content"
+               hx-swap="innerHTML swap:200ms" 
+               hx-push-url="true"
+               class="w-full inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-gray-900 text-white text-sm sm:text-base font-semibold hover:bg-gray-800 transition">View Playbook</a>
+        {% else %}
+          <div class="w-full inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-gray-200 text-gray-500 text-sm sm:text-base font-semibold cursor-wait">
+                <svg class="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+            Preparing... (status updates above)
+            </div>
+        {% endif %}
+    </div>
+
     <a href="{% url 'gtm:download' session.uuid %}" class="flex-1 sm:flex-none inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl border-2 border-gray-300 text-sm sm:text-base font-semibold hover:bg-gray-50 transition">
       <span class="hidden sm:inline">Download Report (PDF)</span>
       <span class="sm:hidden">Download PDF</span>
@@ -327,206 +377,129 @@
 </div>
 
 <script>
-  // Wrap chart initialization in a function so it can be called after HTMX swaps
   function initRadarChart() {
     const radarCanvas = document.getElementById('radar');
-    if (!radarCanvas) return; // Exit if canvas doesn't exist
-    
-    const labels = {{ labels|safe }};
-    const values = {{ values|safe }};
-    
-    // Destroy existing chart instance if it exists to prevent duplicates
-    const existingChart = Chart.getChart(radarCanvas);
-    if (existingChart) {
-      existingChart.destroy();
-    }
-    
-    // Enhanced Radar Chart with animations and interactions
-    new Chart(radarCanvas, {
-      type: 'radar',
-      data: {
-        labels: labels,
-        datasets: [{
-          label: 'Your GTM Performance',
-          data: values,
-          fill: true,
-          backgroundColor: 'rgba(79, 70, 229, 0.2)', // Slightly more visible
-          borderColor: '#4F46E5',
-          borderWidth: 3,
-          pointBackgroundColor: '#4F46E5',
-          pointBorderColor: '#fff',
-          pointBorderWidth: 2,
-          pointRadius: 6,
-          pointHoverRadius: 8,
-          pointHoverBackgroundColor: '#fff',
-          pointHoverBorderColor: '#4F46E5',
-          pointHoverBorderWidth: 3
-        }]
-      },
-      options: { 
-        responsive: true, 
-        maintainAspectRatio: false,
-        animation: {
-          duration: 1500,
-          easing: 'easeInOutQuart',
-          onComplete: function() {
-            // Add a subtle pulse effect after initial animation
-            this.options.animation.duration = 300;
-          }
-        },
-        scales: { 
-          r: { 
-            min: 0, 
-            max: 5,
-            beginAtZero: true,
-            ticks: { 
-              backdropColor: 'rgba(255, 255, 255, 0.9)',
-              backdropPadding: 4,
-              color: '#6B7280',
-              font: {
-                size: 12,
-                weight: '500'
-              },
-              stepSize: 1,
-              callback: function(value) {
-                return value + '/5';
-              }
+    if (!radarCanvas) return;
+
+    const labelsEl = document.getElementById('js-radar-labels');
+    const valuesEl = document.getElementById('js-radar-values');
+    if (!labelsEl || !valuesEl) return;
+
+    try {
+        const labels = JSON.parse(labelsEl.textContent);
+        const values = JSON.parse(valuesEl.textContent);
+        
+        const existingChart = Chart.getChart(radarCanvas);
+        if (existingChart) existingChart.destroy();
+        
+        new Chart(radarCanvas, {
+          type: 'radar',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Your GTM Performance',
+              data: values,
+              fill: true,
+              backgroundColor: 'rgba(79, 70, 229, 0.2)',
+              borderColor: '#4F46E5',
+              borderWidth: 3,
+              pointBackgroundColor: '#4F46E5',
+              pointBorderColor: '#fff',
+              pointBorderWidth: 2,
+              pointRadius: 6,
+              pointHoverRadius: 8,
+              pointHoverBackgroundColor: '#fff',
+              pointHoverBorderColor: '#4F46E5',
+              pointHoverBorderWidth: 3
+            }]
+          },
+          options: { 
+            responsive: true, 
+            maintainAspectRatio: false,
+            animation: { duration: 1500, easing: 'easeInOutQuart' },
+            scales: { 
+              r: { 
+                min: 0, max: 5, beginAtZero: true,
+                ticks: { backdropColor: 'rgba(255, 255, 255, 0.9)', color: '#6B7280', stepSize: 1, callback: v => v + '/5' },
+                grid: { color: 'rgba(0, 0, 0, 0.08)' },
+                angleLines: { color: 'rgba(0, 0, 0, 0.1)' },
+                pointLabels: { color: '#1F2937', font: { size: 13, weight: '600' }, padding: 10 }
+              } 
             },
-            grid: { 
-              color: 'rgba(0, 0, 0, 0.08)',
-              lineWidth: 1
-            },
-            angleLines: {
-              color: 'rgba(0, 0, 0, 0.1)',
-              lineWidth: 1
-            },
-            pointLabels: {
-              color: '#1F2937',
-              font: {
-                size: 13,
-                weight: '600'
-              },
-              padding: 10,
-              callback: function(label) {
-                // Truncate long labels
-                return label.length > 15 ? label.substring(0, 15) + '...' : label;
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                enabled: true,
+                backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                padding: 12,
+                displayColors: false,
+                callbacks: {
+                  label: function(context) {
+                    const score = context.parsed.r;
+                    const percentage = ((score / 5) * 100).toFixed(0);
+                    return [`Score: ${score.toFixed(2)}/5.0`, `Performance: ${percentage}%`];
+                  }
+                }
               }
             }
-          } 
-        },
-        plugins: {
-        legend: { 
-          display: false 
-        },
-        tooltip: {
-          enabled: true,
-          backgroundColor: 'rgba(17, 24, 39, 0.95)',
-          titleColor: '#fff',
-          bodyColor: '#E5E7EB',
-          borderColor: '#4F46E5',
-          borderWidth: 1,
-          padding: 12,
-          displayColors: false,
-          titleFont: {
-            size: 14,
-            weight: '600'
-          },
-          bodyFont: {
-            size: 13
-          },
-          callbacks: {
-            title: function(context) {
-              return context[0].label;
-            },
-            label: function(context) {
-              const score = context.parsed.r;
-              const percentage = ((score / 5) * 100).toFixed(0);
-              let rating = '';
-              
-              if (score >= 4.5) rating = '🟢 Excellent';
-              else if (score >= 4.0) rating = '🟢 Strong';
-              else if (score >= 3.5) rating = '🟡 Good';
-              else if (score >= 3.0) rating = '🟡 Average';
-              else if (score >= 2.0) rating = '🟠 Needs Work';
-              else rating = '🔴 Critical';
-              
-              return [
-                `Score: ${score.toFixed(2)}/5.0`,
-                `Performance: ${percentage}%`,
-                `Status: ${rating}`
-              ];
-            }
           }
-        }
-      },
-      interaction: {
-        mode: 'nearest',
-        intersect: false
-      }
+        });
+    } catch (e) {
+        console.error("Error parsing radar chart data:", e);
     }
-  });
-  }
-  
-  // Initialize on page load (will be called by base.html event listener after HTMX swap)
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initRadarChart);
-  } else {
-    initRadarChart();
   }
 
-  // Animate circular progress ring on load
-  window.addEventListener('load', function() {
+  function animateProgress() {
+    // Circle progress
     const progressRing = document.getElementById('progressRing');
     if (progressRing) {
       const finalValue = progressRing.getAttribute('stroke-dasharray').split(',')[0];
       progressRing.setAttribute('stroke-dasharray', '0, 100');
-      
       setTimeout(() => {
         progressRing.style.transition = 'stroke-dasharray 1.5s ease-out';
         progressRing.setAttribute('stroke-dasharray', `${finalValue}, 100`);
       }, 300);
-      
-      // Animate the score number
-      const scoreElement = progressRing.parentElement.querySelector('.text-4xl');
-      if (scoreElement) {
-        const targetScore = parseInt(scoreElement.textContent);
-        let currentScore = 0;
-        const duration = 1500;
-        const increment = targetScore / (duration / 16);
-        
-        const counter = setInterval(() => {
-          currentScore += increment;
-          if (currentScore >= targetScore) {
-            currentScore = targetScore;
-            clearInterval(counter);
-          }
-          scoreElement.textContent = Math.floor(currentScore);
-        }, 16);
-      }
     }
-    
-    // Animate progress bars
-    const progressBars = document.querySelectorAll('.h-3.rounded-full.transition-all');
-    progressBars.forEach((bar, index) => {
-      const finalWidth = bar.style.width;
+
+    // Horizontal bars
+    document.querySelectorAll('.h-3.rounded-full.transition-all').forEach((bar, index) => {
+      const w = bar.style.width;
       bar.style.width = '0%';
-      
       setTimeout(() => {
         bar.style.transition = 'width 1.2s ease-out';
-        bar.style.width = finalWidth;
+        bar.style.width = w;
       }, 500 + (index * 150));
     });
-  });
-</script>
+  }
 
-<script>
-  document.querySelectorAll('.copy-action').forEach(btn=>{
-    btn.addEventListener('click',()=>{
+  function initResultsPage() {
+    initRadarChart();
+    animateProgress();
+  }
+
+  // Handle both initial load and HTMX swaps
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initResultsPage);
+  } else {
+    initResultsPage();
+  }
+
+  // HTMX Cleanup & Re-init
+  document.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.target.id === 'main-content') {
+      initResultsPage();
+    }
+  });
+
+  // Copy buttons
+  document.querySelectorAll('.copy-action').forEach(btn => {
+    btn.onclick = () => {
       const text = "- " + btn.getAttribute('data-check');
       navigator.clipboard.writeText(text);
+      const original = btn.textContent;
       btn.textContent = "Copied ✓";
-      setTimeout(()=>btn.textContent="Copy to checklist", 1200);
-    });
+      setTimeout(() => btn.textContent = original, 1200);
+    };
   });
 </script>
 

@@ -91,3 +91,48 @@ def send_snapshot_report_email(snapshot):
     # msg.attach(filename, pdf_bytes, "application/pdf")
 
     msg.send(fail_silently=False)
+
+def send_workspace_invitation_email(invitation, request=None):
+    """
+    Sends a workspace invitation email with both HTML and plaintext versions.
+    """
+    from django.urls import reverse
+    
+    workspace = invitation.workspace
+    inviter = invitation.invited_by
+    email = invitation.email
+    
+    # Build absolute URL for invitation link
+    if request:
+        invite_url = request.build_absolute_uri(
+            reverse('gtm:workspace:join', args=[invitation.token])
+        )
+    else:
+        base_url = getattr(settings, "SITE_BASE_URL", "http://127.0.0.1:8000")
+        invite_url = base_url + reverse('gtm:workspace:join', args=[invitation.token])
+        
+    inviter_name = inviter.get_full_name() or inviter.username
+    
+    context = {
+        'workspace': workspace,
+        'inviter_name': inviter_name,
+        'invite_url': invite_url,
+        'role': invitation.role.replace('_', ' '),
+        'brand_name': "Funti3r GTM Validator",
+    }
+    
+    subject = f"You've been invited to join {workspace.name} on Funti3r"
+    html_body = render_to_string("emails/workspace_invitation.html", context)
+    text_body = render_to_string("emails/workspace_invitation.txt", context)
+    
+    if not text_body.strip():
+        text_body = strip_tags(html_body)
+        
+    msg = EmailMultiAlternatives(
+        subject=subject,
+        body=text_body,
+        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+        to=[email],
+    )
+    msg.attach_alternative(html_body, "text/html")
+    msg.send(fail_silently=False)
