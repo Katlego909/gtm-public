@@ -3,6 +3,10 @@ import datetime
 from django.utils import timezone
 from django.conf import settings
 
+def _client_id(request):
+    """Extract client ID from cookie for anonymous user tracking."""
+    return request.COOKIES.get("gtm_client", "")
+
 def transfer_firmographics_to_snapshot(session: AssessmentSession, snapshot: ResultSnapshot):
     """
     Transfers firmographic data from an AssessmentSession to a ResultSnapshot instance.

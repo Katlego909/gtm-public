@@ -10,7 +10,7 @@ import markdown as md
 
 from .models import Category, Question, AssessmentSession, Response, RecommendationBand, ResultSnapshot
 from .utils_logging import log_error
-from .utils import transfer_firmographics_to_snapshot
+from .utils import transfer_firmographics_to_snapshot, _client_id
 from .ai_services import generate_playbook_with_gemini
 
 def _expand_gtm_jargon(text: str) -> str:

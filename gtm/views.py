@@ -29,7 +29,7 @@ from django.db.models import Avg
 from django.conf import settings
 from django.core.cache import cache
 from functools import wraps
-from .utils import transfer_firmographics_to_snapshot
+from .utils import transfer_firmographics_to_snapshot, _client_id
 from .ai_services import (
     generate_playbook_with_gemini,
     generate_diagnostic_insight,
@@ -48,10 +48,6 @@ LEGEND = {
 }
 
 # ---------- helpers ----------
-
-def _client_id(request):
-    """Extract client ID from cookie for anonymous user tracking."""
-    return request.COOKIES.get("gtm_client", "")
 
 def _is_htmx(request):
     """Check if request is from HTMX."""
