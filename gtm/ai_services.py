@@ -628,6 +628,124 @@ def generate_diagnostic_insight(response: Response) -> str:
         _release_lock(lock_key)
 
 
+def generate_diagnostic_insights_batch(responses: list) -> dict:
+    """
+    Generates diagnostic AI insights for multiple Response objects in a single API call.
+    Returns a dict keyed by response.id → insight text.
+    Sets ai_insight_status on each Response and saves to DB.
+    """
+    if not responses:
+        return {}
+
+    client = _get_client()
+    if not client or _quota_cooldown_active() or not _request_budget_available():
+        logger.warning("GenAI client unavailable for batch diagnostic insight.")
+        return {}
+
+    # Build per-response JSON blocks for the prompt
+    response_blocks = []
+    for resp in responses:
+        q = resp.question
+        session = resp.session
+        company_name = getattr(session, 'company_name', None) or "a B2B company"
+        industry = getattr(session, 'industry', None) or "a general industry"
+        try:
+            stage = session.snapshot.band_stage or "Unspecified"
+        except Exception:
+            stage = "Unspecified"
+
+        ai_metadata = q.ai_metadata if isinstance(q.ai_metadata, dict) else {}
+        risk_if_low = ai_metadata.get("risk_if_low") or "N/A"
+        quick_win = ai_metadata.get("quick_win_if_low") or "N/A"
+
+        score_label = {1: "Critical Failure", 2: "Serious Gap", 3: "Improvement Needed",
+                       4: "Strong Foundation", 5: "Exceptional Performance"}.get(resp.score, "Scored")
+
+        response_blocks.append(
+            f'  "{resp.id}": {{\n'
+            f'    "question": "{q.text[:100]}",\n'
+            f'    "score": {resp.score}/5 ({score_label}),\n'
+            f'    "company": "{company_name}", "industry": "{industry}", "stage": "{stage}",\n'
+            f'    "risk_if_low": "{risk_if_low}", "quick_win": "{quick_win}"\n'
+            f'  }}'
+        )
+
+    blocks_text = ",\n".join(response_blocks)
+
+    prompt = f"""You are a Go-To-Market consultant. For each assessment response below, write ONE concise diagnostic paragraph (2-3 sentences max) explaining why the score matters and what specific action to take next.
+
+Assessment responses:
+{{
+{blocks_text}
+}}
+
+Respond ONLY with a valid JSON object mapping each response ID (as a string key) to its insight paragraph.
+Example format:
+{{
+  "42": "Your ICP definition is unclear, which means you're wasting sales cycles on poor-fit leads. Start by documenting 3-5 firmographic filters.",
+  "57": "Your attribution model is strong, giving you clear ROI visibility. Extend it to include longer sales cycles."
+}}
+Do not include markdown code blocks or extra text. Return only the raw JSON object.""".strip()
+
+    model_id = "gemini-2.5-flash"
+    resp_ids = [r.id for r in responses]
+
+    # Mark all as generating
+    from .models import Response as ResponseModel
+    ResponseModel.objects.filter(id__in=resp_ids).update(ai_insight_status="generating")
+
+    try:
+        ai_response = client.models.generate_content(
+            model=model_id,
+            contents=prompt,
+            config=_FAST_CONFIG,
+        )
+        raw = (ai_response.text or "").strip()
+        cleaned = _clean_json_response(raw)
+        parsed = json.loads(cleaned)
+
+        results = {}
+        for resp in responses:
+            insight = parsed.get(str(resp.id), "").strip()
+            if insight:
+                resp.ai_insight = insight
+                resp.ai_insight_status = "done"
+                resp.save(update_fields=["ai_insight", "ai_insight_status"])
+                results[resp.id] = insight
+            else:
+                # Fallback to static note
+                fallback = resp.question.diagnostic_note or ""
+                if fallback:
+                    resp.ai_insight = fallback
+                    resp.ai_insight_status = "done"
+                    resp.save(update_fields=["ai_insight", "ai_insight_status"])
+                    results[resp.id] = fallback
+                else:
+                    resp.ai_insight_status = "failed"
+                    resp.save(update_fields=["ai_insight_status"])
+
+        if hasattr(ai_response, 'usage_metadata') and MONITORING_AVAILABLE:
+            AIUsageTracker.log_usage(ai_response.usage_metadata.total_token_count, 'diagnostic_batch')
+
+        logger.info(f"Batch diagnostic insights generated for {len(results)}/{len(responses)} responses.")
+        return results
+
+    except Exception as e:
+        if _is_quota_error(e):
+            _set_quota_cooldown(_extract_retry_delay_seconds(e))
+        log_ai_error(
+            "Batch diagnostic generation",
+            e,
+            service="google-genai",
+            model=model_id,
+            prompt=prompt[:500],
+            extra={"response_ids": resp_ids},
+        )
+        # Mark all as failed
+        ResponseModel.objects.filter(id__in=resp_ids).update(ai_insight_status="failed")
+        return {}
+
+
 def generate_concise_action_items(playbook_text: str) -> list:
     """
     Extracts and summarizes actionable items from the playbook text using AI.

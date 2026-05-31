@@ -33,6 +33,7 @@ from .utils import transfer_firmographics_to_snapshot, _client_id
 from .ai_services import (
     generate_playbook_with_gemini,
     generate_diagnostic_insight,
+    generate_diagnostic_insights_batch,
     _normalize_ai_playbook_markdown,
     rewrite_context_note_with_ai,
 )
@@ -508,32 +509,36 @@ def results(request, session_id):
     
     responses_by_question_id = {r.question.id: r for r in responses_qs}
 
+    # Collect responses needing batch AI insight generation
+    responses_needing_insight = []
     for q_data in weakest_questions:
-        # Use prefetched response if available
         response = responses_by_question_id.get(q_data["question"].id)
-        
         if response:
-            if not response.ai_insight:
-                # 🤖 TRIGGER ASYNC GENERATION
-                try:
-                    from threading import Thread
-                    # Capture response ID to avoid closure issues
-                    rid = response.id
-                    def gen_diagnostic_async(resp_id):
-                        try:
-                            from .models import Response
-                            from .ai_services import generate_diagnostic_insight
-                            r = Response.objects.get(id=resp_id)
-                            generate_diagnostic_insight(r)
-                        except Exception as e:
-                            log_error("Async Diagnostic Gen", e)
-                    
-                    Thread(target=gen_diagnostic_async, args=(rid,), daemon=True).start()
-                    q_data["ai_insight_loading"] = True
-                except Exception as e:
-                    log_error("Diagnostic Thread creation", e)
+            if not (response.ai_insight or "").strip() and response.ai_insight_status == "pending":
+                responses_needing_insight.append(response)
+                q_data["ai_insight_loading"] = True
             else:
                 q_data["ai_insight"] = response.ai_insight
+
+    # 🤖 TRIGGER BATCH ASYNC GENERATION (one thread for all insights, not one per response)
+    if responses_needing_insight:
+        try:
+            from threading import Thread
+            resp_ids_for_batch = [r.id for r in responses_needing_insight]
+
+            def gen_batch_async(r_ids):
+                try:
+                    from .models import Response as ResponseModel
+                    fresh_responses = list(
+                        ResponseModel.objects.filter(id__in=r_ids).select_related("question", "session__snapshot")
+                    )
+                    generate_diagnostic_insights_batch(fresh_responses)
+                except Exception as e:
+                    log_error("Batch Diagnostic Async", e)
+
+            Thread(target=gen_batch_async, args=(resp_ids_for_batch,), daemon=True).start()
+        except Exception as e:
+            log_error("Batch Diagnostic Thread creation", e)
 
     
     # -----------------------------
