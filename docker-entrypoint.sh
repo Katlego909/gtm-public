@@ -34,6 +34,10 @@ fi
 echo "Running database migrations..."
 python manage.py migrate --noinput
 
+# Load GTM defaults (questions, categories, recommendation bands, tools)
+echo "Loading GTM defaults..."
+python manage.py load_gtm_defaults --noinput
+
 # Collect static files (in case they weren't collected during build)
 echo "Collecting static files..."
 python manage.py collectstatic --noinput --clear 2>/dev/null || true
