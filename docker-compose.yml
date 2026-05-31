@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: gtm_validator
+      POSTGRES_USER: gtm_user
+      POSTGRES_PASSWORD: gtm_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gtm_user -d gtm_validator"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    command: >
+      sh -c "
+        python manage.py migrate &&
+        python manage.py collectstatic --noinput &&
+        gunicorn --bind 0.0.0.0:8080 gtm_validator.wsgi:application
+      "
+    ports:
+      - "8001:8080"
+    environment:
+      PORT: "8080"
+      DEBUG: "True"
+      DATABASE_URL: postgresql://gtm_user:gtm_password@db:5432/gtm_validator
+      DJANGO_SECRET_KEY: development-secret-key-not-for-production
+      ALLOWED_HOSTS: localhost,127.0.0.1,web
+      GCP_PROJECT_ID: your-project-id
+      # Email configuration (optional)
+      EMAIL_HOST_USER: your-email@gmail.com
+      EMAIL_HOST_PASSWORD: your-app-password
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - .:/app
+      - /app/__pycache__
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  postgres_data:

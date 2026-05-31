@@ -63,4 +63,8 @@ tzdata==2025.2
 uritemplate==4.2.0
 urllib3==2.5.0
 google-cloud-aiplatform>=1.70.0
+gunicorn>=23.0.0
+dj-database-url>=2.0.0
+django-storages>=1.14.0
+google-cloud-storage>=2.10.0
 

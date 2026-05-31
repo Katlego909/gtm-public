@@ -1,0 +1,46 @@
+steps:
+  # Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/gtm-validator:$SHORT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/gtm-validator:latest'
+      - '.'
+
+  # Push the image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/gtm-validator:$SHORT_SHA'
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/cloud-builders/gke-deploy'
+    args:
+      - run
+      - --filename=.
+      - --image=gcr.io/$PROJECT_ID/gtm-validator:$SHORT_SHA
+      - --location=us-central1
+      - --config=clouddeploy.yaml
+
+  # Alternative: Direct Cloud Run deployment (uncomment to use instead)
+  # - name: 'gcr.io/cloud-builders/run'
+  #   args:
+  #     - 'deploy'
+  #     - 'gtm-validator'
+  #     - '--image=gcr.io/$PROJECT_ID/gtm-validator:$SHORT_SHA'
+  #     - '--region=us-central1'
+  #     - '--platform=managed'
+  #     - '--allow-unauthenticated'
+  #     - '--set-env-vars=GCP_PROJECT_ID=$PROJECT_ID'
+
+images:
+  - 'gcr.io/$PROJECT_ID/gtm-validator:$SHORT_SHA'
+  - 'gcr.io/$PROJECT_ID/gtm-validator:latest'
+
+options:
+  machineType: 'N1_HIGHCPU_8'
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: 1800s
