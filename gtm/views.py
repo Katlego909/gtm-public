@@ -571,14 +571,21 @@ def playbook_status(request, session_id):
         from django.http import HttpResponseForbidden
         return HttpResponseForbidden("Access denied to this session.")
     snap = getattr(session, "snapshot", None) or ResultSnapshot.objects.filter(session=session).first()
-    
+
     if snap and (snap.ai_playbook or "").strip():
         # Playbook is ready! Return the actual button to view it.
         return render(request, "gtm/partials/playbook_ready_button.html", {"session": session})
 
-    if snap:
+    snap_status = getattr(snap, "ai_playbook_status", "pending") if snap else "pending"
+
+    if snap_status == "failed":
+        # Generation failed — stop polling
+        return render(request, "gtm/partials/playbook_failed_button.html", {"session": session})
+
+    if snap and snap_status == "pending":
+        # Only kick if not already generating
         _kickoff_playbook_generation(snap, session_id=session.uuid)
-    
+
     # Still generating. Return the loading state.
     return render(request, "gtm/partials/playbook_loading_button.html", {"session": session})
 
@@ -605,15 +612,14 @@ def playbook_content_status(request, session_id):
             "ai_playbook_html": mark_safe(ai_playbook_html),
         })
 
-    # Ensure generation remains non-blocking while polling.
-    if snap:
-        _kickoff_playbook_generation(snap, session_id=session.uuid)
+    snap_status = getattr(snap, "ai_playbook_status", "pending") if snap else "pending"
 
     return render(request, "gtm/partials/playbook_content_status.html", {
         "session": session,
         "playbook_ready": False,
-        "playbook_loading": bool(snap),
+        "playbook_loading": snap_status == "generating",
         "ai_playbook_html": "",
+        "snap_status": snap_status,
     })
 
 # Playbook
@@ -691,28 +697,33 @@ def insight_status(request, session_id, response_id):
     if not is_authorized:
         from django.http import HttpResponseForbidden
         return HttpResponseForbidden("Access denied to this session.")
-    
+
     response = get_object_or_404(Response.objects.select_related("question"), pk=response_id, session=session)
 
+    # Refresh both fields from DB to check current status
+    response.refresh_from_db(fields=["ai_insight", "ai_insight_status"])
+
     if not (response.ai_insight or "").strip():
-        try:
-            from threading import Thread
+        status = getattr(response, 'ai_insight_status', 'pending')
 
-            def gen_diagnostic_async(resp_id):
-                try:
-                    from .models import Response
-                    from .ai_services import generate_diagnostic_insight
-                    r = Response.objects.get(id=resp_id)
-                    generate_diagnostic_insight(r)
-                except Exception as e:
-                    log_error("Async Diagnostic Gen (poll)", e)
+        if status == "pending":
+            # Only spawn a thread if generation hasn't started yet
+            try:
+                from threading import Thread
 
-            Thread(target=gen_diagnostic_async, args=(response.id,), daemon=True).start()
-        except Exception as e:
-            log_error("Diagnostic poll thread creation", e)
+                def gen_diagnostic_async(resp_id):
+                    try:
+                        from .models import Response
+                        from .ai_services import generate_diagnostic_insight
+                        r = Response.objects.select_related("question", "session__snapshot").get(id=resp_id)
+                        generate_diagnostic_insight(r)
+                    except Exception as e:
+                        log_error("Async Diagnostic Gen (poll)", e)
 
-    # Refresh model state after potential async kickoff fallback writes.
-    response.refresh_from_db(fields=["ai_insight"])
+                Thread(target=gen_diagnostic_async, args=(response.id,), daemon=True).start()
+            except Exception as e:
+                log_error("Diagnostic poll thread creation", e)
+        # If status is "generating" or "failed", don't spawn another thread
 
     return render(request, "gtm/partials/insight_status.html", {
         "session": session,

@@ -101,6 +101,11 @@ def _kickoff_playbook_generation(snapshot, session_id=None):
     if (snapshot.ai_playbook or "").strip():
         return False
 
+    # Skip if already generating, done, or failed
+    snap_status = getattr(snapshot, "ai_playbook_status", "pending")
+    if snap_status in ("generating", "done", "failed"):
+        return False
+
     kickoff_key = f"gtm:playbook:kickoff:{snapshot.id}"
     # Throttle kickoff frequency across concurrent polling requests.
     if not cache.add(kickoff_key, "1", timeout=20):

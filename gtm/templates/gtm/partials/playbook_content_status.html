@@ -18,8 +18,13 @@
       {{ ai_playbook_html|safe }}
     </article>
   </div>
+{% elif snap_status == "failed" %}
+  <div class="bg-white rounded-3xl shadow-xl border border-gray-100 p-10 text-center">
+    <p class="text-red-600 font-medium">Playbook generation failed. Please reload to retry.</p>
+  </div>
 {% elif playbook_loading %}
-  <div class="bg-white rounded-3xl shadow-xl border border-gray-100 p-10 text-center"
+  <div id="playbook-content-loading"
+       class="bg-white rounded-3xl shadow-xl border border-gray-100 p-10 text-center"
        hx-get="{% url 'gtm:playbook_content_status' session.uuid %}"
        hx-trigger="load, every 3s"
        hx-target="#ai-playbook-container"
@@ -28,6 +33,24 @@
     <p class="mt-4 text-gray-700 font-medium">Generating your personalized GTM playbook...</p>
     <p class="text-sm text-gray-500 mt-2">You can keep browsing this page. This panel will update automatically.</p>
   </div>
+  <script>
+    (function() {
+      var MAX_POLLS = 40; // 40 × 3s = 120s max
+      var el = document.getElementById("playbook-content-loading");
+      var count = 0;
+      if (el) {
+        el.addEventListener("htmx:afterRequest", function() {
+          count++;
+          if (count >= MAX_POLLS) {
+            el.removeAttribute("hx-trigger");
+            htmx.process(el);
+            var para = el.querySelector("p");
+            if (para) para.textContent = "Playbook generation timed out. Please reload to retry.";
+          }
+        });
+      }
+    })();
+  </script>
 {% else %}
   <div class="bg-white rounded-3xl shadow-xl border border-gray-100 p-10 text-center">
     <p class="text-gray-500">No AI playbook available for this session.</p>

@@ -391,6 +391,10 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
     if not _acquire_lock(playbook_lock_key):
         return (snapshot.ai_playbook or "").strip()
 
+    # Set status to generating
+    snapshot.ai_playbook_status = "generating"
+    snapshot.save(update_fields=["ai_playbook_status"])
+
     try:
         # ---- 1️⃣ Attempt Unified Gemini generation
         client = _get_client()
@@ -503,9 +507,16 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
             
         # 🌟 CONSOLIDATED SAVE: Persist the final content once
         snapshot.ai_playbook = final_playbook_text
-        snapshot.save(update_fields=["ai_playbook", "ai_risk_status"])
+        snapshot.ai_playbook_status = "done"
+        snapshot.save(update_fields=["ai_playbook", "ai_risk_status", "ai_playbook_status"])
 
         return final_playbook_text
+    except Exception as outer_exc:
+        # Mark failed if any outer exception
+        snapshot.ai_playbook_status = "failed"
+        snapshot.save(update_fields=["ai_playbook_status"])
+        logger.error(f"Playbook generation outer exception: {outer_exc}")
+        return ""
     finally:
         _release_lock(playbook_lock_key)
 
@@ -577,6 +588,10 @@ def generate_diagnostic_insight(response: Response) -> str:
     if not _acquire_lock(lock_key):
         return (response.ai_insight or "").strip()
 
+    # Set status to generating
+    response.ai_insight_status = "generating"
+    response.save(update_fields=["ai_insight_status"])
+
     try:
         prompt = _build_diagnostic_prompt(response.session, response.question, response.score)
         text = ""
@@ -593,7 +608,8 @@ def generate_diagnostic_insight(response: Response) -> str:
             if text:
                 # 🌟 Save the insight directly to the Response object
                 response.ai_insight = text
-                response.save(update_fields=["ai_insight"])
+                response.ai_insight_status = "done"
+                response.save(update_fields=["ai_insight", "ai_insight_status"])
                 
                 # Log usage if metadata is present
                 if hasattr(ai_response, 'usage_metadata'):
@@ -620,8 +636,12 @@ def generate_diagnostic_insight(response: Response) -> str:
             if response.question.diagnostic_note:
                 text = response.question.diagnostic_note
                 response.ai_insight = text
-                response.save(update_fields=["ai_insight"])
+                response.ai_insight_status = "done"
+                response.save(update_fields=["ai_insight", "ai_insight_status"])
                 logger.info(f"📝 Using static diagnostic for {response.question.id_code}")
+            else:
+                response.ai_insight_status = "failed"
+                response.save(update_fields=["ai_insight_status"])
             
         return text
     finally:
