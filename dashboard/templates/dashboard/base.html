@@ -503,6 +503,16 @@
         closeModal();
     });
 
+    // Refresh asset library when triggered
+    document.body.addEventListener('refreshAssetLibrary', function() {
+        if (window.htmx) {
+            htmx.ajax('GET', '{% url "asset_library" %}', {
+                target: '#main-content',
+                swap: 'innerHTML',
+            });
+        }
+    });
+
     function showDashboardToast(message, level) {
         const container = document.getElementById('dashboard-toast-container');
         if (!container || !message) return;

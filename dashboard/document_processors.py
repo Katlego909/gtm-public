@@ -49,24 +49,27 @@ def _extract_pdf_text(file_bytes: bytes) -> str:
 
 
 def _extract_pdf_text_with_ai(file_bytes: bytes) -> str:
-    """Fallback PDF text extraction through Gemini when parser extraction is unavailable."""
+    """Fallback PDF text extraction through Vertex AI when parser extraction is unavailable."""
     try:
-        from gtm.ai_chat import _init_gemini_chat
+        from gtm.ai_services import _get_client
     except Exception:
         return ''
 
-    model = _init_gemini_chat()
-    if not model:
+    client = _get_client()
+    if not client:
         return ''
 
     try:
-        response = model.generate_content([
-            "Extract all readable text from this PDF document. Return plain text only.",
-            {
-                "mime_type": "application/pdf",
-                "data": file_bytes,
-            },
-        ])
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[
+                "Extract all readable text from this PDF document. Return plain text only.",
+                {
+                    "mime_type": "application/pdf",
+                    "data": file_bytes,
+                },
+            ]
+        )
         extracted = (getattr(response, 'text', '') or '').strip()
         return extracted[:AGENT_ATTACHMENT_TEXT_LIMIT]
     except Exception:
@@ -74,26 +77,29 @@ def _extract_pdf_text_with_ai(file_bytes: bytes) -> str:
 
 
 def _extract_image_text_with_ai(file_bytes: bytes) -> str:
-    """Use Gemini vision to OCR meaningful text from image attachments."""
+    """Use Vertex AI vision to OCR meaningful text from image attachments."""
     try:
         from PIL import Image
-        from gtm.ai_chat import _init_gemini_chat
+        from gtm.ai_services import _get_client
     except Exception:
         return ''
 
-    model = _init_gemini_chat()
-    if not model:
+    client = _get_client()
+    if not client:
         return ''
 
     try:
         image = Image.open(BytesIO(file_bytes))
-        response = model.generate_content([
-            (
-                "Extract all readable text from this image. "
-                "Return plain text only, preserving important headings and bullet points."
-            ),
-            image,
-        ])
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[
+                (
+                    "Extract all readable text from this image. "
+                    "Return plain text only, preserving important headings and bullet points."
+                ),
+                image,
+            ]
+        )
         extracted = (getattr(response, 'text', '') or '').strip()
         return extracted[:AGENT_ATTACHMENT_TEXT_LIMIT]
     except Exception:

@@ -395,17 +395,14 @@ def _ai_gap_suggestions_from_assessment(session):
     allowed_metrics = list(GapAnalysisMetric.METRIC_FIELD_MAPPING.keys())
     allowed_priorities = [name for name, _ in GapAnalysisMetric.PRIORITY_CHOICES]
 
-    model = None
+    client = None
     try:
-        import google.generativeai as genai
-        api_key = getattr(settings, 'GEMINI_API_KEY', None)
-        if api_key:
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-2.5-flash')
+        from gtm.ai_services import _get_client
+        client = _get_client()
     except Exception as exc:
-        logger.warning('AI gap suggestion model unavailable: %s', exc)
+        logger.warning('Vertex AI client unavailable: %s', exc)
 
-    if not model:
+    if not client:
         return _fallback_gap_suggestions(cat_scores), {
             'generator': 'fallback',
             'overall_score': round(float(overall), 1),
@@ -430,7 +427,7 @@ Assessment context:
 """.strip()
 
     try:
-        ai_response = model.generate_content(prompt)
+        ai_response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
         payload = json.loads(_clean_json_payload(getattr(ai_response, 'text', '')))
         raw_suggestions = payload.get('suggestions', []) if isinstance(payload, dict) else []
     except Exception as exc:
@@ -866,10 +863,18 @@ def add_edit_resource(request, pk=None):
             )
             
             if request.htmx:
-                response = refresh_resources(request)
+                # Return updated asset library with all stats recalculated
+                context = {
+                    'current_workspace': current_workspace,
+                    'user_workspaces': current_workspace.members.filter(user=request.user).values_list('workspace', flat=True) if hasattr(current_workspace, 'members') else [],
+                    'resources': Resource.objects.filter(workspace=current_workspace),
+                    'total_assets': Resource.objects.filter(workspace=current_workspace).count(),
+                    'audited_assets': Resource.objects.filter(workspace=current_workspace, audit_status='complete').count(),
+                    'pending_audits': Resource.objects.filter(workspace=current_workspace, audit_status__in=['pending', 'auditing']).count(),
+                }
+                response = render(request, 'dashboard/partials/asset_library_content.html', context)
                 response['HX-Trigger'] = json.dumps({
                     'closeModal': True,
-                    'workspaceUpdated': True,
                     'resourceToast': {
                         'message': f"Resource {action_label} successfully.",
                         'level': 'success'
@@ -899,6 +904,9 @@ def delete_resource(request, pk):
     if request.method == 'POST':
         resource_name = resource.name
         resource_id = resource.id
+
+        # Get workspace before deleting the resource
+        current_workspace = resource.workspace
         resource.delete()
 
         log_workspace_activity(
@@ -911,7 +919,16 @@ def delete_resource(request, pk):
         )
 
         if request.htmx:
-            response = refresh_resources(request)
+            # Return updated asset library with all stats recalculated
+            context = {
+                'current_workspace': current_workspace,
+                'user_workspaces': current_workspace.members.filter(user=request.user).values_list('workspace', flat=True) if hasattr(current_workspace, 'members') else [],
+                'resources': Resource.objects.filter(workspace=current_workspace),
+                'total_assets': Resource.objects.filter(workspace=current_workspace).count(),
+                'audited_assets': Resource.objects.filter(workspace=current_workspace, audit_status='complete').count(),
+                'pending_audits': Resource.objects.filter(workspace=current_workspace, audit_status__in=['pending', 'auditing']).count(),
+            }
+            response = render(request, 'dashboard/partials/asset_library_content.html', context)
             response['HX-Trigger'] = json.dumps({
                 'closeModal': True,
                 'resourceToast': {

@@ -6,7 +6,7 @@ This is a Django project called **GTM Validator**, a "Go-To-Market Readiness Too
 
 *   **Backend:** Django
 *   **Frontend:** Server-rendered HTML with HTMX for dynamic interactions and Tailwind CSS for styling.
-*   **AI:** Google's Generative AI (Gemini) is used for insights, the final report, and a chat feature.
+*   **AI:** Google Cloud's Vertex AI with Gemini models is used for insights, the final report, chat features, and multimodal auditing.
 *   **PDF Generation:** ReportLab is used to create downloadable PDF reports.
 *   **Authentication:** `django-allauth` is used for user authentication.
 
@@ -40,7 +40,7 @@ pip install -r requirements.txt
 
 # Set up environment variables
 cp .env.example .env
-# Edit .env and add your DJANGO_SECRET_KEY, GEMINI_API_KEY, and email settings
+# Edit .env and add your DJANGO_SECRET_KEY, GCP_PROJECT_ID, GOOGLE_APPLICATION_CREDENTIALS, and email settings
 ```
 
 ## 2. Running the Development Server
@@ -65,7 +65,7 @@ The application will be available at `http://127.0.0.1:8000/`.
 # Development Conventions
 
 *   **Styling:** The project uses Tailwind CSS. The `theme` app is configured as the Tailwind app. To re-build the CSS, you may need to run `npm install` in the `theme/static_src` directory and then use a command like `npm run build`.
-*   **AI Services:** All interactions with the Gemini API are handled in the `gtm/ai_services.py` module.
+*   **AI Services:** All interactions with Vertex AI are handled in the `gtm/ai_services.py`, `gtm/ai_chat.py`, and `gtm/ai_auditor.py` modules. Uses the unified `google.genai` SDK with `vertexai=True` flag.
 *   **Views:** The core application logic is in `gtm/views.py`.
 *   **Templates:** Templates are located in the `templates` directory of each app.
 *   **Middleware:** The `gtm/middleware.py` file contains custom middleware, including `EnsureClientIdMiddleware` for tracking anonymous users.

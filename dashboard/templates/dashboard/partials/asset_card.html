@@ -175,17 +175,11 @@
           </button>
         </div>
 
-        {# Preview of audit summary #}
+        {# Preview of audit summary (full report in hidden div) #}
         {% if resource.ai_audit_summary %}
         <div id="audit-preview-{{ resource.id }}"
-             class="hidden mt-3 p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs text-gray-600 leading-relaxed max-h-48 overflow-y-auto audit-detail-panel">
-          {{ resource.ai_audit_summary|linebreaksbr|truncatechars:800 }}
-          <button hx-post="{% url 'trigger_asset_audit' resource.id %}{% if current_workspace %}?workspace={{ current_workspace.id }}{% endif %}"
-                  hx-target="#asset-card-{{ resource.id }}"
-                  hx-swap="outerHTML"
-                  class="mt-2 text-[11px] text-gray-400 hover:text-indigo-600 transition-colors block">
-            ↻ Re-audit
-          </button>
+             class="hidden prose prose-sm max-w-none text-gray-700 leading-relaxed">
+          {{ resource.ai_audit_summary_html|safe }}
         </div>
         {% endif %}
 

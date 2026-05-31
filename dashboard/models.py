@@ -193,6 +193,21 @@ class Resource(models.Model):
             return ext.lower().replace('.', '')
         return 'unknown'
 
+    @property
+    def ai_audit_summary_html(self):
+        """Convert markdown audit summary to HTML for display."""
+        if not self.ai_audit_summary:
+            return ""
+        try:
+            import markdown
+            html = markdown.markdown(self.ai_audit_summary, extensions=['extra', 'codehilite'])
+            return html
+        except ImportError:
+            # Fallback if markdown not available - just use the raw text with line breaks
+            import html as html_module
+            escaped = html_module.escape(self.ai_audit_summary)
+            return escaped.replace('\n', '<br>')
+
 class AIResourceRecommendation(models.Model):
     """
     Links a GTM AssessmentSession to a recommended Resource from the workspace library,

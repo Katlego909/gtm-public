@@ -915,20 +915,21 @@ def action_delete(request, action, action_id):
 # AI CHAT ASSISTANT
 # ================================================================
 from django.views.decorators.http import require_http_methods
-from .ai_chat import process_chat_message, get_suggested_prompts
 from .models import ChatMessage
 
 def chat_view(request, session_id):
     """Render the chat interface page"""
+    from .ai_chat import get_suggested_prompts
+
     # Access control: ensure user owns or is in session's workspace
     session, is_authorized = safe_get_session_or_403(request, session_id)
     if not is_authorized:
         from django.http import HttpResponseForbidden
         return HttpResponseForbidden("Access denied to this session.")
-    
+
     # Get chat history
     chat_history = ChatMessage.objects.filter(session=session).order_by('created_at')[:50]
-    
+
     # Get suggested prompts
     suggested = get_suggested_prompts(session)
     
@@ -943,7 +944,8 @@ def chat_view(request, session_id):
 def chat_api(request, session_id):
     """API endpoint for chat messages"""
     import json
-    
+    from .ai_chat import process_chat_message
+
     try:
         # Access control: ensure user owns or is in session's workspace
         session, is_authorized = safe_get_session_or_403(request, session_id)

@@ -50,8 +50,10 @@ DJANGO_SECRET_KEY=your-super-secret-key-here-generate-new-one
 DEBUG=False
 ALLOWED_HOSTS=yourusername.pythonanywhere.com,localhost,127.0.0.1
 
-# Google Gemini AI
-GEMINI_API_KEY=your-gemini-api-key-here
+# Google Cloud (Vertex AI)
+GCP_PROJECT_ID=your-gcp-project-id
+GCP_LOCATION=us-central1
+GOOGLE_APPLICATION_CREDENTIALS=path/to/service-account.json
 
 # Email Settings (Gmail)
 EMAIL_HOST_USER=your-email@gmail.com
@@ -199,9 +201,10 @@ python manage.py createsuperuser
 
 ### AI Features Not Working
 
-1. Check GEMINI_API_KEY is set correctly in `.env`
-2. Verify your Google AI Studio quota hasn't been exceeded
-3. Check error logs for API-related errors
+1. Check GCP_PROJECT_ID and GCP_LOCATION are set correctly in `.env`
+2. Verify GOOGLE_APPLICATION_CREDENTIALS points to a valid service account JSON
+3. Ensure service account has Vertex AI permissions
+4. Check error logs for API-related errors
 
 ### Email Not Sending
 
@@ -261,7 +264,9 @@ If you encounter issues:
 | `DJANGO_SECRET_KEY` | Yes | Django secret key (generate new for production) | `django-insecure-...` |
 | `DEBUG` | Yes | Debug mode (False for production) | `False` |
 | `ALLOWED_HOSTS` | Yes | Comma-separated list of allowed hosts | `yourusername.pythonanywhere.com,localhost` |
-| `GEMINI_API_KEY` | Yes | Google Gemini API key for AI features | `AIzaSy...` |
+| `GCP_PROJECT_ID` | Yes | Google Cloud Project ID for Vertex AI | `my-gtm-project` |
+| `GCP_LOCATION` | No | Vertex AI region (default: us-central1) | `us-central1` |
+| `GOOGLE_APPLICATION_CREDENTIALS` | Yes | Path to GCP service account JSON | `keys/service-account.json` |
 | `EMAIL_HOST_USER` | Yes | Gmail address for sending emails | `your-email@gmail.com` |
 | `EMAIL_HOST_PASSWORD` | Yes | Gmail App Password (not regular password) | `abcd efgh ijkl mnop` |
 | `EMAIL_REDIRECT_TO` | No | Redirect all emails (for testing) | `test@example.com` |

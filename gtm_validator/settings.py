@@ -196,10 +196,15 @@ EMAIL_REDIRECT_TO = os.getenv("EMAIL_REDIRECT_TO", "").strip()
 if os.getenv("EMAIL_CONSOLE", "").lower() == "true":
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
     
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "")
 GCP_LOCATION = os.getenv("GCP_LOCATION", "us-central1")
 GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+
+# Ensure GOOGLE_APPLICATION_CREDENTIALS is set as an environment variable for Google client libs
+if GOOGLE_APPLICATION_CREDENTIALS and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
+    creds_path = BASE_DIR / GOOGLE_APPLICATION_CREDENTIALS if not GOOGLE_APPLICATION_CREDENTIALS.startswith("/") else GOOGLE_APPLICATION_CREDENTIALS
+    if creds_path.exists():
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(creds_path)
 
 AUTHENTICATION_BACKENDS = [
 
