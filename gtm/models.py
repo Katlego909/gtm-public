@@ -6,6 +6,14 @@ from django.core.serializers.json import DjangoJSONEncoder
 # Import workspace models so Django can find them
 from .models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation
 
+# AI generation status choices
+AI_STATUS_CHOICES = [
+    ("pending", "Pending"),
+    ("generating", "Generating"),
+    ("done", "Done"),
+    ("failed", "Failed"),
+]
+
 class Category(models.Model):
     name = models.CharField(max_length=50, unique=True)
     weight = models.FloatField(default=1.0)  # Demand 0.4, Conversion 0.4, Delivery 0.2 (normalized later)
@@ -86,8 +94,9 @@ class Response(models.Model):
     session = models.ForeignKey(AssessmentSession, on_delete=models.CASCADE, related_name="responses")
     question = models.ForeignKey(Question, on_delete=models.CASCADE)
     score = models.PositiveSmallIntegerField()  # 1..5
-    
+
     ai_insight = models.TextField(blank=True, default="")
+    ai_insight_status = models.CharField(max_length=12, choices=AI_STATUS_CHOICES, default="pending", db_index=True)
     context_note = models.TextField(blank=True, default="")  # User-provided business context
 
     class Meta:
@@ -210,6 +219,7 @@ class ResultSnapshot(models.Model):
     referrer       = models.CharField(max_length=200, blank=True, default="")
     report_sent = models.BooleanField(default=False)
     ai_playbook = models.TextField(blank=True, default="")
+    ai_playbook_status = models.CharField(max_length=12, choices=AI_STATUS_CHOICES, default="pending", db_index=True)
     ai_risk_status = models.CharField(max_length=20, blank=True, default="")
 
     def __str__(self):

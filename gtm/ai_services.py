@@ -264,6 +264,31 @@ except ImportError:
     GENAI_AVAILABLE = False
     logger.warning("google-genai client not installed — AI services disabled.")
 
+# Generation configs to disable thinking and control token usage
+_FAST_CONFIG = None      # diagnostics, rewrites: 600 tokens, no thinking
+_PLAYBOOK_CONFIG = None  # playbook: 4096 tokens, no thinking
+_ACTION_CONFIG = None    # action items: 512 tokens, no thinking
+
+if GENAI_AVAILABLE:
+    try:
+        _FAST_CONFIG = types.GenerateContentConfig(
+            temperature=0.4,
+            max_output_tokens=600,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+        )
+        _PLAYBOOK_CONFIG = types.GenerateContentConfig(
+            temperature=0.6,
+            max_output_tokens=4096,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+        )
+        _ACTION_CONFIG = types.GenerateContentConfig(
+            temperature=0.3,
+            max_output_tokens=512,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+        )
+    except Exception as e:
+        logger.warning(f"Failed to create generation configs: {e}")
+
 def _get_client():
     """Returns cached Google GenAI client, initializing once if needed."""
     global _cached_client
@@ -375,7 +400,8 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
             try:
                 response = client.models.generate_content(
                     model=model_id,
-                    contents=prompt
+                    contents=prompt,
+                    config=_PLAYBOOK_CONFIG,
                 )
                 text = response.text.strip()
                 if text:
@@ -559,7 +585,8 @@ def generate_diagnostic_insight(response: Response) -> str:
             # Use unified client to generate content
             ai_response = client.models.generate_content(
                 model=model_id,
-                contents=prompt
+                contents=prompt,
+                config=_FAST_CONFIG,
             )
             text = ai_response.text.strip()
             
@@ -624,7 +651,8 @@ def generate_concise_action_items(playbook_text: str) -> list:
     try:
         response = client.models.generate_content(
             model=model_id,
-            contents=prompt
+            contents=prompt,
+            config=_ACTION_CONFIG,
         )
         text = response.text.strip()
         # Split by newlines and filter empty lines
@@ -715,7 +743,8 @@ User note:
     try:
         response = client.models.generate_content(
             model=model_id,
-            contents=prompt
+            contents=prompt,
+            config=_FAST_CONFIG,
         )
         text = (getattr(response, "text", "") or "").strip()
         if not text:
