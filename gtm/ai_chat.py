@@ -9,6 +9,7 @@ Supports commands, queries, and contextual help.
 import logging
 import json
 import re
+import threading
 from collections import Counter
 from typing import Dict, Any, Optional, List
 from django.conf import settings
@@ -158,23 +159,47 @@ except ImportError:
     GENAI_AVAILABLE = False
     logger.warning("google-genai not available for chat assistant")
 
+# Cached chat client to avoid repeated initialization
+_chat_client = None
+_chat_lock = threading.Lock()
+
+# Import generation config from ai_services
+try:
+    from .ai_services import _PLAYBOOK_CONFIG
+except (ImportError, AttributeError):
+    _PLAYBOOK_CONFIG = None
+
 
 def _get_chat_client():
-    """Initializes and returns the Unified Google GenAI client for Vertex AI."""
+    """Returns cached Vertex AI client for chat, initializing once if needed."""
+    global _chat_client
+
+    if not GENAI_AVAILABLE:
+        return None
+
     project_id = getattr(settings, "GCP_PROJECT_ID", None)
-    location = getattr(settings, "GCP_LOCATION", "us-central1")
-    
-    if not GENAI_AVAILABLE or not project_id:
+    if not project_id:
         return None
-    try:
-        return genai.Client(
-            vertexai=True,
-            project=project_id,
-            location=location
-        )
-    except Exception as e:
-        log_ai_error("GenAI Chat Client Initialization", e, service="google-genai")
-        return None
+
+    if _chat_client is not None:
+        return _chat_client
+
+    with _chat_lock:
+        if _chat_client is not None:
+            return _chat_client
+
+        location = getattr(settings, "GCP_LOCATION", "us-central1")
+        try:
+            client = genai.Client(
+                vertexai=True,
+                project=project_id,
+                location=location
+            )
+            _chat_client = client
+            return client
+        except Exception as e:
+            log_ai_error("GenAI Chat Client Initialization", e, service="google-genai")
+            return None
 
 
 def _get_chat_config(session_uuid: str):
@@ -208,7 +233,10 @@ Rules:
         ],
         automatic_function_calling=types.AutomaticFunctionCallingConfig(
             disable=False
-        )
+        ),
+        temperature=0.7,
+        max_output_tokens=2048,
+        thinking_config=types.ThinkingConfig(thinking_budget=0),
     )
 
 # ================================================================

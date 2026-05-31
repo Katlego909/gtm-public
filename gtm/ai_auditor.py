@@ -17,8 +17,45 @@ try:
     GENAI_AVAILABLE = True
 except ImportError:
     GENAI_AVAILABLE = False
-    
+
 logger = logging.getLogger(__name__)
+
+# Import generation config from ai_services
+try:
+    from .ai_services import _PLAYBOOK_CONFIG
+except (ImportError, AttributeError):
+    _PLAYBOOK_CONFIG = None
+
+# Cached auditor client to avoid repeated initialization
+_auditor_client = None
+_auditor_lock = threading.Lock()
+
+def _get_auditor_client():
+    """Returns cached Vertex AI client for auditor, initializing once if needed."""
+    global _auditor_client
+
+    if not GENAI_AVAILABLE:
+        return None
+
+    project_id = getattr(settings, "GCP_PROJECT_ID", None)
+    if not project_id:
+        return None
+
+    if _auditor_client is not None:
+        return _auditor_client
+
+    with _auditor_lock:
+        if _auditor_client is not None:
+            return _auditor_client
+
+        location = getattr(settings, "GCP_LOCATION", "europe-west1")
+        try:
+            client = genai.Client(vertexai=True, project=project_id, location=location)
+            _auditor_client = client
+            return client
+        except Exception as e:
+            logger.error(f"Failed to initialize auditor client: {e}")
+            return None
 
 
 # ─── Score extraction ─────────────────────────────────────────────────────────
@@ -97,14 +134,10 @@ def _run_multimodal_audit(file_bytes: bytes, mime_type: str, asset_name: str, se
     """
     Core multimodal audit. Sends file bytes + prompt to Gemini and returns raw text.
     """
-    project_id = getattr(settings, "GCP_PROJECT_ID", None)
-    location = getattr(settings, "GCP_LOCATION", "europe-west1")
-
-    if not GENAI_AVAILABLE or not project_id:
-        logger.error("google-genai not available or GCP_PROJECT_ID missing for audit.")
+    client = _get_auditor_client()
+    if not client:
+        logger.error("Auditor client unavailable for audit.")
         return ""
-
-    client = genai.Client(vertexai=True, project=project_id, location=location)
 
     audit_prompt = f"""You are the 'GTM Strategic Auditor'. 
 Perform a professional strategic critique of this {asset_name}.
@@ -136,7 +169,8 @@ REPORT FORMAT:
                         types.Part.from_text(text=audit_prompt),
                     ]
                 )
-            ]
+            ],
+            config=_PLAYBOOK_CONFIG,
         )
         return response.text or ""
     except Exception as e:
