@@ -26,6 +26,10 @@ AI_REQUEST_COUNTER_CACHE_KEY = "gtm:ai:gemini:req_count:60s"
 AI_LOCK_TTL_SECONDS = 120
 AI_REQUEST_WINDOW_SECONDS = 60
 
+# Module-level client cache to avoid repeated initialization
+_cached_client = None
+_client_lock = __import__('threading').Lock()
+
 
 def _clean_json_response(text: str) -> str:
     """
@@ -261,22 +265,35 @@ except ImportError:
     logger.warning("google-genai client not installed — AI services disabled.")
 
 def _get_client():
-    """Initializes and returns the Unified Google GenAI client for Vertex AI."""
+    """Returns cached Google GenAI client, initializing once if needed."""
+    global _cached_client
+
+    if not GENAI_AVAILABLE:
+        return None
+
     project_id = getattr(settings, "GCP_PROJECT_ID", None)
-    location = getattr(settings, "GCP_LOCATION", "us-central1")
-    
-    if not GENAI_AVAILABLE or not project_id:
+    if not project_id:
         return None
-    try:
-        # The unified SDK uses vertexai=True to signal Enterprise backend
-        return genai.Client(
-            vertexai=True,
-            project=project_id,
-            location=location
-        )
-    except Exception as e:
-        log_ai_error("GenAI Client Initialization", e, service="google-genai")
-        return None
+
+    if _cached_client is not None:
+        return _cached_client
+
+    with _client_lock:
+        if _cached_client is not None:
+            return _cached_client
+
+        location = getattr(settings, "GCP_LOCATION", "us-central1")
+        try:
+            client = genai.Client(
+                vertexai=True,
+                project=project_id,
+                location=location
+            )
+            _cached_client = client
+            return client
+        except Exception as e:
+            log_ai_error("GenAI Client Initialization", e, service="google-genai")
+            return None
 
 
 # ================================================================
@@ -716,3 +733,13 @@ User note:
             prompt=prompt,
         )
         return _fallback_rewrite_context_note(source, mode)
+
+def cleanup_client():
+    """Close the cached GenAI client to release resources."""
+    global _cached_client
+    if _cached_client is not None:
+        try:
+            _cached_client.api_client.close()
+        except Exception:
+            pass
+        _cached_client = None
