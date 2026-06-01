@@ -39,3 +39,10 @@ WHAT_IS_GTM_VALIDATOR.md
 # Temporary files
 *.tmp
 analysis/
+
+# Local debugging and diagnostic scripts
+diagnose_*.py
+verify_*.py
+fix_*.py
+debug_*.py
+test_local_*.py
