@@ -278,7 +278,7 @@ if GENAI_AVAILABLE:
         )
         _PLAYBOOK_CONFIG = types.GenerateContentConfig(
             temperature=0.6,
-            max_output_tokens=4096,
+            max_output_tokens=8192,
             thinking_config=types.ThinkingConfig(thinking_budget=0),
         )
         _ACTION_CONFIG = types.GenerateContentConfig(
@@ -329,6 +329,10 @@ def _build_prompt(snapshot: ResultSnapshot) -> str:
     data = {
         "company_name": snapshot.company_name or "Unnamed Company",
         "industry": snapshot.industry or "Unknown Industry",
+        "company_size": snapshot.company_size or "Not specified",
+        "revenue_range": snapshot.revenue_range or "Not specified",
+        "country": snapshot.country or "Not specified",
+        "crm": snapshot.crm or "Not specified",
         "overall": snapshot.overall,
         "stage": snapshot.band.stage if snapshot.band else "Unspecified",
         "headline": snapshot.band.headline if snapshot.band else "",
@@ -349,20 +353,45 @@ def _build_prompt(snapshot: ResultSnapshot) -> str:
     context_notes_text = "\n".join(context_notes)
 
     prompt = f"""
-You are a Go-To-Market strategy consultant.
+You are a Go-To-Market strategy consultant with deep expertise in financial modeling and competitive positioning.
 
 Create a **personalized 30-day GTM improvement playbook** for the company below.
 
 Respond ONLY with a valid, raw JSON object (do not include markdown codeblocks around the JSON, just the JSON string).
 Ensure the JSON has the following exact keys:
-1. "markdown_playbook": A comprehensive markdown string containing: A diagnostic summary, Top priority areas, a 4-week action plan, and success metrics.
-2. "risk_status": A single string value of either "High", "Medium", or "Low" representing the company's maturity risk.
-3. "learning_topics": An array of up to 3 short strings representing specific GTM concepts the company needs to learn/improve based on their weaknesses.
+1. "markdown_playbook": A comprehensive markdown string containing:
+   - A diagnostic summary
+   - Top priority areas
+   - A 4-week action plan with financial estimates and competitive context woven into each recommendation
+   - Success metrics
+
+   For EACH recommendation, weave in:
+   - A brief financial estimate (cost range, expected ROI timeframe, or investment level) calibrated to their revenue range and company size
+   - A competitive context line (how companies in their industry/region typically perform here, and whether this company is ahead or behind the curve)
+
+2. "financial_summary": A standalone markdown section (150-250 words) titled "Financial Estimates & ROI Projections"
+   - Include the most relevant financial metrics for this company's stage and industry (could be CAC benchmarks, implementation costs, payback periods, revenue impact — whatever is most actionable)
+   - Always show the reasoning ("Based on your {{revenue_range}} revenue range and {{company_size}} company size...")
+   - Include a disclaimer that these are directional estimates and should be validated with their finance team
+
+3. "competitor_analysis": A standalone markdown section (150-250 words) titled "Competitive Gap Analysis"
+   - Based on their industry, country, and market segment — identify 3-4 dimensions where they are strong vs market norms
+   - Identify 2-3 critical gaps to prioritize
+   - Do NOT name specific competitor companies; use industry patterns and benchmarks
+   - Focus on actionable gaps relative to their peers
+
+4. "risk_status": A single string value of either "High", "Medium", or "Low" representing the company's maturity risk.
+
+5. "learning_topics": An array of up to 3 short strings representing specific GTM concepts the company needs to learn/improve based on their weaknesses.
 
 Company: {data['company_name']}
 Industry: {data['industry']}
+Company Size: {data['company_size']}
+Revenue Range: {data['revenue_range']}
+Country/Region: {data['country']}
+CRM in use: {data['crm']}
 Stage: {data['stage']}
-GTM Score: {data['overall']}
+GTM Score: {data['overall']}/100
 Summary: {data['headline']}
 
 Category Averages:
@@ -385,6 +414,10 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
     """
 
     final_playbook_text = ""
+
+    # Initialize new fields to avoid UnboundLocalError if JSON parsing fails
+    snapshot.ai_financial_summary = ""
+    snapshot.ai_competitor_analysis = ""
 
     # Avoid duplicate concurrent generation for the same snapshot.
     playbook_lock_key = f"gtm:ai:playbook:{snapshot.id}:lock"
@@ -414,7 +447,9 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
                         parsed = json.loads(text)
                         final_playbook_text = parsed.get("markdown_playbook", "")
                         snapshot.ai_risk_status = parsed.get("risk_status", "Low")
-                        
+                        snapshot.ai_financial_summary = parsed.get("financial_summary", "")
+                        snapshot.ai_competitor_analysis = parsed.get("competitor_analysis", "")
+
                         # Process resources...
                         topics = parsed.get("learning_topics", [])
                         if topics and getattr(snapshot.session, 'workspace', None):
@@ -508,7 +543,7 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
         # 🌟 CONSOLIDATED SAVE: Persist the final content once
         snapshot.ai_playbook = final_playbook_text
         snapshot.ai_playbook_status = "done"
-        snapshot.save(update_fields=["ai_playbook", "ai_risk_status", "ai_playbook_status"])
+        snapshot.save(update_fields=["ai_playbook", "ai_financial_summary", "ai_competitor_analysis", "ai_risk_status", "ai_playbook_status"])
 
         return final_playbook_text
     except Exception as outer_exc:

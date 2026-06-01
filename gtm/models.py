@@ -221,6 +221,8 @@ class ResultSnapshot(models.Model):
     ai_playbook = models.TextField(blank=True, default="")
     ai_playbook_status = models.CharField(max_length=12, choices=AI_STATUS_CHOICES, default="pending", db_index=True)
     ai_risk_status = models.CharField(max_length=20, blank=True, default="")
+    ai_financial_summary = models.TextField(blank=True, default="")
+    ai_competitor_analysis = models.TextField(blank=True, default="")
 
     def __str__(self):
         return f"Snapshot for {self.session.uuid} – {self.overall}/100"

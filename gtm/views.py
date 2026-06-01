@@ -601,15 +601,30 @@ def playbook_content_status(request, session_id):
 
     playbook_ready = bool(snap and (snap.ai_playbook or "").strip())
     ai_playbook_html = ""
+    ai_financial_html = ""
+    ai_competitor_html = ""
 
     if playbook_ready:
         src = _normalize_ai_playbook_markdown(snap.ai_playbook)
         ai_playbook_html = md.markdown(src, extensions=["extra", "sane_lists", "toc"])
+
+        # Render financial summary if available
+        if snap.ai_financial_summary:
+            fin_src = _normalize_ai_playbook_markdown(snap.ai_financial_summary)
+            ai_financial_html = md.markdown(fin_src, extensions=["extra", "sane_lists"])
+
+        # Render competitor analysis if available
+        if snap.ai_competitor_analysis:
+            comp_src = _normalize_ai_playbook_markdown(snap.ai_competitor_analysis)
+            ai_competitor_html = md.markdown(comp_src, extensions=["extra", "sane_lists"])
+
         return render(request, "gtm/partials/playbook_content_status.html", {
             "session": session,
             "playbook_ready": True,
             "playbook_loading": False,
             "ai_playbook_html": mark_safe(ai_playbook_html),
+            "ai_financial_html": mark_safe(ai_financial_html),
+            "ai_competitor_html": mark_safe(ai_competitor_html),
         })
 
     snap_status = getattr(snap, "ai_playbook_status", "pending") if snap else "pending"
@@ -619,6 +634,8 @@ def playbook_content_status(request, session_id):
         "playbook_ready": False,
         "playbook_loading": snap_status == "generating",
         "ai_playbook_html": "",
+        "ai_financial_html": "",
+        "ai_competitor_html": "",
         "snap_status": snap_status,
     })
 
@@ -657,6 +674,8 @@ def playbook(request, session_id):
     playbook_ready = False
     playbook_loading = bool(needs_generation)
     ai_playbook_html = ""
+    ai_financial_html = ""
+    ai_competitor_html = ""
     try:
         if snap and getattr(snap, "ai_playbook", ""):
             src = _normalize_ai_playbook_markdown(snap.ai_playbook)
@@ -664,10 +683,23 @@ def playbook(request, session_id):
                 src,
                 extensions=["extra", "sane_lists", "toc"]  # 'extra' already includes tables
             )
+
+            # Render financial summary if available
+            if snap.ai_financial_summary:
+                fin_src = _normalize_ai_playbook_markdown(snap.ai_financial_summary)
+                ai_financial_html = md.markdown(fin_src, extensions=["extra", "sane_lists"])
+
+            # Render competitor analysis if available
+            if snap.ai_competitor_analysis:
+                comp_src = _normalize_ai_playbook_markdown(snap.ai_competitor_analysis)
+                ai_competitor_html = md.markdown(comp_src, extensions=["extra", "sane_lists"])
+
             playbook_ready = True
     except Exception as e:
         log_error("AI Playbook rendering", e, {"session_id": str(session.uuid)})
         ai_playbook_html = ""
+        ai_financial_html = ""
+        ai_competitor_html = ""
         playbook_ready = False
         playbook_loading = False
 
@@ -684,6 +716,8 @@ def playbook(request, session_id):
         "cat_sorted": cat_sorted,
         "band_actions_html": band_actions_html,
         "ai_playbook_html": mark_safe(ai_playbook_html),
+        "ai_financial_html": mark_safe(ai_financial_html),
+        "ai_competitor_html": mark_safe(ai_competitor_html),
         "playbook_ready": playbook_ready,
         "playbook_loading": playbook_loading,
         "is_htmx": _is_htmx(request),
