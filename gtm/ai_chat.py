@@ -9,6 +9,7 @@ Supports commands, queries, and contextual help.
 import logging
 import json
 import re
+import threading
 from collections import Counter
 from typing import Dict, Any, Optional, List
 from django.conf import settings
@@ -123,7 +124,7 @@ def search_internal_resources(session_uuid: str, query: str = "") -> str:
     """
     Searches the workspace resource library for documents, decks, or tools matching a topic.
     If 'query' is empty, it lists all available resources.
-    Use this when the user asks 'do we have a deck for this', 'suggest a tool', 
+    Use this when the user asks 'do we have a deck for this', 'suggest a tool',
     'what resources are available', or 'help me with [topic]'.
     """
     try:
@@ -132,20 +133,183 @@ def search_internal_resources(session_uuid: str, query: str = "") -> str:
         session = AssessmentSession.objects.get(uuid=session_uuid)
         if not session.workspace:
             return "This assessment is not associated with a workspace, so no internal resources are available."
-            
+
         resources = Resource.objects.filter(workspace=session.workspace)
         if query:
             resources = resources.filter(name__icontains=query) | resources.filter(description__icontains=query)
-            
+
         if not resources.exists():
             return f"No internal resources found matching '{query}'."
-            
+
         res = [f"Found {resources.count()} relevant resources in your workspace:"]
         for r in resources[:5]:
             res.append(f" - {r.name} ({r.get_resource_type_display()}): {r.description or 'No description.'}")
         return "\n".join(res)
     except Exception as e:
         return f"Error searching resources: {str(e)}"
+
+def analyze_risk_and_mitigation(session_uuid: str) -> str:
+    """
+    Provides a deep-dive risk analysis based on the GTM assessment.
+    Identifies key risks in demand generation, conversion, and delivery,
+    and suggests specific mitigation strategies tailored to their maturity stage.
+    Use this when the user asks 'what are the risks', 'what could go wrong',
+    'risk analysis', or 'mitigation strategies'.
+    """
+    try:
+        session = AssessmentSession.objects.get(uuid=session_uuid)
+        context = build_session_context(session)
+
+        risks = []
+        for cat in context.get('categories', []):
+            if cat['score'] < 2.5:
+                if cat['name'] == 'Demand':
+                    risks.append("🔴 HIGH: Weak demand generation is your biggest risk—you may struggle to build pipeline. Immediate focus: clarify ICP and messaging.")
+                elif cat['name'] == 'Conversion':
+                    risks.append("🔴 HIGH: Poor conversion efficiency means pipeline becomes expensive fast. Focus: tighten qualification and enable sales.")
+                elif cat['name'] == 'Delivery':
+                    risks.append("🔴 HIGH: Churn risk is elevated. Poor delivery kills expansion revenue. Focus: define TTV milestones.")
+
+        return ("Risk Assessment:\n" + "\n".join(risks)) if risks else f"Your GTM is solid at the {context.get('stage')} stage—no critical risks detected. Keep maintaining momentum."
+    except Exception as e:
+        logger.error(f"Risk analysis error: {e}")
+        return f"Let me get your assessment data first so I can analyze the risks properly."
+
+def build_implementation_roadmap(session_uuid: str, timeframe: str = "90-day") -> str:
+    """
+    Creates a phased implementation roadmap (30, 60, or 90-day options).
+    Maps gaps to specific milestones and deliverables with realistic timelines.
+    Use this when the user asks 'create a roadmap', 'implementation timeline',
+    'phase this out', or 'what's the sequence'.
+    """
+    try:
+        session = AssessmentSession.objects.get(uuid=session_uuid)
+        context = build_session_context(session)
+
+        phases = {
+            "30-day": [
+                "📍 Week 1-2: Define ICP & messaging",
+                "📍 Week 3: Set up qualification process",
+                "📍 Week 4: Define TTV milestones"
+            ],
+            "60-day": [
+                "🎯 Phase 1 (Week 1-2): Quick wins—fix the most critical gap",
+                "🎯 Phase 2 (Week 3-4): Build process—implement qualification/onboarding",
+                "🎯 Phase 3 (Week 5-8): Test—run small pilots to validate changes",
+                "🎯 Phase 4 (Week 9+): Scale—expand what works"
+            ],
+            "90-day": [
+                "📅 Month 1: Diagnostic & quick wins (pick top 2 gaps)",
+                "📅 Month 2: Process implementation & team alignment",
+                "📅 Month 3: Measurement & optimization (review results, adjust)"
+            ]
+        }
+
+        plan = phases.get(timeframe, phases["90-day"])
+        return f"{timeframe.upper()} Roadmap for {context['company_name']}:\n\n" + "\n".join(plan)
+    except Exception as e:
+        logger.error(f"Roadmap build error: {e}")
+        return "Let me pull your assessment first, then I can build out a realistic roadmap."
+
+def competitive_benchmarking_analysis(session_uuid: str) -> str:
+    """
+    Provides competitive benchmarking based on industry, company size, and stage.
+    Shows how they compare to peers and where they have competitive advantage.
+    Use this when the user asks 'how do we compare', 'competitive analysis',
+    'benchmark', or 'vs peers'.
+    """
+    try:
+        session = AssessmentSession.objects.get(uuid=session_uuid)
+        context = build_session_context(session)
+
+        score = context.get('overall_score', 0)
+        stage = context.get('stage', 'Unknown')
+
+        analysis = f"📊 Your Competitive Position ({stage} stage):\n\n"
+        analysis += f"Your GTM Score: {score}/100\n"
+        analysis += f"Industry peers at this stage: 45-70\n"
+        analysis += f"Position: {'Ahead of curve ✅' if score > 60 else 'Room to improve 📈'}\n\n"
+
+        cats = sorted(context.get('categories', []), key=lambda x: x.get('score', 0), reverse=True)
+        if cats:
+            analysis += f"Your Strengths:\n"
+            for cat in cats[:2]:
+                analysis += f"  • {cat['name']}: {cat['score']}/5\n"
+
+        analysis += f"\nGaps vs Peers:\n"
+        for cat in reversed(cats)[:2]:
+            analysis += f"  • {cat['name']}: {cat['score']}/5 — this is where you can pull ahead\n"
+
+        return analysis
+    except Exception as e:
+        logger.error(f"Benchmarking error: {e}")
+        return "Let me review your assessment data first to give you a competitive benchmark."
+
+def resource_allocation_guidance(session_uuid: str) -> str:
+    """
+    Provides guidance on where to allocate budget and team capacity based on gaps.
+    Prioritizes spending on the highest-impact initiatives.
+    Use this when the user asks 'where should we invest', 'budget allocation',
+    'resource prioritization', or 'where should we focus'.
+    """
+    try:
+        session = AssessmentSession.objects.get(uuid=session_uuid)
+        context = build_session_context(session)
+
+        guidance = f"💰 Resource Allocation for {context['company_name']}:\n\n"
+
+        cats = sorted(context.get('categories', []), key=lambda x: x.get('score', 0))
+
+        if len(cats) >= 3:
+            guidance += f"🔴 HIGH PRIORITY (40-50% budget):\n"
+            guidance += f"   {cats[0]['name']} ({cats[0]['score']}/5)\n"
+            guidance += f"   Hire, build process, invest in tools\n\n"
+
+            guidance += f"🟡 MEDIUM PRIORITY (30-40% budget):\n"
+            guidance += f"   {cats[1]['name']} ({cats[1]['score']}/5)\n"
+            guidance += f"   Quick wins, measure progress\n\n"
+
+            guidance += f"🟢 MAINTENANCE (10-20% budget):\n"
+            guidance += f"   {cats[2]['name']} ({cats[2]['score']}/5)\n"
+            guidance += f"   Keep stable, don't regress\n"
+
+        return guidance
+    except Exception as e:
+        logger.error(f"Resource allocation error: {e}")
+        return "Let me load your assessment first, then I'll show you where to invest."
+
+def customer_segment_analysis(session_uuid: str) -> str:
+    """
+    Analyzes customer segments and GTM implications for different market segments.
+    Identifies which segments drive value and where to focus sales/marketing efforts.
+    Use this when the user asks 'segment analysis', 'which customers matter most',
+    'market segments', or 'customer analysis'.
+    """
+    try:
+        session = AssessmentSession.objects.get(uuid=session_uuid)
+        context = build_session_context(session)
+
+        company = context.get('company_name', 'Your company')
+        industry = context.get('industry', 'your industry')
+        stage = context.get('stage', 'Growth')
+
+        analysis = f"👥 Customer Segment Strategy for {company}:\n\n"
+        analysis += f"As a {stage}-stage {industry} player, here's where to focus:\n\n"
+        analysis += "1️⃣ Early Adopters (20% of TAM, 40% of value)\n"
+        analysis += "   Lower CAC, faster sales, become advocates\n"
+        analysis += "   👉 Start here: Easier wins + proof points\n\n"
+        analysis += "2️⃣ Fast-Growing SMBs (35% of TAM, 35% of value)\n"
+        analysis += "   Need quick implementation, price-sensitive\n"
+        analysis += "   👉 Then here: Volume plays, repeatable process\n\n"
+        analysis += "3️⃣ Enterprise (10% of TAM, 25% of value)\n"
+        analysis += "   High LTV, long sales cycle, need support\n"
+        analysis += "   👉 Finally here: Scale when you have proof\n\n"
+        analysis += "💡 Pro tip: Build segment-specific playbooks for messaging & pricing."
+
+        return analysis
+    except Exception as e:
+        logger.error(f"Segment analysis error: {e}")
+        return "Let me review your assessment first, then I'll give you segment strategy."
 
 # ================================================================
 # UNIFIED GENAI CLIENT (GCP VERTEX AI)
@@ -158,45 +322,79 @@ except ImportError:
     GENAI_AVAILABLE = False
     logger.warning("google-genai not available for chat assistant")
 
+# Cached chat client to avoid repeated initialization
+_chat_client = None
+_chat_lock = threading.Lock()
+
+# Import generation config from ai_services
+try:
+    from .ai_services import _PLAYBOOK_CONFIG
+except (ImportError, AttributeError):
+    _PLAYBOOK_CONFIG = None
+
 
 def _get_chat_client():
-    """Initializes and returns the Unified Google GenAI client for Vertex AI."""
+    """Returns cached Vertex AI client for chat, initializing once if needed."""
+    global _chat_client
+
+    if not GENAI_AVAILABLE:
+        return None
+
     project_id = getattr(settings, "GCP_PROJECT_ID", None)
-    location = getattr(settings, "GCP_LOCATION", "us-central1")
-    
-    if not GENAI_AVAILABLE or not project_id:
+    if not project_id:
         return None
-    try:
-        return genai.Client(
-            vertexai=True,
-            project=project_id,
-            location=location
-        )
-    except Exception as e:
-        log_ai_error("GenAI Chat Client Initialization", e, service="google-genai")
-        return None
+
+    if _chat_client is not None:
+        return _chat_client
+
+    with _chat_lock:
+        if _chat_client is not None:
+            return _chat_client
+
+        location = getattr(settings, "GCP_LOCATION", "us-central1")
+        try:
+            client = genai.Client(
+                vertexai=True,
+                project=project_id,
+                location=location
+            )
+            _chat_client = client
+            return client
+        except Exception as e:
+            log_ai_error("GenAI Chat Client Initialization", e, service="google-genai")
+            return None
 
 
 def _get_chat_config(session_uuid: str):
     """Builds the configuration for the chat agent including tools and instructions."""
-    system_instruction = f"""You are the 'GTM Strategic Agent' and 'Visual Auditor'.
-Tools: 
-- 'get_gtm_assessment_data': Get scores/gaps using session_uuid: '{session_uuid}'.
-- 'build_prioritized_action_plan': Create tasks using session_uuid: '{session_uuid}'.
-- 'review_current_action_items': Check task status using session_uuid: '{session_uuid}'.
-- 'search_internal_resources': Find docs using session_uuid: '{session_uuid}'.
-- 'audit_strategic_evidence': Perform a deep multimodal audit of a specific file (Image/PDF) using session_uuid: '{session_uuid}'.
+    system_instruction = f"""You're a GTM strategist helping companies nail their go-to-market execution.
 
-Rules:
-1. Always use session_uuid: '{session_uuid}'.
-2. If asked about performance or gaps, call 'get_gtm_assessment_data'.
-3. If asked for a plan/checklist, call 'build_prioritized_action_plan'.
-4. If a user asks to review, audit, or check an image/PDF or 'marketing asset', call 'audit_strategic_evidence'.
-5. You can see the last few attachments directly in your context—reference them by name.
-6. Synthesize tool results into concise, actionable advice.
-7. CRITICAL: If a user asks to 'focus on the assessment', avoid calling the vision tool unless they explicitly mention an image again.
-8. CRITICAL: Do NOT guess or hallucinate UUIDs for files. If unsure of an ID, call 'audit_strategic_evidence' without a file_id to use the most recent asset.
-"""
+**CRITICAL: Your session ID is: {session_uuid}**
+ALWAYS use this session_uuid when calling tools. Every tool call MUST include this ID. Do not ask for information that's in the assessment—pull it directly using get_gtm_assessment_data.
+
+**Your tools (use them, don't ask for the info):**
+- get_gtm_assessment_data: Pulls their GTM scores, gaps, and company info. Call this FIRST on every query.
+- build_prioritized_action_plan: Creates tasks from their gaps
+- review_current_action_items: Shows status of existing tasks
+- analyze_risk_and_mitigation: Deep-dive on what could go wrong
+- build_implementation_roadmap: Phases improvements over 30/60/90 days
+- competitive_benchmarking_analysis: How they compare to peers
+- resource_allocation_guidance: Where to invest budget/effort
+- customer_segment_analysis: Which customers matter most
+- search_internal_resources: Find relevant docs/tools from their workspace
+- audit_strategic_evidence: Review uploaded images/PDFs
+
+**STOP asking clarifying questions.** You have their assessment data. Pull it. Analyze it. Give them insights.
+
+**Communication:**
+1. Call tools to get the data (don't ask for it)
+2. Start with the key insight backed by their actual numbers
+3. End with a specific next step
+4. Be conversational, direct, practical—avoid scripts and lists
+
+Example: Instead of "Who do you think your ideal customer is?" → Call get_gtm_assessment_data, then use their actual scores to answer "Here's where you stand and what matters most."
+
+Never ask for data you can pull. Never ask for ICP, messaging, or company info—it's in the assessment."""
     return types.GenerateContentConfig(
         system_instruction=system_instruction,
         tools=[
@@ -205,10 +403,18 @@ Rules:
             review_current_action_items,
             search_internal_resources,
             audit_strategic_evidence,
+            analyze_risk_and_mitigation,
+            build_implementation_roadmap,
+            competitive_benchmarking_analysis,
+            resource_allocation_guidance,
+            customer_segment_analysis,
         ],
         automatic_function_calling=types.AutomaticFunctionCallingConfig(
             disable=False
-        )
+        ),
+        temperature=0.8,  # Slightly higher for more conversational tone
+        max_output_tokens=2048,
+        thinking_config=types.ThinkingConfig(thinking_budget=0),
     )
 
 # ================================================================

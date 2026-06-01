@@ -33,6 +33,7 @@ from .utils import transfer_firmographics_to_snapshot, _client_id
 from .ai_services import (
     generate_playbook_with_gemini,
     generate_diagnostic_insight,
+    generate_diagnostic_insights_batch,
     _normalize_ai_playbook_markdown,
     rewrite_context_note_with_ai,
 )
@@ -508,32 +509,36 @@ def results(request, session_id):
     
     responses_by_question_id = {r.question.id: r for r in responses_qs}
 
+    # Collect responses needing batch AI insight generation
+    responses_needing_insight = []
     for q_data in weakest_questions:
-        # Use prefetched response if available
         response = responses_by_question_id.get(q_data["question"].id)
-        
         if response:
-            if not response.ai_insight:
-                # 🤖 TRIGGER ASYNC GENERATION
-                try:
-                    from threading import Thread
-                    # Capture response ID to avoid closure issues
-                    rid = response.id
-                    def gen_diagnostic_async(resp_id):
-                        try:
-                            from .models import Response
-                            from .ai_services import generate_diagnostic_insight
-                            r = Response.objects.get(id=resp_id)
-                            generate_diagnostic_insight(r)
-                        except Exception as e:
-                            log_error("Async Diagnostic Gen", e)
-                    
-                    Thread(target=gen_diagnostic_async, args=(rid,), daemon=True).start()
-                    q_data["ai_insight_loading"] = True
-                except Exception as e:
-                    log_error("Diagnostic Thread creation", e)
+            if not (response.ai_insight or "").strip() and response.ai_insight_status == "pending":
+                responses_needing_insight.append(response)
+                q_data["ai_insight_loading"] = True
             else:
                 q_data["ai_insight"] = response.ai_insight
+
+    # 🤖 TRIGGER BATCH ASYNC GENERATION (one thread for all insights, not one per response)
+    if responses_needing_insight:
+        try:
+            from threading import Thread
+            resp_ids_for_batch = [r.id for r in responses_needing_insight]
+
+            def gen_batch_async(r_ids):
+                try:
+                    from .models import Response as ResponseModel
+                    fresh_responses = list(
+                        ResponseModel.objects.filter(id__in=r_ids).select_related("question", "session__snapshot")
+                    )
+                    generate_diagnostic_insights_batch(fresh_responses)
+                except Exception as e:
+                    log_error("Batch Diagnostic Async", e)
+
+            Thread(target=gen_batch_async, args=(resp_ids_for_batch,), daemon=True).start()
+        except Exception as e:
+            log_error("Batch Diagnostic Thread creation", e)
 
     
     # -----------------------------
@@ -566,14 +571,21 @@ def playbook_status(request, session_id):
         from django.http import HttpResponseForbidden
         return HttpResponseForbidden("Access denied to this session.")
     snap = getattr(session, "snapshot", None) or ResultSnapshot.objects.filter(session=session).first()
-    
+
     if snap and (snap.ai_playbook or "").strip():
         # Playbook is ready! Return the actual button to view it.
         return render(request, "gtm/partials/playbook_ready_button.html", {"session": session})
 
-    if snap:
+    snap_status = getattr(snap, "ai_playbook_status", "pending") if snap else "pending"
+
+    if snap_status == "failed":
+        # Generation failed — stop polling
+        return render(request, "gtm/partials/playbook_failed_button.html", {"session": session})
+
+    if snap and snap_status == "pending":
+        # Only kick if not already generating
         _kickoff_playbook_generation(snap, session_id=session.uuid)
-    
+
     # Still generating. Return the loading state.
     return render(request, "gtm/partials/playbook_loading_button.html", {"session": session})
 
@@ -589,26 +601,42 @@ def playbook_content_status(request, session_id):
 
     playbook_ready = bool(snap and (snap.ai_playbook or "").strip())
     ai_playbook_html = ""
+    ai_financial_html = ""
+    ai_competitor_html = ""
 
     if playbook_ready:
         src = _normalize_ai_playbook_markdown(snap.ai_playbook)
         ai_playbook_html = md.markdown(src, extensions=["extra", "sane_lists", "toc"])
+
+        # Render financial summary if available
+        if snap.ai_financial_summary:
+            fin_src = _normalize_ai_playbook_markdown(snap.ai_financial_summary)
+            ai_financial_html = md.markdown(fin_src, extensions=["extra", "sane_lists"])
+
+        # Render competitor analysis if available
+        if snap.ai_competitor_analysis:
+            comp_src = _normalize_ai_playbook_markdown(snap.ai_competitor_analysis)
+            ai_competitor_html = md.markdown(comp_src, extensions=["extra", "sane_lists"])
+
         return render(request, "gtm/partials/playbook_content_status.html", {
             "session": session,
             "playbook_ready": True,
             "playbook_loading": False,
             "ai_playbook_html": mark_safe(ai_playbook_html),
+            "ai_financial_html": mark_safe(ai_financial_html),
+            "ai_competitor_html": mark_safe(ai_competitor_html),
         })
 
-    # Ensure generation remains non-blocking while polling.
-    if snap:
-        _kickoff_playbook_generation(snap, session_id=session.uuid)
+    snap_status = getattr(snap, "ai_playbook_status", "pending") if snap else "pending"
 
     return render(request, "gtm/partials/playbook_content_status.html", {
         "session": session,
         "playbook_ready": False,
-        "playbook_loading": bool(snap),
+        "playbook_loading": snap_status == "generating",
         "ai_playbook_html": "",
+        "ai_financial_html": "",
+        "ai_competitor_html": "",
+        "snap_status": snap_status,
     })
 
 # Playbook
@@ -646,6 +674,8 @@ def playbook(request, session_id):
     playbook_ready = False
     playbook_loading = bool(needs_generation)
     ai_playbook_html = ""
+    ai_financial_html = ""
+    ai_competitor_html = ""
     try:
         if snap and getattr(snap, "ai_playbook", ""):
             src = _normalize_ai_playbook_markdown(snap.ai_playbook)
@@ -653,10 +683,23 @@ def playbook(request, session_id):
                 src,
                 extensions=["extra", "sane_lists", "toc"]  # 'extra' already includes tables
             )
+
+            # Render financial summary if available
+            if snap.ai_financial_summary:
+                fin_src = _normalize_ai_playbook_markdown(snap.ai_financial_summary)
+                ai_financial_html = md.markdown(fin_src, extensions=["extra", "sane_lists"])
+
+            # Render competitor analysis if available
+            if snap.ai_competitor_analysis:
+                comp_src = _normalize_ai_playbook_markdown(snap.ai_competitor_analysis)
+                ai_competitor_html = md.markdown(comp_src, extensions=["extra", "sane_lists"])
+
             playbook_ready = True
     except Exception as e:
         log_error("AI Playbook rendering", e, {"session_id": str(session.uuid)})
         ai_playbook_html = ""
+        ai_financial_html = ""
+        ai_competitor_html = ""
         playbook_ready = False
         playbook_loading = False
 
@@ -673,6 +716,8 @@ def playbook(request, session_id):
         "cat_sorted": cat_sorted,
         "band_actions_html": band_actions_html,
         "ai_playbook_html": mark_safe(ai_playbook_html),
+        "ai_financial_html": mark_safe(ai_financial_html),
+        "ai_competitor_html": mark_safe(ai_competitor_html),
         "playbook_ready": playbook_ready,
         "playbook_loading": playbook_loading,
         "is_htmx": _is_htmx(request),
@@ -686,28 +731,33 @@ def insight_status(request, session_id, response_id):
     if not is_authorized:
         from django.http import HttpResponseForbidden
         return HttpResponseForbidden("Access denied to this session.")
-    
+
     response = get_object_or_404(Response.objects.select_related("question"), pk=response_id, session=session)
 
+    # Refresh both fields from DB to check current status
+    response.refresh_from_db(fields=["ai_insight", "ai_insight_status"])
+
     if not (response.ai_insight or "").strip():
-        try:
-            from threading import Thread
+        status = getattr(response, 'ai_insight_status', 'pending')
 
-            def gen_diagnostic_async(resp_id):
-                try:
-                    from .models import Response
-                    from .ai_services import generate_diagnostic_insight
-                    r = Response.objects.get(id=resp_id)
-                    generate_diagnostic_insight(r)
-                except Exception as e:
-                    log_error("Async Diagnostic Gen (poll)", e)
+        if status == "pending":
+            # Only spawn a thread if generation hasn't started yet
+            try:
+                from threading import Thread
 
-            Thread(target=gen_diagnostic_async, args=(response.id,), daemon=True).start()
-        except Exception as e:
-            log_error("Diagnostic poll thread creation", e)
+                def gen_diagnostic_async(resp_id):
+                    try:
+                        from .models import Response
+                        from .ai_services import generate_diagnostic_insight
+                        r = Response.objects.select_related("question", "session__snapshot").get(id=resp_id)
+                        generate_diagnostic_insight(r)
+                    except Exception as e:
+                        log_error("Async Diagnostic Gen (poll)", e)
 
-    # Refresh model state after potential async kickoff fallback writes.
-    response.refresh_from_db(fields=["ai_insight"])
+                Thread(target=gen_diagnostic_async, args=(response.id,), daemon=True).start()
+            except Exception as e:
+                log_error("Diagnostic poll thread creation", e)
+        # If status is "generating" or "failed", don't spawn another thread
 
     return render(request, "gtm/partials/insight_status.html", {
         "session": session,
@@ -915,84 +965,8 @@ def action_delete(request, action, action_id):
 # AI CHAT ASSISTANT
 # ================================================================
 from django.views.decorators.http import require_http_methods
-from .ai_chat import process_chat_message, get_suggested_prompts
 from .models import ChatMessage
 
-def chat_view(request, session_id):
-    """Render the chat interface page"""
-    # Access control: ensure user owns or is in session's workspace
-    session, is_authorized = safe_get_session_or_403(request, session_id)
-    if not is_authorized:
-        from django.http import HttpResponseForbidden
-        return HttpResponseForbidden("Access denied to this session.")
-    
-    # Get chat history
-    chat_history = ChatMessage.objects.filter(session=session).order_by('created_at')[:50]
-    
-    # Get suggested prompts
-    suggested = get_suggested_prompts(session)
-    
-    return render(request, "gtm/chat.html", {
-        "session": session,
-        "chat_history": chat_history,
-        "suggested_prompts": suggested,
-        "is_htmx": _is_htmx(request),
-    })
-
-@require_http_methods(["POST"])
-def chat_api(request, session_id):
-    """API endpoint for chat messages"""
-    import json
-    
-    try:
-        # Access control: ensure user owns or is in session's workspace
-        session, is_authorized = safe_get_session_or_403(request, session_id)
-        if not is_authorized:
-            return JsonResponse({
-                "success": False,
-                "error": "Access denied to this session."
-            }, status=403)
-
-        # Parse JSON body
-        data = json.loads(request.body)
-        message = data.get("message", "").strip()
-
-        if not message:
-            return JsonResponse({
-                "success": False,
-                "error": "Message cannot be empty"
-            }, status=400)
-
-        # Process the message
-        result = process_chat_message(
-            session_id=str(session_id),
-            message=message,
-            user=request.user if request.user.is_authenticated else None
-        )
-
-        # Save to database
-        if result.get("success"):
-            ChatMessage.objects.create(
-                session=session,
-                user=request.user if request.user.is_authenticated else None,
-                message=message,
-                response=result.get("response", ""),
-                intent=result.get("intent", "")
-            )
-
-        return JsonResponse(result)
-
-    except json.JSONDecodeError:
-        return JsonResponse({
-            "success": False,
-            "error": "Invalid JSON"
-        }, status=400)
-    except Exception as e:
-        log_error("Chat API Error", e, {"session_id": str(session_id)})
-        return JsonResponse({
-            "success": False,
-            "error": "An error occurred processing your message"
-        }, status=500)
 
 # ================================================================
 # USER PROFILE & AUTHENTICATION

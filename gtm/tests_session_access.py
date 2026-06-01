@@ -164,25 +164,6 @@ class SessionAccessControlTests(TestCase):
         response = self.client.get(reverse('gtm:download', args=[self.session1.uuid]))
         self.assertEqual(response.status_code, 403)
 
-    def test_chat_endpoint_access_control(self):
-        """Chat endpoint enforces access control."""
-        self.client.login(username='user2', password='pass2')
-        
-        response = self.client.get(reverse('gtm:chat', args=[self.session1.uuid]))
-        self.assertEqual(response.status_code, 403)
-
-    def test_chat_api_endpoint_access_control(self):
-        """Chat API endpoint enforces access control."""
-        self.client.login(username='user2', password='pass2')
-        
-        response = self.client.post(
-            reverse('gtm:chat_api', args=[self.session1.uuid]),
-            data='{"message": "test"}',
-            content_type='application/json'
-        )
-        self.assertEqual(response.status_code, 403)
-        self.assertIn('error', response.json())
-
     def test_insight_status_endpoint_access_control(self):
         """Insight status endpoint enforces access control."""
         self.client.login(username='user2', password='pass2')

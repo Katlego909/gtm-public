@@ -1,6 +1,7 @@
-<div class="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3" 
-     hx-get="{% url 'gtm:playbook_status' session.uuid %}" 
-     hx-trigger="every 5s" 
+<div class="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3"
+     id="playbook-btn-loading"
+     hx-get="{% url 'gtm:playbook_status' session.uuid %}"
+     hx-trigger="every 5s"
      hx-swap="outerHTML">
     <div class="inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-indigo-500 text-white font-bold shadow-lg cursor-wait text-sm sm:text-base whitespace-nowrap">
         <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -14,3 +15,21 @@
         <span>Download PDF</span>
     </a>
 </div>
+<script>
+  (function() {
+    var MAX_POLLS = 24; // 24 × 5s = 120s max
+    var el = document.getElementById("playbook-btn-loading");
+    var count = 0;
+    if (el) {
+      el.addEventListener("htmx:afterRequest", function() {
+        count++;
+        if (count >= MAX_POLLS) {
+          el.removeAttribute("hx-trigger");
+          htmx.process(el);
+          var span = el.querySelector("span");
+          if (span) span.textContent = "Playbook generation timed out. Reload to retry.";
+        }
+      });
+    }
+  })();
+</script>

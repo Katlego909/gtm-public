@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+import dj_database_url
+
 load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -42,8 +44,6 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "django.contrib.humanize",
 
-    
-    
     # Apps
     "gtm",  
     "dashboard",
@@ -119,10 +119,10 @@ WSGI_APPLICATION = "gtm_validator.wsgi.application"
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
+    "default": dj_database_url.config(
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        conn_max_age=600,
+    )
 }
 
 
@@ -172,34 +172,45 @@ MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-# --- Gmail SMTP (use an App Password) ---
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = "smtp.gmail.com"
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "youraddress@gmail.com")
-EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "your_app_password")
-# Ensure DEFAULT_FROM_EMAIL is always valid
-DEFAULT_FROM_EMAIL = f"Funti3r GTM <{EMAIL_HOST_USER if EMAIL_HOST_USER else 'youraddress@gmail.com'}>"
-SERVER_EMAIL = EMAIL_HOST_USER
-EMAIL_SUBJECT_PREFIX = "[Funti3r GTM]"
+# Email Configuration
+# Development: uses console backend (prints to console)
+# Production: set EMAIL_BACKEND env var to smtp config with valid credentials
+if DEBUG or os.getenv("EMAIL_CONSOLE", "").lower() == "true":
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+else:
+    EMAIL_BACKEND = os.getenv(
+        "EMAIL_BACKEND",
+        "django.core.mail.backends.smtp.EmailBackend"
+    )
+    EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+    EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+    EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"
+    EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+    EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 
+DEFAULT_FROM_EMAIL = os.getenv(
+    "DEFAULT_FROM_EMAIL",
+    f"Funti3r GTM <{os.getenv('EMAIL_HOST_USER', 'noreply@funti3r.xyz')}>"
+)
+SERVER_EMAIL = os.getenv("SERVER_EMAIL", os.getenv("EMAIL_HOST_USER", "noreply@funti3r.xyz"))
+EMAIL_SUBJECT_PREFIX = "[Funti3r GTM] "
 
 # Internal routing for reports (you receive a copy even if client email is missing)
-GTM_REPORT_INTERNAL_TO = ["gtm-reports@funti3r.xyz"]  # change
+GTM_REPORT_INTERNAL_TO = ["gtm-reports@funti3r.xyz"]
 
 # Optional: redirect *all* outbound mail in staging/sandbox
 # set EMAIL_REDIRECT_TO="you@domain.com" in env to capture everything
 EMAIL_REDIRECT_TO = os.getenv("EMAIL_REDIRECT_TO", "").strip()
-
-# Optional dev switch
-if os.getenv("EMAIL_CONSOLE", "").lower() == "true":
-    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
     
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "")
 GCP_LOCATION = os.getenv("GCP_LOCATION", "us-central1")
 GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
+
+# Ensure GOOGLE_APPLICATION_CREDENTIALS is set as an environment variable for Google client libs
+if GOOGLE_APPLICATION_CREDENTIALS and not os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
+    creds_path = BASE_DIR / GOOGLE_APPLICATION_CREDENTIALS if not GOOGLE_APPLICATION_CREDENTIALS.startswith("/") else GOOGLE_APPLICATION_CREDENTIALS
+    if creds_path.exists():
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(creds_path)
 
 AUTHENTICATION_BACKENDS = [
 

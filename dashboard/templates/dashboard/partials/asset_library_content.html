@@ -130,14 +130,14 @@
 {# ── Audit Detail Drawer (lightweight modal) ── #}
 <div id="audit-detail-modal" class="hidden fixed inset-0 z-[9999] flex items-end md:items-center justify-center p-4">
   <div class="absolute inset-0 bg-gray-900 bg-opacity-60" onclick="closeAuditDetail()"></div>
-  <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl z-10 max-h-[80vh] flex flex-col">
+  <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-4xl z-10 max-h-[85vh] flex flex-col">
     <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
       <h3 class="text-lg font-bold text-gray-900">AI Audit Report</h3>
       <button onclick="closeAuditDetail()" class="text-gray-400 hover:text-gray-600">
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
       </button>
     </div>
-    <div id="audit-detail-body" class="overflow-y-auto p-6 prose prose-sm max-w-none text-gray-700 leading-relaxed"></div>
+    <div id="audit-detail-body" class="overflow-y-auto px-8 py-6 prose prose-base max-w-none text-gray-700 space-y-4 prose-h2:text-lg prose-h2:font-bold prose-h2:mb-3 prose-p:mb-3 prose-li:mb-2 prose-strong:font-semibold prose-strong:text-gray-900"></div>
   </div>
 </div>
 

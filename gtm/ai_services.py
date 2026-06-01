@@ -26,6 +26,10 @@ AI_REQUEST_COUNTER_CACHE_KEY = "gtm:ai:gemini:req_count:60s"
 AI_LOCK_TTL_SECONDS = 120
 AI_REQUEST_WINDOW_SECONDS = 60
 
+# Module-level client cache to avoid repeated initialization
+_cached_client = None
+_client_lock = __import__('threading').Lock()
+
 
 def _clean_json_response(text: str) -> str:
     """
@@ -260,23 +264,61 @@ except ImportError:
     GENAI_AVAILABLE = False
     logger.warning("google-genai client not installed — AI services disabled.")
 
-def _get_client():
-    """Initializes and returns the Unified Google GenAI client for Vertex AI."""
-    project_id = getattr(settings, "GCP_PROJECT_ID", None)
-    location = getattr(settings, "GCP_LOCATION", "us-central1")
-    
-    if not GENAI_AVAILABLE or not project_id:
-        return None
+# Generation configs to disable thinking and control token usage
+_FAST_CONFIG = None      # diagnostics, rewrites: 600 tokens, no thinking
+_PLAYBOOK_CONFIG = None  # playbook: 4096 tokens, no thinking
+_ACTION_CONFIG = None    # action items: 512 tokens, no thinking
+
+if GENAI_AVAILABLE:
     try:
-        # The unified SDK uses vertexai=True to signal Enterprise backend
-        return genai.Client(
-            vertexai=True,
-            project=project_id,
-            location=location
+        _FAST_CONFIG = types.GenerateContentConfig(
+            temperature=0.4,
+            max_output_tokens=600,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+        )
+        _PLAYBOOK_CONFIG = types.GenerateContentConfig(
+            temperature=0.6,
+            max_output_tokens=8192,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+        )
+        _ACTION_CONFIG = types.GenerateContentConfig(
+            temperature=0.3,
+            max_output_tokens=512,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
         )
     except Exception as e:
-        log_ai_error("GenAI Client Initialization", e, service="google-genai")
+        logger.warning(f"Failed to create generation configs: {e}")
+
+def _get_client():
+    """Returns cached Google GenAI client, initializing once if needed."""
+    global _cached_client
+
+    if not GENAI_AVAILABLE:
         return None
+
+    project_id = getattr(settings, "GCP_PROJECT_ID", None)
+    if not project_id:
+        return None
+
+    if _cached_client is not None:
+        return _cached_client
+
+    with _client_lock:
+        if _cached_client is not None:
+            return _cached_client
+
+        location = getattr(settings, "GCP_LOCATION", "us-central1")
+        try:
+            client = genai.Client(
+                vertexai=True,
+                project=project_id,
+                location=location
+            )
+            _cached_client = client
+            return client
+        except Exception as e:
+            log_ai_error("GenAI Client Initialization", e, service="google-genai")
+            return None
 
 
 # ================================================================
@@ -287,6 +329,10 @@ def _build_prompt(snapshot: ResultSnapshot) -> str:
     data = {
         "company_name": snapshot.company_name or "Unnamed Company",
         "industry": snapshot.industry or "Unknown Industry",
+        "company_size": snapshot.company_size or "Not specified",
+        "revenue_range": snapshot.revenue_range or "Not specified",
+        "country": snapshot.country or "Not specified",
+        "crm": snapshot.crm or "Not specified",
         "overall": snapshot.overall,
         "stage": snapshot.band.stage if snapshot.band else "Unspecified",
         "headline": snapshot.band.headline if snapshot.band else "",
@@ -307,20 +353,45 @@ def _build_prompt(snapshot: ResultSnapshot) -> str:
     context_notes_text = "\n".join(context_notes)
 
     prompt = f"""
-You are a Go-To-Market strategy consultant.
+You are a Go-To-Market strategy consultant with deep expertise in financial modeling and competitive positioning.
 
 Create a **personalized 30-day GTM improvement playbook** for the company below.
 
 Respond ONLY with a valid, raw JSON object (do not include markdown codeblocks around the JSON, just the JSON string).
 Ensure the JSON has the following exact keys:
-1. "markdown_playbook": A comprehensive markdown string containing: A diagnostic summary, Top priority areas, a 4-week action plan, and success metrics.
-2. "risk_status": A single string value of either "High", "Medium", or "Low" representing the company's maturity risk.
-3. "learning_topics": An array of up to 3 short strings representing specific GTM concepts the company needs to learn/improve based on their weaknesses.
+1. "markdown_playbook": A comprehensive markdown string containing:
+   - A diagnostic summary
+   - Top priority areas
+   - A 4-week action plan with financial estimates and competitive context woven into each recommendation
+   - Success metrics
+
+   For EACH recommendation, weave in:
+   - A brief financial estimate (cost range, expected ROI timeframe, or investment level) calibrated to their revenue range and company size
+   - A competitive context line (how companies in their industry/region typically perform here, and whether this company is ahead or behind the curve)
+
+2. "financial_summary": A standalone markdown section (150-250 words) titled "Financial Estimates & ROI Projections"
+   - Include the most relevant financial metrics for this company's stage and industry (could be CAC benchmarks, implementation costs, payback periods, revenue impact — whatever is most actionable)
+   - Always show the reasoning ("Based on your {{revenue_range}} revenue range and {{company_size}} company size...")
+   - Include a disclaimer that these are directional estimates and should be validated with their finance team
+
+3. "competitor_analysis": A standalone markdown section (150-250 words) titled "Competitive Gap Analysis"
+   - Based on their industry, country, and market segment — identify 3-4 dimensions where they are strong vs market norms
+   - Identify 2-3 critical gaps to prioritize
+   - Do NOT name specific competitor companies; use industry patterns and benchmarks
+   - Focus on actionable gaps relative to their peers
+
+4. "risk_status": A single string value of either "High", "Medium", or "Low" representing the company's maturity risk.
+
+5. "learning_topics": An array of up to 3 short strings representing specific GTM concepts the company needs to learn/improve based on their weaknesses.
 
 Company: {data['company_name']}
 Industry: {data['industry']}
+Company Size: {data['company_size']}
+Revenue Range: {data['revenue_range']}
+Country/Region: {data['country']}
+CRM in use: {data['crm']}
 Stage: {data['stage']}
-GTM Score: {data['overall']}
+GTM Score: {data['overall']}/100
 Summary: {data['headline']}
 
 Category Averages:
@@ -344,10 +415,18 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
 
     final_playbook_text = ""
 
+    # Initialize new fields to avoid UnboundLocalError if JSON parsing fails
+    snapshot.ai_financial_summary = ""
+    snapshot.ai_competitor_analysis = ""
+
     # Avoid duplicate concurrent generation for the same snapshot.
     playbook_lock_key = f"gtm:ai:playbook:{snapshot.id}:lock"
     if not _acquire_lock(playbook_lock_key):
         return (snapshot.ai_playbook or "").strip()
+
+    # Set status to generating
+    snapshot.ai_playbook_status = "generating"
+    snapshot.save(update_fields=["ai_playbook_status"])
 
     try:
         # ---- 1️⃣ Attempt Unified Gemini generation
@@ -358,7 +437,8 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
             try:
                 response = client.models.generate_content(
                     model=model_id,
-                    contents=prompt
+                    contents=prompt,
+                    config=_PLAYBOOK_CONFIG,
                 )
                 text = response.text.strip()
                 if text:
@@ -367,7 +447,9 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
                         parsed = json.loads(text)
                         final_playbook_text = parsed.get("markdown_playbook", "")
                         snapshot.ai_risk_status = parsed.get("risk_status", "Low")
-                        
+                        snapshot.ai_financial_summary = parsed.get("financial_summary", "")
+                        snapshot.ai_competitor_analysis = parsed.get("competitor_analysis", "")
+
                         # Process resources...
                         topics = parsed.get("learning_topics", [])
                         if topics and getattr(snapshot.session, 'workspace', None):
@@ -460,9 +542,16 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
             
         # 🌟 CONSOLIDATED SAVE: Persist the final content once
         snapshot.ai_playbook = final_playbook_text
-        snapshot.save(update_fields=["ai_playbook", "ai_risk_status"])
+        snapshot.ai_playbook_status = "done"
+        snapshot.save(update_fields=["ai_playbook", "ai_financial_summary", "ai_competitor_analysis", "ai_risk_status", "ai_playbook_status"])
 
         return final_playbook_text
+    except Exception as outer_exc:
+        # Mark failed if any outer exception
+        snapshot.ai_playbook_status = "failed"
+        snapshot.save(update_fields=["ai_playbook_status"])
+        logger.error(f"Playbook generation outer exception: {outer_exc}")
+        return ""
     finally:
         _release_lock(playbook_lock_key)
 
@@ -534,6 +623,10 @@ def generate_diagnostic_insight(response: Response) -> str:
     if not _acquire_lock(lock_key):
         return (response.ai_insight or "").strip()
 
+    # Set status to generating
+    response.ai_insight_status = "generating"
+    response.save(update_fields=["ai_insight_status"])
+
     try:
         prompt = _build_diagnostic_prompt(response.session, response.question, response.score)
         text = ""
@@ -542,14 +635,16 @@ def generate_diagnostic_insight(response: Response) -> str:
             # Use unified client to generate content
             ai_response = client.models.generate_content(
                 model=model_id,
-                contents=prompt
+                contents=prompt,
+                config=_FAST_CONFIG,
             )
             text = ai_response.text.strip()
             
             if text:
                 # 🌟 Save the insight directly to the Response object
                 response.ai_insight = text
-                response.save(update_fields=["ai_insight"])
+                response.ai_insight_status = "done"
+                response.save(update_fields=["ai_insight", "ai_insight_status"])
                 
                 # Log usage if metadata is present
                 if hasattr(ai_response, 'usage_metadata'):
@@ -576,12 +671,134 @@ def generate_diagnostic_insight(response: Response) -> str:
             if response.question.diagnostic_note:
                 text = response.question.diagnostic_note
                 response.ai_insight = text
-                response.save(update_fields=["ai_insight"])
+                response.ai_insight_status = "done"
+                response.save(update_fields=["ai_insight", "ai_insight_status"])
                 logger.info(f"📝 Using static diagnostic for {response.question.id_code}")
+            else:
+                response.ai_insight_status = "failed"
+                response.save(update_fields=["ai_insight_status"])
             
         return text
     finally:
         _release_lock(lock_key)
+
+
+def generate_diagnostic_insights_batch(responses: list) -> dict:
+    """
+    Generates diagnostic AI insights for multiple Response objects in a single API call.
+    Returns a dict keyed by response.id → insight text.
+    Sets ai_insight_status on each Response and saves to DB.
+    """
+    if not responses:
+        return {}
+
+    client = _get_client()
+    if not client or _quota_cooldown_active() or not _request_budget_available():
+        logger.warning("GenAI client unavailable for batch diagnostic insight.")
+        return {}
+
+    # Build per-response JSON blocks for the prompt
+    response_blocks = []
+    for resp in responses:
+        q = resp.question
+        session = resp.session
+        company_name = getattr(session, 'company_name', None) or "a B2B company"
+        industry = getattr(session, 'industry', None) or "a general industry"
+        try:
+            stage = session.snapshot.band_stage or "Unspecified"
+        except Exception:
+            stage = "Unspecified"
+
+        ai_metadata = q.ai_metadata if isinstance(q.ai_metadata, dict) else {}
+        risk_if_low = ai_metadata.get("risk_if_low") or "N/A"
+        quick_win = ai_metadata.get("quick_win_if_low") or "N/A"
+
+        score_label = {1: "Critical Failure", 2: "Serious Gap", 3: "Improvement Needed",
+                       4: "Strong Foundation", 5: "Exceptional Performance"}.get(resp.score, "Scored")
+
+        response_blocks.append(
+            f'  "{resp.id}": {{\n'
+            f'    "question": "{q.text[:100]}",\n'
+            f'    "score": {resp.score}/5 ({score_label}),\n'
+            f'    "company": "{company_name}", "industry": "{industry}", "stage": "{stage}",\n'
+            f'    "risk_if_low": "{risk_if_low}", "quick_win": "{quick_win}"\n'
+            f'  }}'
+        )
+
+    blocks_text = ",\n".join(response_blocks)
+
+    prompt = f"""You are a Go-To-Market consultant. For each assessment response below, write ONE concise diagnostic paragraph (2-3 sentences max) explaining why the score matters and what specific action to take next.
+
+Assessment responses:
+{{
+{blocks_text}
+}}
+
+Respond ONLY with a valid JSON object mapping each response ID (as a string key) to its insight paragraph.
+Example format:
+{{
+  "42": "Your ICP definition is unclear, which means you're wasting sales cycles on poor-fit leads. Start by documenting 3-5 firmographic filters.",
+  "57": "Your attribution model is strong, giving you clear ROI visibility. Extend it to include longer sales cycles."
+}}
+Do not include markdown code blocks or extra text. Return only the raw JSON object.""".strip()
+
+    model_id = "gemini-2.5-flash"
+    resp_ids = [r.id for r in responses]
+
+    # Mark all as generating
+    from .models import Response as ResponseModel
+    ResponseModel.objects.filter(id__in=resp_ids).update(ai_insight_status="generating")
+
+    try:
+        ai_response = client.models.generate_content(
+            model=model_id,
+            contents=prompt,
+            config=_FAST_CONFIG,
+        )
+        raw = (ai_response.text or "").strip()
+        cleaned = _clean_json_response(raw)
+        parsed = json.loads(cleaned)
+
+        results = {}
+        for resp in responses:
+            insight = parsed.get(str(resp.id), "").strip()
+            if insight:
+                resp.ai_insight = insight
+                resp.ai_insight_status = "done"
+                resp.save(update_fields=["ai_insight", "ai_insight_status"])
+                results[resp.id] = insight
+            else:
+                # Fallback to static note
+                fallback = resp.question.diagnostic_note or ""
+                if fallback:
+                    resp.ai_insight = fallback
+                    resp.ai_insight_status = "done"
+                    resp.save(update_fields=["ai_insight", "ai_insight_status"])
+                    results[resp.id] = fallback
+                else:
+                    resp.ai_insight_status = "failed"
+                    resp.save(update_fields=["ai_insight_status"])
+
+        if hasattr(ai_response, 'usage_metadata') and MONITORING_AVAILABLE:
+            AIUsageTracker.log_usage(ai_response.usage_metadata.total_token_count, 'diagnostic_batch')
+
+        logger.info(f"Batch diagnostic insights generated for {len(results)}/{len(responses)} responses.")
+        return results
+
+    except Exception as e:
+        if _is_quota_error(e):
+            _set_quota_cooldown(_extract_retry_delay_seconds(e))
+        log_ai_error(
+            "Batch diagnostic generation",
+            e,
+            service="google-genai",
+            model=model_id,
+            prompt=prompt[:500],
+            extra={"response_ids": resp_ids},
+        )
+        # Mark all as failed
+        ResponseModel.objects.filter(id__in=resp_ids).update(ai_insight_status="failed")
+        return {}
 
 
 def generate_concise_action_items(playbook_text: str) -> list:
@@ -607,7 +824,8 @@ def generate_concise_action_items(playbook_text: str) -> list:
     try:
         response = client.models.generate_content(
             model=model_id,
-            contents=prompt
+            contents=prompt,
+            config=_ACTION_CONFIG,
         )
         text = response.text.strip()
         # Split by newlines and filter empty lines
@@ -698,7 +916,8 @@ User note:
     try:
         response = client.models.generate_content(
             model=model_id,
-            contents=prompt
+            contents=prompt,
+            config=_FAST_CONFIG,
         )
         text = (getattr(response, "text", "") or "").strip()
         if not text:
@@ -716,3 +935,13 @@ User note:
             prompt=prompt,
         )
         return _fallback_rewrite_context_note(source, mode)
+
+def cleanup_client():
+    """Close the cached GenAI client to release resources."""
+    global _cached_client
+    if _cached_client is not None:
+        try:
+            _cached_client.api_client.close()
+        except Exception:
+            pass
+        _cached_client = None
