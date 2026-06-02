@@ -76,8 +76,9 @@ INTERNAL_IPS = [
 NPM_BIN_PATH = os.getenv("NPM_BIN_PATH", r"C:\Program Files\nodejs\npm.cmd")
 
 MIDDLEWARE = [
-    "gtm.middleware.EnsureClientIdMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
+    "gtm.middleware.EnsureClientIdMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -160,8 +161,9 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 # Media files (Uploads)
 MEDIA_URL = "media/"
@@ -227,6 +229,22 @@ LOGIN_REDIRECT_URL = 'gtm:landing'
 LOGOUT_REDIRECT_URL = 'gtm:landing'
 ACCOUNT_LOGOUT_REDIRECT_URL = 'gtm:landing'
 
+# Security settings for production
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    
+    # Trust the Cloud Run domain for CSRF
+    CSRF_TRUSTED_ORIGINS = [
+        "https://*.run.app",
+        "https://*.cloudrun.app",
+    ]
+    # Add any custom domains if they are set in environment
+    if os.getenv("CUSTOM_DOMAIN"):
+        CSRF_TRUSTED_ORIGINS.append(f"https://{os.getenv('CUSTOM_DOMAIN')}")
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
@@ -235,13 +253,13 @@ LOGGING = {
     },
     "handlers": {
         "file": {
-            "level": "ERROR",
+            "level": "INFO",
             "class": "logging.FileHandler",
             "filename": "gtm_errors.log",  # stored at project root
             "formatter": "verbose",
         },
         "console": {
-            "level": "ERROR",
+            "level": "INFO",
             "class": "logging.StreamHandler",
             "formatter": "verbose",
         },
@@ -249,7 +267,12 @@ LOGGING = {
     "loggers": {
         "gtm": {
             "handlers": ["file", "console"],
-            "level": "ERROR",
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.security.csrf": {
+            "handlers": ["console"],
+            "level": "INFO",
             "propagate": False,
         },
     },
