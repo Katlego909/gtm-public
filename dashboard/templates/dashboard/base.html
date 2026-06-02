@@ -472,8 +472,13 @@
     // Re-initialize charts after HTMX swaps — only when chart canvases are present
     if (window.htmx) {
         htmx.on('htmx:afterSwap', function(evt) {
-            if (typeof window.initializeDashboardCharts === 'function' && document.querySelector('canvas')) {
-                setTimeout(() => window.initializeDashboardCharts(), 100);
+            if (document.querySelector('canvas')) {
+                if (typeof window.initializeDashboardCharts === 'function') {
+                    setTimeout(() => window.initializeDashboardCharts(), 100);
+                }
+                if (typeof initAnalyticsCharts === 'function') {
+                    setTimeout(() => initAnalyticsCharts(), 100);
+                }
             }
         });
     }
