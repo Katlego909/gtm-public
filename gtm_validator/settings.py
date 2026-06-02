@@ -182,13 +182,7 @@ LOGIN_REDIRECT_URL = 'gtm:landing'
 LOGOUT_REDIRECT_URL = 'gtm:landing'
 ACCOUNT_LOGOUT_REDIRECT_URL = 'gtm:landing'
 
-# CSRF Trusted Origins - Active out-of-the-box for your active Cloud Run instance
-CSRF_TRUSTED_ORIGINS = [
-    "https://gtm-validator-601175512678.us-west1.run.app",
-]
-csrf_env = os.getenv("CSRF_TRUSTED_ORIGINS", "")
-if csrf_env:
-    CSRF_TRUSTED_ORIGINS.extend([url.strip() for url in csrf_env.split(",") if url.strip()])
+# CSRF validation handled via standard token validation for same-origin requests
 
 # HTTPS security headers applied automatically when DEBUG is off
 if not DEBUG:
