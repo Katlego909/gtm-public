@@ -11,7 +11,8 @@ def _md(text):
     return markdown.markdown(text)
 
 def get_dashboard_context(request, current_workspace, user_workspaces, agent_session_id):
-    from dashboard.views import _collect_recent_action_feed, _load_pending_gap_suggestions, calculate_gap_metric_display_properties
+    from dashboard.views import _collect_recent_action_feed, _load_pending_gap_suggestions
+    from dashboard.utils import calculate_gap_metric_display_properties
     # Filter data by workspace if selected
     if current_workspace:
         # Workspace-scoped data
