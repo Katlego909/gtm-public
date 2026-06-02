@@ -270,3 +270,27 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.title} for {self.recipient.username}"
+
+
+class UserSettings(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='settings')
+
+    # Email notifications
+    email_task_assigned = models.BooleanField(default=True)
+    email_task_completed = models.BooleanField(default=True)
+    email_workspace_invite = models.BooleanField(default=True)
+    email_ai_insights = models.BooleanField(default=False)
+
+    # In-app notifications
+    inapp_task_assigned = models.BooleanField(default=True)
+    inapp_task_completed = models.BooleanField(default=True)
+    inapp_workspace_activity = models.BooleanField(default=True)
+    inapp_ai_insights = models.BooleanField(default=True)
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name_plural = 'User Settings'
+
+    def __str__(self):
+        return f"Settings for {self.user.username}"

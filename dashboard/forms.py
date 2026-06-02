@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth.models import User
-from .models import GapAnalysisMetric, Resource
+from .models import GapAnalysisMetric, Resource, UserSettings
 
 class ResourceForm(forms.ModelForm):
     class Meta:
@@ -116,3 +116,31 @@ class UserProfileForm(forms.ModelForm):
         model = User
         fields = ['first_name', 'last_name', 'email']
 
+
+class UserSettingsForm(forms.ModelForm):
+    class Meta:
+        model = UserSettings
+        fields = [
+            'email_task_assigned', 'email_task_completed', 'email_workspace_invite', 'email_ai_insights',
+            'inapp_task_assigned', 'inapp_task_completed', 'inapp_workspace_activity', 'inapp_ai_insights'
+        ]
+        widgets = {
+            'email_task_assigned': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded'}),
+            'email_task_completed': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded'}),
+            'email_workspace_invite': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded'}),
+            'email_ai_insights': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded'}),
+            'inapp_task_assigned': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded'}),
+            'inapp_task_completed': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded'}),
+            'inapp_workspace_activity': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded'}),
+            'inapp_ai_insights': forms.CheckboxInput(attrs={'class': 'w-4 h-4 rounded'}),
+        }
+        labels = {
+            'email_task_assigned': 'Task Assigned',
+            'email_task_completed': 'Task Completed',
+            'email_workspace_invite': 'Workspace Invitation',
+            'email_ai_insights': 'AI Insights',
+            'inapp_task_assigned': 'Task Assigned',
+            'inapp_task_completed': 'Task Completed',
+            'inapp_workspace_activity': 'Workspace Activity',
+            'inapp_ai_insights': 'AI Insights',
+        }

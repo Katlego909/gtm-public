@@ -47,7 +47,8 @@ from gtm.models import (
 from gtm.models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation, WorkspaceActivityEvent
 from gtm.ai_chat import get_suggested_prompts, process_chat_message
 from gtm.decorators import workspace_permission_required, workspace_admin_required, workspace_member_required
-from dashboard.models import Channel, ChannelAnalytics, GapAnalysisMetric, GapAnalysisSuggestion, Resource, Notification
+from dashboard.models import Channel, ChannelAnalytics, GapAnalysisMetric, GapAnalysisSuggestion, Resource, Notification, UserSettings
+from dashboard.forms import GapAnalysisMetricForm, ActionItemForm, UserProfileForm, UserSettingsForm
 from dashboard.utils_notifications import send_notification
 from .forms import GapAnalysisMetricForm, ActionItemForm, UserProfileForm, ResourceForm
 from gtm.views import _compute_scores, _band_for_score
@@ -2410,3 +2411,81 @@ def invite_to_workspace(request, workspace_id):
             'resourceToast': {'message': error, 'level': 'error'}
         })
     return response
+
+
+@vary_on_headers('HX-Request')
+@login_required
+def analytics(request):
+    current_workspace, user_workspaces = _resolve_dashboard_workspace(request)
+    agent_session_id = request.GET.get('session_id') or (request.session.get('dashboard_agent_session_id') if request.session else None)
+    ctx = get_dashboard_context(request, current_workspace, user_workspaces, agent_session_id)
+
+    # Add gap analysis aggregations (reusing gap_report logic)
+    gap_metrics = ctx.get('gap_analysis', [])
+
+    # Calculate priority counts and category summary
+    priority_counts = {'High': 0, 'Medium': 0, 'Low': 0}
+    category_summary = {}
+    at_risk_metrics = []
+    source_breakdown = {'AI': 0, 'USER': 0}
+
+    for metric in gap_metrics:
+        priority_counts[metric.priority] = priority_counts.get(metric.priority, 0) + 1
+
+        category = metric.category
+        if category not in category_summary:
+            category_summary[category] = {'count': 0, 'behind_count': 0}
+        category_summary[category]['count'] += 1
+
+        source_breakdown[metric.source] = source_breakdown.get(metric.source, 0) + 1
+
+        # Track at-risk metrics (those with negative gaps)
+        if hasattr(metric, 'gap_percent'):
+            try:
+                gap_val = float(str(metric.gap_percent).rstrip('%'))
+                if gap_val < 0:
+                    at_risk_metrics.append(metric)
+            except (ValueError, TypeError):
+                pass
+
+    # Sort at-risk metrics by gap percentage (worst first)
+    def get_gap_value(m):
+        try:
+            return float(str(getattr(m, 'gap_percent', 0)).rstrip('%'))
+        except (ValueError, TypeError):
+            return 0
+
+    at_risk_metrics.sort(key=get_gap_value)
+    at_risk_metrics = at_risk_metrics[:6]
+
+    ctx.update({
+        'priority_counts': priority_counts,
+        'category_summary': list(category_summary.items()),
+        'at_risk_metrics': at_risk_metrics,
+        'source_breakdown': source_breakdown,
+        'page_title': 'Analytics',
+    })
+
+    template = 'dashboard/partials/analytics_content.html' if request.htmx else 'dashboard/analytics.html'
+    return render(request, template, ctx)
+
+
+@vary_on_headers('HX-Request')
+@login_required
+def settings_view(request):
+    user_settings, _ = UserSettings.objects.get_or_create(user=request.user)
+
+    if request.method == 'POST':
+        form = UserSettingsForm(request.POST, instance=user_settings)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Settings saved successfully.')
+            ctx = {'form': form, 'success': True}
+        else:
+            ctx = {'form': form, 'success': False}
+    else:
+        form = UserSettingsForm(instance=user_settings)
+        ctx = {'form': form, 'success': False}
+
+    template = 'dashboard/partials/settings_content.html' if request.htmx else 'dashboard/settings.html'
+    return render(request, template, ctx)

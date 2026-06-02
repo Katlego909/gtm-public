@@ -47,6 +47,10 @@ urlpatterns = [
     
     # Profile URL
     path('profile/', views.profile, name='profile'),
+
+    # Analytics and Settings
+    path('analytics/', views.analytics, name='analytics'),
+    path('settings/', views.settings_view, name='settings'),
     
     # Workspace management from dashboard
     path('workspace/create/', views.create_workspace_dashboard, name='create_workspace_dashboard'),
