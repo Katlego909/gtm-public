@@ -53,7 +53,7 @@ RUN chmod +x /app/docker-entrypoint.sh
 RUN mkdir -p /app/staticfiles /app/media
 
 # Collect static files
-RUN python manage.py collectstatic --noinput --clear 2>/dev/null || true
+RUN python manage.py collectstatic --noinput
 
 # Set entrypoint
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
