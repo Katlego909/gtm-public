@@ -62,9 +62,5 @@ ENTRYPOINT ["/app/docker-entrypoint.sh"]
 ENV PORT=8080
 ENV PYTHONUNBUFFERED=1
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/health/').read()"
-
 # Run gunicorn with proper signal handling for Cloud Run
 CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "4", "--threads", "2", "--worker-class", "gthread", "--worker-tmp-dir", "/dev/shm", "--max-requests", "1000", "--max-requests-jitter", "100", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "gtm_validator.wsgi:application"]
