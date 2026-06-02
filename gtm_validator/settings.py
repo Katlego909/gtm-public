@@ -236,6 +236,14 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 
+    CSRF_TRUSTED_ORIGINS = [
+        "https://gtm-validator-601175512678.us-west1.run.app",
+    ]
+
+    csrf_env = os.getenv("CSRF_TRUSTED_ORIGINS", "")
+    if csrf_env:
+        CSRF_TRUSTED_ORIGINS.extend([url.strip() for url in csrf_env.split(",") if url.strip()])
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
