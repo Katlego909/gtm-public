@@ -30,17 +30,17 @@ for attempt in range(max_attempts):
 "
 fi
 
-# Run migrations
+# Run migrations (with timeout to prevent hanging)
 echo "Running database migrations..."
-python manage.py migrate --noinput
+timeout 60 python manage.py migrate --noinput || echo "Migrations timed out or failed, continuing startup..."
 
-# Load GTM defaults (questions, categories, recommendation bands, tools)
+# Load GTM defaults (questions, categories, recommendation bands, tools) - optional, skip on timeout
 echo "Loading GTM defaults..."
-python manage.py load_gtm_defaults
+timeout 30 python manage.py load_gtm_defaults || echo "Load defaults timed out, continuing startup..."
 
-# Collect static files (in case they weren't collected during build)
-echo "Collecting static files..."
-python manage.py collectstatic --noinput 2>/dev/null || true
+# Collect static files already done in build, skip here to save startup time
+# echo "Collecting static files..."
+# python manage.py collectstatic --noinput 2>/dev/null || true
 
 echo "Starting Gunicorn..."
 exec "$@"
