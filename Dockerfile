@@ -52,18 +52,16 @@ RUN chmod +x /app/docker-entrypoint.sh
 # Create necessary directories
 RUN mkdir -p /app/staticfiles /app/media
 
-# Collect static files
-RUN python manage.py collectstatic --noinput
-
-# Debug: List collected static files
-RUN ls -R /app/staticfiles
+# Collect static files during build (optional, will also run at startup)
+RUN python manage.py collectstatic --noinput --clear 2>/dev/null || true
 
 # Set entrypoint
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
 
-# Cloud Run requires listening on 0.0.0.0:8080
+# Cloud Run environment variables
 ENV PORT=8080
 ENV PYTHONUNBUFFERED=1
+ENV DJANGO_SETTINGS_MODULE=gtm_validator.settings
 
-# Run gunicorn with proper signal handling for Cloud Run
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "--workers", "4", "--threads", "2", "--worker-class", "gthread", "--worker-tmp-dir", "/dev/shm", "--max-requests", "1000", "--max-requests-jitter", "100", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-", "gtm_validator.wsgi:application"]
+# Default CMD (can be overridden by entrypoint)
+CMD []
