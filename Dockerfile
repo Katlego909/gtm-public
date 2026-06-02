@@ -55,6 +55,9 @@ RUN mkdir -p /app/staticfiles /app/media
 # Collect static files
 RUN python manage.py collectstatic --noinput
 
+# Debug: List collected static files
+RUN ls -R /app/staticfiles
+
 # Set entrypoint
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
 
