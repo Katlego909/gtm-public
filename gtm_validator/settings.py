@@ -238,12 +238,11 @@ if not DEBUG:
     
     # Trust the Cloud Run domain for CSRF
     CSRF_TRUSTED_ORIGINS = [
-        "https://*.run.app",
-        "https://*.cloudrun.app",
+        "https://gtm-validator-601175512678.us-west1.run.app",
     ]
     # Add any custom domains if they are set in environment
-    if os.getenv("CUSTOM_DOMAIN"):
-        CSRF_TRUSTED_ORIGINS.append(f"https://{os.getenv('CUSTOM_DOMAIN')}")
+    csrf_custom = os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
+    CSRF_TRUSTED_ORIGINS.extend([d.strip() for d in csrf_custom if d.strip()])
 
 LOGGING = {
     "version": 1,
