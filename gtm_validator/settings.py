@@ -18,8 +18,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-c=&nz9k*2q%_@ft=n_+ut(uz=!wgql1sxyo!q9qnrz@bx05=1y")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# Defaulting to False prevents security leaks if env loading slips up on Cloud Run
-DEBUG = os.getenv("DEBUG", "False") == "True"
+DEBUG = os.getenv("DEBUG", "True") == "True"
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,gtm-validator-601175512678.us-west1.run.app").split(",")
 
@@ -34,21 +33,21 @@ INSTALLED_APPS = [
     "django.contrib.humanize",
 
     # Apps
-    "gtm",
+    "gtm",  
     "dashboard",
     "theme",
-
+    
     # Django-tailwind - commented out until installed
     # 'tailwind',
     'django_browser_reload',
-
+    
     # allauth
     'allauth',
     'allauth.account',
-
+    
     # htmx
     'django_htmx',
-
+    
     # Turbo
     'turbo_response',
 ]
@@ -79,7 +78,7 @@ MIDDLEWARE = [
 # Only enable browser reload in development
 if DEBUG:
     MIDDLEWARE.append("django_browser_reload.middleware.BrowserReloadMiddleware")
-
+    
 MIDDLEWARE.append("allauth.account.middleware.AccountMiddleware")
 
 ROOT_URLCONF = "gtm_validator.urls"
@@ -164,7 +163,7 @@ EMAIL_SUBJECT_PREFIX = "[Funti3r GTM] "
 
 GTM_REPORT_INTERNAL_TO = ["gtm-reports@funti3r.xyz"]
 EMAIL_REDIRECT_TO = os.getenv("EMAIL_REDIRECT_TO", "").strip()
-
+    
 GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "")
 GCP_LOCATION = os.getenv("GCP_LOCATION", "us-central1")
 GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
