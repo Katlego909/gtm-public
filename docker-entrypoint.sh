@@ -30,13 +30,13 @@ for attempt in range(max_attempts):
 "
 fi
 
-# Run migrations
+# Run migrations (non-fatal if database unavailable)
 echo "Running database migrations..."
-python manage.py migrate --noinput
+python manage.py migrate --noinput 2>&1 || echo "WARNING: Migration failed, continuing..."
 
 # Load GTM defaults (questions, categories, recommendation bands, tools)
 echo "Loading GTM defaults..."
-python manage.py load_gtm_defaults
+python manage.py load_gtm_defaults 2>&1 || echo "WARNING: Load defaults failed, continuing..."
 
 # Collect static files (in case they weren't collected during build)
 echo "Collecting static files..."
