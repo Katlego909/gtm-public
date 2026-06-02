@@ -235,14 +235,6 @@ if not DEBUG:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    
-    # Trust the Cloud Run domain for CSRF
-    CSRF_TRUSTED_ORIGINS = [
-        "https://gtm-validator-601175512678.us-west1.run.app",
-    ]
-    # Add any custom domains if they are set in environment
-    csrf_custom = os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
-    CSRF_TRUSTED_ORIGINS.extend([d.strip() for d in csrf_custom if d.strip()])
 
 LOGGING = {
     "version": 1,
