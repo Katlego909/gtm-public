@@ -39,7 +39,6 @@ INSTALLED_APPS = [
     
     # Django-tailwind - commented out until installed
     # 'tailwind',
-    'django_browser_reload',
     
     # allauth
     'allauth',
@@ -75,10 +74,6 @@ MIDDLEWARE = [
     "django_htmx.middleware.HtmxMiddleware",
 ]
 
-# Only enable browser reload in development
-if DEBUG:
-    MIDDLEWARE.append("django_browser_reload.middleware.BrowserReloadMiddleware")
-    
 MIDDLEWARE.append("allauth.account.middleware.AccountMiddleware")
 
 ROOT_URLCONF = "gtm_validator.urls"
@@ -100,6 +95,10 @@ TEMPLATES = [
 ]
 
 WSGI_APPLICATION = "gtm_validator.wsgi.application"
+
+# Use cookie-based sessions for Cloud Run scalability
+SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
+SESSION_COOKIE_HTTPONLY = True
 
 # Database
 DATABASES = {
@@ -133,7 +132,7 @@ STORAGES = {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
     },
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
     },
 }
 

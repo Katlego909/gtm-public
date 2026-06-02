@@ -554,10 +554,13 @@
         toast.className = `pointer-events-auto rounded-xl border shadow-lg px-4 py-3 text-sm font-medium transition-all duration-300 opacity-0 translate-y-2 ${toneClasses[tone]}`;
         toast.innerHTML = `<div class="flex items-start gap-3"><span class="flex-1">${message}</span><button type="button" class="text-current/70 hover:text-current">&times;</button></div>`;
 
-        toast.querySelector('button').addEventListener('click', () => {
-          toast.classList.add('opacity-0', 'translate-y-2');
-          setTimeout(() => toast.remove(), 220);
-        });
+        const toastButton = toast.querySelector('button');
+        if (toastButton) {
+          toastButton.addEventListener('click', () => {
+            toast.classList.add('opacity-0', 'translate-y-2');
+            setTimeout(() => toast.remove(), 220);
+          });
+        }
 
         toastContainer.appendChild(toast);
         requestAnimationFrame(() => toast.classList.remove('opacity-0', 'translate-y-2'));
