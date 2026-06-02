@@ -40,7 +40,7 @@ python manage.py load_gtm_defaults
 
 # Collect static files (in case they weren't collected during build)
 echo "Collecting static files..."
-python manage.py collectstatic --noinput --clear 2>/dev/null || true
+python manage.py collectstatic --noinput 2>/dev/null || true
 
 echo "Starting Gunicorn..."
 exec "$@"
