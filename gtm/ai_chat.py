@@ -1106,16 +1106,23 @@ def process_chat_message(
         
         context = build_session_context(session)
         
-        # The Agent now handles intent detection autonomously via Function Calling.
-        # We only use hardcoded handlers for high-priority system actions (like exports).
         intent = detect_intent(message)
-        
+
         if intent == "export_report":
             response_text = handle_export(session, context)
         elif intent == "schedule_meeting":
             response_text = handle_schedule_meeting(session, context)
+        elif intent == "execution_plan":
+            # Build action plan when user asks
+            plan = build_execution_plan(session=session, actor=user, persist=True, limit=5)
+            if not plan["has_critical_gaps"]:
+                response_text = "You don't have any critical low-scoring responses right now. Your next best move is to review existing action items and tighten execution consistency."
+            else:
+                response_text = f"✅ Created {plan['created_count']} new action items for {session.company_name}. " \
+                                f"Focus areas: {', '.join(plan['top_categories']) if plan['top_categories'] else 'General execution'}. " \
+                                f"Check your action items dashboard to see them!"
         else:
-            # Let the Agent reason through everything else (scores, plans, tasks, resources, chat)
+            # Let the Agent handle everything else (scores, chat, recommendations)
             response_text = handle_general_chat(
                 session,
                 context,
