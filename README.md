@@ -93,13 +93,20 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-#### 4. Configure environment (optional for local dev)
-Create a `.env` file if needed:
+#### 4. Configure environment and set up service account credentials
+Create a `.env` file in the project root:
 ```
 DEBUG=True
 SECRET_KEY=your-secret-key
+GOOGLE_APPLICATION_CREDENTIALS=keys/service-account.json
 ```
 By default, local development uses SQLite (no database configuration needed). The `SECRET_KEY` will be auto-generated if not set.
+
+**Important:** You'll need to set up Google Cloud credentials for the application:
+1. Create a `keys/` folder in the project root
+2. Download your Google Cloud service account JSON file and place it in the `keys/` folder as `service-account.json`
+3. This file is git-ignored (see `.gitignore`) and should never be committed to the repository
+4. Ask a team lead or project maintainer for the service account credentials if you don't have them
 
 #### 5. Run migrations
 ```bash
