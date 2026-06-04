@@ -102,19 +102,13 @@ SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
 SESSION_COOKIE_HTTPONLY = True
 
 # Database
-if DEBUG:
-    # Local development: use SQLite
-    DATABASES = {
-        "default": dj_database_url.config(
-            default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-            conn_max_age=600,
-        )
-    }
-else:
-    # Production: require DATABASE_URL to be explicitly set
-    DATABASES = {
-        "default": dj_database_url.config(conn_max_age=600)
-    }
+# Use SQLite by default; use Cloud SQL if DATABASE_URL is set
+DATABASES = {
+    "default": dj_database_url.config(
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        conn_max_age=600,
+    )
+}
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
