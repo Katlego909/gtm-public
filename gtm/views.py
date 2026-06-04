@@ -30,6 +30,7 @@ from django.conf import settings
 from django.core.cache import cache
 from functools import wraps
 from .utils import transfer_firmographics_to_snapshot, _client_id
+from .utils_pdf import render_gtm_report_pdf_response
 from .ai_services import (
     generate_playbook_with_gemini,
     generate_diagnostic_insight,

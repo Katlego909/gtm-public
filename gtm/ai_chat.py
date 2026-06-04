@@ -333,6 +333,55 @@ except (ImportError, AttributeError):
     _PLAYBOOK_CONFIG = None
 
 
+# ================================================================
+# TOOL DECLARATIONS FOR GEMINI
+# ================================================================
+def _build_tool_declarations():
+    """Build Gemini Tool declarations for all agent functions."""
+    if not GENAI_AVAILABLE:
+        return []
+
+    # Map each function to its Tool declaration
+    tools = []
+
+    # Single-param tools (session_uuid)
+    single_param_funcs = [
+        get_gtm_assessment_data,
+        build_prioritized_action_plan,
+        review_current_action_items,
+        search_internal_resources,
+        audit_strategic_evidence,
+        analyze_risk_and_mitigation,
+        build_implementation_roadmap,
+        competitive_benchmarking_analysis,
+        resource_allocation_guidance,
+        customer_segment_analysis,
+    ]
+
+    for func in single_param_funcs:
+        tool = types.Tool(
+            function_declarations=[
+                types.FunctionDeclaration(
+                    name=func.__name__,
+                    description=func.__doc__ or "GTM analysis tool",
+                    parameters=types.Schema(
+                        type=types.Type.OBJECT,
+                        properties={
+                            "session_uuid": types.Schema(
+                                type=types.Type.STRING,
+                                description="The GTM assessment session UUID"
+                            )
+                        },
+                        required=["session_uuid"],
+                    ),
+                )
+            ]
+        )
+        tools.append(tool)
+
+    return tools
+
+
 def _get_chat_client():
     """Returns cached Vertex AI client for chat, initializing once if needed."""
     global _chat_client
@@ -395,23 +444,15 @@ ALWAYS use this session_uuid when calling tools. Every tool call MUST include th
 Example: Instead of "Who do you think your ideal customer is?" → Call get_gtm_assessment_data, then use their actual scores to answer "Here's where you stand and what matters most."
 
 Never ask for data you can pull. Never ask for ICP, messaging, or company info—it's in the assessment."""
+    # Build Tool declarations for Gemini
+    tool_declarations = _build_tool_declarations()
+
     return types.GenerateContentConfig(
         system_instruction=system_instruction,
-        tools=[
-            get_gtm_assessment_data,
-            build_prioritized_action_plan,
-            review_current_action_items,
-            search_internal_resources,
-            audit_strategic_evidence,
-            analyze_risk_and_mitigation,
-            build_implementation_roadmap,
-            competitive_benchmarking_analysis,
-            resource_allocation_guidance,
-            customer_segment_analysis,
-        ],
+        tools=tool_declarations if tool_declarations else None,
         automatic_function_calling=types.AutomaticFunctionCallingConfig(
             disable=False
-        ),
+        ) if tool_declarations else None,
         temperature=0.8,  # Slightly higher for more conversational tone
         max_output_tokens=2048,
         thinking_config=types.ThinkingConfig(thinking_budget=0),
