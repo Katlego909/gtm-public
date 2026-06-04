@@ -156,18 +156,50 @@ When `DATABASE_URL` is set, the application will use PostgreSQL instead of SQLit
 ## Project Structure
 
 ```
-gtm/
-├── gtm/                     # Main Django app
+gtm-public/
+├── .env                     # Environment configuration (CREATE THIS - not in repo)
+├── .env.example             # Example environment variables
+├── .gitignore               # Git ignore file
+├── manage.py                # Django management script
+├── requirements.txt         # Python dependencies
+├── Dockerfile               # Docker configuration
+├── cloudbuild.yaml          # Google Cloud Build config
+│
+├── keys/                    # GCP Service Account Credentials (CREATE THIS - not in repo)
+│   └── service-account.json # Service account JSON key (git-ignored)
+│
+├── config/                  # Django settings
+│   ├── settings.py          # Main settings
+│   ├── urls.py              # URL routing
+│   └── wsgi.py              # WSGI config
+│
+├── gtm/                     # Main GTM assessment app
 │   ├── models.py            # Data models
 │   ├── views.py             # View logic
 │   ├── urls.py              # URL routing
+│   ├── ai_services.py       # AI/Gemini integration
 │   ├── templates/           # HTML templates
 │   ├── static/              # CSS, JavaScript, images
 │   └── management/          # Management commands
-├── config/                  # Django settings
-├── requirements.txt         # Python dependencies
-└── manage.py               # Django management script
+│
+├── dashboard/               # Dashboard & analytics app
+│   ├── models.py            # Dashboard models
+│   ├── views.py             # Dashboard views
+│   ├── analytics.py         # Analytics logic
+│   └── templates/           # Dashboard templates
+│
+├── conductor/               # Deployment & automation
+│   └── deploy_cloud_run.md  # Cloud Run deployment guide
+│
+├── docs/                    # Documentation
+├── theme/                   # UI theme/styling
+├── venv/                    # Python virtual environment (auto-created)
+└── workspace_resources/     # Workspace-related resources
 ```
+
+**Important:** After cloning, create these missing directories and files:
+- Create `keys/` folder and add `service-account.json` (from GCP)
+- Create `.env` file based on `.env.example`
 
 ---
 
