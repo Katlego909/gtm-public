@@ -333,55 +333,6 @@ except (ImportError, AttributeError):
     _PLAYBOOK_CONFIG = None
 
 
-# ================================================================
-# TOOL DECLARATIONS FOR GEMINI
-# ================================================================
-def _build_tool_declarations():
-    """Build Gemini Tool declarations for all agent functions."""
-    if not GENAI_AVAILABLE:
-        return []
-
-    # Map each function to its Tool declaration
-    tools = []
-
-    # Single-param tools (session_uuid)
-    single_param_funcs = [
-        get_gtm_assessment_data,
-        build_prioritized_action_plan,
-        review_current_action_items,
-        search_internal_resources,
-        audit_strategic_evidence,
-        analyze_risk_and_mitigation,
-        build_implementation_roadmap,
-        competitive_benchmarking_analysis,
-        resource_allocation_guidance,
-        customer_segment_analysis,
-    ]
-
-    for func in single_param_funcs:
-        tool = types.Tool(
-            function_declarations=[
-                types.FunctionDeclaration(
-                    name=func.__name__,
-                    description=func.__doc__ or "GTM analysis tool",
-                    parameters=types.Schema(
-                        type=types.Type.OBJECT,
-                        properties={
-                            "session_uuid": types.Schema(
-                                type=types.Type.STRING,
-                                description="The GTM assessment session UUID"
-                            )
-                        },
-                        required=["session_uuid"],
-                    ),
-                )
-            ]
-        )
-        tools.append(tool)
-
-    return tools
-
-
 def _get_chat_client():
     """Returns cached Vertex AI client for chat, initializing once if needed."""
     global _chat_client
@@ -415,38 +366,22 @@ def _get_chat_client():
 
 
 def _get_chat_config(session_uuid: str):
-    """Builds the configuration for the chat agent including tools and instructions."""
-    system_instruction = f"""You're a GTM strategist helping companies nail their go-to-market execution.
+    """Builds the configuration for the chat agent including instructions."""
+    system_instruction = f"""You're a GTM strategist helping companies improve their Go-To-Market execution.
 
-**CRITICAL: Your session ID is: {session_uuid}**
-ALWAYS use this session_uuid when calling tools. Every tool call MUST include this ID. Do not ask for information that's in the assessment—pull it directly using get_gtm_assessment_data.
+Be conversational, direct, and practical. Provide actionable insights backed by the company's assessment data.
+Focus on: their strongest areas, critical gaps, and specific next steps they can take immediately.
 
-**Your tools (use them, don't ask for the info):**
-- get_gtm_assessment_data: Pulls their GTM scores, gaps, and company info. Call this FIRST on every query.
-- build_prioritized_action_plan: Creates tasks from their gaps
-- review_current_action_items: Shows status of existing tasks
-- analyze_risk_and_mitigation: Deep-dive on what could go wrong
-- build_implementation_roadmap: Phases improvements over 30/60/90 days
-- competitive_benchmarking_analysis: How they compare to peers
-- resource_allocation_guidance: Where to invest budget/effort
-- customer_segment_analysis: Which customers matter most
-- search_internal_resources: Find relevant docs/tools from their workspace
-- audit_strategic_evidence: Review uploaded images/PDFs
+When users ask to:
+- "Build my action plan" → Acknowledge and suggest they check the action items dashboard
+- "Review my action items" → Provide a summary of what they should focus on next
+- "Show my scores" → Provide a brief performance overview
+- "What should I focus on?" → Highlight their 2-3 most critical gaps
 
-**STOP asking clarifying questions.** You have their assessment data. Pull it. Analyze it. Give them insights.
-
-**Communication:**
-1. Call tools to get the data (don't ask for it)
-2. Start with the key insight backed by their actual numbers
-3. End with a specific next step
-4. Be conversational, direct, practical—avoid scripts and lists
-
-Example: Instead of "Who do you think your ideal customer is?" → Call get_gtm_assessment_data, then use their actual scores to answer "Here's where you stand and what matters most."
-
-Never ask for data you can pull. Never ask for ICP, messaging, or company info—it's in the assessment."""
+Keep responses conversational and avoid lengthy lists. End with a specific next step."""
     return types.GenerateContentConfig(
         system_instruction=system_instruction,
-        temperature=0.8,  # Slightly higher for more conversational tone
+        temperature=0.8,
         max_output_tokens=2048,
         thinking_config=types.ThinkingConfig(thinking_budget=0),
     )
