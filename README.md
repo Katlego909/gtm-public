@@ -78,8 +78,8 @@ GTM Validator is a Django-based web application that helps startups and business
 
 #### 1. Clone the repository
 ```bash
-git clone https://github.com/Katlego909/gtm.git
-cd gtm
+git clone https://github.com/Katlego909/gtm-public.git
+cd gtm-public
 ```
 
 #### 2. Create virtual environment
