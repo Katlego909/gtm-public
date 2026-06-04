@@ -94,12 +94,13 @@ pip install -r requirements.txt
 ```
 
 #### 4. Configure environment and set up service account credentials
-Create a `.env` file in the project root:
+Copy the `.env.example` file to create your `.env` file:
+```bash
+cp .env.example .env
 ```
-DEBUG=True
-SECRET_KEY=your-secret-key
-GOOGLE_APPLICATION_CREDENTIALS=keys/service-account.json
-```
+
+Then edit the `.env` file with your configuration. See `.env.example` for all available options.
+
 By default, local development uses SQLite (no database configuration needed). The `SECRET_KEY` will be auto-generated if not set.
 
 **Important:** You'll need to set up Google Cloud credentials for the application:
