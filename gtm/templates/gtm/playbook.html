@@ -11,7 +11,6 @@
   </div>
   
   <div class="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-center flex-wrap">
-    {# AI Chat Button #}
     <a href="{% url 'dashboard' %}?agent_session={{ session.uuid }}" class="w-full sm:w-auto px-6 py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:shadow-xl transition transform hover:scale-105 flex items-center justify-center gap-2">
       <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
@@ -22,12 +21,10 @@
       <i class="fas fa-bolt shrink-0"></i>
       <span class="truncate">Run Execution Agent</span>
     </a>
-    {# Download PDF Button #}
     <a href="{% url 'gtm:download' session.uuid %}" class="w-full sm:w-auto px-6 py-3 rounded-xl border-2 border-gray-300 font-semibold hover:bg-gray-50 transition flex items-center justify-center gap-2">
       <i class="fas fa-file-pdf shrink-0"></i>
       <span class="truncate">Download PDF</span>
     </a>
-    {# Back to Dashboard Button #}
     <a href="{% url 'gtm:results' session.uuid %}" 
        hx-get="{% url 'gtm:results' session.uuid %}" 
        hx-target="#main-content" 
@@ -139,8 +136,7 @@
           <li class="bg-gray-50 border border-gray-200 rounded-xl p-4">
             <div class="flex items-start justify-between">
               <div class="min-w-0 pr-2">
-                {# Added break-words for long task names #}
-                <span class="text-base font-medium {% if a.status == 'done' %}line-through text-gray-500{% endif %} break-words">
+                    <span class="text-base font-medium {% if a.status == 'done' %}line-through text-gray-500{% endif %} break-words">
                   {{ a.note }}
                 </span>
                 <div class="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-3">
@@ -152,14 +148,12 @@
               <div class="flex flex-col sm:flex-row gap-2 shrink-0 ml-2 sm:ml-4">
                 <form method="post" action="{% url 'gtm:action_toggle' a.id %}">
                   {% csrf_token %}
-                  {# Styled toggle button #}
                   <button class="text-xs sm:text-sm px-3 py-1 rounded-lg border hover:bg-gray-100 transition whitespace-nowrap">
                     {% if a.status == 'done' %}Mark todo{% else %}Mark done{% endif %}
                   </button>
                 </form>
                 <form method="post" action="{% url 'gtm:action_delete' a.id %}" onsubmit="return confirm('Delete this task?');">
                   {% csrf_token %}
-                  {# Styled delete button #}
                   <button class="text-xs sm:text-sm px-3 py-1 rounded-lg border text-red-600 hover:bg-red-50 transition whitespace-nowrap">Delete</button>
                 </form>
               </div>
@@ -194,7 +188,6 @@
     </div>
 
     <ul class="space-y-3 text-sm">
-      {# Added break-words and stronger bolding #}
       <li><b class="text-gray-800">Company:</b> <span class="break-words">{{ session.company_name|default:"—" }}</span></li>
       <li><b class="text-gray-800">Industry:</b> {{ session.industry|default:"—" }}</li>
       <li><b class="text-gray-800">Website:</b> 

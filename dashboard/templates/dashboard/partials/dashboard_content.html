@@ -331,10 +331,8 @@
         </div>
     </div>
 
-    {# ── Strategic Asset Library Snapshot ── #}
     {% if current_workspace %}
     <div class="bg-gradient-to-br from-indigo-900 via-indigo-800 to-purple-900 rounded-2xl shadow-lg p-6 mb-8 relative overflow-hidden">
-        {# Background decoration #}
         <div class="absolute top-0 right-0 w-64 h-64 bg-white opacity-[0.03] rounded-full -translate-y-1/2 translate-x-1/2"></div>
         <div class="absolute bottom-0 left-0 w-48 h-48 bg-purple-400 opacity-[0.06] rounded-full translate-y-1/2 -translate-x-1/2"></div>
         
@@ -460,10 +458,6 @@
             {% endfor %}
         </div>
     </div>
-
-    <!-- Recent AI Insights -->
-                    
-
 
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mt-8">
         <h3 class="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
@@ -602,7 +596,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initCharts();
 });
 
-// Also try to initialize immediately in case DOM isalready loaded (HTMX partial load)
+// Also try to initialize immediately in case DOM is already loaded (HTMX partial load)
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initCharts);
 } else {

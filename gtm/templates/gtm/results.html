@@ -288,7 +288,6 @@
             <p class="text-xs text-gray-500 mt-1 break-words">Diagnostic: {{ q.note }}</p>
         {% endif %}
 
-        {% comment %} AI INSIGHT (Styled for visibility with Async Loading) {% endcomment %}
         <div id="insight-{{ q.question.id_code }}">
           {% if q.ai_insight %}
             <div class="mt-3 p-3 rounded text-sm shadow-inner overflow-hidden border-l-4
