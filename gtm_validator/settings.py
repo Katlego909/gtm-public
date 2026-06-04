@@ -101,13 +101,27 @@ WSGI_APPLICATION = "gtm_validator.wsgi.application"
 SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
 SESSION_COOKIE_HTTPONLY = True
 
-# Database - Force SQLite, ignore DATABASE_URL entirely
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+# Database configuration - dynamically choose based on environment
+if os.getenv("ENVIRONMENT") == "production" or os.getenv("DATABASE_URL"):
+    # Production: Use PostgreSQL via Cloud SQL
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": "gtm_validator",
+            "USER": "gtm_user",
+            "PASSWORD": os.getenv("DB_PASSWORD", ""),
+            "HOST": "/cloudsql/forge-497716:us-west1:gtm-db-v2",
+            "PORT": "",
+        }
     }
-}
+else:
+    # Development: Use SQLite
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -183,6 +197,10 @@ LOGOUT_REDIRECT_URL = 'gtm:landing'
 ACCOUNT_LOGOUT_REDIRECT_URL = 'gtm:landing'
 
 # CSRF validation handled via standard token validation for same-origin requests
+CSRF_TRUSTED_ORIGINS = [
+    "https://gtm-validator-601175512678.us-west1.run.app",
+    "http://localhost:8000",
+]
 
 # HTTPS security headers applied automatically when DEBUG is off
 if not DEBUG:
