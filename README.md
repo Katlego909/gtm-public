@@ -74,52 +74,63 @@ GTM Validator is a Django-based web application that helps startups and business
 
 ## Installation and Setup
 
-### 1. Clone the repository
+### Local Development
+
+#### 1. Clone the repository
 ```bash
 git clone https://github.com/Katlego909/gtm.git
 cd gtm
 ```
 
-### 2. Create virtual environment
+#### 2. Create virtual environment
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-### 3. Install dependencies
+#### 3. Install dependencies
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configure environment
-Create a `.env` file with required settings:
+#### 4. Configure environment (optional for local dev)
+Create a `.env` file if needed:
 ```
 DEBUG=True
 SECRET_KEY=your-secret-key
-DATABASE_URL=your-database-url
 ```
+By default, local development uses SQLite (no database configuration needed). The `SECRET_KEY` will be auto-generated if not set.
 
-### 5. Run migrations
+#### 5. Run migrations
 ```bash
 python manage.py migrate
 ```
 
-### 6. Load default data
+#### 6. Load default data
 ```bash
 python manage.py load_gtm_defaults
 ```
 
-### 7. Create superuser
+#### 7. Create superuser
 ```bash
 python manage.py createsuperuser
 ```
 
-### 8. Run development server
+#### 8. Run development server
 ```bash
 python manage.py runserver
 ```
 
 Visit http://localhost:8000 to access the application.
+
+### Production Deployment
+
+For production deployments, set the `DATABASE_URL` environment variable to use Cloud SQL or PostgreSQL:
+```bash
+export DATABASE_URL=postgresql://user:password@host:port/database
+```
+
+When `DATABASE_URL` is set, the application will use PostgreSQL instead of SQLite.
 
 ---
 
