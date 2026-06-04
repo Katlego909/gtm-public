@@ -170,7 +170,7 @@
           <p class="text-sm text-blue-700 mb-4">
             Use the AI Execution Agent to automatically generate a prioritized action plan based on your assessment results.
           </p>
-          <a href="{% url 'dashboard' %}?agent_session={{ session.uuid }}?prompt=action-plan" class="inline-flex items-center justify-center px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition gap-2">
+          <a href="{% url 'dashboard' %}?agent_session={{ session.uuid }}&prompt=action-plan" class="inline-flex items-center justify-center px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition gap-2">
             <i class="fas fa-wand-magic-sparkles"></i>
             Build My Action Plan with AI
           </a>
