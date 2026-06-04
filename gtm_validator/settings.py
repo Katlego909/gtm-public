@@ -101,13 +101,12 @@ WSGI_APPLICATION = "gtm_validator.wsgi.application"
 SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
 SESSION_COOKIE_HTTPONLY = True
 
-# Database
-# Use SQLite by default; use Cloud SQL if DATABASE_URL is set
+# Database - Force SQLite, ignore DATABASE_URL entirely
 DATABASES = {
-    "default": dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        conn_max_age=600,
-    )
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
+    }
 }
 
 # Password validation
