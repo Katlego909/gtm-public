@@ -47,3 +47,5 @@ verify_*.py
 fix_*.py
 debug_*.py
 test_local_*.py
+
+keys/service-account.json
