@@ -149,7 +149,7 @@ When `DATABASE_URL` is set, the application will use PostgreSQL instead of SQLit
 - Visualization: Chart.js
 - Database: PostgreSQL (production) / SQLite (development)
 - File Storage: Cloud Storage (configurable)
-- AI Integration: OpenAI API
+- AI Integration: Google Gemini (via Vertex AI)
 
 ---
 
