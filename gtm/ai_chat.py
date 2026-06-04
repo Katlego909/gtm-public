@@ -444,15 +444,8 @@ ALWAYS use this session_uuid when calling tools. Every tool call MUST include th
 Example: Instead of "Who do you think your ideal customer is?" → Call get_gtm_assessment_data, then use their actual scores to answer "Here's where you stand and what matters most."
 
 Never ask for data you can pull. Never ask for ICP, messaging, or company info—it's in the assessment."""
-    # Build Tool declarations for Gemini
-    tool_declarations = _build_tool_declarations()
-
     return types.GenerateContentConfig(
         system_instruction=system_instruction,
-        tools=tool_declarations if tool_declarations else None,
-        automatic_function_calling=types.AutomaticFunctionCallingConfig(
-            disable=False
-        ) if tool_declarations else None,
         temperature=0.8,  # Slightly higher for more conversational tone
         max_output_tokens=2048,
         thinking_config=types.ThinkingConfig(thinking_budget=0),
@@ -1126,7 +1119,11 @@ def handle_general_chat(
             usage = response.usage_metadata
             if MONITORING_AVAILABLE:
                 AIUsageTracker.log_usage(usage.total_token_count, 'agent_chat')
-                
+
+        # Handle case where response contains function calls instead of text
+        if response.text is None or not response.text.strip():
+            return "I've processed your request. Check your action items for the results."
+
         return response.text.strip()
 
     except Exception as e:
