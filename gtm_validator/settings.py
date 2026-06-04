@@ -18,7 +18,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-c=&nz9k*2q%_@ft=n_+ut(uz=!wgql1sxyo!q9qnrz@bx05=1y")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DEBUG", "False") == "True"
+# Default to False for production; set DEBUG=True locally or in .env for development
+DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes")
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,gtm-validator-601175512678.us-west1.run.app").split(",")
 
