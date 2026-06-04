@@ -18,8 +18,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-c=&nz9k*2q%_@ft=n_+ut(uz=!wgql1sxyo!q9qnrz@bx05=1y")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# Default to False for production; set DEBUG=True locally or in .env for development
-DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes")
+# Default to True for local dev safety; explicitly set DEBUG=False in production
+DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1", "yes")
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,gtm-validator-601175512678.us-west1.run.app").split(",")
 
@@ -102,12 +102,19 @@ SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
 SESSION_COOKIE_HTTPONLY = True
 
 # Database
-DATABASES = {
-    "default": dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        conn_max_age=600,
-    )
-}
+if DEBUG:
+    # Local development: use SQLite
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+            conn_max_age=600,
+        )
+    }
+else:
+    # Production: require DATABASE_URL to be explicitly set
+    DATABASES = {
+        "default": dj_database_url.config(conn_max_age=600)
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
