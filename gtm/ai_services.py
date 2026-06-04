@@ -34,11 +34,11 @@ _client_lock = __import__('threading').Lock()
 def _clean_json_response(text: str) -> str:
     """
     Cleans AI-generated text to ensure it's a valid JSON string.
-    Handles markdown code blocks and common formatting quirks.
+    Handles markdown code blocks, escape sequences, and common formatting quirks from Vertex AI.
     """
     if not text:
         return ""
-    
+
     # 1. Remove Markdown code labels and strip spaces
     # Standard ```json label
     text = re.sub(r'^```json\s*', '', text.strip(), flags=re.MULTILINE | re.IGNORECASE)
@@ -46,13 +46,18 @@ def _clean_json_response(text: str) -> str:
     text = re.sub(r'^```\s*', '', text, flags=re.MULTILINE)
     # Closing ```
     text = re.sub(r'\s*```$', '', text, flags=re.MULTILINE)
-    
+
     # 2. Extract the first { and last } to ignore any conversational chatter
     start = text.find('{')
     end = text.rfind('}')
     if start != -1 and end != -1:
         text = text[start:end+1]
-    
+
+    # 3. Fix common escape sequence issues from Vertex AI
+    # Handle invalid escape sequences like \u (without 4 hex digits), \x, etc.
+    # Replace with literal backslash to let JSON handle it
+    text = re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', text)  # Escape invalid backslashes
+
     return text.strip()
 
 
@@ -469,30 +474,52 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
                     except Exception as json_err:
                         # 🚨 REPORT RESCUE: If JSON fails, manually extract the playbook content
                         logger.error(f"Failed to parse JSON for {snapshot.company_name}: {json_err}. Rescuing playbook text.")
-                        
-                        # Try to find the markdown_playbook value using regex
-                        # We use [\"\'] to handle both single and double quotes from AI
-                        match = re.search(r'["\']markdown_playbook["\']\s*:\s*["\'](.*?)(?=["\']\s*,\s*["\']|["\']\s*})', text, re.DOTALL)
-                        
+
+                        # Try multiple strategies to extract markdown content from malformed JSON
+                        # Strategy 1: Look for markdown_playbook field with flexible escaping
+                        match = re.search(r'["\']?markdown_playbook["\']?\s*:\s*["\']+(.*?)(?=["\'],\s*["\']|["\'],?\s*\}|$)', text, re.DOTALL | re.IGNORECASE)
+
                         if match:
-                            # Clean up the rescued text (fix escapes)
                             rescuing = match.group(1)
-                            rescuing = rescuing.replace('\\n', '\n').replace('\\"', '"').replace("\\'", "'")
+                            # Aggressive cleanup of escape sequences
+                            rescuing = rescuing.replace('\\n', '\n').replace('\\\\', '\\').replace('\\"', '"').replace("\\'", "'")
                             final_playbook_text = rescuing.strip()
-                        elif "# " in text:
-                            # If no match but it looks like markdown, just strip any json-like prefix
-                            # Find first # (Markdown header)
+
+                        # Strategy 2: Extract from first markdown header
+                        if not final_playbook_text and "# " in text:
                             start_of_md = text.find("# ")
                             if start_of_md != -1:
-                                final_playbook_text = text[start_of_md:].replace('\\n', '\n').strip()
-                                # Also strip a trailing quote if present
-                                if final_playbook_text.endswith('"') or final_playbook_text.endswith("'"):
+                                # Get content from first # to end or next major delimiter
+                                end_match = re.search(r'["\'],?\s*\}', text[start_of_md:])
+                                end_pos = end_match.start() + start_of_md if end_match else len(text)
+                                final_playbook_text = text[start_of_md:end_pos].replace('\\n', '\n').replace('\\\\', '\\').strip()
+                                # Strip trailing quote if present
+                                if final_playbook_text and final_playbook_text[-1] in ('"', "'"):
                                     final_playbook_text = final_playbook_text[:-1]
-                            else:
-                                final_playbook_text = text
-                        else:
-                            final_playbook_text = text
-                    
+
+                        # Strategy 3: If still nothing, use the entire text (might contain some markdown)
+                        if not final_playbook_text:
+                            final_playbook_text = text.replace('\\n', '\n').replace('\\\\', '\\').strip()
+
+                        # Also extract financial_summary and competitor_analysis from malformed JSON
+                        financial_match = re.search(r'["\']?financial_summary["\']?\s*:\s*["\']+(.*?)(?=["\'],\s*["\']|["\'],?\s*\}|$)', text, re.DOTALL | re.IGNORECASE)
+                        if financial_match:
+                            fin_text = financial_match.group(1).replace('\\n', '\n').replace('\\\\', '\\').replace('\\"', '"').strip()
+                            if fin_text and fin_text[-1] in ('"', "'"):
+                                fin_text = fin_text[:-1]
+                            snapshot.ai_financial_summary = fin_text
+
+                        competitor_match = re.search(r'["\']?competitor_analysis["\']?\s*:\s*["\']+(.*?)(?=["\'],\s*["\']|["\'],?\s*\}|$)', text, re.DOTALL | re.IGNORECASE)
+                        if competitor_match:
+                            comp_text = competitor_match.group(1).replace('\\n', '\n').replace('\\\\', '\\').replace('\\"', '"').strip()
+                            if comp_text and comp_text[-1] in ('"', "'"):
+                                comp_text = comp_text[:-1]
+                            snapshot.ai_competitor_analysis = comp_text
+
+                        risk_match = re.search(r'["\']?risk_status["\']?\s*:\s*["\']+(.*?)(?=["\']|,)', text, re.IGNORECASE)
+                        if risk_match:
+                            snapshot.ai_risk_status = risk_match.group(1).strip().strip('"\'')
+
                     if final_playbook_text:
                         # Log token usage
                         if hasattr(response, 'usage_metadata'):
