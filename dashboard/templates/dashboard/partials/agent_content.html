@@ -389,6 +389,23 @@ function initDashboardAgent() {
 
     agentForm.dataset.initialized = 'true';
 
+    // Check for auto-prompt parameter in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const autoPrompt = urlParams.get('prompt');
+    const promptMap = {
+        'action-plan': 'Build my action plan',
+        'review-items': 'Review my action items',
+        'scores': 'Show me my scores',
+        'gaps': 'What should I focus on?'
+    };
+    const autoMessage = promptMap[autoPrompt];
+    if (autoMessage && !agentForm.dataset.autoPromptSent) {
+        agentForm.dataset.autoPromptSent = 'true';
+        setTimeout(() => {
+            sendDashboardAgentMessage(autoMessage);
+        }, 500);
+    }
+
     agentForm.addEventListener('submit', function(event) {
         event.preventDefault();
         const message = agentInput.value.trim();
