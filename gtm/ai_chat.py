@@ -367,18 +367,24 @@ def _get_chat_client():
 
 def _get_chat_config(session_uuid: str):
     """Builds the configuration for the chat agent including instructions."""
-    system_instruction = f"""You're a GTM strategist helping companies improve their Go-To-Market execution.
+    system_instruction = f"""You're a GTM strategist consulting on the company's assessment data.
 
-Be conversational, direct, and practical. Provide actionable insights backed by the company's assessment data.
-Focus on: their strongest areas, critical gaps, and specific next steps they can take immediately.
+ALWAYS reference their actual assessment results—don't ask clarifying questions about data you already have.
+You know their scores, gaps, and company context from the assessment. Use this directly.
 
-When users ask to:
-- "Build my action plan" → Acknowledge and suggest they check the action items dashboard
-- "Review my action items" → Provide a summary of what they should focus on next
-- "Show my scores" → Provide a brief performance overview
-- "What should I focus on?" → Highlight their 2-3 most critical gaps
+Key principles:
+1. Start by acknowledging what you see in their data (scores, stage, critical gaps)
+2. Be specific: reference their actual numbers and assessment findings
+3. Provide 2-3 concrete next steps based on their specific gaps
+4. Conversational tone—avoid scripts and generic advice
 
-Keep responses conversational and avoid lengthy lists. End with a specific next step."""
+When discussing their GTM:
+- Their strengths are the foundation to build on
+- Their critical gaps (scores ≤ 2) are where they should focus first
+- Give specific, actionable recommendations based on their actual situation
+- Reference their company, industry, and stage when relevant
+
+Don't ask "what's your biggest challenge" or "tell me about your company"—you already know this from their assessment."""
     return types.GenerateContentConfig(
         system_instruction=system_instruction,
         temperature=0.8,
@@ -1020,11 +1026,31 @@ def handle_general_chat(
         return "I'm having trouble connecting to my AI brain right now. Please try again in a moment."
 
     try:
-        # 3. Prepare Multimodal Parts (fetch last 3 files for visual context)
+        # 3. Build assessment context to include with the message
+        assessment_context = f"""ASSESSMENT CONTEXT FOR THIS SESSION:
+Company: {context.get('company_name', 'Unknown')}
+Industry: {context.get('industry', 'Not specified')}
+GTM Stage: {context.get('stage', 'Unknown')}
+Overall Score: {context.get('overall_score', '?')}/100
+
+CATEGORY SCORES:
+{chr(10).join(f"- {cat['name']}: {cat['score']}/5" for cat in context.get('categories', []))}
+
+CRITICAL GAPS (Score ≤ 2):
+{chr(10).join(f"- {q['id_code']}: {q['text']} (Score: {q['score']}/5)" for q in context.get('weak_questions', [])[:5])}
+
+STRENGTHS (Score ≥ 4):
+{chr(10).join(f"- {q['id_code']}: {q['text']} (Score: {q['score']}/5)" for q in context.get('strong_questions', [])[:3])}
+"""
+
+        # 4. Prepare Multimodal Parts (fetch last 3 files for visual context)
         from .models import GTMFile
         recent_files = session.evidence_files.all()[:3]
-        
-        parts = [types.Part.from_text(text=message)]
+
+        parts = [
+            types.Part.from_text(text=assessment_context),
+            types.Part.from_text(text=message)
+        ]
         for f in recent_files:
             try:
                 # Add filenames to help the AI map parts to user mentions
@@ -1039,17 +1065,17 @@ def handle_general_chat(
             except Exception as fe:
                 logger.warning(f"Failed to attach file {f.id} to chat: {fe}")
 
-        # 4. Create Chat Session with Unified SDK
+        # 5. Create Chat Session with Unified SDK
         session_id_str = str(session.uuid)
         model_id = "gemini-2.5-flash"
-        
+
         response = client.models.generate_content(
             model=model_id,
             contents=[types.Content(role="user", parts=parts)],
             config=_get_chat_config(session_id_str)
         )
-        
-        # 5. Log usage if available
+
+        # 6. Log usage if available
         if hasattr(response, 'usage_metadata'):
             usage = response.usage_metadata
             if MONITORING_AVAILABLE:
@@ -1062,7 +1088,7 @@ def handle_general_chat(
         return response.text.strip()
 
     except Exception as e:
-        # 5. Handle Quota/Rate Limits Gracefully
+        # 7. Handle Quota/Rate Limits Gracefully
         if _is_quota_error(e):
             _set_quota_cooldown(_extract_retry_delay_seconds(e))
             return f"I've hit my temporary GTM strategy quota. Based on your data, your top priority is **{context['weakest_categories'][0]['name']}**. Let's discuss details in a minute!"
