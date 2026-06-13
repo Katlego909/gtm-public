@@ -1,0 +1,1355 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The Go-To-Market Readiness Platform.">
+      
+      
+        <meta name="author" content="Katlego">
+      
+      
+      
+        <link rel="prev" href="../system_design/">
+      
+      
+        <link rel="next" href="../python_reference/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Developer Deep Dive - GTM Validator Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#developer-deep-dive-system-architecture-core-logic" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="GTM Validator Documentation" class="md-header__button md-logo" aria-label="GTM Validator Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GTM Validator Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Developer Deep Dive
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../plain_english_guide/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Start Here (Plain English)
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Project Vision & Mission
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../hosting_guide/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Hosting & Deployment
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../system_design/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  System Design Logic
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Developer Deep Dive
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../python_reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Python Module Directory
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../ai_engine/" class="md-tabs__link">
+          
+  
+  
+  Technical Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../api_reference/" class="md-tabs__link">
+          
+  
+  
+  Developer Tools
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="GTM Validator Documentation" class="md-nav__button md-logo" aria-label="GTM Validator Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    GTM Validator Documentation
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plain_english_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Start Here (Plain English)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Vision & Mission
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hosting_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosting & Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../system_design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Design Logic
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Deep Dive
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Deep Dive
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-system-design-the-data-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. System Design: The Data Flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-module-directory-who-does-what" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Module Directory: Who Does What?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Module Directory: Who Does What?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#gtm-core-assessment-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gtm/ (Core Assessment Engine)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dashboard-analytics-assets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dashboard/ (Analytics &amp; Assets)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-core-logic-deep-dives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Core Logic Deep Dives
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Core Logic Deep Dives">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-the-weighted-scoring-algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A. The Weighted Scoring Algorithm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b-resilient-ai-the-rescue-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B. Resilient AI: The "Rescue" Pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c-multimodal-vision-to-scoring-bridge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C. Multimodal Vision-to-Scoring Bridge
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d-multi-tenant-isolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D. Multi-Tenant Isolation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-performance-standards-query-bounding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Performance Standards: Query Bounding
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../python_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Module Directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Technical Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Technical Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ai_engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intelligence & AI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scoring_logic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scoring Math
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data_models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workspaces/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspaces & RBAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../document_processing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Document Processing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Tools
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer Tools
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API & Views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../maintenance_tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Commands
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-system-design-the-data-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. System Design: The Data Flow
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-module-directory-who-does-what" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Module Directory: Who Does What?
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Module Directory: Who Does What?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#gtm-core-assessment-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        gtm/ (Core Assessment Engine)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dashboard-analytics-assets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        dashboard/ (Analytics &amp; Assets)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-core-logic-deep-dives" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Core Logic Deep Dives
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Core Logic Deep Dives">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#a-the-weighted-scoring-algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A. The Weighted Scoring Algorithm
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b-resilient-ai-the-rescue-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        B. Resilient AI: The "Rescue" Pattern
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c-multimodal-vision-to-scoring-bridge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        C. Multimodal Vision-to-Scoring Bridge
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#d-multi-tenant-isolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        D. Multi-Tenant Isolation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-performance-standards-query-bounding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Performance Standards: Query Bounding
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="developer-deep-dive-system-architecture-core-logic">Developer Deep Dive: System Architecture &amp; Core Logic</h1>
+<p>This document provides a high-substance technical reference for the GTM Validator. It explains how the system is architected, what each file is responsible for, and dives into the complex logic with actual code references.</p>
+<hr />
+<h2 id="1-system-design-the-data-flow">1. System Design: The Data Flow</h2>
+<p>The GTM Validator follows a <strong>Diagnostic-to-Action</strong> lifecycle. Here is how data moves through the system:</p>
+<ol>
+<li><strong>Identity:</strong> Middleware ensures every visitor has a <code>gtm_client</code> UUID cookie.</li>
+<li><strong>Assessment:</strong> <code>AssessmentSession</code> collects responses (1-5 scores + text notes).</li>
+<li><strong>Aggregation:</strong> <code>gtm.services._compute_scores</code> runs a weighted algorithm to generate a maturity rating.</li>
+<li><strong>Snapshotted State:</strong> Results are frozen into a <code>ResultSnapshot</code> to prevent recalculation lag.</li>
+<li><strong>AI Strategy:</strong> Background threads kickoff Gemini to write a 30-day playbook based on the snapshot.</li>
+<li><strong>Collaborative Execution:</strong> Workspace members turn playbook recommendations into <code>ActionItems</code>.</li>
+</ol>
+<hr />
+<h2 id="2-module-directory-who-does-what">2. Module Directory: Who Does What?</h2>
+<h3 id="gtm-core-assessment-engine"><code>gtm/</code> (Core Assessment Engine)</h3>
+<ul>
+<li><strong><code>models.py</code></strong>: The "Relational Bible." Defines Categories, Questions, Responses, and the critical <code>ResultSnapshot</code>.</li>
+<li><strong><code>services.py</code></strong>: The "Brain." Contains the math for weighted scoring and the logic for safe session retrieval.</li>
+<li><strong><code>ai_services.py</code></strong>: The "AI Gateway." Handles interaction with Vertex AI, prompt building, and response sanitization.</li>
+<li><strong><code>ai_auditor.py</code></strong>: The "Vision Bridge." Multimodal logic that audits images/PDFs and modifiers the GTM score.</li>
+<li><strong><code>views.py</code></strong>: The "Traffic Controller." Manages the multi-step HTMX assessment wizard.</li>
+<li><strong><code>middleware.py</code></strong>: Handles anonymous user tracking and persistent identity.</li>
+</ul>
+<h3 id="dashboard-analytics-assets"><code>dashboard/</code> (Analytics &amp; Assets)</h3>
+<ul>
+<li><strong><code>analytics.py</code></strong>: Logic for calculating KPI velocity, weekly trends, and workspace-scoped context.</li>
+<li><strong><code>document_processors.py</code></strong>: The "Parser." Hybrid PDF/Image OCR engine using local libraries and AI fallback.</li>
+<li><strong><code>views.py</code></strong>: Manages the Kanban task board, asset library, and KPI gap reporting.</li>
+</ul>
+<hr />
+<h2 id="3-core-logic-deep-dives">3. Core Logic Deep Dives</h2>
+<h3 id="a-the-weighted-scoring-algorithm">A. The Weighted Scoring Algorithm</h3>
+<p>The maturity score isn't a simple average. It uses two tiers of weights defined in the <code>load_gtm_defaults</code> command.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># gtm/services.py (simplified logic)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_compute_scores</span><span class="p">(</span><span class="n">session</span><span class="p">):</span>
+    <span class="c1"># Tier 1: Question weights (e.g. ICP is 1.25, Testimonials are 0.95)</span>
+    <span class="n">category_avg</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">score</span> <span class="o">*</span> <span class="n">question_weight</span><span class="p">)</span> <span class="o">/</span> <span class="nb">sum</span><span class="p">(</span><span class="n">question_weights</span><span class="p">)</span>
+
+    <span class="c1"># Tier 2: Category weights (Demand 40%, Conversion 40%, Delivery 20%)</span>
+    <span class="n">overall_score</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">((</span><span class="n">category_avg</span> <span class="o">/</span> <span class="mi">5</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">cat_weight</span> <span class="o">/</span> <span class="n">total_weight</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">overall_score</span>
+</code></pre></div>
+<h3 id="b-resilient-ai-the-rescue-pattern">B. Resilient AI: The "Rescue" Pattern</h3>
+<p>Vertex AI sometimes returns malformed JSON or markdown-wrapped strings. The project uses a regex-based discovery engine to "rescue" the content.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># gtm/ai_services.py</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_normalize_ai_playbook_markdown</span><span class="p">(</span><span class="n">playbook_text</span><span class="p">):</span>
+    <span class="c1"># Regex fallback: extract content of &quot;markdown_playbook&quot; key if json.loads fails</span>
+    <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;[&quot;</span><span class="se">\&#39;</span><span class="s1">]markdown_playbook[&quot;</span><span class="se">\&#39;</span><span class="s1">]\s*:\s*[&quot;</span><span class="se">\&#39;</span><span class="s1">](.*?)(?:[&quot;</span><span class="se">\&#39;</span><span class="s1">]\s*,\s*[&quot;</span><span class="se">\&#39;</span><span class="s1">]|[&quot;</span><span class="se">\&#39;</span><span class="s1">]\s*}|$)&#39;</span><span class="p">,</span> 
+                      <span class="n">src</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">DOTALL</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+        <span class="n">src</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># Clean up LLM artifacts (\n, \&quot;, etc)</span>
+    <span class="k">return</span> <span class="n">src</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">n&#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">&quot;&#39;</span><span class="p">,</span> <span class="s1">&#39;&quot;&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+</code></pre></div>
+<h3 id="c-multimodal-vision-to-scoring-bridge">C. Multimodal Vision-to-Scoring Bridge</h3>
+<p>The <code>ai_auditor</code> turns qualitative critiques into quantitative score modifiers.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># gtm/ai_auditor.py</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_extract_score_modifier</span><span class="p">(</span><span class="n">audit_text</span><span class="p">):</span>
+    <span class="c1"># Regex looks for &quot;Evidence Score: N/10&quot; in the AI&#39;s prose</span>
+    <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;evidence\s+score[:\s*]+(\d+(?:\.\d+)?)\s*(?:/\s*10)?&quot;</span><span class="p">,</span> <span class="n">audit_text</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">I</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+        <span class="n">score</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span>
+        <span class="c1"># Map 1-10 scale to -3 to +3 GTM score modifier</span>
+        <span class="k">if</span> <span class="n">score</span> <span class="o">&lt;=</span> <span class="mi">3</span><span class="p">:</span> <span class="k">return</span> <span class="o">-</span><span class="mi">3</span>
+        <span class="k">if</span> <span class="n">score</span> <span class="o">&gt;=</span> <span class="mi">7</span><span class="p">:</span> <span class="k">return</span> <span class="mi">3</span>
+        <span class="k">return</span> <span class="mi">0</span>
+</code></pre></div>
+<h3 id="d-multi-tenant-isolation">D. Multi-Tenant Isolation</h3>
+<p>Security is enforced by scoping every query to a <code>Workspace</code> while maintaining a fallback for personal assessments.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># dashboard/analytics.py</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_dashboard_context</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">current_workspace</span><span class="p">,</span> <span class="o">...</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">current_workspace</span><span class="p">:</span>
+        <span class="c1"># Strict workspace isolation</span>
+        <span class="n">assessments_qs</span> <span class="o">=</span> <span class="n">AssessmentSession</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">workspace</span><span class="o">=</span><span class="n">current_workspace</span><span class="p">)</span>
+        <span class="n">action_items_qs</span> <span class="o">=</span> <span class="n">ActionItem</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">workspace</span><span class="o">=</span><span class="n">current_workspace</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Fallback to private user data</span>
+        <span class="n">assessments_qs</span> <span class="o">=</span> <span class="n">AssessmentSession</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">user</span><span class="o">=</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="4-performance-standards-query-bounding">4. Performance Standards: Query Bounding</h2>
+<p>The results page is complex but stays fast because of a strict "Query Bounding" rule verified in <code>gtm/tests.py</code>.</p>
+<p><div class="highlight"><pre><span></span><code><span class="c1"># gtm/tests.py</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">test_results_performance</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">with</span> <span class="n">CaptureQueriesContext</span><span class="p">(</span><span class="n">connection</span><span class="p">)</span> <span class="k">as</span> <span class="n">ctx</span><span class="p">:</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">client</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">reverse</span><span class="p">(</span><span class="s1">&#39;gtm:results&#39;</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">session</span><span class="o">.</span><span class="n">uuid</span><span class="p">]))</span>
+        <span class="c1"># Guardrail: A 36-question assessment must not trigger &gt; 30 queries</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">assertLessEqual</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">ctx</span><span class="p">),</span> <span class="mi">30</span><span class="p">)</span>
+</code></pre></div>
+This is achieved by <strong>Prefetching</strong> categories and tool recommendations in bulk at the start of the view request.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

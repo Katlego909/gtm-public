@@ -1,0 +1,1308 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The Go-To-Market Readiness Platform.">
+      
+      
+        <meta name="author" content="Katlego">
+      
+      
+      
+        <link rel="prev" href="../python_reference/">
+      
+      
+        <link rel="next" href="../scoring_logic/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Intelligence & AI - GTM Validator Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#intelligence-ai-engine-technical-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="GTM Validator Documentation" class="md-header__button md-logo" aria-label="GTM Validator Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GTM Validator Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Intelligence & AI
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../plain_english_guide/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Start Here (Plain English)
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Project Vision & Mission
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../hosting_guide/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Hosting & Deployment
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../system_design/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  System Design Logic
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../developer_deep_dive/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Developer Deep Dive
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../python_reference/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Python Module Directory
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+  Technical Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../api_reference/" class="md-tabs__link">
+          
+  
+  
+  Developer Tools
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="GTM Validator Documentation" class="md-nav__button md-logo" aria-label="GTM Validator Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    GTM Validator Documentation
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plain_english_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Start Here (Plain English)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Vision & Mission
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../hosting_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Hosting & Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../system_design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Design Logic
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../developer_deep_dive/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Deep Dive
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../python_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python Module Directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Technical Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Technical Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intelligence & AI
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intelligence & AI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-interaction-layer-gtmai_servicespy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Interaction Layer (gtm/ai_services.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Interaction Layer (gtm/ai_services.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prompt-orchestration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prompt Orchestration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safety-quota-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Safety &amp; Quota Logic
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-multimodal-auditor-gtmai_auditorpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Multimodal Auditor (gtm/ai_auditor.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Multimodal Auditor (gtm/ai_auditor.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#binary-data-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Binary Data Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-agentic-autonomy-gtmai_chatpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Agentic Autonomy (gtm/ai_chat.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Agentic Autonomy (gtm/ai_chat.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#intent-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Intent Detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gtmai_chatpy-if-user-says-make-a-task-for-that-the-intent-execution_plan-is-triggered-if-intent-execution_plan-this-python-function-creates-actionitem-rows-in-the-db-automatically-return-build_execution_plansession-ai_recommendations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        # gtm/ai_chat.py # If user says &quot;Make a task for that,&quot; the intent &#39;execution_plan&#39; is triggered. if intent == &#39;execution_plan&#39;: # This Python function creates ActionItem rows in the DB automatically return build_execution_plan(session, ai_recommendations)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scoring_logic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scoring Math
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data_models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workspaces/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspaces & RBAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../document_processing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Document Processing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Tools
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer Tools
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API & Views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../maintenance_tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Commands
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-interaction-layer-gtmai_servicespy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Interaction Layer (gtm/ai_services.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. Interaction Layer (gtm/ai_services.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#prompt-orchestration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prompt Orchestration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safety-quota-logic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Safety &amp; Quota Logic
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-multimodal-auditor-gtmai_auditorpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Multimodal Auditor (gtm/ai_auditor.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Multimodal Auditor (gtm/ai_auditor.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#binary-data-flow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Binary Data Flow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-agentic-autonomy-gtmai_chatpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Agentic Autonomy (gtm/ai_chat.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Agentic Autonomy (gtm/ai_chat.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#intent-detection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Intent Detection
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gtmai_chatpy-if-user-says-make-a-task-for-that-the-intent-execution_plan-is-triggered-if-intent-execution_plan-this-python-function-creates-actionitem-rows-in-the-db-automatically-return-build_execution_plansession-ai_recommendations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        # gtm/ai_chat.py # If user says &quot;Make a task for that,&quot; the intent &#39;execution_plan&#39; is triggered. if intent == &#39;execution_plan&#39;: # This Python function creates ActionItem rows in the DB automatically return build_execution_plan(session, ai_recommendations)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="intelligence-ai-engine-technical-reference">Intelligence &amp; AI Engine: Technical Reference</h1>
+<div class="admonition info">
+<p class="admonition-title">The Big Picture</p>
+<p>The AI Engine is the <strong>GTM Validator's "Executive Consultant."</strong> It doesn't just generate text; it observes the database state, audits visual files, and mutates the task backlog. The architecture is built for <strong>resilience</strong>, ensuring that even if Gemini is down, the user still receives high-quality pre-written guidance.</p>
+</div>
+<hr />
+<h2 id="1-interaction-layer-gtmai_servicespy">1. Interaction Layer (<code>gtm/ai_services.py</code>)</h2>
+<p>The system interacts with Vertex AI via the <code>google-genai</code> SDK. The core entry point is <code>generate_playbook_with_gemini</code>.</p>
+<h3 id="prompt-orchestration">Prompt Orchestration</h3>
+<p>Prompts are not static strings; they are dynamically constructed using data from the <code>ResultSnapshot</code>.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># gtm/ai_services.py</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_build_playbook_prompt</span><span class="p">(</span><span class="n">snapshot</span><span class="p">):</span>
+    <span class="n">category_data</span> <span class="o">=</span> <span class="n">snapshot</span><span class="o">.</span><span class="n">category_breakdown</span>
+    <span class="n">weak_answers</span> <span class="o">=</span> <span class="n">Response</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">session</span><span class="o">=</span><span class="n">snapshot</span><span class="o">.</span><span class="n">session</span><span class="p">,</span> <span class="n">score__lte</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+    <span class="c1"># The prompt forces a specific JSON structure for easy parsing</span>
+    <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">    Analyze this GTM data for </span><span class="si">{</span><span class="n">snapshot</span><span class="o">.</span><span class="n">company_name</span><span class="si">}</span><span class="s2"> (</span><span class="si">{</span><span class="n">snapshot</span><span class="o">.</span><span class="n">industry</span><span class="si">}</span><span class="s2">):</span>
+<span class="s2">    Overall Score: </span><span class="si">{</span><span class="n">snapshot</span><span class="o">.</span><span class="n">overall</span><span class="si">}</span>
+<span class="s2">    Categories: </span><span class="si">{</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">category_data</span><span class="p">)</span><span class="si">}</span>
+<span class="s2">    Weak Points: </span><span class="si">{</span><span class="p">[</span><span class="n">r</span><span class="o">.</span><span class="n">question</span><span class="o">.</span><span class="n">text</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">r</span><span class="w"> </span><span class="ow">in</span><span class="w"> </span><span class="n">weak_answers</span><span class="p">]</span><span class="si">}</span>
+
+<span class="s2">    Return a JSON object with: </span>
+<span class="s2">    - &quot;markdown_playbook&quot;: A 30-day strategy.</span>
+<span class="s2">    - &quot;financial_summary&quot;: Estimated ROI.</span>
+<span class="s2">    - &quot;competitor_analysis&quot;: Gap assessment.</span>
+<span class="s2">    &quot;&quot;&quot;</span>
+</code></pre></div>
+<h3 id="safety-quota-logic">Safety &amp; Quota Logic</h3>
+<p>To handle enterprise-grade stability, the engine implements a global <strong>Quota Cooldown</strong>.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># gtm/ai_services.py</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_set_quota_cooldown</span><span class="p">():</span>
+    <span class="c1"># If Vertex AI returns &#39;ResourceExhausted&#39;, we pause for 5 minutes</span>
+    <span class="n">cache</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="s2">&quot;gtm:ai:quota_cooldown&quot;</span><span class="p">,</span> <span class="kc">True</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">300</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">generate_playbook_with_gemini</span><span class="p">(</span><span class="n">snapshot</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">cache</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;gtm:ai:quota_cooldown&quot;</span><span class="p">):</span>
+        <span class="c1"># Revert to safe pre-written content</span>
+        <span class="k">return</span> <span class="n">_fallback_to_static_content</span><span class="p">(</span><span class="n">snapshot</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="2-multimodal-auditor-gtmai_auditorpy">2. Multimodal Auditor (<code>gtm/ai_auditor.py</code>)</h2>
+<p>The auditor handles visual strategic evidence. It supports <strong>Image (Landing Pages)</strong> and <strong>PDF (Sales Decks)</strong>.</p>
+<h3 id="binary-data-flow">Binary Data Flow</h3>
+<p>Files are never sent as URLs; they are sent as raw binary parts to ensure the AI "sees" the exact state of the asset.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># gtm/ai_auditor.py</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">audit_gtm_file</span><span class="p">(</span><span class="n">gtm_file_id</span><span class="p">):</span>
+    <span class="n">file_obj</span> <span class="o">=</span> <span class="n">GTMFile</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">id</span><span class="o">=</span><span class="n">gtm_file_id</span><span class="p">)</span>
+    <span class="k">with</span> <span class="n">file_obj</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s1">&#39;rb&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">content</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+
+    <span class="c1"># Multimodal call sending text prompt + image bytes</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">generate_content</span><span class="p">(</span>
+        <span class="n">model</span><span class="o">=</span><span class="s1">&#39;gemini-2.5-flash&#39;</span><span class="p">,</span>
+        <span class="n">contents</span><span class="o">=</span><span class="p">[</span>
+            <span class="n">types</span><span class="o">.</span><span class="n">Part</span><span class="o">.</span><span class="n">from_text</span><span class="p">(</span><span class="s2">&quot;Critique this landing page for GTM clarity.&quot;</span><span class="p">),</span>
+            <span class="n">types</span><span class="o">.</span><span class="n">Part</span><span class="o">.</span><span class="n">from_bytes</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">content</span><span class="p">,</span> <span class="n">mime_type</span><span class="o">=</span><span class="s2">&quot;image/png&quot;</span><span class="p">)</span>
+        <span class="p">]</span>
+    <span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="3-agentic-autonomy-gtmai_chatpy">3. Agentic Autonomy (<code>gtm/ai_chat.py</code>)</h2>
+<p>The chat assistant is an <strong>Agent</strong>, meaning it can take actions in the database.</p>
+<h3 id="intent-detection">Intent Detection</h3>
+<p>The AI doesn't just talk; it classifies the user's "Intent."</p>
+<h2 id="gtmai_chatpy-if-user-says-make-a-task-for-that-the-intent-execution_plan-is-triggered-if-intent-execution_plan-this-python-function-creates-actionitem-rows-in-the-db-automatically-return-build_execution_plansession-ai_recommendations"><div class="highlight"><pre><span></span><code><span class="c1"># gtm/ai_chat.py</span>
+<span class="c1"># If user says &quot;Make a task for that,&quot; the intent &#39;execution_plan&#39; is triggered.</span>
+<span class="k">if</span> <span class="n">intent</span> <span class="o">==</span> <span class="s1">&#39;execution_plan&#39;</span><span class="p">:</span>
+    <span class="c1"># This Python function creates ActionItem rows in the DB automatically</span>
+    <span class="k">return</span> <span class="n">build_execution_plan</span><span class="p">(</span><span class="n">session</span><span class="p">,</span> <span class="n">ai_recommendations</span><span class="p">)</span>
+</code></pre></div></h2>
+<p><em>Technical Note: All AI interactions are logged to <code>AIUsageTracker</code> for cost and performance monitoring.</em></p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
