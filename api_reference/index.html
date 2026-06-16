@@ -13,7 +13,7 @@
       
       
       
-        <link rel="prev" href="../document_processing/">
+        <link rel="prev" href="../python_reference/">
       
       
         <link rel="next" href="../maintenance_tools/">
@@ -52,6 +52,8 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
     
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -286,17 +288,18 @@
   
   
   
-    <li class="md-tabs__item">
-      <a href="../python_reference/" class="md-tabs__link">
-        
-  
-  
     
+    
+      <li class="md-tabs__item">
+        <a href="../scoring_logic/" class="md-tabs__link">
+          
   
-  Python Module Directory
+  
+  Business Logic & Implementation
 
-      </a>
-    </li>
+        </a>
+      </li>
+    
   
 
       
@@ -308,11 +311,11 @@
     
     
       <li class="md-tabs__item">
-        <a href="../ai_engine/" class="md-tabs__link">
+        <a href="../data_models/" class="md-tabs__link">
           
   
   
-  Technical Reference
+  Data Architecture
 
         </a>
       </li>
@@ -330,11 +333,31 @@
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="./" class="md-tabs__link">
+        <a href="../python_reference/" class="md-tabs__link">
           
   
   
-  Developer Tools
+  Python API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../maintenance_tools/" class="md-tabs__link">
+          
+  
+  
+  Operations & Tools
 
         </a>
       </li>
@@ -489,15 +512,67 @@
   
   
   
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Business Logic & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Business Logic & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
     <li class="md-nav__item">
-      <a href="../python_reference/" class="md-nav__link">
+      <a href="../scoring_logic/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Python Module Directory
+    Scoring Math
   
 
     
@@ -506,6 +581,98 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../core_logic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Logic Deep Dives
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ai_engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI Engine & Resilience
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../document_processing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Document Processing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -540,7 +707,7 @@
   <span class="md-ellipsis">
     
   
-    Technical Reference
+    Data Architecture
   
 
     
@@ -556,67 +723,11 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Technical Reference
+    Data Architecture
   
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../ai_engine/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Intelligence & AI
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../scoring_logic/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Scoring Math
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -674,34 +785,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../document_processing/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Document Processing
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -744,7 +827,7 @@
   <span class="md-ellipsis">
     
   
-    Developer Tools
+    Python API Reference
   
 
     
@@ -760,11 +843,39 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Developer Tools
+    Python API Reference
   
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../python_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Module Directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -833,32 +944,77 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#1-the-assessment-wizard-gtmviewspy" class="md-nav__link">
+  <a href="#1-the-assessment-lifecycle-gtmviewspy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. The Assessment Wizard (gtm/views.py)
+        1. The Assessment Lifecycle (gtm/views.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. The Assessment Lifecycle (gtm/views.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#view-pattern-assessment_step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        View Pattern: assessment_step
       
     </span>
   </a>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#2-asynchronous-ai-polling" class="md-nav__link">
+  <a href="#2-asynchronous-ai-polling-state-management" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Asynchronous AI Polling
+        2. Asynchronous AI Polling &amp; State Management
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Asynchronous AI Polling &amp; State Management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-polling-partial-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The "Polling Partial" Pattern
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#3-real-time-context-optimization" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#implementation-ai-diagnostic-insights" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Real-Time Context Optimization
+        Implementation: AI Diagnostic Insights
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-real-time-context-assist-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Real-Time Context Assist API
       
     </span>
   </a>
@@ -877,10 +1033,38 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#5-report-generation-utils_pdfpy" class="md-nav__link">
+  <a href="#5-the-chat-agent-api-dashboardviewspy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. Report Generation (utils_pdf.py)
+        5. The Chat Agent API (dashboard/views.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. The Chat Agent API (dashboard/views.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#agent-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-report-generation-utils_pdfpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Report Generation (utils_pdf.py)
       
     </span>
   </a>
@@ -895,6 +1079,65 @@
   
 
               
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations & Tools
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations & Tools
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
             
               
                 
@@ -958,32 +1201,77 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#1-the-assessment-wizard-gtmviewspy" class="md-nav__link">
+  <a href="#1-the-assessment-lifecycle-gtmviewspy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. The Assessment Wizard (gtm/views.py)
+        1. The Assessment Lifecycle (gtm/views.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. The Assessment Lifecycle (gtm/views.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#view-pattern-assessment_step" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        View Pattern: assessment_step
       
     </span>
   </a>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#2-asynchronous-ai-polling" class="md-nav__link">
+  <a href="#2-asynchronous-ai-polling-state-management" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Asynchronous AI Polling
+        2. Asynchronous AI Polling &amp; State Management
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Asynchronous AI Polling &amp; State Management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-polling-partial-pattern" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The "Polling Partial" Pattern
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#3-real-time-context-optimization" class="md-nav__link">
+        
+          <li class="md-nav__item">
+  <a href="#implementation-ai-diagnostic-insights" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Real-Time Context Optimization
+        Implementation: AI Diagnostic Insights
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-real-time-context-assist-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Real-Time Context Assist API
       
     </span>
   </a>
@@ -1002,10 +1290,38 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#5-report-generation-utils_pdfpy" class="md-nav__link">
+  <a href="#5-the-chat-agent-api-dashboardviewspy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. Report Generation (utils_pdf.py)
+        5. The Chat Agent API (dashboard/views.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. The Chat Agent API (dashboard/views.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#agent-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Agent Workflow
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-report-generation-utils_pdfpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Report Generation (utils_pdf.py)
       
     </span>
   </a>
@@ -1030,28 +1346,99 @@
 
 
 <h1 id="developer-reference-api-views">Developer Reference: API &amp; Views</h1>
-<p>The GTM Validator uses a mix of standard Django views and HTMX-powered partials to manage the assessment lifecycle and AI interactions.</p>
-<h2 id="1-the-assessment-wizard-gtmviewspy">1. The Assessment Wizard (<code>gtm/views.py</code>)</h2>
-<p>The assessment process is managed through a single-view, multi-step pattern:
-- <strong><code>assessment_step</code></strong>: This view dynamically renders questions based on the <code>current_step</code> of the <code>AssessmentSession</code>.
-- <strong>HTMX Integration:</strong> If a request contains the <code>HX-Request</code> header, the view returns only the form partial. This prevents full page reloads and maintains the "Single Page App" feel of the diagnostic.
-- <strong>State Management:</strong> Scores and context notes are saved to <code>Response</code> objects on every "Next" click, ensuring zero data loss if a user disconnects.</p>
-<h2 id="2-asynchronous-ai-polling">2. Asynchronous AI Polling</h2>
-<p>Because playbook generation and diagnostic insights are non-blocking (running in background threads), the frontend uses polling to update the UI.
-- <strong><code>playbook_status</code> View:</strong> Returns the <code>ai_playbook_status</code> of a <code>ResultSnapshot</code>. Once "done", it triggers an HTMX swap to display the final playbook.
-- <strong><code>insight_status</code> View:</strong> Similar logic for individual question-level diagnostics.</p>
-<h2 id="3-real-time-context-optimization">3. Real-Time Context Optimization</h2>
-<p>The <code>rewrite_context_note</code> view provides an "AI Assist" for user notes:
-- <strong>Endpoint:</strong> Post a note to this view, and it returns a "cleaned" version using <code>ai_services.rewrite_context_note_with_ai</code>.
-- <strong>UI:</strong> This is used in the assessment form to help users turn raw thoughts into specific, actionable business context that improves the final AI playbook.</p>
+<p>This document provides a comprehensive technical reference for the GTM Validator's interaction layer. It details how the platform manages the assessment lifecycle, asynchronous AI processing, and multi-tenant security through a combination of standard Django views and HTMX-powered partials.</p>
+<hr />
+<h2 id="1-the-assessment-lifecycle-gtmviewspy">1. The Assessment Lifecycle (<code>gtm/views.py</code>)</h2>
+<p>The assessment process is managed through a single-view, multi-step pattern designed for high performance and zero data loss.</p>
+<h3 id="view-pattern-assessment_step">View Pattern: <code>assessment_step</code></h3>
+<p>This view dynamically renders questions based on the <code>current_step</code> of the <code>AssessmentSession</code>.</p>
+<ul>
+<li><strong>Logic:</strong> Detects the <code>HX-Request</code> header to return only the form partial for a seamless "Single Page App" feel.</li>
+<li><strong>Security:</strong> Wrapped in <code>safe_get_session_or_403</code> to prevent unauthorized access.</li>
+<li><strong>State Persistence:</strong> Every "Next" click triggers a <code>transaction.atomic</code> update that saves scores and context notes to <code>Response</code> objects.</li>
+</ul>
+<div class="highlight"><pre><span></span><code><span class="nd">@login_required</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">assessment_step</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">session_id</span><span class="p">,</span> <span class="n">step</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+    <span class="c1"># 1. Authorization &amp; Data Fetch</span>
+    <span class="n">session</span><span class="p">,</span> <span class="n">is_authorized</span> <span class="o">=</span> <span class="n">safe_get_session_or_403</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">session_id</span><span class="p">)</span>
+    <span class="n">steps</span> <span class="o">=</span> <span class="n">_paginated_questions</span><span class="p">()</span>
+    <span class="n">questions</span> <span class="o">=</span> <span class="n">steps</span><span class="p">[</span><span class="n">step</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+
+    <span class="c1"># 2. Dynamic Form Construction</span>
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;POST&quot;</span><span class="p">:</span>
+        <span class="n">form</span> <span class="o">=</span> <span class="n">StepForm</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">POST</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">form</span><span class="o">.</span><span class="n">is_valid</span><span class="p">():</span>
+            <span class="c1"># Atomic save ensures session state stays consistent</span>
+            <span class="k">with</span> <span class="n">transaction</span><span class="o">.</span><span class="n">atomic</span><span class="p">():</span>
+                <span class="c1"># Save Response objects...</span>
+                <span class="n">session</span><span class="o">.</span><span class="n">current_step</span> <span class="o">=</span> <span class="n">step</span> <span class="o">+</span> <span class="mi">1</span>
+                <span class="n">session</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">redirect</span><span class="p">(</span><span class="s2">&quot;gtm:assessment_step&quot;</span><span class="p">,</span> <span class="n">session_id</span><span class="o">=</span><span class="n">session</span><span class="o">.</span><span class="n">uuid</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="n">step</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="c1"># 3. Fragment Selection (HTMX)</span>
+    <span class="n">template</span> <span class="o">=</span> <span class="s2">&quot;gtm/assessment_step.html&quot;</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">_is_htmx</span><span class="p">(</span><span class="n">request</span><span class="p">)</span> <span class="k">else</span> <span class="s2">&quot;gtm/partials/step_form.html&quot;</span>
+    <span class="k">return</span> <span class="n">render</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">template</span><span class="p">,</span> <span class="n">context</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="2-asynchronous-ai-polling-state-management">2. Asynchronous AI Polling &amp; State Management</h2>
+<p>Because AI generation (Playbooks, Diagnostics) is non-blocking, the frontend uses a polling pattern to update the UI once the background thread finishes.</p>
+<h3 id="the-polling-partial-pattern">The "Polling Partial" Pattern</h3>
+<ul>
+<li><strong><code>playbook_status</code></strong>: A view that checks the <code>ai_playbook_status</code> field.</li>
+<li><strong>States:</strong><ul>
+<li><code>pending</code>: Triggers <code>_kickoff_playbook_generation</code>.</li>
+<li><code>generating</code>: Returns an HTMX loading indicator with <code>hx-trigger="every 2s"</code>.</li>
+<li><code>done</code>: Returns the final "View Playbook" button or content.</li>
+<li><code>failed</code>: Returns a retry button.</li>
+</ul>
+</li>
+</ul>
+<h3 id="implementation-ai-diagnostic-insights">Implementation: AI Diagnostic Insights</h3>
+<p>Similar to the playbook, individual question insights are generated in batches to minimize latency.</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">insight_status</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">session_id</span><span class="p">,</span> <span class="n">response_id</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Individual polling endpoint for question-level AI feedback.</span>
+<span class="sd">    If &#39;pending&#39;, it spawns a background thread to call generate_diagnostic_insight.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="n">get_object_or_404</span><span class="p">(</span><span class="n">Response</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">select_related</span><span class="p">(</span><span class="s2">&quot;question&quot;</span><span class="p">),</span> <span class="n">pk</span><span class="o">=</span><span class="n">response_id</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">response</span><span class="o">.</span><span class="n">ai_insight</span> <span class="ow">and</span> <span class="n">response</span><span class="o">.</span><span class="n">ai_insight_status</span> <span class="o">==</span> <span class="s2">&quot;pending&quot;</span><span class="p">:</span>
+        <span class="c1"># Spawn thread and mark status as &#39;generating&#39;</span>
+        <span class="n">spawn_diagnostic_thread</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">id</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">render</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="s2">&quot;gtm/partials/insight_status.html&quot;</span><span class="p">,</span> <span class="p">{</span><span class="s2">&quot;response&quot;</span><span class="p">:</span> <span class="n">response</span><span class="p">})</span>
+</code></pre></div>
+<hr />
+<h2 id="3-real-time-context-assist-api">3. Real-Time Context Assist API</h2>
+<p>The <code>rewrite_context_note</code> view provides an "AI Assist" for users during the assessment.</p>
+<ul>
+<li><strong>Endpoint:</strong> <code>POST /gtm/assessment/&lt;uuid&gt;/rewrite-note/</code></li>
+<li><strong>Functionality:</strong> Takes a raw user thought and returns a "cleaned" version optimized for the final AI strategy engine.</li>
+<li><strong>Technical Detail:</strong> Uses <code>rewrite_context_note_with_ai</code> (Gemini-Flash) with specific modes: <code>rewrite</code>, <code>summarize</code>, or <code>specific</code>.</li>
+</ul>
+<hr />
 <h2 id="4-multimodal-audit-endpoints">4. Multimodal Audit Endpoints</h2>
-<p>The asset library uses specialized views to trigger and track audits:
-- <strong><code>trigger_resource_audit</code></strong>: Spawns an <code>audit_resource_async</code> thread for a specific <code>Resource</code>.
-- <strong>HTMX Trigger:</strong> When a file is uploaded, an HTMX trigger calls the audit endpoint automatically, showing a "Critiquing..." spinner in the UI until the AI Auditor finishes its vision analysis.</p>
-<h2 id="5-report-generation-utils_pdfpy">5. Report Generation (<code>utils_pdf.py</code>)</h2>
-<p>The <code>download_report</code> view handles the generation of the professional PDF report:
-- <strong>Dynamic Context:</strong> It aggregates data from the <code>ResultSnapshot</code>, <code>Category</code> scores, and the AI Playbook.
-- <strong>Binary Stream:</strong> It returns a <code>FileResponse</code> containing the generated ReportLab PDF, allowing for direct download or browser viewing.</p>
+<p>The asset library (<code>dashboard/views.py</code>) uses specialized endpoints to trigger visual critiques.</p>
+<ul>
+<li><strong><code>trigger_resource_audit</code></strong>: Spawns an <code>audit_resource_async</code> thread for a specific <code>Resource</code>.</li>
+<li><strong>Binary Handling:</strong> The view reads the file from <code>default_storage</code> (local or Cloud Storage) and streams the bytes directly to the AI Auditor, avoiding public URL exposure.</li>
+</ul>
+<hr />
+<h2 id="5-the-chat-agent-api-dashboardviewspy">5. The Chat Agent API (<code>dashboard/views.py</code>)</h2>
+<p>The dashboard features an agentic chat interface that can mutate the database state (e.g., creating tasks from chat).</p>
+<h3 id="agent-workflow">Agent Workflow</h3>
+<ol>
+<li><strong>Request:</strong> User sends a natural language prompt (e.g., "Create a task for the ICP gap").</li>
+<li><strong>Intent Detection:</strong> <code>gtm/ai_chat.py</code> classifies the intent as <code>execution_plan</code>.</li>
+<li><strong>Command Execution:</strong> The view calls <code>_run_dashboard_action_command</code> to create <code>ActionItem</code> or <code>GapAnalysisMetric</code> rows.</li>
+<li><strong>Response:</strong> The agent returns a markdown confirmation which is rendered in the chat window.</li>
+</ol>
+<hr />
+<h2 id="6-report-generation-utils_pdfpy">6. Report Generation (<code>utils_pdf.py</code>)</h2>
+<p>The <code>download_report</code> view generates a professional executive PDF using <strong>ReportLab</strong>.</p>
+<ul>
+<li><strong>Performance:</strong> The PDF is generated in-memory using <code>BytesIO</code> and returned as a <code>FileResponse</code>.</li>
+<li><strong>Security:</strong> Generation requires the same <code>safe_get_session_or_403</code> check as the results page, ensuring sensitive strategic data is never exposed.</li>
+</ul>
 
 
 
@@ -1105,6 +1492,8 @@
     
     
       <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
       
     
   </body>

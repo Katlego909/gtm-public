@@ -13,10 +13,10 @@
       
       
       
-        <link rel="prev" href="../ai_engine/">
+        <link rel="prev" href="../developer_deep_dive/">
       
       
-        <link rel="next" href="../data_models/">
+        <link rel="next" href="../core_logic/">
       
       
         
@@ -53,6 +53,8 @@
       
     
     
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -78,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#scoring-analytics-logic" class="md-skip">
+        <a href="#scoring-analytics-the-mathematical-engine" class="md-skip">
           Skip to content
         </a>
       
@@ -285,36 +287,17 @@
   
   
   
-  
-    <li class="md-tabs__item">
-      <a href="../python_reference/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Python Module Directory
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
     
   
   
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="../ai_engine/" class="md-tabs__link">
+        <a href="./" class="md-tabs__link">
           
   
   
-  Technical Reference
+  Business Logic & Implementation
 
         </a>
       </li>
@@ -330,11 +313,51 @@
     
     
       <li class="md-tabs__item">
-        <a href="../api_reference/" class="md-tabs__link">
+        <a href="../data_models/" class="md-tabs__link">
           
   
   
-  Developer Tools
+  Data Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../python_reference/" class="md-tabs__link">
+          
+  
+  
+  Python API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../maintenance_tools/" class="md-tabs__link">
+          
+  
+  
+  Operations & Tools
 
         </a>
       </li>
@@ -487,33 +510,6 @@
       
   
   
-  
-  
-    <li class="md-nav__item">
-      <a href="../python_reference/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Python Module Directory
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
     
   
   
@@ -535,17 +531,17 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
             
   
   
   <span class="md-ellipsis">
     
   
-    Technical Reference
+    Business Logic & Implementation
   
 
     
@@ -556,44 +552,16 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_6">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
   
-    Technical Reference
+    Business Logic & Implementation
   
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../ai_engine/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Intelligence & AI
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -662,22 +630,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#1-weighted-scoring-algorithm" class="md-nav__link">
+  <a href="#1-hierarchical-weighted-scoring" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Weighted Scoring Algorithm
+        1. Hierarchical Weighted Scoring
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="1. Weighted Scoring Algorithm">
+    <nav class="md-nav" aria-label="1. Hierarchical Weighted Scoring">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#tier-1-per-question-weighted-average" class="md-nav__link">
+  <a href="#tier-1-question-level-weighting" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Tier 1: Per-Question Weighted Average
+        Tier 1: Question-Level Weighting
       
     </span>
   </a>
@@ -701,26 +669,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#2-performance-first-results-view" class="md-nav__link">
+  <a href="#2-the-analytics-engine-execution-velocity" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Performance-First Results View
+        2. The Analytics Engine: Execution Velocity
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#3-advanced-kpi-analytics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Advanced KPI Analytics
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="3. Advanced KPI Analytics">
+    <nav class="md-nav" aria-label="2. The Analytics Engine: Execution Velocity">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -735,10 +692,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#comparative-weekly-trends" class="md-nav__link">
+  <a href="#momentum-metrics-weekly-trends" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Comparative Weekly Trends
+        Momentum Metrics (Weekly Trends)
       
     </span>
   </a>
@@ -751,10 +708,49 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#4-gap-analysis-display-logic" class="md-nav__link">
+  <a href="#3-gap-analysis-prioritization" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Gap Analysis Display Logic
+        3. Gap Analysis &amp; Prioritization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Gap Analysis &amp; Prioritization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#visual-property-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Visual Property Mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-vision-to-scoring-bridge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Vision-to-Scoring Bridge
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-revenue-attribution-analytics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Revenue Attribution Analytics
       
     </span>
   </a>
@@ -777,14 +773,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../data_models/" class="md-nav__link">
+      <a href="../core_logic/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Data Models
+    Core Logic Deep Dives
   
 
     
@@ -805,14 +801,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../workspaces/" class="md-nav__link">
+      <a href="../ai_engine/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Workspaces & RBAC
+    AI Engine & Resilience
   
 
     
@@ -881,6 +877,121 @@
       
         
         
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data_models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workspaces/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspaces & RBAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
         
           
@@ -891,7 +1002,7 @@
   <span class="md-ellipsis">
     
   
-    Developer Tools
+    Python API Reference
   
 
     
@@ -907,11 +1018,39 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Developer Tools
+    Python API Reference
   
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../python_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Module Directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -940,6 +1079,65 @@
   
 
               
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations & Tools
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations & Tools
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
             
               
                 
@@ -1003,22 +1201,22 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#1-weighted-scoring-algorithm" class="md-nav__link">
+  <a href="#1-hierarchical-weighted-scoring" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Weighted Scoring Algorithm
+        1. Hierarchical Weighted Scoring
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="1. Weighted Scoring Algorithm">
+    <nav class="md-nav" aria-label="1. Hierarchical Weighted Scoring">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#tier-1-per-question-weighted-average" class="md-nav__link">
+  <a href="#tier-1-question-level-weighting" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Tier 1: Per-Question Weighted Average
+        Tier 1: Question-Level Weighting
       
     </span>
   </a>
@@ -1042,26 +1240,15 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#2-performance-first-results-view" class="md-nav__link">
+  <a href="#2-the-analytics-engine-execution-velocity" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. Performance-First Results View
+        2. The Analytics Engine: Execution Velocity
       
     </span>
   </a>
   
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#3-advanced-kpi-analytics" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        3. Advanced KPI Analytics
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="3. Advanced KPI Analytics">
+    <nav class="md-nav" aria-label="2. The Analytics Engine: Execution Velocity">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -1076,10 +1263,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#comparative-weekly-trends" class="md-nav__link">
+  <a href="#momentum-metrics-weekly-trends" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Comparative Weekly Trends
+        Momentum Metrics (Weekly Trends)
       
     </span>
   </a>
@@ -1092,10 +1279,49 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#4-gap-analysis-display-logic" class="md-nav__link">
+  <a href="#3-gap-analysis-prioritization" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Gap Analysis Display Logic
+        3. Gap Analysis &amp; Prioritization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Gap Analysis &amp; Prioritization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#visual-property-mapping" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Visual Property Mapping
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-vision-to-scoring-bridge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Vision-to-Scoring Bridge
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-revenue-attribution-analytics" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Revenue Attribution Analytics
       
     </span>
   </a>
@@ -1119,33 +1345,110 @@
 
 
 
-<h1 id="scoring-analytics-logic">Scoring &amp; Analytics Logic</h1>
-<p>The GTM Validator uses a two-tier weighted scoring algorithm to determine business maturity. This logic is derived from <code>gtm/services.py</code> and <code>dashboard/analytics.py</code>.</p>
-<h2 id="1-weighted-scoring-algorithm">1. Weighted Scoring Algorithm</h2>
-<p>The final GTM score is calculated through a hierarchy of weights:</p>
-<h3 id="tier-1-per-question-weighted-average">Tier 1: Per-Question Weighted Average</h3>
-<p>Each response is multiplied by its question's weight. The category score is the sum of these weighted scores divided by the sum of weights.
-$$\text{Category Avg} = \frac{\sum (\text{Response Score} \times \text{Question Weight})}{\sum \text{Question Weight}}$$</p>
+<h1 id="scoring-analytics-the-mathematical-engine">Scoring &amp; Analytics: The Mathematical Engine</h1>
+<p>This document provides a deep-substance reference for the GTM Validator's analytical framework. It explains how we translate qualitative assessment responses into quantitative maturity metrics and execution velocity.</p>
+<hr />
+<h2 id="1-hierarchical-weighted-scoring">1. Hierarchical Weighted Scoring</h2>
+<p>The GTM maturity score is not a simple average. It uses a <strong>two-tier weighted index</strong> that prioritizes strategic fundamentals over tactical execution.</p>
+<h3 id="tier-1-question-level-weighting">Tier 1: Question-Level Weighting</h3>
+<p>Each question carries a specific weight ($q_w$) defined in the diagnostic framework.
+-   <strong>Strategic Questions:</strong> (e.g., ICP, Value Prop) are weighted at <strong>1.25</strong>.
+-   <strong>Tactical Questions:</strong> (e.g., Tool usage) are weighted at <strong>0.85</strong>.</p>
+<p><strong>Formula:</strong>
+$$\text{Category Score} = \frac{\sum (\text{Response}<em>i \times q</em>{w,i})}{\sum q_{w,i}}$$</p>
 <h3 id="tier-2-categorical-normalization">Tier 2: Categorical Normalization</h3>
-<p>Categories have their own weights (e.g., Demand: 0.4, Conversion: 0.4, Delivery: 0.2). These are normalized against the total of all category weights to ensure a final score between 0 and 100.
-$$\text{Overall Score} = \sum \left( \frac{\text{Category Avg}}{5} \times \frac{\text{Category Weight}}{\text{Total Weight}} \times 100 \right)$$</p>
-<h2 id="2-performance-first-results-view">2. Performance-First Results View</h2>
-<p>The system is architected to handle large datasets efficiently:
-- <strong>Query Bounding:</strong> The results view is performance-tested to stay under 30 queries for a standard assessment.
-- <strong>Denormalization:</strong> Analytical results are cached in the <code>ResultSnapshot</code> model to avoid recalculating complex weighted averages on every page load.</p>
-<h2 id="3-advanced-kpi-analytics">3. Advanced KPI Analytics</h2>
-<p>The dashboard calculates several non-obvious metrics to track team productivity:</p>
+<p>Categories are weighted to reflect their impact on revenue growth.
+-   <strong>Demand Generation:</strong> 40%
+-   <strong>Conversion / Sales:</strong> 40%
+-   <strong>Delivery / Success:</strong> 20%</p>
+<p><strong>Implementation (SQL-Level Aggregation):</strong>
+We avoid Python loops by performing the entire aggregation in the database using Django's <code>Sum</code> and <code>F</code> expressions.</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># gtm/services.py - The heart of the scoring engine</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_compute_scores</span><span class="p">(</span><span class="n">session</span><span class="p">):</span>
+    <span class="n">category_results</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">Response</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">session</span><span class="o">=</span><span class="n">session</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">values</span><span class="p">(</span><span class="s1">&#39;question__category_id&#39;</span><span class="p">,</span> <span class="s1">&#39;question__category__weight&#39;</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">annotate</span><span class="p">(</span>
+            <span class="n">total_weighted_score</span><span class="o">=</span><span class="n">Sum</span><span class="p">(</span><span class="n">F</span><span class="p">(</span><span class="s1">&#39;score&#39;</span><span class="p">)</span> <span class="o">*</span> <span class="n">F</span><span class="p">(</span><span class="s1">&#39;question__weight&#39;</span><span class="p">)),</span>
+            <span class="n">total_weight</span><span class="o">=</span><span class="n">Sum</span><span class="p">(</span><span class="s1">&#39;question__weight&#39;</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="p">)</span>
+    <span class="c1"># Final normalization to a 100-point scale</span>
+    <span class="n">overall</span> <span class="o">+=</span> <span class="p">(</span><span class="n">cat_avg</span> <span class="o">/</span> <span class="mf">5.0</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">cat_weight</span> <span class="o">/</span> <span class="n">total_global_weight</span><span class="p">)</span> <span class="o">*</span> <span class="mf">100.0</span>
+</code></pre></div>
+<hr />
+<h2 id="2-the-analytics-engine-execution-velocity">2. The Analytics Engine: Execution Velocity</h2>
+<p>Execution speed is the primary driver of GTM success. The dashboard tracks how fast a workspace moves from "Strategy" to "Done."</p>
 <h3 id="action-item-velocity">Action Item Velocity</h3>
-<p>Measures the efficiency of the GTM team by calculating the average days between a task's creation and its "Done" status change:
-$$\text{Velocity} = \text{Avg}(\text{completed_at} - \text{created_at})$$</p>
-<h3 id="comparative-weekly-trends">Comparative Weekly Trends</h3>
-<p>The system identifies "meaningful change" by comparing this week's metrics against the previous week.
-- <strong>Sentiment Logic:</strong> For "Pending Items", a <em>decrease</em> is flagged as a positive trend (<code>pending_change_positive=True</code>).
-- <strong>Activity Mapping:</strong> A 7-day time-series tracks Sessions, Tasks Created, and Tasks Completed to visualize momentum.</p>
-<h2 id="4-gap-analysis-display-logic">4. Gap Analysis Display Logic</h2>
-<p>The Gap Analysis system (<code>calculate_gap_metric_display_properties</code>) maps numeric deltas to visual statuses:
-- <strong>Critical Gaps:</strong> Gaps &gt; 50% of the target are flagged as high priority.
-- <strong>Categorical Sorting:</strong> Insights are sorted by both <code>priority</code> and <code>category</code> (Lead Gen, Sales Velocity, etc.) to ensure a balanced improvement roadmap.</p>
+<p>We measure the efficiency of the GTM team by calculating the average days between a task's creation and its completion.</p>
+<p><strong>Formula:</strong>
+$$\text{Velocity (Days)} = \frac{\sum (\text{Completed At} - \text{Created At})}{N_{completed}}$$</p>
+<h3 id="momentum-metrics-weekly-trends">Momentum Metrics (Weekly Trends)</h3>
+<p>The system identifies "Momentum" by comparing this week's performance against the previous 7 days.</p>
+<table>
+<thead>
+<tr>
+<th style="text-align: left;">Metric</th>
+<th style="text-align: left;">Sentiment Logic</th>
+<th style="text-align: left;">Why?</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;"><strong>Sessions</strong></td>
+<td style="text-align: left;">Increase is Positive</td>
+<td style="text-align: left;">Indicates more strategic planning activity.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Completed Items</strong></td>
+<td style="text-align: left;">Increase is Positive</td>
+<td style="text-align: left;">Indicates higher execution throughput.</td>
+</tr>
+<tr>
+<td style="text-align: left;"><strong>Pending Items</strong></td>
+<td style="text-align: left;"><strong>Decrease is Positive</strong></td>
+<td style="text-align: left;">Indicates the team is clearing the backlog faster than it grows.</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><span class="c1"># dashboard/analytics.py logic</span>
+<span class="k">if</span> <span class="n">last_week_pending</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+    <span class="n">raw_change</span> <span class="o">=</span> <span class="p">((</span><span class="n">this_week_pending</span> <span class="o">-</span> <span class="n">last_week_pending</span><span class="p">)</span> <span class="o">/</span> <span class="n">last_week_pending</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span>
+    <span class="n">pending_change_positive</span> <span class="o">=</span> <span class="n">raw_change</span> <span class="o">&lt;</span> <span class="mi">0</span>  <span class="c1"># A decrease is GOOD for pending items</span>
+</code></pre></div>
+<hr />
+<h2 id="3-gap-analysis-prioritization">3. Gap Analysis &amp; Prioritization</h2>
+<p>The platform automatically identifies the "Critical Path" for improvement using delta-based prioritization.</p>
+<pre class="mermaid"><code>graph LR
+    A[Raw Score] --&gt; B{Target Score}
+    B --&gt; C[Gap Delta]
+    C --&gt; D{Priority Logic}
+    D -- Delta &gt; 2.0 --&gt; E[CRITICAL]
+    D -- Delta &gt; 1.0 --&gt; F[MODERATE]
+    D -- Delta &lt;= 1.0 --&gt; G[OPTIMIZATION]</code></pre>
+<h3 id="visual-property-mapping">Visual Property Mapping</h3>
+<p>The <code>calculate_gap_metric_display_properties</code> function maps numeric deltas to visual UI elements:
+-   <strong>High Priority:</strong> Gaps representing &gt; 40% of the target are flagged for immediate action.
+-   <strong>Trend Analysis:</strong> Compares the <code>current</code> score against the <code>target</code> to generate the <code>progress_percentage</code> shown in the dashboard.</p>
+<hr />
+<h2 id="4-vision-to-scoring-bridge">4. Vision-to-Scoring Bridge</h2>
+<p>Unique to this platform is the <strong>Multimodal Modifier</strong>. Qualitative visual audits (Sales Decks, Websites) are mathematically injected into the numeric maturity score.</p>
+<ul>
+<li><strong>Auditor Pass:</strong> AI generates an "Evidence Score" (1-10).</li>
+<li><strong>Modifier Logic:</strong><ul>
+<li>Score 1-3 $\rightarrow$ <strong>-3% Overall Score</strong> (Strategic disconnect).</li>
+<li>Score 8-10 $\rightarrow$ <strong>+3% Overall Score</strong> (Best-in-class validation).</li>
+</ul>
+</li>
+</ul>
+<p>This ensures that a company's GTM rating is <strong>evidence-backed</strong>, not just self-reported.</p>
+<hr />
+<h2 id="5-revenue-attribution-analytics">5. Revenue Attribution Analytics</h2>
+<p>The system ties GTM maturity to financial performance by tracking revenue distribution across channels (e.g., SEO, Paid, Referrals).</p>
+<ul>
+<li><strong>Revenue Percent:</strong> $(\text{Channel Revenue} / \text{Total Revenue}) \times 100$.</li>
+<li><strong>Correlation:</strong> By overlaying the <strong>Conversion Category</strong> score against <strong>Paid Search ROI</strong>, the platform identifies whether high CAC is a marketing problem or a sales execution problem.</li>
+</ul>
 
 
 
@@ -1199,6 +1502,8 @@ $$\text{Velocity} = \text{Avg}(\text{completed_at} - \text{created_at})$$</p>
     
     
       <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
       
     
   </body>

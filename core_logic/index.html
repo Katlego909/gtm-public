@@ -13,6 +13,10 @@
       
       
       
+        <link rel="prev" href="../scoring_logic/">
+      
+      
+        <link rel="next" href="../ai_engine/">
       
       
         
@@ -23,7 +27,7 @@
     
     
       
-        <title>Technical Substace & Core Logic - GTM Validator Documentation</title>
+        <title>Core Logic Deep Dives - GTM Validator Documentation</title>
       
     
     
@@ -48,6 +52,8 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
     
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
@@ -74,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#technical-substace-core-logic" class="md-skip">
+        <a href="#implementation-showcase-production-grade-code-snippets" class="md-skip">
           Skip to content
         </a>
       
@@ -108,7 +114,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Technical Substace &amp; Core Logic
+              Core Logic Deep Dives
             
           </span>
         </div>
@@ -281,34 +287,17 @@
   
   
   
-  
-    <li class="md-tabs__item">
-      <a href="../python_reference/" class="md-tabs__link">
-        
-  
-  
     
-  
-  Python Module Directory
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
   
   
     
     
-      <li class="md-tabs__item">
-        <a href="../ai_engine/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../scoring_logic/" class="md-tabs__link">
           
   
   
-  Technical Reference
+  Business Logic & Implementation
 
         </a>
       </li>
@@ -324,11 +313,51 @@
     
     
       <li class="md-tabs__item">
-        <a href="../api_reference/" class="md-tabs__link">
+        <a href="../data_models/" class="md-tabs__link">
           
   
   
-  Developer Tools
+  Data Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../python_reference/" class="md-tabs__link">
+          
+  
+  
+  Python API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../maintenance_tools/" class="md-tabs__link">
+          
+  
+  
+  Operations & Tools
 
         </a>
       </li>
@@ -481,60 +510,38 @@
       
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../python_reference/" class="md-nav__link">
+  
+    
+    
+    
+    
+      
         
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Python Module Directory
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
+        
       
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
             
   
   
   <span class="md-ellipsis">
     
   
-    Technical Reference
+    Business Logic & Implementation
   
 
     
@@ -545,44 +552,16 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
   
-    Technical Reference
+    Business Logic & Implementation
   
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../ai_engine/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Intelligence & AI
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -616,17 +595,44 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../data_models/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Logic Deep Dives
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
   <span class="md-ellipsis">
     
   
-    Data Models
+    Core Logic Deep Dives
   
 
     
@@ -635,6 +641,138 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-the-mathematical-engine-weighted-scoring-gtmservicespy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. The Mathematical Engine: Weighted Scoring (gtm/services.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. The Mathematical Engine: Weighted Scoring (gtm/services.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_compute_scoressession" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        _compute_scores(session)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-ai-resilience-the-json-rescue-pattern-gtmai_servicespy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. AI Resilience: The "JSON Rescue" Pattern (gtm/ai_services.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. AI Resilience: The &#34;JSON Rescue&#34; Pattern (gtm/ai_services.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#generate_playbook_with_geminisnapshot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generate_playbook_with_gemini(snapshot)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-multimodal-audit-vision-to-score-bridge-gtmai_auditorpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Multimodal Audit: Vision-to-Score Bridge (gtm/ai_auditor.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Multimodal Audit: Vision-to-Score Bridge (gtm/ai_auditor.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#perform_resource_auditresource" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        perform_resource_audit(resource)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-performance-batch-diagnostic-polling-gtmviewspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Performance: Batch Diagnostic Polling (gtm/views.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Performance: Batch Diagnostic Polling (gtm/views.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#generate_diagnostic_insights_batchresponses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generate_diagnostic_insights_batch(responses)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -647,14 +785,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../workspaces/" class="md-nav__link">
+      <a href="../ai_engine/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Workspaces & RBAC
+    AI Engine & Resilience
   
 
     
@@ -723,6 +861,121 @@
       
         
         
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data_models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workspaces/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspaces & RBAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
         
           
@@ -733,7 +986,7 @@
   <span class="md-ellipsis">
     
   
-    Developer Tools
+    Python API Reference
   
 
     
@@ -749,11 +1002,39 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Developer Tools
+    Python API Reference
   
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../python_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Module Directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -782,6 +1063,65 @@
   
 
               
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations & Tools
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations & Tools
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
             
               
                 
@@ -845,57 +1185,114 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#1-weighted-scoring-architecture" class="md-nav__link">
+  <a href="#1-the-mathematical-engine-weighted-scoring-gtmservicespy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Weighted Scoring Architecture
+        1. The Mathematical Engine: Weighted Scoring (gtm/services.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. The Mathematical Engine: Weighted Scoring (gtm/services.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_compute_scoressession" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        _compute_scores(session)
       
     </span>
   </a>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#2-the-vision-to-value-bridge" class="md-nav__link">
+  <a href="#2-ai-resilience-the-json-rescue-pattern-gtmai_servicespy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        2. The "Vision-to-Value" Bridge
+        2. AI Resilience: The "JSON Rescue" Pattern (gtm/ai_services.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. AI Resilience: The &#34;JSON Rescue&#34; Pattern (gtm/ai_services.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#generate_playbook_with_geminisnapshot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generate_playbook_with_gemini(snapshot)
       
     </span>
   </a>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#3-resilient-ai-pipeline" class="md-nav__link">
+  <a href="#3-multimodal-audit-vision-to-score-bridge-gtmai_auditorpy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. Resilient AI Pipeline
+        3. Multimodal Audit: Vision-to-Score Bridge (gtm/ai_auditor.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Multimodal Audit: Vision-to-Score Bridge (gtm/ai_auditor.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#perform_resource_auditresource" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        perform_resource_audit(resource)
       
     </span>
   </a>
   
 </li>
+        
+      </ul>
+    </nav>
+  
+</li>
       
         <li class="md-nav__item">
-  <a href="#4-multi-tenant-data-isolation" class="md-nav__link">
+  <a href="#4-performance-batch-diagnostic-polling-gtmviewspy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. Multi-Tenant Data Isolation
+        4. Performance: Batch Diagnostic Polling (gtm/views.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Performance: Batch Diagnostic Polling (gtm/views.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#generate_diagnostic_insights_batchresponses" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        generate_diagnostic_insights_batch(responses)
       
     </span>
   </a>
   
 </li>
-      
-        <li class="md-nav__item">
-  <a href="#5-document-eyes-for-the-agent" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        5. Document "Eyes" for the Agent
-      
-    </span>
-  </a>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -916,41 +1313,172 @@
 
 
 
-<h1 id="technical-substace-core-logic">Technical Substace &amp; Core Logic</h1>
-<p>This document explains the technical "Why" behind the GTM Validator. It bridges the gap between the product features and the Django/AI implementation.</p>
+<h1 id="implementation-showcase-production-grade-code-snippets">Implementation Showcase: Production-Grade Code Snippets</h1>
+<p>This page contains the <strong>full, production-ready source code</strong> for the GTM Validator's most critical business logic. These snippets are not simplified; they include the actual error handling, performance optimizations (select_related, bulk operations), and resilience patterns used in the project.</p>
 <hr />
-<h2 id="1-weighted-scoring-architecture">1. Weighted Scoring Architecture</h2>
-<p>The "Substance" of the GTM assessment relies on a hierarchical weighting system. Not all questions are equal.</p>
-<ul>
-<li><strong>Question Weights:</strong> Found in <code>gtm/models.py</code>. A question like "Do you have a documented ICP?" is weighted higher (1.25) than "Do you capture proof points?" (0.95).</li>
-<li><strong>Normalization:</strong> In <code>gtm/services.py</code>, category scores are normalized to a 100-point scale. This ensures that even if one category has 10 questions and another has 5, they impact the final "Maturity Rating" according to the business-defined importance (Demand: 40%, Conversion: 40%, Delivery: 20%).</li>
-</ul>
-<h2 id="2-the-vision-to-value-bridge">2. The "Vision-to-Value" Bridge</h2>
-<p>The project includes a unique integration between visual auditing and numerical scoring (<code>gtm/ai_auditor.py</code>).</p>
-<ul>
-<li><strong>Logic:</strong> The AI Auditor doesn't just provide text feedback. It returns an "Evidence Score" (1-10).</li>
-<li><strong>Implementation:</strong> The code uses a regex-based parser (<code>_extract_score_modifier</code>) to turn LLM prose into a numeric integer (-3 to +3).</li>
-<li><strong>Business Impact:</strong> This modifier is applied to the <code>ResultSnapshot</code>, meaning a company's GTM maturity rating is <strong>validated by actual evidence</strong>, not just their self-reported answers.</li>
-</ul>
-<h2 id="3-resilient-ai-pipeline">3. Resilient AI Pipeline</h2>
-<p>AI is unpredictable. The GTM Validator uses several patterns to ensure the platform stays "Up" even when the AI is "Down" or slow.</p>
-<ul>
-<li><strong>Background Processing:</strong> Tasks like playbook generation are handled in background threads (<code>threading.Thread</code>). The user sees a "Generating..." status while the AI works, and the UI polls for completion using HTMX.</li>
-<li><strong>JSON Sanitization:</strong> LLMs often break JSON formatting. <code>gtm/ai_services.py</code> includes a <code>_clean_json_response</code> utility that "rescues" the content by stripping markdown tags and finding structural JSON boundaries.</li>
-<li><strong>Static Fallbacks:</strong> If the Gemini API hits a quota limit or fails, the platform automatically switches to "Safe Mode," serving high-quality pre-written advice from the <code>RecommendationBand</code> models.</li>
-</ul>
-<h2 id="4-multi-tenant-data-isolation">4. Multi-Tenant Data Isolation</h2>
-<p>The "Workspace" feature uses a <strong>Soft Isolation</strong> model (<code>gtm/models_workspace.py</code>).</p>
-<ul>
-<li><strong>Pattern:</strong> Every major data point (<code>AssessmentSession</code>, <code>ActionItem</code>, <code>Resource</code>) has an optional <code>workspace</code> foreign key.</li>
-<li><strong>Authorization:</strong> Permission checks are centralized in <code>safe_get_session_or_403</code>. This ensures that "Contributor" A in "Workspace" X can never see data from "Workspace" Y, while still allowing the same user to have private personal assessments.</li>
-</ul>
-<h2 id="5-document-eyes-for-the-agent">5. Document "Eyes" for the Agent</h2>
-<p>The chat agent can "read" files (<code>dashboard/document_processors.py</code>).</p>
-<ul>
-<li><strong>OCR Strategy:</strong> It uses a hybrid approach. It first tries to parse PDFs locally. If that fails (e.g., a scanned image PDF), it sends the document to Gemini for <strong>AI-powered text extraction</strong>.</li>
-<li><strong>Context Windowing:</strong> To avoid crashing the AI with too much text, the code tokenizes documents and only sends the most relevant snippets based on the user's specific question.</li>
-</ul>
+<h2 id="1-the-mathematical-engine-weighted-scoring-gtmservicespy">1. The Mathematical Engine: Weighted Scoring (<code>gtm/services.py</code>)</h2>
+<p>This service calculates the hierarchical maturity score. It is designed to be highly performant, using a single database aggregation to compute results across any number of questions.</p>
+<h3 id="_compute_scoressession"><code>_compute_scores(session)</code></h3>
+<p>Calculates the 100-point GTM Maturity Index.</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_compute_scores</span><span class="p">(</span><span class="n">session</span><span class="p">:</span> <span class="n">AssessmentSession</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculates the hierarchical weighted maturity score (0-100).</span>
+<span class="sd">    - Tier 1: Question-level weights (normalized within category).</span>
+<span class="sd">    - Tier 2: Category-level weights (normalized globally).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># 1. Fetch all category weights and map to ID for overall calculation</span>
+    <span class="n">all_cats</span> <span class="o">=</span> <span class="n">Category</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">all</span><span class="p">()</span><span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">)</span>
+    <span class="n">total_w</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">weight</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">all_cats</span><span class="p">)</span> <span class="ow">or</span> <span class="mf">1.0</span>
+    <span class="n">cat_weight_map</span> <span class="o">=</span> <span class="p">{</span><span class="n">c</span><span class="o">.</span><span class="n">id</span><span class="p">:</span> <span class="n">c</span><span class="o">.</span><span class="n">weight</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">all_cats</span><span class="p">}</span>
+
+    <span class="c1"># 2. Efficient DB Aggregation: Group by category and sum weighted scores</span>
+    <span class="n">category_results</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">Response</span><span class="o">.</span><span class="n">objects</span>
+        <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">session</span><span class="o">=</span><span class="n">session</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">values</span><span class="p">(</span><span class="s1">&#39;question__category_id&#39;</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">annotate</span><span class="p">(</span>
+            <span class="n">total_weighted_score</span><span class="o">=</span><span class="n">Sum</span><span class="p">(</span><span class="n">F</span><span class="p">(</span><span class="s1">&#39;score&#39;</span><span class="p">)</span> <span class="o">*</span> <span class="n">F</span><span class="p">(</span><span class="s1">&#39;question__weight&#39;</span><span class="p">)),</span>
+            <span class="n">total_weight</span><span class="o">=</span><span class="n">Sum</span><span class="p">(</span><span class="s1">&#39;question__weight&#39;</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="s1">&#39;question__category_id&#39;</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">overall</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">scores_by_id</span> <span class="o">=</span> <span class="p">{</span><span class="n">c</span><span class="o">.</span><span class="n">id</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="n">c</span><span class="p">,</span> <span class="s2">&quot;avg&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span> <span class="s2">&quot;pct&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">}</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">all_cats</span><span class="p">}</span>
+
+    <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">category_results</span><span class="p">:</span>
+        <span class="n">cat_id</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;question__category_id&#39;</span><span class="p">]</span>
+        <span class="n">num</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;total_weighted_score&#39;</span><span class="p">]</span>
+        <span class="n">den</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;total_weight&#39;</span><span class="p">]</span>
+        <span class="n">avg</span> <span class="o">=</span> <span class="n">num</span> <span class="o">/</span> <span class="n">den</span> <span class="k">if</span> <span class="n">den</span> <span class="k">else</span> <span class="mf">0.0</span>
+
+        <span class="c1"># Update category data</span>
+        <span class="n">scores_by_id</span><span class="p">[</span><span class="n">cat_id</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;avg&quot;</span><span class="p">:</span> <span class="n">avg</span><span class="p">,</span> <span class="s2">&quot;pct&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">avg</span> <span class="o">/</span> <span class="mf">5.0</span><span class="p">)</span> <span class="o">*</span> <span class="mf">100.0</span><span class="p">})</span>
+
+        <span class="c1"># Aggregate to overall score based on global category weights</span>
+        <span class="n">weight</span> <span class="o">=</span> <span class="n">cat_weight_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">cat_id</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">overall</span> <span class="o">+=</span> <span class="p">(</span><span class="n">avg</span> <span class="o">/</span> <span class="mf">5.0</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">weight</span> <span class="o">/</span> <span class="n">total_w</span><span class="p">)</span> <span class="o">*</span> <span class="mf">100.0</span>
+
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">scores_by_id</span><span class="o">.</span><span class="n">values</span><span class="p">()),</span> <span class="n">overall</span>
+</code></pre></div>
+<hr />
+<h2 id="2-ai-resilience-the-json-rescue-pattern-gtmai_servicespy">2. AI Resilience: The "JSON Rescue" Pattern (<code>gtm/ai_services.py</code>)</h2>
+<p>LLMs often fail to return perfect JSON. This pattern ensures the application remains functional even when the AI returns malformed data or markdown-wrapped objects.</p>
+<h3 id="generate_playbook_with_geminisnapshot"><code>generate_playbook_with_gemini(snapshot)</code></h3>
+<p>Orchestrates the AI playbook generation with multi-layered fallbacks.</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">generate_playbook_with_gemini</span><span class="p">(</span><span class="n">snapshot</span><span class="p">:</span> <span class="n">ResultSnapshot</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generates a strategy playbook with aggressive content rescuing.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># 1. Concurrency Guard: Prevent multiple threads for the same snapshot</span>
+    <span class="n">playbook_lock_key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;gtm:ai:playbook:</span><span class="si">{</span><span class="n">snapshot</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">:lock&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">_acquire_lock</span><span class="p">(</span><span class="n">playbook_lock_key</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">snapshot</span><span class="o">.</span><span class="n">ai_playbook</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span>
+
+    <span class="n">snapshot</span><span class="o">.</span><span class="n">ai_playbook_status</span> <span class="o">=</span> <span class="s2">&quot;generating&quot;</span>
+    <span class="n">snapshot</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">update_fields</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ai_playbook_status&quot;</span><span class="p">])</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">client</span> <span class="o">=</span> <span class="n">_get_client</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">client</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">_quota_cooldown_active</span><span class="p">():</span>
+            <span class="n">prompt</span> <span class="o">=</span> <span class="n">_build_prompt</span><span class="p">(</span><span class="n">snapshot</span><span class="p">)</span>
+            <span class="n">response</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">generate_content</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;gemini-2.5-flash&quot;</span><span class="p">,</span> <span class="n">contents</span><span class="o">=</span><span class="n">prompt</span><span class="p">)</span>
+            <span class="n">text</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">text</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+            <span class="c1"># --- THE RESCUE PATTERN ---</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="c1"># Attempt standard JSON parse</span>
+                <span class="n">parsed</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_clean_json_response</span><span class="p">(</span><span class="n">text</span><span class="p">))</span>
+                <span class="n">final_text</span> <span class="o">=</span> <span class="n">parsed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;markdown_playbook&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="c1"># Fallback: Regex extraction of the &#39;markdown_playbook&#39; field</span>
+                <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;[&quot;</span><span class="se">\&#39;</span><span class="s1">]?markdown_playbook[&quot;</span><span class="se">\&#39;</span><span class="s1">]?\s*:\s*[&quot;</span><span class="se">\&#39;</span><span class="s1">]+(.*?)(?=[&quot;</span><span class="se">\&#39;</span><span class="s1">],\s*[&quot;</span><span class="se">\&#39;</span><span class="s1">]|[&quot;</span><span class="se">\&#39;</span><span class="s1">],?\s*\}|$)&#39;</span><span class="p">,</span> <span class="n">text</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">DOTALL</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">match</span><span class="p">:</span>
+                    <span class="n">final_text</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">n&#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">&quot;&#39;</span><span class="p">,</span> <span class="s1">&#39;&quot;&#39;</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="c1"># Final Fallback: Use raw text if headers are present</span>
+                    <span class="n">final_text</span> <span class="o">=</span> <span class="n">text</span> <span class="k">if</span> <span class="s2">&quot;# &quot;</span> <span class="ow">in</span> <span class="n">text</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+
+        <span class="c1"># --- PERSISTENCE ---</span>
+        <span class="n">snapshot</span><span class="o">.</span><span class="n">ai_playbook</span> <span class="o">=</span> <span class="n">final_text</span> <span class="ow">or</span> <span class="n">_get_static_fallback</span><span class="p">(</span><span class="n">snapshot</span><span class="p">)</span>
+        <span class="n">snapshot</span><span class="o">.</span><span class="n">ai_playbook_status</span> <span class="o">=</span> <span class="s2">&quot;done&quot;</span>
+        <span class="n">snapshot</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">snapshot</span><span class="o">.</span><span class="n">ai_playbook</span>
+
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">snapshot</span><span class="o">.</span><span class="n">ai_playbook_status</span> <span class="o">=</span> <span class="s2">&quot;failed&quot;</span>
+        <span class="n">snapshot</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Playbook failure: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">_release_lock</span><span class="p">(</span><span class="n">playbook_lock_key</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="3-multimodal-audit-vision-to-score-bridge-gtmai_auditorpy">3. Multimodal Audit: Vision-to-Score Bridge (<code>gtm/ai_auditor.py</code>)</h2>
+<p>This logic turns raw image/PDF data into a numeric GTM score modifier. It is the bridge between qualitative AI critique and quantitative maturity modeling.</p>
+<h3 id="perform_resource_auditresource"><code>perform_resource_audit(resource)</code></h3>
+<p>Analyzes a file and updates the resource model with AI-derived strategic data.</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">perform_resource_audit</span><span class="p">(</span><span class="n">resource</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Full multimodal audit lifecycle for a strategic asset.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># 1. Read binary stream from storage (Cloud Storage or Local)</span>
+    <span class="n">resource</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s1">&#39;rb&#39;</span><span class="p">)</span>
+    <span class="n">file_bytes</span> <span class="o">=</span> <span class="n">resource</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+    <span class="n">resource</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+    <span class="c1"># 2. Run the vision model (Gemini-Flash)</span>
+    <span class="n">audit_text</span> <span class="o">=</span> <span class="n">_run_multimodal_audit</span><span class="p">(</span>
+        <span class="n">file_bytes</span><span class="p">,</span> 
+        <span class="n">mime_type</span><span class="o">=</span><span class="n">_detect_mime</span><span class="p">(</span><span class="n">resource</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">name</span><span class="p">),</span>
+        <span class="n">asset_name</span><span class="o">=</span><span class="n">resource</span><span class="o">.</span><span class="n">get_category_display</span><span class="p">()</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">audit_text</span><span class="p">:</span>
+        <span class="c1"># 3. Extract numeric modifier (-3 to +3) from AI prose</span>
+        <span class="n">resource</span><span class="o">.</span><span class="n">ai_score_modifier</span> <span class="o">=</span> <span class="n">_extract_score_modifier</span><span class="p">(</span><span class="n">audit_text</span><span class="p">)</span>
+
+        <span class="c1"># 4. Identify GTM categories (e.g. &#39;Lead Gen&#39;) mentioned in the critique</span>
+        <span class="n">resource</span><span class="o">.</span><span class="n">gtm_categories</span> <span class="o">=</span> <span class="n">_extract_gtm_categories</span><span class="p">(</span><span class="n">audit_text</span><span class="p">)</span>
+
+        <span class="n">resource</span><span class="o">.</span><span class="n">ai_audit_summary</span> <span class="o">=</span> <span class="n">audit_text</span> <span class="c1"># Store full text</span>
+        <span class="n">resource</span><span class="o">.</span><span class="n">audit_status</span> <span class="o">=</span> <span class="s1">&#39;complete&#39;</span>
+        <span class="n">resource</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="k">return</span> <span class="kc">False</span>
+</code></pre></div>
+<hr />
+<h2 id="4-performance-batch-diagnostic-polling-gtmviewspy">4. Performance: Batch Diagnostic Polling (<code>gtm/views.py</code>)</h2>
+<p>To avoid "N+1" API calls and UI flickering, the results page uses a <strong>Batch AI Insight</strong> generator.</p>
+<h3 id="generate_diagnostic_insights_batchresponses"><code>generate_diagnostic_insights_batch(responses)</code></h3>
+<p>Generates individual feedback for multiple low-scored questions in a <strong>single AI request</strong>.</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">generate_diagnostic_insights_batch</span><span class="p">(</span><span class="n">responses</span><span class="p">:</span> <span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Sends up to 10 responses to Gemini in a single batch.</span>
+<span class="sd">    Maps results back to IDs for atomic database updates.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># 1. Build a structured JSON request for the AI</span>
+    <span class="n">response_blocks</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">resp</span> <span class="ow">in</span> <span class="n">responses</span><span class="p">:</span>
+        <span class="n">response_blocks</span><span class="o">.</span><span class="n">append</span><span class="p">({</span>
+            <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">resp</span><span class="o">.</span><span class="n">id</span><span class="p">),</span>
+            <span class="s2">&quot;question&quot;</span><span class="p">:</span> <span class="n">resp</span><span class="o">.</span><span class="n">question</span><span class="o">.</span><span class="n">text</span><span class="p">,</span>
+            <span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="n">resp</span><span class="o">.</span><span class="n">score</span>
+        <span class="p">})</span>
+
+    <span class="n">prompt</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Analyze these </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">responses</span><span class="p">)</span><span class="si">}</span><span class="s2"> gaps and return a JSON mapping ID to 2-sentence advice: </span><span class="si">{</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">response_blocks</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+
+    <span class="c1"># 2. Single API Call</span>
+    <span class="n">ai_response</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">generate_content</span><span class="p">(</span><span class="n">contents</span><span class="o">=</span><span class="n">prompt</span><span class="p">)</span>
+    <span class="n">parsed_insights</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_clean_json_response</span><span class="p">(</span><span class="n">ai_response</span><span class="o">.</span><span class="n">text</span><span class="p">))</span>
+
+    <span class="c1"># 3. Atomic Batch Update</span>
+    <span class="k">for</span> <span class="n">resp</span> <span class="ow">in</span> <span class="n">responses</span><span class="p">:</span>
+        <span class="n">resp</span><span class="o">.</span><span class="n">ai_insight</span> <span class="o">=</span> <span class="n">parsed_insights</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">resp</span><span class="o">.</span><span class="n">id</span><span class="p">),</span> <span class="s2">&quot;Improve this area.&quot;</span><span class="p">)</span>
+        <span class="n">resp</span><span class="o">.</span><span class="n">ai_insight_status</span> <span class="o">=</span> <span class="s2">&quot;done&quot;</span>
+        <span class="n">resp</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+</code></pre></div>
 
 
 
@@ -1004,6 +1532,8 @@
     
     
       <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
       
     
   </body>

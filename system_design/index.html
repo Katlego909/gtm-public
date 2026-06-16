@@ -53,6 +53,8 @@
       
     
     
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
     <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
     
       
@@ -78,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#gtm-validator-high-context-system-design" class="md-skip">
+        <a href="#system-design-logic-the-engineering-philosophy" class="md-skip">
           Skip to content
         </a>
       
@@ -288,33 +290,14 @@
   
   
   
-    <li class="md-tabs__item">
-      <a href="../python_reference/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Python Module Directory
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
-  
     
     
       <li class="md-tabs__item">
-        <a href="../ai_engine/" class="md-tabs__link">
+        <a href="../scoring_logic/" class="md-tabs__link">
           
   
   
-  Technical Reference
+  Business Logic & Implementation
 
         </a>
       </li>
@@ -330,11 +313,51 @@
     
     
       <li class="md-tabs__item">
-        <a href="../api_reference/" class="md-tabs__link">
+        <a href="../data_models/" class="md-tabs__link">
           
   
   
-  Developer Tools
+  Data Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../python_reference/" class="md-tabs__link">
+          
+  
+  
+  Python API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../maintenance_tools/" class="md-tabs__link">
+          
+  
+  
+  Operations & Tools
 
         </a>
       </li>
@@ -508,10 +531,21 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#goal-zero-downtime-strategy" class="md-nav__link">
+  <a href="#ai-processing-flow-fallback-strategy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Goal: Zero-Downtime Strategy
+        AI Processing Flow &amp; Fallback Strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#technical-rationale-distributed-locking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Technical Rationale: Distributed Locking
       
     </span>
   </a>
@@ -536,10 +570,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#goal-single-page-experience-without-js-overhead" class="md-nav__link">
+  <a href="#htmx-django-synergy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Goal: Single-Page Experience without JS Overhead
+        HTMX-Django Synergy
       
     </span>
   </a>
@@ -552,22 +586,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#3-the-snapshot-integrity-model" class="md-nav__link">
+  <a href="#3-data-integrity-the-snapshot-pattern" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. The "Snapshot" Integrity Model
+        3. Data Integrity: The "Snapshot" Pattern
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="3. The &#34;Snapshot&#34; Integrity Model">
+    <nav class="md-nav" aria-label="3. Data Integrity: The &#34;Snapshot&#34; Pattern">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#goal-strategic-immutability" class="md-nav__link">
+  <a href="#strategic-immutability" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Goal: Strategic Immutability
+        Strategic Immutability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#implementation-detail" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation Detail
       
     </span>
   </a>
@@ -592,10 +637,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#goal-secure-but-collaborative" class="md-nav__link">
+  <a href="#the-rbac-hierarchy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Goal: Secure but Collaborative
+        The RBAC Hierarchy
       
     </span>
   </a>
@@ -608,22 +653,50 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#5-token-aware-analytics" class="md-nav__link">
+  <a href="#5-vision-to-scoring-pipeline" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. Token-Aware Analytics
+        5. Vision-to-Scoring Pipeline
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="5. Token-Aware Analytics">
+    <nav class="md-nav" aria-label="5. Vision-to-Scoring Pipeline">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#goal-cost-transparency" class="md-nav__link">
+  <a href="#multimodal-pipeline" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Goal: Cost Transparency
+        Multimodal Pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-token-aware-cost-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Token-Aware Cost Management
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Token-Aware Cost Management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#usage-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage Monitoring
       
     </span>
   </a>
@@ -676,33 +749,6 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../python_reference/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Python Module Directory
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
     
     
     
@@ -717,17 +763,17 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
             
   
   
   <span class="md-ellipsis">
     
   
-    Technical Reference
+    Business Logic & Implementation
   
 
     
@@ -738,44 +784,16 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_6">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
             <span class="md-nav__icon md-icon"></span>
             
   
-    Technical Reference
+    Business Logic & Implementation
   
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../ai_engine/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Intelligence & AI
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
             
               
                 
@@ -812,14 +830,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../data_models/" class="md-nav__link">
+      <a href="../core_logic/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Data Models
+    Core Logic Deep Dives
   
 
     
@@ -840,14 +858,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../workspaces/" class="md-nav__link">
+      <a href="../ai_engine/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Workspaces & RBAC
+    AI Engine & Resilience
   
 
     
@@ -916,6 +934,121 @@
       
         
         
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data_models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workspaces/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspaces & RBAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
         
           
@@ -926,7 +1059,7 @@
   <span class="md-ellipsis">
     
   
-    Developer Tools
+    Python API Reference
   
 
     
@@ -942,11 +1075,39 @@
             <span class="md-nav__icon md-icon"></span>
             
   
-    Developer Tools
+    Python API Reference
   
 
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../python_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Module Directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -975,6 +1136,65 @@
   
 
               
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations & Tools
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations & Tools
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
             
               
                 
@@ -1050,10 +1270,21 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#goal-zero-downtime-strategy" class="md-nav__link">
+  <a href="#ai-processing-flow-fallback-strategy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Goal: Zero-Downtime Strategy
+        AI Processing Flow &amp; Fallback Strategy
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#technical-rationale-distributed-locking" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Technical Rationale: Distributed Locking
       
     </span>
   </a>
@@ -1078,10 +1309,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#goal-single-page-experience-without-js-overhead" class="md-nav__link">
+  <a href="#htmx-django-synergy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Goal: Single-Page Experience without JS Overhead
+        HTMX-Django Synergy
       
     </span>
   </a>
@@ -1094,22 +1325,33 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#3-the-snapshot-integrity-model" class="md-nav__link">
+  <a href="#3-data-integrity-the-snapshot-pattern" class="md-nav__link">
     <span class="md-ellipsis">
       
-        3. The "Snapshot" Integrity Model
+        3. Data Integrity: The "Snapshot" Pattern
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="3. The &#34;Snapshot&#34; Integrity Model">
+    <nav class="md-nav" aria-label="3. Data Integrity: The &#34;Snapshot&#34; Pattern">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#goal-strategic-immutability" class="md-nav__link">
+  <a href="#strategic-immutability" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Goal: Strategic Immutability
+        Strategic Immutability
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#implementation-detail" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Implementation Detail
       
     </span>
   </a>
@@ -1134,10 +1376,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#goal-secure-but-collaborative" class="md-nav__link">
+  <a href="#the-rbac-hierarchy" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Goal: Secure but Collaborative
+        The RBAC Hierarchy
       
     </span>
   </a>
@@ -1150,22 +1392,50 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#5-token-aware-analytics" class="md-nav__link">
+  <a href="#5-vision-to-scoring-pipeline" class="md-nav__link">
     <span class="md-ellipsis">
       
-        5. Token-Aware Analytics
+        5. Vision-to-Scoring Pipeline
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="5. Token-Aware Analytics">
+    <nav class="md-nav" aria-label="5. Vision-to-Scoring Pipeline">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#goal-cost-transparency" class="md-nav__link">
+  <a href="#multimodal-pipeline" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Goal: Cost Transparency
+        Multimodal Pipeline
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-token-aware-cost-management" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Token-Aware Cost Management
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Token-Aware Cost Management">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#usage-monitoring" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Usage Monitoring
       
     </span>
   </a>
@@ -1194,41 +1464,76 @@
 
 
 
-<h1 id="gtm-validator-high-context-system-design">GTM Validator: High-Context System Design</h1>
-<p>This document maps the business goals of the platform to the technical implementation. It provides the "Substance" for how each part of the codebase enables the project's vision.</p>
+<h1 id="system-design-logic-the-engineering-philosophy">System Design Logic: The Engineering Philosophy</h1>
+<p>This document outlines the architectural decisions and engineering principles that power the GTM Validator. It maps business goals to technical implementations, providing a high-substance reference for the platform's "Modern Monolith" design.</p>
 <hr />
 <h2 id="1-the-resilient-consultant-architecture">1. The "Resilient Consultant" Architecture</h2>
-<p>The core challenge of the GTM Validator is providing <strong>always-on strategic advice</strong> while relying on external AI APIs that can be slow or unavailable.</p>
-<h3 id="goal-zero-downtime-strategy">Goal: Zero-Downtime Strategy</h3>
-<p>Even if Google's Gemini API is down, the user must receive value.
-- <strong>Implementation:</strong> <code>gtm/ai_services.py</code> uses a <strong>Static-Fallback Pattern</strong>.
-- <strong>Context:</strong> If <code>ResourceExhausted</code> is caught, the system sets a cache-based "Quota Cooldown" and serves high-quality, pre-written advice from the <code>RecommendationBand</code> model.</p>
+<p><strong>Goal:</strong> Provide 24/7 strategic advice despite the inherent latency and unreliability of external AI APIs.</p>
+<h3 id="ai-processing-flow-fallback-strategy">AI Processing Flow &amp; Fallback Strategy</h3>
+<p>We use a <strong>Layered Resilience</strong> model. If the primary AI (Gemini) is slow or reaches quota, the system automatically degrades gracefully without breaking the user experience.</p>
+<pre class="mermaid"><code>graph TD
+    A[User Completes Assessment] --&gt; B{AI Quota Check}
+    B -- Available --&gt; C[Trigger Gemini Generation]
+    B -- Quota Hit --&gt; D[Activate Cooldown &amp; Static Fallback]
+    C --&gt; E{Response Valid?}
+    E -- Yes --&gt; F[Save Personalized Playbook]
+    E -- Malformed --&gt; G[Trigger JSON Rescue Engine]
+    G --&gt; F
+    D --&gt; H[Serve High-Quality Pre-written Advice]</code></pre>
+<h3 id="technical-rationale-distributed-locking">Technical Rationale: Distributed Locking</h3>
+<p>To prevent "Quota Storms" where multiple users trigger simultaneous AI requests, we implement a <strong>Global Quota Cooldown</strong> in the cache layer. If a <code>ResourceExhausted</code> error is caught, the platform pauses all AI calls for 5 minutes, ensuring we stay within enterprise rate limits while serving pre-written "Safe Mode" content.</p>
+<hr />
 <h2 id="2-the-modern-monolith-ui-strategy">2. The "Modern Monolith" UI Strategy</h2>
-<p>We avoided the complexity of a separate React/Vue frontend to keep the AI-to-UI feedback loop as tight as possible.</p>
-<h3 id="goal-single-page-experience-without-js-overhead">Goal: Single-Page Experience without JS Overhead</h3>
-<p>The assessment wizard must feel like a modern app but remain fast and SEO-friendly.
-- <strong>Implementation:</strong> <code>gtm/views.py</code> uses <strong>HTMX</strong> with the <code>HX-Request</code> header check.
-- <strong>Context:</strong> The view detects if it's an partial update and returns only the form segment, saving bandwidth and improving perceived performance.</p>
-<h2 id="3-the-snapshot-integrity-model">3. The "Snapshot" Integrity Model</h2>
-<p>GTM strategy changes quarterly. A report from January should not change if the diagnostic questions are updated in March.</p>
-<h3 id="goal-strategic-immutability">Goal: Strategic Immutability</h3>
-<p>Ensure that historical reports are preserved exactly as they were generated.
-- <strong>Implementation:</strong> <code>gtm/models.py</code> defines the <code>ResultSnapshot</code> record.
-- <strong>Context:</strong> Instead of linking to current <code>Question</code> objects, the snapshot stores a <strong>JSON-denormalized</strong> copy of all weighted scores and AI text at the time of completion.</p>
+<p><strong>Goal:</strong> Deliver a "Single Page App" (SPA) feel without the complexity and "hydration" lag of a heavy JavaScript framework like React or Vue.</p>
+<h3 id="htmx-django-synergy">HTMX-Django Synergy</h3>
+<p>We leverage <strong>HTMX</strong> to handle high-interactivity components (like the multi-step assessment wizard and the Kanban board) while keeping 100% of the business logic in Python.</p>
+<ul>
+<li><strong>Logic:</strong> The view detects the <code>HX-Request</code> header.</li>
+<li><strong>Implementation:</strong> It returns only the required HTML partial rather than the full base template.</li>
+<li><strong>Benefit:</strong> Zero client-state management and a dramatically simplified testing suite. The "Single Source of Truth" remains the Django model.</li>
+</ul>
+<hr />
+<h2 id="3-data-integrity-the-snapshot-pattern">3. Data Integrity: The "Snapshot" Pattern</h2>
+<p><strong>Goal:</strong> Ensure that strategic reports are immutable. A GTM strategy from six months ago must not change if the diagnostic questions are updated today.</p>
+<h3 id="strategic-immutability">Strategic Immutability</h3>
+<p>Instead of linking <code>Results</code> to the current <code>Question</code> objects, we use the <code>ResultSnapshot</code> model to <strong>denormalize</strong> the state of the business at the time of completion.</p>
+<pre class="mermaid"><code>erDiagram
+    AssessmentSession ||--|| ResultSnapshot : creates
+    ResultSnapshot {
+        float overall_score
+        json category_breakdown
+        text ai_playbook
+        json firmographics
+    }</code></pre>
+<h3 id="implementation-detail">Implementation Detail</h3>
+<p>The <code>category_breakdown</code> is stored as a JSON blob containing the names, scores, and weights at the exact second the assessment was finished. This allows us to evolve our diagnostic framework (adding/removing questions) without corrupting historical audit trails.</p>
+<hr />
 <h2 id="4-multi-tenant-soft-isolation">4. Multi-Tenant "Soft" Isolation</h2>
-<p>The platform needs to support team collaboration while allowing individual users to have private assessments.</p>
-<h3 id="goal-secure-but-collaborative">Goal: Secure but Collaborative</h3>
+<p><strong>Goal:</strong> Enable team collaboration (Workspaces) while maintaining a seamless path for anonymous "Guest" users.</p>
+<h3 id="the-rbac-hierarchy">The RBAC Hierarchy</h3>
+<p>Security is enforced through a hierarchical authorization check (<code>safe_get_session_or_403</code>) rather than rigid row-level security. This allows the system to be "Soft" enough for guest users but "Hard" enough for enterprise workspaces.</p>
+<ol>
+<li><strong>Direct Owner:</strong> The <code>User</code> who created the session.</li>
+<li><strong>Workspace Member:</strong> Any user with an active membership in the session's workspace.</li>
+<li><strong>Anonymous Owner:</strong> Verified via a browser-scoped <code>client_id</code> cookie.</li>
+</ol>
+<hr />
+<h2 id="5-vision-to-scoring-pipeline">5. Vision-to-Scoring Pipeline</h2>
+<p><strong>Goal:</strong> Transition from subjective self-reporting to objective evidence-based validation.</p>
+<h3 id="multimodal-pipeline">Multimodal Pipeline</h3>
+<p>The AI Auditor acts as a "Secondary Grader." It analyzes visual evidence (PDF decks, Landing Page screenshots) to verify the claims made in the diagnostic survey.</p>
 <ul>
-<li><strong>Implementation:</strong> The <code>safe_get_session_or_403</code> service in <code>gtm/services.py</code>.</li>
-<li><strong>Context:</strong> This function implements a hierarchical check: (1) Does the user own it? (2) If not, is the user a member of the Workspace that owns it? (3) Is their role high enough? This centralizes security logic in one place.</li>
+<li><strong>Input:</strong> Raw binary bytes (not URLs) are streamed to Gemini-Flash.</li>
+<li><strong>Logic:</strong> The AI generates a 1-10 "Evidence Score."</li>
+<li><strong>Output:</strong> The system maps this score to a <strong>Numeric Modifier</strong> (-3 to +3) which is mathematically injected into the final GTM score.</li>
 </ul>
-<h2 id="5-token-aware-analytics">5. Token-Aware Analytics</h2>
-<p>AI cost management is critical for a SaaS product.</p>
-<h3 id="goal-cost-transparency">Goal: Cost Transparency</h3>
-<ul>
-<li><strong>Implementation:</strong> <code>gtm/utils_ai_monitoring.py</code>.</li>
-<li><strong>Context:</strong> Every AI call logs tokens used to the <code>AIUsageTracker</code>. This allows administrators to see exactly which features (Playbook vs. Chat) are driving costs and set proactive rate limits.</li>
-</ul>
+<hr />
+<h2 id="6-token-aware-cost-management">6. Token-Aware Cost Management</h2>
+<p><strong>Goal:</strong> Maintain SaaS profitability by tracking AI costs at the granular level.</p>
+<h3 id="usage-monitoring">Usage Monitoring</h3>
+<p>Every AI call (Playbook, Audit, Insight) is intercepted by the <code>AIUsageTracker</code>.
+-   <strong>Granularity:</strong> Logs input/output tokens per feature and per workspace.
+-   <strong>Proactive Guardrails:</strong> Administrators can see cost trends in real-time and adjust feature accessibility (e.g., limiting Chat usage for free-tier workspaces).</p>
 
 
 
@@ -1282,6 +1587,8 @@
     
     
       <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
       
     
   </body>
