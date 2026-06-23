@@ -59,7 +59,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "DEM-ICP-01",
             "text": "We have a simple written profile of our ideal customer, including who is a strong fit and who is not, and we review it every quarter so all teams stay aligned.",
-            "weight": 1.25,
+            "weight": 0.22,
             "diagnostic_note": "If this is unclear, teams chase more leads instead of the right leads.",
             "ai_metadata": {
                 "pillar": "Demand",
@@ -75,7 +75,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "DEM-FIT-02",
             "text": "At least 6 out of 10 new inbound leads match our ideal customer profile, and we can verify this with clear qualification fields in our CRM.",
-            "weight": 1.2,
+            "weight": 0.16,
             "diagnostic_note": "If lead fit is low, spend goes up and conversion goes down.",
             "ai_metadata": {
                 "pillar": "Demand",
@@ -91,7 +91,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "DEM-MSG-03",
             "text": "Our core value message is easy to understand, tested with each target segment, and used consistently across our website, outbound messages, and sales materials.",
-            "weight": 1.15,
+            "weight": 0.18,
             "diagnostic_note": "If the message is inconsistent, fewer buyers move forward.",
             "ai_metadata": {
                 "pillar": "Demand",
@@ -107,7 +107,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "DEM-CHN-04",
             "text": "We have a clear channel plan that shows expected customer acquisition cost and pipeline contribution for each channel, and we review performance every month.",
-            "weight": 1.1,
+            "weight": 0.2,
             "diagnostic_note": "Without this, channel spend becomes guesswork.",
             "ai_metadata": {
                 "pillar": "Demand",
@@ -123,7 +123,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "DEM-ATT-05",
             "text": "We can clearly see which channel first brought a lead in and which channels later influenced the deal, using reporting data we trust.",
-            "weight": 1.2,
+            "weight": 0.14,
             "diagnostic_note": "Without clear attribution, it is hard to know where to invest.",
             "ai_metadata": {
                 "pillar": "Demand",
@@ -139,7 +139,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "DEM-CNT-06",
             "text": "We run content or outbound work on a regular schedule, not randomly, and each activity is tied to target accounts and clear pipeline goals.",
-            "weight": 1.0,
+            "weight": 0.1,
             "diagnostic_note": "If execution is irregular, pipeline becomes harder to predict.",
             "ai_metadata": {
                 "pillar": "Demand",
@@ -157,7 +157,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "CON-SLA-01",
             "text": "We set clear response-time targets for new leads by source, and we check every week how quickly reps reply so high-intent leads are not lost.",
-            "weight": 1.2,
+            "weight": 0.13,
             "diagnostic_note": "Slow replies reduce meetings and close rates.",
             "ai_metadata": {
                 "pillar": "Conversion",
@@ -173,7 +173,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "CON-QLF-02",
             "text": "We use one shared qualification checklist for all leads, and required CRM fields must be completed before an opportunity can move to the next stage.",
-            "weight": 1.15,
+            "weight": 0.19,
             "diagnostic_note": "Weak qualification fills pipeline with poor-fit deals.",
             "ai_metadata": {
                 "pillar": "Conversion",
@@ -189,7 +189,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "CON-STG-03",
             "text": "Each pipeline stage has clear entry and exit rules, and sales leaders review stage-to-stage conversion rates monthly to spot bottlenecks early.",
-            "weight": 1.1,
+            "weight": 0.22,
             "diagnostic_note": "If stage rules are unclear, forecasts become unreliable.",
             "ai_metadata": {
                 "pillar": "Conversion",
@@ -205,7 +205,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "CON-OBJ-04",
             "text": "We keep a simple playbook of common buyer objections and competitor risks, and managers coach the team on it so responses stay consistent.",
-            "weight": 1.0,
+            "weight": 0.08,
             "diagnostic_note": "Without this, reps answer objections inconsistently.",
             "ai_metadata": {
                 "pillar": "Conversion",
@@ -221,7 +221,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "CON-WNL-05",
             "text": "We capture why deals are won or lost in structured fields, then use those patterns in a monthly review to run focused improvement experiments.",
-            "weight": 1.1,
+            "weight": 0.22,
             "diagnostic_note": "If win/loss reasons are not tracked, the same problems repeat.",
             "ai_metadata": {
                 "pillar": "Conversion",
@@ -237,7 +237,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "CON-PGE-06",
             "text": "We run regular tests on key conversion pages and forms, using clear hypotheses and success metrics, and we track whether results improve.",
-            "weight": 1.0,
+            "weight": 0.16,
             "diagnostic_note": "Without regular tests, conversion pages get stale.",
             "ai_metadata": {
                 "pillar": "Conversion",
@@ -255,7 +255,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "DEL-TTV-01",
             "text": "We track how long it takes new customers to get their first real value, by segment, and we actively work to shorten that time.",
-            "weight": 1.2,
+            "weight": 0.18,
             "diagnostic_note": "If first value takes too long, churn risk rises.",
             "ai_metadata": {
                 "pillar": "Delivery",
@@ -271,7 +271,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "DEL-ONB-02",
             "text": "Our onboarding process has clear milestones, clear owners, and realistic completion targets, and progress is tracked in one shared system.",
-            "weight": 1.1,
+            "weight": 0.16,
             "diagnostic_note": "Poor onboarding slows activation and increases support load.",
             "ai_metadata": {
                 "pillar": "Delivery",
@@ -287,7 +287,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "DEL-HLT-03",
             "text": "We score customer health using product usage, engagement, and support signals, and we use clear playbooks to act early on at-risk accounts.",
-            "weight": 1.15,
+            "weight": 0.24,
             "diagnostic_note": "Without health signals, risk is found too late.",
             "ai_metadata": {
                 "pillar": "Delivery",
@@ -303,7 +303,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "DEL-RET-04",
             "text": "We review gross and net retention by cohort every month, and we launch targeted actions quickly when any segment starts to decline.",
-            "weight": 1.2,
+            "weight": 0.22,
             "diagnostic_note": "If retention drops go unseen, growth slows quietly.",
             "ai_metadata": {
                 "pillar": "Delivery",
@@ -319,7 +319,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "DEL-QBR-05",
             "text": "Our high-value customers receive regular business reviews focused on outcomes, roadmap alignment, and practical expansion opportunities.",
-            "weight": 1.0,
+            "weight": 0.12,
             "diagnostic_note": "Without regular reviews, expansion opportunities are missed.",
             "ai_metadata": {
                 "pillar": "Delivery",
@@ -335,7 +335,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "DEL-ADV-06",
             "text": "After customers achieve clear value, we consistently capture proof points like quotes, case studies, and references to support future selling.",
-            "weight": 0.95,
+            "weight": 0.08,
             "diagnostic_note": "If proof points are not captured, future buyers trust you less.",
             "ai_metadata": {
                 "pillar": "Delivery",
