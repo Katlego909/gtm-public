@@ -7,6 +7,7 @@ from django.test import TestCase, Client
 from django.contrib.auth import get_user_model
 from django.urls import reverse
 from uuid import uuid4
+from django.test.utils import override_settings
 
 from gtm.models import AssessmentSession, Response, Question, Category, ResultSnapshot
 from gtm.models_workspace import Workspace, WorkspaceMembership
@@ -14,6 +15,7 @@ from gtm.models_workspace import Workspace, WorkspaceMembership
 User = get_user_model()
 
 
+@override_settings(SECURE_SSL_REDIRECT=False)
 class SessionAccessControlTests(TestCase):
     """Test suite for session access control across endpoints."""
 

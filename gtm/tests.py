@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from django.db import connection
 from django.test import TestCase
-from django.test.utils import CaptureQueriesContext
+from django.test.utils import CaptureQueriesContext, override_settings
 from django.urls import reverse
 
 from gtm.models import (
@@ -15,6 +15,7 @@ from gtm.models import (
 )
 
 
+@override_settings(SECURE_SSL_REDIRECT=False)
 class ResultsQueryOptimizationTests(TestCase):
 	def setUp(self):
 		user_model = get_user_model()
