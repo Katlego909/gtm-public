@@ -122,7 +122,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEM-ATT-05",
-            "text": "We can clearly see which channel first brought a lead in and which channels later influenced the deal, using reporting data we trust.",
+            "text": "We can reliably identify which marketing channels generate qualified leads and pipeline, using reporting data we trust.",
             "weight": 0.14,
             "diagnostic_note": "Without clear attribution, it is hard to know where to invest.",
             "ai_metadata": {
