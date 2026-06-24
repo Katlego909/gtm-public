@@ -157,97 +157,293 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "CON-SLA-01",
             "text": "We set clear response-time targets for new leads by source, and we check every week how quickly reps reply so high-intent leads are not lost.",
+            "input_type": "frequency_select",
+            "input_options": [
+                "never",
+                "monthly",
+                "bi_weekly",
+                "weekly",
+                "daily"
+            ],
+            "input_option_labels": {
+                "never": "We do not currently track or review rep response times",
+                "monthly": "We review rep response times once a month",
+                "bi_weekly": "We review rep response times every two weeks",
+                "weekly": "We review rep response times every week",
+                "daily": "We review rep response times every day"
+            },
             "weight": 0.13,
             "diagnostic_note": "Slow replies reduce meetings and close rates.",
+            "scoring_logic": {
+                "never": 1,
+                "monthly": 2,
+                "bi_weekly": 3,
+                "daily": 4,
+                "weekly": 5
+            },
             "ai_metadata": {
                 "pillar": "Conversion",
                 "dimension": "Speed to Lead",
-                "question_type": "outcome",
+                "question_type": "operational",
                 "evidence_type": "quantitative",
                 "time_horizon": "30d",
                 "owner_role": "sales",
-                "maturity_stage": "repeatable",
+                "maturity_stage": "managed",
                 "quick_win_if_low": "Set source-based SLA targets and trigger alerts for breaches.",
+                "input_options": [
+                    "never",
+                    "monthly",
+                    "bi_weekly",
+                    "weekly",
+                    "daily"
+                ],
+                "input_option_labels": {
+                    "never": "We do not currently track or review rep response times",
+                    "monthly": "We review rep response times once a month",
+                    "bi_weekly": "We review rep response times every two weeks",
+                    "weekly": "We review rep response times every week",
+                    "daily": "We review rep response times every day"
+                },
             },
         },
         {
             "id_code": "CON-QLF-02",
-            "text": "We use one shared qualification checklist for all leads, and required CRM fields must be completed before an opportunity can move to the next stage.",
+            "text": "Are required qualification fields enforced as mandatory gates before opportunities can advance to the next pipeline stage?",
+            "input_type": "single_select",
+            "input_options": [
+                "no",
+                "yes"
+            ],
             "weight": 0.19,
             "diagnostic_note": "Weak qualification fills pipeline with poor-fit deals.",
+            "scoring_logic": {
+                "no": 1,
+                "yes": 5
+            },
             "ai_metadata": {
                 "pillar": "Conversion",
                 "dimension": "Qualification",
-                "question_type": "process",
+                "question_type": "structural",
                 "evidence_type": "system-data",
                 "time_horizon": "current",
                 "owner_role": "revops",
-                "maturity_stage": "repeatable",
+                "maturity_stage": "defined",
                 "quick_win_if_low": "Make qualification fields mandatory at stage transition and audit weekly.",
+                "input_type": "single_select",
+                "input_options": [
+                    "no",
+                    "yes"
+                ]
             },
         },
         {
             "id_code": "CON-STG-03",
-            "text": "Each pipeline stage has clear entry and exit rules, and sales leaders review stage-to-stage conversion rates monthly to spot bottlenecks early.",
+            "text": "Which of the following are true of how your team manages and monitors pipeline stages?",
+            "input_type": "multi_select",
+            "input_options": [
+                "defined_stage_criteria",
+                "criteria_enforced_at_advancement",
+                "conversion_rates_reviewed_regularly",
+                "leaders_act_on_conversion_data",
+                "none"
+            ],
+            "input_option_labels": {
+                "defined_stage_criteria": "Each pipeline stage has clear, documented entry and exit criteria",
+                "criteria_enforced_at_advancement": "Stage criteria are enforced before deals can advance to the next stage",
+                "conversion_rates_reviewed_regularly": "We review stage-to-stage conversion rates on a regular monthly cadence",
+                "leaders_act_on_conversion_data": "Sales leaders use conversion data to identify and act on bottlenecks",
+                "none": "We do not currently have structured pipeline stage management in place"
+            },
             "weight": 0.22,
             "diagnostic_note": "If stage rules are unclear, forecasts become unreliable.",
+            "scoring_logic": {
+                "0_selected": 1,
+                "1_selected": 2,
+                "2_selected": 3,
+                "3_selected": 4,
+                "4_selected": 5,
+                "none_selected": 1,
+                "conversion_rates_reviewed_regularly_required_for_5": True #needs backend encoding for this line
+            },
             "ai_metadata": {
                 "pillar": "Conversion",
                 "dimension": "Pipeline Hygiene",
-                "question_type": "evidence",
+                "question_type": "structural",
                 "evidence_type": "system-data",
                 "time_horizon": "30d",
                 "owner_role": "sales",
-                "maturity_stage": "optimized",
+                "maturity_stage": "managed",
                 "quick_win_if_low": "Define stage exit criteria and report stage-to-stage conversion by segment.",
+                "input_type": "multi_select",
+                "input_options": [
+                    "defined_stage_criteria",
+                    "criteria_enforced_at_advancement",
+                    "conversion_rates_reviewed_regularly",
+                    "leaders_act_on_conversion_data",
+                    "none"
+                ],
+                "input_option_labels": {
+                    "defined_stage_criteria": "Each pipeline stage has clear, documented entry and exit criteria",
+                    "criteria_enforced_at_advancement": "Stage criteria are enforced before deals can advance to the next stage",
+                    "conversion_rates_reviewed_regularly": "We review stage-to-stage conversion rates on a regular monthly cadence",
+                    "leaders_act_on_conversion_data": "Sales leaders use conversion data to identify and act on bottlenecks",
+                    "none": "We do not currently have structured pipeline stage management in place"
+                },
             },
         },
         {
             "id_code": "CON-OBJ-04",
-            "text": "We keep a simple playbook of common buyer objections and competitor risks, and managers coach the team on it so responses stay consistent.",
+            "text": "Which of the following does your team currently have in place for handling objections and competitor questions?",
+            "input_type": "multi_select",
+            "input_options": [
+                "written_playbook",
+                "regular_coaching_sessions",
+                "recorded_call_reviews",
+                "competitive_battlecards",
+                "none"
+            ],
+            "input_option_labels": {
+                "written_playbook": "We have a written playbook of common objections and approved responses",
+                "regular_coaching_sessions": "Managers run regular coaching sessions focused on objection handling",
+                "recorded_call_reviews": "We review recorded calls specifically to improve objection handling",
+                "competitive_battlecards": "We maintain competitive battlecards or risk guides for the sales team",
+                "none": "We do not currently have any structured objection handling in place"
+            },
             "weight": 0.08,
             "diagnostic_note": "Without this, reps answer objections inconsistently.",
+            "scoring_logic": {
+                "0_selected": 1,
+                "1_selected": 2,
+                "2_selected": 3,
+                "3_selected": 4,
+                "4_selected": 5,
+                "none_selected": 1
+            },
             "ai_metadata": {
                 "pillar": "Conversion",
                 "dimension": "Deal Enablement",
-                "question_type": "diagnostic",
+                "question_type": "operational",
                 "evidence_type": "qualitative",
                 "time_horizon": "90d",
                 "owner_role": "sales",
-                "maturity_stage": "foundation",
+                "maturity_stage": "developing",
                 "quick_win_if_low": "Document top five objections with approved responses and examples.",
+                "input_type": "multi_select",
+                "input_options": ["written_playbook", "regular_coaching_sessions", "recorded_call_reviews", "competitive_battlecards"],
+                "input_option_labels": {
+                    "written_playbook": "We have a written playbook of common objections and approved responses",
+                    "regular_coaching_sessions": "Managers run regular coaching sessions focused on objection handling",
+                    "recorded_call_reviews": "We review recorded calls specifically to improve objection handling",
+                    "competitive_battlecards": "We maintain competitive battlecards or risk guides for the sales team",
+                    "none": "We do not currently have any structured objection handling in place"
+                },
             },
         },
         {
             "id_code": "CON-WNL-05",
-            "text": "We capture why deals are won or lost in structured fields, then use those patterns in a monthly review to run focused improvement experiments.",
+            "text": "How would you best describe your team's current win/loss analysis practice?",
+            "input_type": "single_select",
+            "input_options": [
+                "no_capture",
+                "capture_no_review",
+                "occasional_review",
+                "structured_monthly_review",
+                "full_loop"
+            ],
+            "input_option_labels": {
+                "no_capture": "We don't currently capture structured win/loss reasons",
+                "capture_no_review": "We capture win/loss reasons but don't review them regularly",
+                "occasional_review": "We capture and review win/loss patterns occasionally but not on a set cadence",
+                "structured_monthly_review": "We run a structured monthly review and use findings to make changes",
+                "full_loop": "We run regular reviews, act on findings, and track whether our experiments are working"
+            },
             "weight": 0.22,
             "diagnostic_note": "If win/loss reasons are not tracked, the same problems repeat.",
+            "scoring_logic": {
+                "no_capture": 1,
+                "capture_no_review": 2,
+                "occasional_review": 3,
+                "structured_monthly_review": 4,
+                "full_loop": 5
+            },
             "ai_metadata": {
                 "pillar": "Conversion",
                 "dimension": "Win-Loss Learning",
-                "question_type": "evidence",
-                "evidence_type": "system-data",
+                "question_type": "operational",
+                "evidence_type": "qualitative",
                 "time_horizon": "30d",
-                "owner_role": "revops",
-                "maturity_stage": "optimized",
+                "owner_role": "sales",
+                "maturity_stage": "repeatable",
                 "quick_win_if_low": "Add mandatory closed-lost reason taxonomy and run a monthly improvement retro.",
+                "input_type": "single_select",
+                "input_options": [
+                    "no_capture",
+                    "capture_no_review",
+                    "occasional_review",
+                    "structured_monthly_review",
+                    "full_loop"
+                ],
+                "input_option_labels": {
+                    "no_capture": "We don't currently capture structured win/loss reasons",
+                    "capture_no_review": "We capture win/loss reasons but don't review them regularly",
+                    "occasional_review": "We capture and review win/loss patterns occasionally but not on a set cadence",
+                    "structured_monthly_review": "We run a structured monthly review and use findings to make changes",
+                    "full_loop": "We run regular reviews, act on findings, and track whether our experiments are working"
+                }
             },
         },
         {
             "id_code": "CON-PGE-06",
-            "text": "We run regular tests on key conversion pages and forms, using clear hypotheses and success metrics, and we track whether results improve.",
+            "text": "Which of the following are true of how your team tests and optimizes key conversion pages and forms?",
+            "input_type": "multi_select",
+            "input_options": [
+                "defined_hypotheses",
+                "clear_success_metrics",
+                "results_tracked_in_shared_system",
+                "results_used_to_document_changes",
+                "no_structured_testing"
+            ],
+            "input_option_labels": {
+                "defined_hypotheses": "We write a clear hypothesis before starting each test",
+                "clear_success_metrics": "We define success metrics before each test begins",
+                "results_tracked_in_shared_system": "We track results in a shared system after each test",
+                "results_used_to_document_changes": "We use test results to make and document changes",
+                "no_structured_testing": "We do not currently run structured conversion tests"
+            },
             "weight": 0.16,
             "diagnostic_note": "Without regular tests, conversion pages get stale.",
+            "scoring_logic": {
+                "0_selected": 1,
+                "1_selected": 2,
+                "2_selected": 3,
+                "3_selected": 4,
+                "4_selected": 5,
+                "no_structured_testing_selected": 1
+            },
             "ai_metadata": {
                 "pillar": "Conversion",
                 "dimension": "Funnel Optimization",
-                "question_type": "process",
-                "evidence_type": "quantitative",
+                "question_type": "operational",
+                "evidence_type": "qualitative",
                 "time_horizon": "90d",
                 "owner_role": "marketing",
-                "maturity_stage": "repeatable",
+                "maturity_stage": "developing",
                 "quick_win_if_low": "Launch one monthly A/B test on a high-traffic conversion page.",
+                "input_type": "multi_select",
+                "input_options": [
+                    "defined_hypotheses",
+                    "clear_success_metrics",
+                    "results_tracked_in_shared_system",
+                    "results_used_to_document_changes",
+                    "no_structured_testing"
+                ],
+                "input_option_labels": {
+                    "defined_hypotheses": "We write a clear hypothesis before starting each test",
+                    "clear_success_metrics": "We define success metrics before each test begins",
+                    "results_tracked_in_shared_system": "We track results in a shared system after each test",
+                    "results_used_to_document_changes": "We use test results to make and document changes",
+                    "no_structured_testing": "We do not currently run structured conversion tests"
+                }
             },
         },
     ],
