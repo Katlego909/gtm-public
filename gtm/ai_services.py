@@ -698,7 +698,6 @@ def _build_diagnostic_prompt(session: AssessmentSession, question: Question, sco
     stage = session.snapshot.band_stage if getattr(session, 'snapshot', None) and session.snapshot.band_stage else "Unspecified"
     ai_metadata = question.ai_metadata if isinstance(question.ai_metadata, dict) else {}
     risk_if_low    = ai_metadata.get("risk_if_low")    or "N/A"
-    quick_win      = ai_metadata.get("quick_win_if_low") or "N/A"
 
     # Score severity mapping
     if score >= 4:
@@ -710,13 +709,13 @@ def _build_diagnostic_prompt(session: AssessmentSession, question: Question, sco
     else:
         severity  = {1: "Critical Failure", 2: "Serious Gap", 3: "Improvement Needed"}.get(score, "Low Priority")
         task_desc = (
-            f"explain the immediate risk of this low score in the context of the "
-            f"{industry} industry and {stage} stage. Known risk: {risk_if_low}. "
-            f"Suggested quick win: {quick_win}."
+            f"diagnose exactly what is absent or broken at {company_name} based on this low score. "
+            f"Be specific to {company_name}'s industry ({industry}) and GTM stage ({stage}). "
+            f"Known risk if unaddressed: {risk_if_low}."
         )
 
     prompt = f"""
-You are a highly experienced Go-To-Market consultant. Provide a brief, actionable insight for the assessment area below.
+You are a GTM diagnostician. Your ONLY job is to describe what is currently absent or broken.
 
 Company: {company_name} | Industry: {industry} | GTM Stage: {stage}
 Question: {question.text}
@@ -724,7 +723,13 @@ Score: {score}/5 ({severity})
 
 Task: {task_desc}
 
-Write one concise paragraph (3–4 sentences max) in clean professional prose.
+STRICT OUTPUT FORMAT:
+- 2 sentences maximum.
+- State what {company_name} currently lacks or has broken. Nothing else.
+- FORBIDDEN: Do not start any sentence with an action verb (Implement, Establish, Build, Create, Define, Set, Launch, Prioritize, Consider, Develop, Use, Ensure, Track, Review, etc.)
+- FORBIDDEN: Do not write "should", "must", "need to", "recommend", "suggest", or any forward-looking instruction.
+- FORBIDDEN: Do not describe what to do. Only describe what is wrong or missing right now.
+- Write in third person about {company_name}.
     """.strip()
 
     return prompt
