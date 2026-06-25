@@ -24,6 +24,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='question',
             name='input_type',
-            field=models.CharField(default='scale', max_length=20),
+            field=models.CharField(blank=True, default='scale', max_length=50),
         ),
     ]

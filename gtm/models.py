@@ -31,7 +31,7 @@ class Question(models.Model):
     weight = models.FloatField(default=1.0)  # per-question weight (e.g., 1.2)
     diagnostic_note = models.CharField(max_length=200, blank=True)
     ai_metadata = models.JSONField(default=dict, blank=True, encoder=DjangoJSONEncoder)
-    input_type = models.CharField(max_length=20, default="scale")
+    input_type = models.CharField(max_length=50, blank=True, default="scale")
     input_options = models.JSONField(default=list, blank=True, encoder=DjangoJSONEncoder)
     input_option_labels = models.JSONField(default=dict, blank=True, encoder=DjangoJSONEncoder)
     def __str__(self): return f"{self.id_code} – {self.text[:60]}"
