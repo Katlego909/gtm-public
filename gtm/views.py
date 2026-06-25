@@ -975,9 +975,10 @@ def analyze_delivery_documents(request, session_id):
         )
 
     result = _run_analysis(session)
-    if not result:
+    if not result or "_error" in result:
+        error_detail = result.get("_error", "") if result else ""
         return JsonResponse(
-            {"success": False, "error": "Could not analyse documents. Please try again."},
+            {"success": False, "error": f"Analysis failed: {error_detail}" if error_detail else "Could not analyse documents. Please try again."},
             status=500,
         )
 

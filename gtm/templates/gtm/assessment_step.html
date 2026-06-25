@@ -765,9 +765,8 @@
         return;
       }
       if (!analysisComplete) {
-        e.preventDefault();
         const status = document.getElementById('analyzeStatus');
-        if (status) { status.textContent = 'Click "Analyze Documents" before finishing.'; status.className = 'text-sm text-red-600'; status.classList.remove('hidden'); }
+        if (status) { status.textContent = 'Tip: Click "Analyze Documents" to auto-score with AI, or score manually below.'; status.className = 'text-sm text-amber-600'; status.classList.remove('hidden'); }
       }
     }, true);
 
@@ -780,9 +779,6 @@
     window.runDeliveryAnalysis      = runDeliveryAnalysis;
     window.overrideAiScore          = overrideAiScore;
 
-    // Disable submit until analysis done, then load existing docs
-    const submitBtn = document.getElementById('submitBtn');
-    if (submitBtn) { submitBtn.disabled = true; submitBtn.style.opacity = '0.4'; submitBtn.style.pointerEvents = 'none'; }
     loadDeliveryDocs();
   })();
   {% endif %}
