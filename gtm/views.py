@@ -454,14 +454,6 @@ def results(request, session_id):
     labels = [c["category"].name for c in cat_scores]
     values = [round(c["avg"], 2) for c in cat_scores]
 
-    # ── Scoring engine: opportunity ranking + pattern detection ──────────────
-    from .scoring_engine import build_recommendation_context
-    _q_scores = {
-        r.question.id_code: r.score
-        for r in Response.objects.filter(session=session).select_related("question")
-    }
-    scoring_context = build_recommendation_context(_q_scores) if _q_scores else {}
-
     # -----------------------------
     # 🧩 Tool Recommendations Logic (Optimized to prevent N+1)
     # -----------------------------
@@ -585,29 +577,14 @@ def results(request, session_id):
     # -----------------------------
     # 🤖 Trigger AI playbook generation in background (non-blocking)
     # -----------------------------
-    playbook_raw = (snap.ai_playbook or "").strip() if snap else ""
-    # The final fallback stored when Gemini fails — treat as if no playbook exists
-    is_generic_fallback = playbook_raw.startswith("No AI-generated playbook available yet.")
-
-    if snap and (not playbook_raw or is_generic_fallback):
-        if is_generic_fallback:
-            snap.ai_playbook = ""
-            snap.ai_playbook_status = "pending"
-            snap.save(update_fields=["ai_playbook", "ai_playbook_status"])
+    if snap and not (snap.ai_playbook or "").strip():
         _kickoff_playbook_generation(snap, session_id=session.uuid)
-
-    # Render AI playbook HTML for the "Recommended Next Moves" card
-    ai_playbook_html = ""
-    if snap and playbook_raw and not is_generic_fallback:
-        src = _normalize_ai_playbook_markdown(snap.ai_playbook)
-        ai_playbook_html = mark_safe(md.markdown(src, extensions=["extra", "sane_lists"]))
 
     return render(request, "gtm/results.html", {
         "session": session,
         "overall": round(overall, 1),
         "band": band,
         "band_actions_html": band_actions_html,
-        "ai_playbook_html": ai_playbook_html,
         "cat_scores": cat_scores,
         "labels": labels,
         "values": values,
@@ -615,7 +592,6 @@ def results(request, session_id):
         "focus_categories": focus_categories,
         "weakest_questions": weakest_questions,
         "recommendations": recommendations,
-        "scoring_context": scoring_context,
         "is_htmx": _is_htmx(request),
         "snap": snap,
     })
