@@ -26,6 +26,12 @@ urlpatterns = [
     
     # Evidence upload (used by workspace agent)
     path("evidence/upload/<uuid:session_id>/", views.upload_strategic_evidence, name="upload_evidence"),
+
+    # Delivery document analysis
+    path("delivery/<uuid:session_id>/upload/", views.upload_delivery_document, name="upload_delivery_document"),
+    path("delivery/<uuid:session_id>/analyze/", views.analyze_delivery_documents, name="analyze_delivery_documents"),
+    path("delivery/<uuid:session_id>/documents/", views.get_delivery_documents, name="get_delivery_documents"),
+    path("delivery/<uuid:session_id>/delete/<uuid:doc_id>/", views.delete_delivery_document, name="delete_delivery_document"),
     
     # User Profile & Auth
     path("profile/", views.profile, name="profile"),

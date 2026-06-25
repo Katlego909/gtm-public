@@ -450,7 +450,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
     "Delivery": [
         {
             "id_code": "DEL-TTV-01",
-            "text": "We track how long it takes new customers to get their first real value, by segment, and we actively work to shorten that time.",
+            "text": "Does your business track how long it takes new customers to reach their first real value, broken down by segment, and actively work to shorten that time?",
             "weight": 0.18,
             "diagnostic_note": "If first value takes too long, churn risk rises.",
             "ai_metadata": {
@@ -466,7 +466,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEL-ONB-02",
-            "text": "Our onboarding process has clear milestones, clear owners, and realistic completion targets, and progress is tracked in one shared system.",
+            "text": "Does your organization's onboarding process have clear milestones, defined owners, and realistic completion targets — with progress tracked in a single shared system?",
             "weight": 0.16,
             "diagnostic_note": "Poor onboarding slows activation and increases support load.",
             "ai_metadata": {
@@ -482,7 +482,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEL-HLT-03",
-            "text": "We score customer health using product usage, engagement, and support signals, and we use clear playbooks to act early on at-risk accounts.",
+            "text": "Does your organization score customer health using product usage, engagement, and support signals — and apply clear playbooks to act early on at-risk accounts?",
             "weight": 0.24,
             "diagnostic_note": "Without health signals, risk is found too late.",
             "ai_metadata": {
@@ -498,7 +498,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEL-RET-04",
-            "text": "We review gross and net retention by cohort every month, and we launch targeted actions quickly when any segment starts to decline.",
+            "text": "Does your business review gross and net retention by cohort on a monthly basis, and launch targeted actions quickly when any segment starts to decline?",
             "weight": 0.22,
             "diagnostic_note": "If retention drops go unseen, growth slows quietly.",
             "ai_metadata": {
@@ -514,7 +514,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEL-QBR-05",
-            "text": "Our high-value customers receive regular business reviews focused on outcomes, roadmap alignment, and practical expansion opportunities.",
+            "text": "Do your high-value customers receive regular business reviews focused on outcomes, roadmap alignment, and practical expansion opportunities?",
             "weight": 0.12,
             "diagnostic_note": "Without regular reviews, expansion opportunities are missed.",
             "ai_metadata": {
@@ -530,7 +530,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEL-ADV-06",
-            "text": "After customers achieve clear value, we consistently capture proof points like quotes, case studies, and references to support future selling.",
+            "text": "After customers achieve clear value, does your business consistently capture proof points — such as quotes, case studies, and references — to support future selling?",
             "weight": 0.08,
             "diagnostic_note": "If proof points are not captured, future buyers trust you less.",
             "ai_metadata": {

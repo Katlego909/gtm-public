@@ -9,7 +9,7 @@ from datetime import datetime
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib import messages
-from .models import AssessmentSession, Question, Response, Category, RecommendationBand, ActionItem, ToolRecommendation, ResultSnapshot
+from .models import AssessmentSession, Question, Response, Category, RecommendationBand, ActionItem, ToolRecommendation, ResultSnapshot, DeliveryDocument
 from django.utils.safestring import mark_safe
 import markdown as md
 import math
@@ -335,6 +335,7 @@ def assessment_step(request, session_id, step: int):
         "is_htmx": _is_htmx(request),
         "context_fields": context_fields,
         "question_guidance": question_guidance,
+        "is_delivery_step": step == total_steps,
     })
 
 
@@ -421,6 +422,14 @@ def results(request, session_id):
 
     labels = [c["category"].name for c in cat_scores]
     values = [round(c["avg"], 2) for c in cat_scores]
+
+    # ── Scoring engine: opportunity ranking + pattern detection ──────────────
+    from .scoring_engine import build_recommendation_context
+    _q_scores = {
+        r.question.id_code: r.score
+        for r in Response.objects.filter(session=session).select_related("question")
+    }
+    scoring_context = build_recommendation_context(_q_scores) if _q_scores else {}
 
     # -----------------------------
     # 🧩 Tool Recommendations Logic (Optimized to prevent N+1)
@@ -545,14 +554,29 @@ def results(request, session_id):
     # -----------------------------
     # 🤖 Trigger AI playbook generation in background (non-blocking)
     # -----------------------------
-    if snap and not (snap.ai_playbook or "").strip():
+    playbook_raw = (snap.ai_playbook or "").strip() if snap else ""
+    # The final fallback stored when Gemini fails — treat as if no playbook exists
+    is_generic_fallback = playbook_raw.startswith("No AI-generated playbook available yet.")
+
+    if snap and (not playbook_raw or is_generic_fallback):
+        if is_generic_fallback:
+            snap.ai_playbook = ""
+            snap.ai_playbook_status = "pending"
+            snap.save(update_fields=["ai_playbook", "ai_playbook_status"])
         _kickoff_playbook_generation(snap, session_id=session.uuid)
+
+    # Render AI playbook HTML for the "Recommended Next Moves" card
+    ai_playbook_html = ""
+    if snap and playbook_raw and not is_generic_fallback:
+        src = _normalize_ai_playbook_markdown(snap.ai_playbook)
+        ai_playbook_html = mark_safe(md.markdown(src, extensions=["extra", "sane_lists"]))
 
     return render(request, "gtm/results.html", {
         "session": session,
         "overall": round(overall, 1),
         "band": band,
         "band_actions_html": band_actions_html,
+        "ai_playbook_html": ai_playbook_html,
         "cat_scores": cat_scores,
         "labels": labels,
         "values": values,
@@ -560,6 +584,7 @@ def results(request, session_id):
         "focus_categories": focus_categories,
         "weakest_questions": weakest_questions,
         "recommendations": recommendations,
+        "scoring_context": scoring_context,
         "is_htmx": _is_htmx(request),
         "snap": snap,
     })
@@ -890,6 +915,136 @@ def upload_strategic_evidence(request, session_id):
     except Exception as e:
         log_error("Evidence Upload Failure", e)
         return JsonResponse({"success": False, "error": "Could not upload file."}, status=500)
+
+@login_required
+@require_POST
+def upload_delivery_document(request, session_id):
+    """Upload a document for the Delivery step AI analysis. Text extraction runs async."""
+    import os as _os
+
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        return JsonResponse({"success": False, "error": "Access denied."}, status=403)
+
+    if 'file' not in request.FILES:
+        return JsonResponse({"success": False, "error": "No file provided."}, status=400)
+
+    uploaded = request.FILES['file']
+
+    if uploaded.size > 10 * 1024 * 1024:
+        return JsonResponse({"success": False, "error": "File too large (max 10 MB)."}, status=400)
+
+    ext_map = {
+        '.csv': 'csv', '.xlsx': 'xlsx', '.xls': 'xlsx',
+        '.pdf': 'pdf', '.docx': 'docx', '.doc': 'docx',
+        '.txt': 'txt', '.md': 'txt', '.log': 'txt',
+        '.json': 'json',
+        '.png': 'image', '.jpg': 'image', '.jpeg': 'image', '.webp': 'image',
+    }
+    ext = _os.path.splitext(uploaded.name.lower())[1]
+    file_type = ext_map.get(ext, 'other')
+
+    doc = DeliveryDocument.objects.create(
+        session=session,
+        file=uploaded,
+        original_filename=uploaded.name,
+        file_size=uploaded.size,
+        file_type=file_type,
+        analysis_status='uploaded',
+    )
+
+    def _extract_in_background(doc_id, ftype):
+        try:
+            from .delivery_analyzer import extract_text_from_path
+            from .ai_services import _get_client
+            d = DeliveryDocument.objects.get(id=doc_id)
+            client = _get_client() if ftype == 'image' else None
+            text = extract_text_from_path(d.file.path, ftype, client, "gemini-2.5-flash")
+            d.extracted_text = text
+            d.save(update_fields=['extracted_text'])
+        except Exception as exc:
+            log_error("DeliveryDoc background extraction", exc)
+
+    from threading import Thread
+    Thread(target=_extract_in_background, args=(str(doc.id), file_type), daemon=True).start()
+
+    return JsonResponse({
+        "success": True,
+        "doc_id": str(doc.id),
+        "filename": doc.original_filename,
+        "file_type": file_type,
+        "file_size": doc.file_size,
+    })
+
+
+@login_required
+@require_POST
+def analyze_delivery_documents(request, session_id):
+    """Run Gemini analysis on all uploaded delivery documents and return per-question scores."""
+    from .delivery_analyzer import analyze_delivery_documents as _run_analysis
+
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        return JsonResponse({"success": False, "error": "Access denied."}, status=403)
+
+    docs = DeliveryDocument.objects.filter(session=session)
+    if not docs.exists():
+        return JsonResponse({"success": False, "error": "No documents uploaded yet."}, status=400)
+
+    docs_with_text = docs.filter(extracted_text__gt='')
+    if not docs_with_text.exists():
+        return JsonResponse(
+            {"success": False, "error": "Documents are still being processed. Please wait a moment and try again."},
+            status=400,
+        )
+
+    result = _run_analysis(session)
+    if not result or "_error" in result:
+        error_detail = result.get("_error", "") if result else ""
+        return JsonResponse(
+            {"success": False, "error": f"Analysis failed: {error_detail}" if error_detail else "Could not analyse documents. Please try again."},
+            status=500,
+        )
+
+    docs_with_text.update(analysis_status='complete', analysis_result=result)
+
+    return JsonResponse({"success": True, "scores": result})
+
+
+@login_required
+def get_delivery_documents(request, session_id):
+    """Return the list of uploaded delivery documents for this session (GET)."""
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        return JsonResponse({"success": False, "error": "Access denied."}, status=403)
+
+    docs = list(
+        DeliveryDocument.objects.filter(session=session).values(
+            'id', 'original_filename', 'file_size', 'file_type', 'analysis_status'
+        )
+    )
+    for d in docs:
+        d['id'] = str(d['id'])
+
+    return JsonResponse({"success": True, "documents": docs})
+
+
+@login_required
+@require_POST
+def delete_delivery_document(request, session_id, doc_id):
+    """Delete a previously uploaded delivery document."""
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        return JsonResponse({"success": False, "error": "Access denied."}, status=403)
+
+    doc = get_object_or_404(DeliveryDocument, id=doc_id, session=session)
+    try:
+        doc.file.delete(save=False)
+    except Exception:
+        pass
+    doc.delete()
+    return JsonResponse({"success": True})
+
 
 @require_POST
 @require_session_ownership
