@@ -616,6 +616,44 @@ def playbook_status(request, session_id):
     return render(request, "gtm/partials/playbook_loading_button.html", {"session": session})
 
 
+def enrichment_status(request, session_id):
+    """HTMX polling endpoint: triggers and returns financial + competitor sections."""
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        return HttpResponse("")
+
+    snap = getattr(session, "snapshot", None) or ResultSnapshot.objects.filter(session=session).first()
+    if not snap:
+        return HttpResponse("")
+
+    if not snap.ai_financial_summary or not snap.ai_competitor_analysis:
+        from .ai_services import generate_enrichment_sections
+        import threading
+        def _run(snap_id):
+            from django.db import connection
+            try:
+                from .models import ResultSnapshot as RS
+                s = RS.objects.get(id=snap_id)
+                generate_enrichment_sections(s)
+            finally:
+                connection.close()
+        threading.Thread(target=_run, args=(snap.id,), daemon=True).start()
+        snap.refresh_from_db()
+
+    fin_html = comp_html = ""
+    if snap.ai_financial_summary:
+        fin_html = mark_safe(md.markdown(_normalize_ai_playbook_markdown(snap.ai_financial_summary), extensions=["extra", "sane_lists"]))
+    if snap.ai_competitor_analysis:
+        comp_html = mark_safe(md.markdown(_normalize_ai_playbook_markdown(snap.ai_competitor_analysis), extensions=["extra", "sane_lists"]))
+
+    return render(request, "gtm/partials/enrichment_sections.html", {
+        "session": session,
+        "fin_html": fin_html,
+        "comp_html": comp_html,
+        "still_loading": not (snap.ai_financial_summary and snap.ai_competitor_analysis),
+    })
+
+
 def playbook_content_status(request, session_id):
     """Return only the playbook content panel for incremental HTMX polling."""
     # Access control: ensure user owns or is in session's workspace
@@ -651,6 +689,7 @@ def playbook_content_status(request, session_id):
             "ai_playbook_html": mark_safe(ai_playbook_html),
             "ai_financial_html": mark_safe(ai_financial_html),
             "ai_competitor_html": mark_safe(ai_competitor_html),
+            "enrichment_loading": not (snap.ai_financial_summary and snap.ai_competitor_analysis),
         })
 
     snap_status = getattr(snap, "ai_playbook_status", "pending") if snap else "pending"

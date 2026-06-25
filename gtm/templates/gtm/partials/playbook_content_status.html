@@ -18,50 +18,7 @@
       {{ ai_playbook_html|safe }}
     </article>
 
-    {% if ai_financial_html %}
-    <div class="mt-6 mx-8 rounded-xl border border-emerald-200 bg-emerald-50 px-6 py-6">
-      <h3 class="text-sm font-semibold text-emerald-800 mb-3">Financial Estimates</h3>
-      <div class="text-sm prose prose-slate max-w-none prose-emerald">
-        {{ ai_financial_html|safe }}
-      </div>
-      <p class="text-xs text-emerald-600 mt-4 italic">
-        These are AI-generated estimates based on your company data. Validate with your finance team before making budget decisions.
-      </p>
-    </div>
-    {% else %}
-    <div class="mt-6 mx-8 rounded-xl border border-emerald-200 bg-emerald-50 px-6 py-6 animate-pulse">
-      <h3 class="text-sm font-semibold text-emerald-800 mb-3 flex items-center gap-2">
-        <i class="fas fa-spinner fa-spin text-emerald-600"></i>
-        Generating Financial Estimates...
-      </h3>
-      <div class="space-y-3">
-        <div class="h-4 bg-emerald-200 rounded w-3/4"></div>
-        <div class="h-4 bg-emerald-200 rounded w-5/6"></div>
-        <div class="h-4 bg-emerald-200 rounded w-4/5"></div>
-      </div>
-    </div>
-    {% endif %}
-
-    {% if ai_competitor_html %}
-    <div class="mt-4 mx-8 rounded-xl border border-blue-200 bg-blue-50 px-6 py-6 mb-6">
-      <h3 class="text-sm font-semibold text-blue-800 mb-3">Competitive Gap Analysis</h3>
-      <div class="text-sm prose prose-slate max-w-none prose-blue">
-        {{ ai_competitor_html|safe }}
-      </div>
-    </div>
-    {% else %}
-    <div class="mt-4 mx-8 rounded-xl border border-blue-200 bg-blue-50 px-6 py-6 mb-6 animate-pulse">
-      <h3 class="text-sm font-semibold text-blue-800 mb-3 flex items-center gap-2">
-        <i class="fas fa-spinner fa-spin text-blue-600"></i>
-        Generating Competitive Analysis...
-      </h3>
-      <div class="space-y-3">
-        <div class="h-4 bg-blue-200 rounded w-3/4"></div>
-        <div class="h-4 bg-blue-200 rounded w-5/6"></div>
-        <div class="h-4 bg-blue-200 rounded w-4/5"></div>
-      </div>
-    </div>
-    {% endif %}
+    {% include "gtm/partials/enrichment_sections.html" with fin_html=ai_financial_html comp_html=ai_competitor_html still_loading=enrichment_loading %}
   </div>
 {% elif snap_status == "failed" %}
   <div class="bg-white rounded-3xl shadow-xl border border-gray-100 p-10 text-center">
