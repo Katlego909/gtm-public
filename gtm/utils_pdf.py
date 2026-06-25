@@ -14,6 +14,38 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import markdown as mdlib
 
 
+def _clean_md(text: str) -> str:
+    """Strip markdown formatting and escape XML special chars for ReportLab Paragraph."""
+    text = re.sub(r'\*{1,3}([^*\n]+)\*{1,3}', r'\1', text)
+    text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+    return text.strip()
+
+
+def _trunc(text: str, max_len: int = 160) -> str:
+    if len(text) <= max_len:
+        return text
+    return text[:max_len].rsplit(' ', 1)[0] + '…'
+
+
+def _parse_playbook_priorities(ai_md: str) -> list:
+    """Extract Priority sections from AI playbook markdown."""
+    priorities = []
+    pattern = re.compile(
+        r'(?:^|\n)#{0,3}\s*Priority\s+\d+:\s*(.+?)(?:\s*\(([^)]+)\))?\s*\n(.*?)(?=\n#{0,3}\s*Priority\s+\d+:|\Z)',
+        re.DOTALL | re.IGNORECASE,
+    )
+    for m in pattern.finditer(ai_md):
+        title = m.group(1).strip()
+        category = (m.group(2) or "").strip()
+        body = m.group(3).strip()
+        # Only match real bullet lines (• or -), not ** heading lines
+        raw_bullets = re.findall(r'(?m)^[•\-]\s*(.+)', body)
+        bullets = [_clean_md(b) for b in raw_bullets[:3]]
+        if title:
+            priorities.append({"title": title, "category": category, "bullets": bullets})
+    return priorities[:3]
+
+
 def _header_footer(canvas, doc):
     # Top brand bar + title
     canvas.saveState()
@@ -353,27 +385,55 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
     def P(txt): return Paragraph(strip_tags(txt), styles["Body"])
     def PBold(txt): return Paragraph(f"<b>{strip_tags(txt)}</b>", styles["Body"])
 
+    _week_hex = ["#1E40AF", "#7C3AED", "#059669"]
+    _week_bg  = [colors.HexColor("#EFF6FF"), colors.white, colors.HexColor("#F5F3FF")]
+
+    priorities = _parse_playbook_priorities(ai_md)
+
     table_data = [
         [Paragraph("<b>Week</b>", styles["Body"]),
          Paragraph("<b>Focus Area</b>", styles["Body"]),
          Paragraph("<b>Key Objectives</b>", styles["Body"]),
          Paragraph("<b>Success Metrics</b>", styles["Body"])],
-        [PBold("Week 1"), 
-         Paragraph('<font color="#1E40AF"><b>Audit & Alignment</b></font>', styles["Body"]),
-         P("• Define ideal customer profile (ICP)<br/>• Refine value proposition & messaging<br/>• Review and document current lead sources"),
-         P("✓ Documented ICP<br/>✓ Updated messaging<br/>✓ Lead source audit complete")],
-        [PBold("Week 2"), 
-         Paragraph('<font color="#7C3AED"><b>Process Optimization</b></font>', styles["Body"]),
-         P("• Set response time targets (< 5 min ideal)<br/>• Standardize lead qualification criteria<br/>• Implement systematic follow-up sequences"),
-         P("✓ Response time < 1 hour<br/>✓ 80%+ leads qualified<br/>✓ Follow-up rate > 90%")],
-        [PBold("Week 3"), 
-         Paragraph('<font color="#059669"><b>Demand Generation</b></font>', styles["Body"]),
-         P("• Launch one consistent content/outreach campaign<br/>• Activate multiple lead channels<br/>• Test and iterate messaging across channels"),
-         P("✓ 20%+ increase in traffic<br/>✓ 15%+ more qualified leads<br/>✓ Campaign running weekly")],
-        [PBold("Week 4"), 
-         Paragraph('<font color="#DC2626"><b>Measure & Refine</b></font>', styles["Body"]),
-         P("• Review all metrics and conversion rates<br/>• Identify and fix bottlenecks<br/>• Plan next 30-day improvement cycle"),
-         P("✓ Full metrics dashboard<br/>✓ Conversion improved 10%+<br/>✓ Next cycle planned")],
+    ]
+
+    def PBr(raw): return Paragraph(raw, styles["Body"])
+
+    for i, pri in enumerate(priorities):
+        obj_lines = "<br/>".join(f"• {b}" for b in pri["bullets"]) if pri["bullets"] else f"• Complete {_clean_md(pri['title'])} actions"
+        cat_clean = _clean_md(pri["category"])
+        title_clean = _clean_md(pri["title"])
+        metric_lines = (
+            f"&#10003; {title_clean} actions completed<br/>&#10003; {cat_clean} score improving"
+            if cat_clean else f"&#10003; {title_clean} actions completed"
+        )
+        table_data.append([
+            PBold(f"Week {i + 1}"),
+            Paragraph(f'<font color="{_week_hex[i]}"><b>{_clean_md(pri["title"])}</b></font>', styles["Body"]),
+            PBr(obj_lines),
+            PBr(metric_lines),
+        ])
+
+    # Week 4: Measure & Refine — mention the specific weak categories
+    _weak_cats = [r["category"].name for r in cat_scores if r["avg"] < 3.0][:2]
+    _weak_str = " &amp; ".join(_clean_md(c) for c in _weak_cats)
+    _measure_focus = (
+        f"• Track improvements in {_weak_str}<br/>• Review all metrics and conversion rates<br/>• Plan next 30-day improvement cycle"
+        if _weak_cats
+        else "• Review all metrics and conversion rates<br/>• Identify and fix bottlenecks<br/>• Plan next 30-day improvement cycle"
+    )
+    table_data.append([
+        PBold("Week 4"),
+        Paragraph('<font color="#DC2626"><b>Measure &amp; Refine</b></font>', styles["Body"]),
+        PBr(_measure_focus),
+        PBr("&#10003; Full metrics dashboard<br/>&#10003; Conversion improved 10%+<br/>&#10003; Next cycle planned"),
+    ])
+
+    # Alternating row backgrounds (dynamic row count)
+    _row_bg_cycle = [colors.HexColor("#EFF6FF"), colors.white, colors.HexColor("#F5F3FF"), colors.white]
+    _row_bg_cmds = [
+        ("BACKGROUND", (0, r), (-1, r), _row_bg_cycle[(r - 1) % len(_row_bg_cycle)])
+        for r in range(1, len(table_data))
     ]
 
     # Proportional widths based on available frame width
@@ -388,37 +448,25 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
         hAlign="LEFT",
     )
     table.setStyle(TableStyle([
-        # header with gradient-like effect
         ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E40AF")),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("FONTSIZE", (0, 0), (-1, 0), 11),
         ("BOTTOMPADDING", (0, 0), (-1, 0), 10),
         ("TOPPADDING", (0, 0), (-1, 0), 10),
-
-        # body styling
         ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
         ("FONTSIZE", (0, 1), (-1, -1), 10),
         ("TEXTCOLOR", (0, 1), (-1, -1), colors.HexColor("#1F2937")),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("ALIGN", (0, 1), (0, -1), "CENTER"),
-
-        # alternating row colors for better readability
-        ("BACKGROUND", (0, 1), (-1, 1), colors.HexColor("#EFF6FF")),
-        ("BACKGROUND", (0, 2), (-1, 2), colors.white),
-        ("BACKGROUND", (0, 3), (-1, 3), colors.HexColor("#F5F3FF")),
-        ("BACKGROUND", (0, 4), (-1, 4), colors.white),
-
-        # padding for breathing room
         ("LEFTPADDING", (0, 0), (-1, -1), 10),
         ("RIGHTPADDING", (0, 0), (-1, -1), 10),
         ("TOPPADDING", (0, 1), (-1, -1), 10),
         ("BOTTOMPADDING", (0, 1), (-1, -1), 12),
-        
-        # grid and borders
         ("GRID", (0, 0), (-1, -1), 0.75, colors.HexColor("#CBD5E1")),
         ("LINEBELOW", (0, 0), (-1, 0), 1.5, colors.HexColor("#1E3A8A")),
         ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#94A3B8")),
+        *_row_bg_cmds,
     ]))
     content.append(table)
     content.append(Spacer(1, 0.6 * cm))
@@ -443,6 +491,8 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
     buffer.close()
 
     resp = HttpResponse(content_type="application/pdf")
-    resp["Content-Disposition"] = f'attachment; filename=\"gtm_report_{session.uuid}.pdf\"'
+    _company_slug = re.sub(r'[^\w\s-]', '', session.company_name or "company").strip()
+    _company_slug = re.sub(r'[\s]+', '_', _company_slug)
+    resp["Content-Disposition"] = f'attachment; filename=\"{_company_slug}_AI_playbook_report_ForgeGTM.pdf\"'
     resp.write(pdf)
     return resp
