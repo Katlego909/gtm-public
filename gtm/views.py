@@ -715,6 +715,31 @@ def playbook(request, session_id):
         getattr(band, "actions_markdown", "") if band else ""
     )
 
+    # Scoring engine context for company-specific next moves bullets
+    from .scoring_engine import build_recommendation_context
+    _q_scores = {
+        r.question.id_code: r.score
+        for r in Response.objects.filter(session=session).select_related("question")
+    }
+    scoring_context = build_recommendation_context(_q_scores) if _q_scores else {}
+
+    # Build short action bullets from pattern quick_wins (split into sentences)
+    import re as _re
+    _next_moves = []
+    for _pat in scoring_context.get("patterns", []):
+        _qw = (_pat.get("quick_win") or "").strip()
+        _sentences = [s.strip() for s in _re.split(r'(?<=[.!?])\s+', _qw) if s.strip()]
+        _next_moves.extend(_sentences[:2])
+    next_move_bullets = _next_moves[:6]
+
+    # Tool recommendations for the 2 weakest categories — flatten into bullet strings
+    _weak_cat_ids = [c["category"].id for c in cat_sorted[:2]]
+    _tool_recs = ToolRecommendation.objects.filter(category__id__in=_weak_cat_ids).select_related("category")[:5]
+    playbook_tool_recs = [
+        f"{_tr.tools} — {_tr.description}".strip(" —") if _tr.description else _tr.tools
+        for _tr in _tool_recs if _tr.tools
+    ]
+
     # -----------------------------
     # 🤖 AI Playbook Rendering (+ optional lazy-generate)
     # -----------------------------
@@ -772,6 +797,9 @@ def playbook(request, session_id):
         "cat_scores": cat_scores,
         "cat_sorted": cat_sorted,
         "band_actions_html": band_actions_html,
+        "scoring_context": scoring_context,
+        "next_move_bullets": next_move_bullets,
+        "playbook_tool_recs": playbook_tool_recs,
         "ai_playbook_html": mark_safe(ai_playbook_html),
         "ai_financial_html": mark_safe(ai_financial_html),
         "ai_competitor_html": mark_safe(ai_competitor_html),
