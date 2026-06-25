@@ -654,7 +654,8 @@ def _build_diagnostic_prompt(session: AssessmentSession, question: Question, sco
     industry = session.industry or "a general industry"
     stage = session.snapshot.band_stage if getattr(session, 'snapshot', None) and session.snapshot.band_stage else "Unspecified"
     ai_metadata = question.ai_metadata if isinstance(question.ai_metadata, dict) else {}
-    risk_if_low = ai_metadata.get("risk_if_low") or "N/A"
+    risk_if_low    = ai_metadata.get("risk_if_low")    or "N/A"
+    quick_win      = ai_metadata.get("quick_win_if_low") or "N/A"
 
     # Score severity mapping
     if score >= 4:
@@ -666,14 +667,13 @@ def _build_diagnostic_prompt(session: AssessmentSession, question: Question, sco
     else:
         severity  = {1: "Critical Failure", 2: "Serious Gap", 3: "Improvement Needed"}.get(score, "Low Priority")
         task_desc = (
-            f"describe specifically what is absent, broken, or lacking at {company_name} that caused this low score. "
-            f"Focus entirely on diagnosing the weakness — what is missing or not in place for a {industry} company "
-            f"at the {stage} stage. Known consequence of this gap: {risk_if_low}. "
-            f"Do NOT give recommendations or action items. Only describe the flaw."
+            f"explain the immediate risk of this low score in the context of the "
+            f"{industry} industry and {stage} stage. Known risk: {risk_if_low}. "
+            f"Suggested quick win: {quick_win}."
         )
 
     prompt = f"""
-You are a highly experienced Go-To-Market consultant diagnosing GTM weaknesses.
+You are a highly experienced Go-To-Market consultant. Provide a brief, actionable insight for the assessment area below.
 
 Company: {company_name} | Industry: {industry} | GTM Stage: {stage}
 Question: {question.text}
@@ -681,7 +681,7 @@ Score: {score}/5 ({severity})
 
 Task: {task_desc}
 
-Write one concise paragraph (2–3 sentences max) in clean professional prose. Name the company. Do not suggest fixes.
+Write one concise paragraph (3–4 sentences max) in clean professional prose.
     """.strip()
 
     return prompt
@@ -816,22 +816,18 @@ def generate_diagnostic_insights_batch(responses: list) -> dict:
 
     blocks_text = ",\n".join(response_blocks)
 
-    prompt = f"""You are a Go-To-Market consultant diagnosing GTM weaknesses. For each assessment response below, write ONE concise diagnostic paragraph (2-3 sentences max) that:
-- Names the company by name
-- Describes specifically what is absent, broken, or lacking that caused this low score
-- Explains the consequence of that gap
-- Does NOT give recommendations or action items — only diagnose the flaw
+    prompt = f"""You are a Go-To-Market consultant. For each assessment response below, write ONE concise diagnostic paragraph (2-3 sentences max) explaining why the score matters and what specific action to take next.
 
 Assessment responses:
 {{
 {blocks_text}
 }}
 
-Respond ONLY with a valid JSON object mapping each response ID (as a string key) to its diagnostic paragraph.
+Respond ONLY with a valid JSON object mapping each response ID (as a string key) to its insight paragraph.
 Example format:
 {{
-  "42": "Acme Corp lacks a defined ICP, meaning sales reps are targeting a broad, unqualified audience with no firmographic filters in place. This absence makes it impossible to predict which leads will convert, causing wasted cycles and inflated CAC.",
-  "57": "Acme Corp has no win/loss review process, so the reasons deals are lost to competitors are never captured or analysed. This blind spot means the same objections recur without the team understanding why they are losing."
+  "42": "Your ICP definition is unclear, which means you're wasting sales cycles on poor-fit leads. Start by documenting 3-5 firmographic filters.",
+  "57": "Your attribution model is strong, giving you clear ROI visibility. Extend it to include longer sales cycles."
 }}
 Do not include markdown code blocks or extra text. Return only the raw JSON object.""".strip()
 
