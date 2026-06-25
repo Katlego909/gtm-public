@@ -49,3 +49,6 @@ debug_*.py
 test_local_*.py
 
 keys/service-account.json
+
+# Test files
+test_documents/
