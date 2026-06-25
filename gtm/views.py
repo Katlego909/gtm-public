@@ -709,6 +709,48 @@ def playbook(request, session_id):
         for _tr in _tool_recs if _tr.tools
     ]
 
+    # Auto-populate task list on first visit (no tasks yet)
+    # 90% from AI playbook via Gemini extraction, 10% from scoring engine quick_win
+    if scoring_context and not session.actions.exists():
+        from .ai_services import extract_tasks_from_playbook
+        _snap_for_tasks = getattr(session, "snapshot", None) or ResultSnapshot.objects.filter(session=session).first()
+        _playbook_text = (_snap_for_tasks.ai_playbook or "").strip() if _snap_for_tasks else ""
+        _company = session.company_name or "your company"
+        _patterns = scoring_context.get("patterns", [])
+        _severity_days = {"Critical": 14, "High": 28, "Medium": 42}
+        _tasks_to_create = []
+
+        # Try 90%: extract ~4 tasks from AI playbook
+        _ai_tasks = extract_tasks_from_playbook(_playbook_text, _company, n=4) if _playbook_text else []
+
+        if _ai_tasks:
+            _default_due = timezone.now().date() + timedelta(days=21)
+            for _t in _ai_tasks:
+                _tasks_to_create.append(ActionItem(session=session, note=_t, status="todo", due_date=_default_due))
+            # 10%: first quick_win sentence from highest-severity pattern
+            if _patterns:
+                _top_pat = _patterns[0]
+                _qw = (_top_pat.get("quick_win") or "").strip()
+                _first = _re.split(r'(?<=[.!?])\s+', _qw)[0].strip() if _qw else ""
+                _due = timezone.now().date() + timedelta(days=_severity_days.get(_top_pat["severity"], 28))
+                _first_words = set(_first.lower().split()) if _first else set()
+                _too_similar = any(
+                    len(_first_words & set(_t.lower().split())) / max(len(_first_words), 1) > 0.6
+                    for _t in _ai_tasks
+                )
+                if _first and len(_first) <= 240 and not _too_similar:
+                    _tasks_to_create.append(ActionItem(session=session, note=_first, status="todo", due_date=_due))
+        else:
+            # Fallback: all scoring engine quick_win sentences
+            for _pat in _patterns:
+                _due = timezone.now().date() + timedelta(days=_severity_days.get(_pat["severity"], 28))
+                _qw = (_pat.get("quick_win") or "").strip()
+                for _s in [s.strip() for s in _re.split(r'(?<=[.!?])\s+', _qw) if s.strip()]:
+                    if len(_s) <= 240:
+                        _tasks_to_create.append(ActionItem(session=session, note=_s, status="todo", due_date=_due))
+
+        ActionItem.objects.bulk_create(_tasks_to_create)
+
     # -----------------------------
     # 🤖 AI Playbook Rendering (+ optional lazy-generate)
     # -----------------------------

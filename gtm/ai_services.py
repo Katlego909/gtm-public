@@ -468,6 +468,49 @@ Respond ONLY with a valid raw JSON object (no markdown code fences). Use these e
     return prompt
 
 
+def extract_tasks_from_playbook(playbook_text: str, company_name: str, n: int = 4) -> list[str]:
+    """
+    Ask Gemini to extract n short actionable tasks from an existing AI playbook.
+    Returns a list of task strings (each <= 220 chars). Returns [] on any failure.
+    """
+    client = _get_client()
+    if not client or not playbook_text:
+        return []
+
+    prompt = f"""You are extracting action items from a GTM playbook for {company_name}.
+
+Read the playbook below and extract exactly {n} specific, actionable tasks the company should complete.
+
+Rules:
+- Each task must be a single imperative sentence (start with a verb)
+- Max 200 characters each
+- Be concrete and specific to {company_name} — no generic advice
+- Return ONLY a valid JSON array of strings, e.g. ["Task one.", "Task two."]
+- No markdown, no extra text, just the JSON array
+
+Playbook:
+{playbook_text[:2000]}"""
+
+    try:
+        from google.genai import types as genai_types
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=genai_types.GenerateContentConfig(
+                temperature=0.3,
+                max_output_tokens=2048,
+            ),
+        )
+        raw = (response.text or "").strip()
+        raw = _clean_json_response(raw)
+        tasks = json.loads(raw)
+        if isinstance(tasks, list):
+            return [str(t).strip() for t in tasks if isinstance(t, str) and len(t.strip()) <= 220][:n]
+    except Exception as e:
+        log_ai_error("extract_tasks_from_playbook", e, {})
+    return []
+
+
 # ================================================================
 # MAIN GENERATION FUNCTION
 # ================================================================
