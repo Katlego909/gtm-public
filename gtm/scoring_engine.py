@@ -219,7 +219,7 @@ _PATTERNS: list[dict] = [
         ),
         "quick_win": (
             "Define exit criteria for each pipeline stage. Add a mandatory closed-lost "
-            "reason taxonomy with 5–7 categories. Run a monthly 30-minute win/loss retro."
+            "reason taxonomy with 5-7 categories. Run a monthly 30-minute win/loss retro."
         ),
         "trigger": lambda q, _: q.get("CON-STG-03", 5) <= 2 or q.get("CON-WNL-05", 5) <= 2,
     },
