@@ -166,21 +166,152 @@
             </div>
             <div>
                 <h3 class="text-2xl font-bold text-gray-900 mb-1">Recommended Next Moves</h3>
-                <p class="text-sm text-gray-600">Strategic actions to accelerate your GTM maturity</p>
+                <p class="text-sm text-gray-600">
+                  {% if ai_playbook_html %}
+                    AI-generated and personalised for {{ session.company_name|default:"your company" }}
+                  {% else %}
+                    Strategic actions to accelerate your GTM maturity
+                  {% endif %}
+                </p>
             </div>
         </div>
-        
-        <!-- Content with enhanced styling -->
-        <div class="prose prose-base max-w-none 
-                    prose-headings:text-gray-900 prose-headings:font-bold prose-headings:text-lg prose-headings:mb-3 prose-headings:mt-6 first:prose-headings:mt-0
-                    prose-p:text-gray-700 prose-p:text-base prose-p:leading-relaxed prose-p:my-3
-                    prose-strong:text-indigo-700 prose-strong:font-semibold prose-strong:text-base
-                    prose-ul:my-4 prose-ul:space-y-2.5 prose-ul:ml-6
-                    prose-li:text-gray-700 prose-li:text-base prose-li:leading-relaxed prose-li:pl-2
-                    prose-li:marker:text-indigo-500 prose-li:marker:font-bold">
+
+        {% if ai_playbook_html %}
+          <!-- AI-generated personalised content -->
+          <div class="prose prose-base max-w-none
+                      prose-headings:text-gray-900 prose-headings:font-bold prose-headings:text-lg prose-headings:mb-3 prose-headings:mt-6 first:prose-headings:mt-0
+                      prose-p:text-gray-700 prose-p:text-base prose-p:leading-relaxed prose-p:my-3
+                      prose-strong:text-indigo-700 prose-strong:font-semibold prose-strong:text-base
+                      prose-ul:my-4 prose-ul:space-y-2.5 prose-ul:ml-6
+                      prose-li:text-gray-700 prose-li:text-base prose-li:leading-relaxed prose-li:pl-2
+                      prose-li:marker:text-indigo-500 prose-li:marker:font-bold">
+            {{ ai_playbook_html }}
+          </div>
+        {% else %}
+          <!-- Generating banner shown while AI is working -->
+          {% if snap and snap.ai_playbook_status == "generating" or snap and snap.ai_playbook_status == "pending" %}
+          <div class="flex items-center gap-3 mb-5 p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-sm text-indigo-700">
+            <div class="animate-spin h-4 w-4 border-2 border-indigo-500 border-t-transparent rounded-full flex-shrink-0"></div>
+            <span>Personalising recommendations for {{ session.company_name|default:"your company" }}… Refresh in a few moments to see your AI-generated plan.</span>
+          </div>
+          {% endif %}
+          <!-- Static band content as fallback -->
+          <div class="prose prose-base max-w-none
+                      prose-headings:text-gray-900 prose-headings:font-bold prose-headings:text-lg prose-headings:mb-3 prose-headings:mt-6 first:prose-headings:mt-0
+                      prose-p:text-gray-700 prose-p:text-base prose-p:leading-relaxed prose-p:my-3
+                      prose-strong:text-indigo-700 prose-strong:font-semibold prose-strong:text-base
+                      prose-ul:my-4 prose-ul:space-y-2.5 prose-ul:ml-6
+                      prose-li:text-gray-700 prose-li:text-base prose-li:leading-relaxed prose-li:pl-2
+                      prose-li:marker:text-indigo-500 prose-li:marker:font-bold">
             {{ band_actions_html|safe }}
-        </div>
+          </div>
+        {% endif %}
     </div>
+{% endif %}
+
+{% if scoring_context %}
+{# ── Priority Opportunities + Detected Patterns ───────────────────────────── #}
+<div class="grid lg:grid-cols-2 gap-6 mt-8">
+
+  {# Left: Top 3 Opportunities #}
+  <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 chart-card fade-in-up">
+    <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
+      <div class="flex items-center justify-center w-14 h-14 rounded-xl bg-indigo-600 shadow-lg flex-shrink-0">
+        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+        </svg>
+      </div>
+      <div>
+        <h3 class="text-2xl font-bold text-gray-900 mb-1">Priority Opportunities</h3>
+        <p class="text-sm text-gray-600">
+          Ranked by score-point impact — fix these first.
+          {% if scoring_context.total_opportunity_pts %}
+            <span class="font-semibold text-indigo-600">+{{ scoring_context.total_opportunity_pts|floatformat:1 }} pts still available overall.</span>
+          {% endif %}
+        </p>
+      </div>
+    </div>
+
+    <ol class="space-y-4">
+      {% for pri in scoring_context.top_priorities %}
+      <li class="flex gap-4 p-4 rounded-xl border border-gray-100 bg-gray-50 hover:border-indigo-200 transition">
+        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-600 text-white text-sm font-bold flex items-center justify-center">
+          {{ forloop.counter }}
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <span class="font-semibold text-gray-900">{{ pri.dimension }}</span>
+            <span class="text-xs font-medium px-2 py-0.5 rounded-full
+              {% if pri.pillar == 'Demand' %}bg-blue-100 text-blue-700
+              {% elif pri.pillar == 'Conversion' %}bg-amber-100 text-amber-700
+              {% else %}bg-green-100 text-green-700{% endif %}">
+              {{ pri.pillar }}
+            </span>
+          </div>
+          <div class="flex items-center gap-3 mt-2 flex-wrap">
+            <span class="text-sm text-gray-600">Score: <strong class="{% if pri.current_score <= 2 %}text-red-600{% elif pri.current_score >= 4 %}text-green-600{% else %}text-amber-600{% endif %}">{{ pri.current_score }}/5</strong></span>
+            <span class="text-sm font-semibold text-indigo-600">+{{ pri.opportunity_pts|floatformat:1 }} pts if fixed</span>
+          </div>
+        </div>
+      </li>
+      {% empty %}
+      <li class="text-gray-500 text-sm p-4">No opportunity data yet.</li>
+      {% endfor %}
+    </ol>
+  </div>
+
+  {# Right: Detected Patterns #}
+  <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 chart-card fade-in-up">
+    <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
+      <div class="flex items-center justify-center w-14 h-14 rounded-xl bg-rose-600 shadow-lg flex-shrink-0">
+        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+        </svg>
+      </div>
+      <div>
+        <h3 class="text-2xl font-bold text-gray-900 mb-1">Detected GTM Patterns</h3>
+        <p class="text-sm text-gray-600">Structural failure modes identified from your individual scores.</p>
+      </div>
+    </div>
+
+    {% if scoring_context.patterns %}
+    <ul class="space-y-4">
+      {% for pat in scoring_context.patterns %}
+      <li class="p-4 rounded-xl border
+        {% if pat.severity == 'Critical' %}border-red-200 bg-red-50
+        {% elif pat.severity == 'High' %}border-amber-200 bg-amber-50
+        {% elif pat.severity == 'Medium' %}border-yellow-100 bg-yellow-50
+        {% else %}border-green-200 bg-green-50{% endif %}">
+        <div class="flex items-center gap-2 mb-1 flex-wrap">
+          <span class="text-xs font-bold px-2 py-0.5 rounded-full
+            {% if pat.severity == 'Critical' %}bg-red-600 text-white
+            {% elif pat.severity == 'High' %}bg-amber-500 text-white
+            {% elif pat.severity == 'Medium' %}bg-yellow-400 text-gray-900
+            {% else %}bg-green-500 text-white{% endif %}">
+            {{ pat.severity }}
+          </span>
+          <span class="font-semibold text-gray-900 text-sm">{{ pat.headline }}</span>
+        </div>
+        <p class="text-xs text-gray-600 mt-1">{{ pat.root_cause }}</p>
+        <p class="text-xs font-medium text-indigo-700 mt-2">
+          Quick win: {{ pat.quick_win }}
+        </p>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <div class="flex items-center gap-3 p-4 rounded-xl bg-green-50 border border-green-200">
+      <svg class="w-6 h-6 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+      </svg>
+      <p class="text-sm text-green-800 font-medium">No critical GTM patterns detected. Your scores are above the risk thresholds across all dimensions.</p>
+    </div>
+    {% endif %}
+  </div>
+
+</div>
 {% endif %}
 
 
