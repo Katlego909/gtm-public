@@ -387,7 +387,7 @@ def results(request, session_id):
     band = _band_for_score(overall)
 
     step_map = {cat.id: idx + 1 for idx, cat in enumerate(Category.objects.all().order_by("id"))}
-    strengths_categories = [c for c in sorted(cat_scores, key=lambda x: x["avg"], reverse=True) if c["avg"] >= 3.5][:3]
+    strengths_categories = sorted(cat_scores, key=lambda x: x["avg"], reverse=True)[:3]
     focus_categories = sorted(cat_scores, key=lambda x: x["avg"])[:3]
 
     for it in strengths_categories:
@@ -422,14 +422,6 @@ def results(request, session_id):
 
     labels = [c["category"].name for c in cat_scores]
     values = [round(c["avg"], 2) for c in cat_scores]
-
-    # ── Scoring engine: opportunity ranking + pattern detection ──────────────
-    from .scoring_engine import build_recommendation_context
-    _q_scores = {
-        r.question.id_code: r.score
-        for r in Response.objects.filter(session=session).select_related("question")
-    }
-    scoring_context = build_recommendation_context(_q_scores) if _q_scores else {}
 
     # -----------------------------
     # 🧩 Tool Recommendations Logic (Optimized to prevent N+1)
@@ -554,29 +546,14 @@ def results(request, session_id):
     # -----------------------------
     # 🤖 Trigger AI playbook generation in background (non-blocking)
     # -----------------------------
-    playbook_raw = (snap.ai_playbook or "").strip() if snap else ""
-    # The final fallback stored when Gemini fails — treat as if no playbook exists
-    is_generic_fallback = playbook_raw.startswith("No AI-generated playbook available yet.")
-
-    if snap and (not playbook_raw or is_generic_fallback):
-        if is_generic_fallback:
-            snap.ai_playbook = ""
-            snap.ai_playbook_status = "pending"
-            snap.save(update_fields=["ai_playbook", "ai_playbook_status"])
+    if snap and not (snap.ai_playbook or "").strip():
         _kickoff_playbook_generation(snap, session_id=session.uuid)
-
-    # Render AI playbook HTML for the "Recommended Next Moves" card
-    ai_playbook_html = ""
-    if snap and playbook_raw and not is_generic_fallback:
-        src = _normalize_ai_playbook_markdown(snap.ai_playbook)
-        ai_playbook_html = mark_safe(md.markdown(src, extensions=["extra", "sane_lists"]))
 
     return render(request, "gtm/results.html", {
         "session": session,
         "overall": round(overall, 1),
         "band": band,
         "band_actions_html": band_actions_html,
-        "ai_playbook_html": ai_playbook_html,
         "cat_scores": cat_scores,
         "labels": labels,
         "values": values,
@@ -584,7 +561,6 @@ def results(request, session_id):
         "focus_categories": focus_categories,
         "weakest_questions": weakest_questions,
         "recommendations": recommendations,
-        "scoring_context": scoring_context,
         "is_htmx": _is_htmx(request),
         "snap": snap,
     })
@@ -684,6 +660,31 @@ def playbook(request, session_id):
         getattr(band, "actions_markdown", "") if band else ""
     )
 
+    # Scoring engine context for company-specific next moves bullets
+    from .scoring_engine import build_recommendation_context
+    _q_scores = {
+        r.question.id_code: r.score
+        for r in Response.objects.filter(session=session).select_related("question")
+    }
+    scoring_context = build_recommendation_context(_q_scores) if _q_scores else {}
+
+    # Build short action bullets from pattern quick_wins (split into sentences)
+    import re as _re
+    _next_moves = []
+    for _pat in scoring_context.get("patterns", []):
+        _qw = (_pat.get("quick_win") or "").strip()
+        _sentences = [s.strip() for s in _re.split(r'(?<=[.!?])\s+', _qw) if s.strip()]
+        _next_moves.extend(_sentences[:2])
+    next_move_bullets = _next_moves[:6]
+
+    # Tool recommendations for the 2 weakest categories — flatten into bullet strings
+    _weak_cat_ids = [c["category"].id for c in cat_sorted[:2]]
+    _tool_recs = ToolRecommendation.objects.filter(category__id__in=_weak_cat_ids).select_related("category")[:5]
+    playbook_tool_recs = [
+        f"{_tr.tools} — {_tr.description}".strip(" —") if _tr.description else _tr.tools
+        for _tr in _tool_recs if _tr.tools
+    ]
+
     # -----------------------------
     # 🤖 AI Playbook Rendering (+ optional lazy-generate)
     # -----------------------------
@@ -741,6 +742,9 @@ def playbook(request, session_id):
         "cat_scores": cat_scores,
         "cat_sorted": cat_sorted,
         "band_actions_html": band_actions_html,
+        "scoring_context": scoring_context,
+        "next_move_bullets": next_move_bullets,
+        "playbook_tool_recs": playbook_tool_recs,
         "ai_playbook_html": mark_safe(ai_playbook_html),
         "ai_financial_html": mark_safe(ai_financial_html),
         "ai_competitor_html": mark_safe(ai_competitor_html),
