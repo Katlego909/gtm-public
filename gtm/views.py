@@ -387,7 +387,7 @@ def results(request, session_id):
     band = _band_for_score(overall)
 
     step_map = {cat.id: idx + 1 for idx, cat in enumerate(Category.objects.all().order_by("id"))}
-    strengths_categories = sorted(cat_scores, key=lambda x: x["avg"], reverse=True)[:3]
+    strengths_categories = [c for c in sorted(cat_scores, key=lambda x: x["avg"], reverse=True) if c["avg"] >= 3.5][:3]
     focus_categories = sorted(cat_scores, key=lambda x: x["avg"])[:3]
 
     for it in strengths_categories:
