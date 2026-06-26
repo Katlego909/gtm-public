@@ -373,3 +373,55 @@ class DeliveryDocument(models.Model):
 
     def __str__(self):
         return f"{self.original_filename} ({self.session_id})"
+
+
+class CategoryDocument(models.Model):
+    """
+    Documents uploaded to auto-score Demand or Conversion sections via AI analysis.
+    Mirrors DeliveryDocument but is shared across non-delivery categories.
+    """
+
+    CATEGORY_CHOICES = [
+        ('demand', 'Demand'),
+        ('conversion', 'Conversion'),
+    ]
+
+    ANALYSIS_STATUS = [
+        ('uploaded', 'Uploaded'),
+        ('analyzing', 'Analyzing'),
+        ('complete', 'Analysis Complete'),
+        ('failed', 'Analysis Failed'),
+    ]
+
+    FILE_TYPE_CHOICES = [
+        ('csv', 'CSV Spreadsheet'),
+        ('xlsx', 'Excel Spreadsheet'),
+        ('pdf', 'PDF Document'),
+        ('docx', 'Word Document'),
+        ('txt', 'Text / Notepad File'),
+        ('json', 'JSON Data'),
+        ('image', 'Image / Screenshot'),
+        ('other', 'Other'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session = models.ForeignKey(
+        AssessmentSession, on_delete=models.CASCADE, related_name='category_docs'
+    )
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    file = models.FileField(upload_to='gtm/category/%Y/%m/%d/', max_length=255)
+    original_filename = models.CharField(max_length=255, blank=True)
+    file_size = models.PositiveIntegerField(default=0)
+    file_type = models.CharField(max_length=10, choices=FILE_TYPE_CHOICES, default='other')
+    extracted_text = models.TextField(blank=True, default='')
+    analysis_result = models.JSONField(default=dict, blank=True, encoder=DjangoJSONEncoder)
+    analysis_status = models.CharField(max_length=12, choices=ANALYSIS_STATUS, default='uploaded')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Category Evidence Document"
+        verbose_name_plural = "Category Evidence Documents"
+
+    def __str__(self):
+        return f"[{self.category}] {self.original_filename} ({self.session_id})"

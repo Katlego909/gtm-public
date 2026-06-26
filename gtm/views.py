@@ -9,7 +9,7 @@ from datetime import datetime
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib import messages
-from .models import AssessmentSession, Question, Response, Category, RecommendationBand, ActionItem, ToolRecommendation, ResultSnapshot, DeliveryDocument
+from .models import AssessmentSession, Question, Response, Category, RecommendationBand, ActionItem, ToolRecommendation, ResultSnapshot, DeliveryDocument, CategoryDocument
 from django.utils.safestring import mark_safe
 import markdown as md
 import math
@@ -328,6 +328,29 @@ def assessment_step(request, session_id, step: int):
     progress_pct = int((step - 1) / total_steps * 100)
     legend_html = "<br>".join([f"<b>{k}</b>: {v}" for k, v in LEGEND.items()])
 
+    # Build per-step AI document analysis URLs
+    from django.urls import reverse as _reverse
+    is_delivery_step = (step == total_steps)
+    category_slug = (questions[0].category.name.lower() if questions else '')
+
+    if is_delivery_step:
+        ai_upload_url  = _reverse('gtm:upload_delivery_document',  kwargs={'session_id': session.uuid})
+        ai_analyze_url = _reverse('gtm:analyze_delivery_documents', kwargs={'session_id': session.uuid})
+        ai_docs_url    = _reverse('gtm:get_delivery_documents',     kwargs={'session_id': session.uuid})
+        ai_delete_tpl  = _reverse('gtm:delete_delivery_document',  kwargs={'session_id': session.uuid, 'doc_id': '00000000-0000-0000-0000-000000000000'})
+    else:
+        ai_upload_url  = _reverse('gtm:upload_category_document',   kwargs={'session_id': session.uuid, 'category': category_slug})
+        ai_analyze_url = _reverse('gtm:analyze_category_documents', kwargs={'session_id': session.uuid, 'category': category_slug})
+        ai_docs_url    = _reverse('gtm:get_category_documents',     kwargs={'session_id': session.uuid, 'category': category_slug})
+        ai_delete_tpl  = _reverse('gtm:delete_category_document',  kwargs={'session_id': session.uuid, 'category': category_slug, 'doc_id': '00000000-0000-0000-0000-000000000000'})
+
+    category_label = questions[0].category.name if questions else ''
+    ai_panel_description = {
+        'demand': 'Upload marketing plans, ICP docs, channel reports, attribution data, and CRM exports. AI will propose scores based on what it finds.',
+        'conversion': 'Upload CRM pipeline reports, sales playbooks, win/loss data, and conversion analytics. AI will propose scores based on what it finds.',
+        'delivery': 'Upload documents and let AI propose scores based on real evidence. Review and override before finishing.',
+    }.get(category_slug, 'Upload documents and let AI propose scores based on real evidence. Review and override before finishing.')
+
     return render(request, "gtm/assessment_step.html", {
         "session": session, "form": form, "step": step, "total_steps": total_steps,
         "progress_pct": progress_pct, "legend": mark_safe(legend_html),
@@ -335,7 +358,14 @@ def assessment_step(request, session_id, step: int):
         "is_htmx": _is_htmx(request),
         "context_fields": context_fields,
         "question_guidance": question_guidance,
-        "is_delivery_step": step == total_steps,
+        "is_delivery_step": is_delivery_step,
+        "is_ai_step": True,
+        "ai_upload_url": ai_upload_url,
+        "ai_analyze_url": ai_analyze_url,
+        "ai_docs_url": ai_docs_url,
+        "ai_delete_tpl": ai_delete_tpl,
+        "ai_category_label": category_label,
+        "ai_panel_description": ai_panel_description,
     })
 
 
@@ -1147,6 +1177,154 @@ def delete_delivery_document(request, session_id, doc_id):
         return JsonResponse({"success": False, "error": "Access denied."}, status=403)
 
     doc = get_object_or_404(DeliveryDocument, id=doc_id, session=session)
+    try:
+        doc.file.delete(save=False)
+    except Exception:
+        pass
+    doc.delete()
+    return JsonResponse({"success": True})
+
+
+# ---------------------------------------------------------------------------
+# Generic Category Document Analysis (Demand / Conversion)
+# ---------------------------------------------------------------------------
+
+_VALID_CATEGORIES = {'demand', 'conversion'}
+
+_CATEGORY_EXT_MAP = {
+    '.csv': 'csv', '.xlsx': 'xlsx', '.xls': 'xlsx',
+    '.pdf': 'pdf', '.docx': 'docx', '.doc': 'docx',
+    '.txt': 'txt', '.md': 'txt', '.log': 'txt',
+    '.json': 'json',
+    '.png': 'image', '.jpg': 'image', '.jpeg': 'image', '.webp': 'image',
+}
+
+
+@login_required
+@require_POST
+def upload_category_document(request, session_id, category):
+    """Upload a document for Demand or Conversion AI analysis. Text extraction runs async."""
+    import os as _os
+
+    if category not in _VALID_CATEGORIES:
+        return JsonResponse({"success": False, "error": "Invalid category."}, status=400)
+
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        return JsonResponse({"success": False, "error": "Access denied."}, status=403)
+
+    if 'file' not in request.FILES:
+        return JsonResponse({"success": False, "error": "No file provided."}, status=400)
+
+    uploaded = request.FILES['file']
+    if uploaded.size > 10 * 1024 * 1024:
+        return JsonResponse({"success": False, "error": "File too large (max 10 MB)."}, status=400)
+
+    ext = _os.path.splitext(uploaded.name.lower())[1]
+    file_type = _CATEGORY_EXT_MAP.get(ext, 'other')
+
+    doc = CategoryDocument.objects.create(
+        session=session,
+        category=category,
+        file=uploaded,
+        original_filename=uploaded.name,
+        file_size=uploaded.size,
+        file_type=file_type,
+        analysis_status='uploaded',
+    )
+
+    def _extract_in_background(doc_id, ftype):
+        try:
+            from .delivery_analyzer import extract_text_from_path
+            from .ai_services import _get_client
+            d = CategoryDocument.objects.get(id=doc_id)
+            client = _get_client() if ftype == 'image' else None
+            text = extract_text_from_path(d.file.path, ftype, client, "gemini-2.5-flash")
+            d.extracted_text = text
+            d.save(update_fields=['extracted_text'])
+        except Exception as exc:
+            log_error("CategoryDoc background extraction", exc)
+
+    from threading import Thread
+    Thread(target=_extract_in_background, args=(str(doc.id), file_type), daemon=True).start()
+
+    return JsonResponse({
+        "success": True,
+        "doc_id": str(doc.id),
+        "filename": doc.original_filename,
+        "file_type": file_type,
+        "file_size": doc.file_size,
+    })
+
+
+@login_required
+@require_POST
+def analyze_category_documents(request, session_id, category):
+    """Run Gemini analysis on uploaded documents for a Demand or Conversion step."""
+    if category not in _VALID_CATEGORIES:
+        return JsonResponse({"success": False, "error": "Invalid category."}, status=400)
+
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        return JsonResponse({"success": False, "error": "Access denied."}, status=403)
+
+    docs = CategoryDocument.objects.filter(session=session, category=category)
+    if not docs.exists():
+        return JsonResponse({"success": False, "error": "No documents uploaded yet."}, status=400)
+
+    docs_with_text = docs.filter(extracted_text__gt='')
+    if not docs_with_text.exists():
+        return JsonResponse(
+            {"success": False, "error": "Documents are still being processed. Please wait a moment and try again."},
+            status=400,
+        )
+
+    from .category_analyzer import analyze_category_documents as _run_analysis
+    result = _run_analysis(session, category)
+    if not result or "_error" in result:
+        error_detail = result.get("_error", "") if result else ""
+        return JsonResponse(
+            {"success": False, "error": f"Analysis failed: {error_detail}" if error_detail else "Could not analyse documents. Please try again."},
+            status=500,
+        )
+
+    docs_with_text.update(analysis_status='complete', analysis_result=result)
+    return JsonResponse({"success": True, "scores": result})
+
+
+@login_required
+def get_category_documents(request, session_id, category):
+    """Return uploaded category documents for this session (GET)."""
+    if category not in _VALID_CATEGORIES:
+        return JsonResponse({"success": False, "error": "Invalid category."}, status=400)
+
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        return JsonResponse({"success": False, "error": "Access denied."}, status=403)
+
+    docs = list(
+        CategoryDocument.objects.filter(session=session, category=category).values(
+            'id', 'original_filename', 'file_size', 'file_type', 'analysis_status'
+        )
+    )
+    for d in docs:
+        d['id'] = str(d['id'])
+
+    return JsonResponse({"success": True, "documents": docs})
+
+
+@login_required
+@require_POST
+def delete_category_document(request, session_id, category, doc_id):
+    """Delete a previously uploaded category document."""
+    if category not in _VALID_CATEGORIES:
+        return JsonResponse({"success": False, "error": "Invalid category."}, status=400)
+
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        return JsonResponse({"success": False, "error": "Access denied."}, status=403)
+
+    doc = get_object_or_404(CategoryDocument, id=doc_id, session=session, category=category)
     try:
         doc.file.delete(save=False)
     except Exception:

@@ -33,6 +33,12 @@ urlpatterns = [
     path("delivery/<uuid:session_id>/analyze/", views.analyze_delivery_documents, name="analyze_delivery_documents"),
     path("delivery/<uuid:session_id>/documents/", views.get_delivery_documents, name="get_delivery_documents"),
     path("delivery/<uuid:session_id>/delete/<uuid:doc_id>/", views.delete_delivery_document, name="delete_delivery_document"),
+
+    # Demand / Conversion document analysis (generic category endpoints)
+    path("category/<str:category>/<uuid:session_id>/upload/", views.upload_category_document, name="upload_category_document"),
+    path("category/<str:category>/<uuid:session_id>/analyze/", views.analyze_category_documents, name="analyze_category_documents"),
+    path("category/<str:category>/<uuid:session_id>/documents/", views.get_category_documents, name="get_category_documents"),
+    path("category/<str:category>/<uuid:session_id>/delete/<uuid:doc_id>/", views.delete_category_document, name="delete_category_document"),
     
     # User Profile & Auth
     path("profile/", views.profile, name="profile"),
