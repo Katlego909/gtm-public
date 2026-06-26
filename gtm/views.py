@@ -351,8 +351,8 @@ def assessment_step(request, session_id, step: int):
     else:
         form = StepForm(initial=initial)
 
-    progress_pct = int((step - 1) / total_steps * 100)
-    legend_html = "<br>".join([f"<b>{k}</b>: {v}" for k, v in LEGEND.items()])
+                progress_pct = int((step - 1) / total_steps * 100)
+                legend_html = "<br>".join([f"<b>{k}</b>: {v}" for k, v in LEGEND.items()])
 
                 question_input_types = {q.id_code: getattr(q, 'input_type', 'scale') for q in questions}
                 question_input_options = {q.id_code: getattr(q, 'input_option_labels', {}) for q in questions}
