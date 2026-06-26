@@ -500,9 +500,11 @@ def _split_sentences(text: str, min_len: int = 25) -> list:
     return [s.strip() for s in sents if len(s.strip()) >= min_len]
 
 
-def _build_nlp_evidence(combined_text: str) -> dict:
+def _build_nlp_evidence(combined_text: str, questions: list = None) -> dict:
     """
     Orchestrate all three NLP/ML stages and return per-question structured evidence.
+
+    When `questions` is None, defaults to DELIVERY_QUESTIONS.
 
     Schema:
         {
@@ -515,10 +517,13 @@ def _build_nlp_evidence(combined_text: str) -> dict:
           "_stages_run": {"tfidf": bool, "semantic": bool, "ner": bool},
         }
     """
+    if questions is None:
+        questions = DELIVERY_QUESTIONS
+
     clean     = _clean_text_for_nlp(combined_text)
     paragraphs = _split_paragraphs(clean)
     sentences  = _split_sentences(clean)
-    queries    = [f"{q['text']} {q['evidence_hint']}" for q in DELIVERY_QUESTIONS]
+    queries    = [f"{q['text']} {q['evidence_hint']}" for q in questions]
 
     logger.info(
         "NLP Stage 2 | %d paragraphs · %d sentences · %d questions",
@@ -542,7 +547,7 @@ def _build_nlp_evidence(combined_text: str) -> dict:
     )
 
     evidence = {"_metrics": ner_metrics, "_stages_run": stages_run}
-    for qi, q in enumerate(DELIVERY_QUESTIONS):
+    for qi, q in enumerate(questions):
         evidence[q["id_code"]] = {
             "tfidf":    [t for t, _ in tfidf_results.get(qi, [])],
             "semantic": [s for s, _ in semantic_results.get(qi, [])],
@@ -554,15 +559,18 @@ def _build_nlp_evidence(combined_text: str) -> dict:
 # Stage 3 — Gemini analysis prompt (enriched with NLP evidence)
 # ---------------------------------------------------------------------------
 
-def _build_analysis_prompt(combined_text: str, nlp_evidence: dict = None) -> str:
+def _build_analysis_prompt(combined_text: str, nlp_evidence: dict = None,
+                            questions: list = None, category_label: str = "Delivery") -> str:
     """
     Build the Gemini scoring prompt.  When nlp_evidence is provided, each
     question block includes the TF-IDF and semantic passages most relevant to
     that question, plus a global NER metrics section.  Falls back to raw text
     if NLP stages produced no output.
     """
+    if questions is None:
+        questions = DELIVERY_QUESTIONS
     question_parts = []
-    for q in DELIVERY_QUESTIONS:
+    for q in questions:
         id_code = q["id_code"]
         lines = [
             f"**{id_code} — {q['dimension']}**",
@@ -618,9 +626,18 @@ def _build_analysis_prompt(combined_text: str, nlp_evidence: dict = None) -> str
     else:
         doc_section = f"UPLOADED DOCUMENTS:\n---\n{combined_text}\n---"
 
-    return f"""You are a senior GTM analyst evaluating a company's Delivery capabilities.
+    n = len(questions)
+    json_template = "\n".join(
+        f'  "{q["id_code"]}": {{"score": <int 1-5>, "reasoning": "<one clear sentence>", '
+        f'"evidence": "<exact quote or metric from document, or \'No direct evidence found\'>", '
+        f'"confidence": "<high|medium|low>"}}'
+        + ("," if i < n - 1 else "")
+        for i, q in enumerate(questions)
+    )
 
-Your task: read the pre-processed evidence below and score the company on 6 Delivery \
+    return f"""You are a senior GTM analyst evaluating a company's {category_label} capabilities.
+
+Your task: read the pre-processed evidence below and score the company on {n} {category_label} \
 assessment statements using a 1–5 scale.
 {nlp_note}
 SCORING SCALE:
@@ -638,19 +655,14 @@ SCORING GUIDANCE:
 - Measured, reviewed, and continuously improved → score 4 or 5.
 - Be conservative: overconfident scores mislead the playbook generation.
 
-DELIVERY STATEMENTS WITH PRE-EXTRACTED EVIDENCE:
+{category_label.upper()} STATEMENTS WITH PRE-EXTRACTED EVIDENCE:
 {question_block}
 {metrics_section}
 {doc_section}
 
 Return ONLY a valid JSON object — no markdown, no extra text, no explanation outside the JSON:
 {{
-  "DEL-TTV-01": {{"score": <int 1-5>, "reasoning": "<one clear sentence>", "evidence": "<exact quote or metric from document, or 'No direct evidence found'>", "confidence": "<high|medium|low>"}},
-  "DEL-ONB-02": {{"score": <int 1-5>, "reasoning": "<one clear sentence>", "evidence": "<exact quote or metric from document, or 'No direct evidence found'>", "confidence": "<high|medium|low>"}},
-  "DEL-HLT-03": {{"score": <int 1-5>, "reasoning": "<one clear sentence>", "evidence": "<exact quote or metric from document, or 'No direct evidence found'>", "confidence": "<high|medium|low>"}},
-  "DEL-RET-04": {{"score": <int 1-5>, "reasoning": "<one clear sentence>", "evidence": "<exact quote or metric from document, or 'No direct evidence found'>", "confidence": "<high|medium|low>"}},
-  "DEL-QBR-05": {{"score": <int 1-5>, "reasoning": "<one clear sentence>", "evidence": "<exact quote or metric from document, or 'No direct evidence found'>", "confidence": "<high|medium|low>"}},
-  "DEL-ADV-06": {{"score": <int 1-5>, "reasoning": "<one clear sentence>", "evidence": "<exact quote or metric from document, or 'No direct evidence found'>", "confidence": "<high|medium|low>"}}
+{json_template}
 }}"""
 
 
@@ -695,11 +707,11 @@ def analyze_delivery_documents(session) -> dict:
 
     # ── Stage 2: NLP / ML pre-processing ────────────────────────────────────
     logger.info("Delivery analysis — starting NLP/ML pre-processing…")
-    nlp_evidence = _build_nlp_evidence(combined_text)
+    nlp_evidence = _build_nlp_evidence(combined_text, DELIVERY_QUESTIONS)
 
     # ── Stage 3: Gemini scoring with enriched prompt ─────────────────────────
     model_id = "gemini-2.5-flash"
-    prompt   = _build_analysis_prompt(combined_text, nlp_evidence)
+    prompt   = _build_analysis_prompt(combined_text, nlp_evidence, DELIVERY_QUESTIONS, "Delivery")
 
     try:
         config = genai_types.GenerateContentConfig(

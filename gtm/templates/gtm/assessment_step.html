@@ -166,16 +166,16 @@
           class="space-y-8">
       {% csrf_token %}
 
-      {% if is_delivery_step %}
-      <!-- ── Delivery Document Upload Panel ── -->
+      {% if is_ai_step %}
+      <!-- ── AI Document Upload Panel ── -->
       <div id="delivery-panel" class="mb-8 app-card-soft p-6 border border-indigo-100">
         <div class="flex items-center gap-3 mb-4">
           <div class="app-icon-badge app-icon-badge--solid h-10 w-10 rounded-lg shrink-0">
             <i class="fas fa-robot text-white text-sm"></i>
           </div>
           <div>
-            <h3 class="font-bold text-gray-900">AI-Powered Delivery Analysis</h3>
-            <p class="text-sm text-gray-600">Upload documents and let AI propose scores based on real evidence. Review and override before finishing.</p>
+            <h3 class="font-bold text-gray-900">AI-Powered {{ ai_category_label }} Analysis</h3>
+            <p class="text-sm text-gray-600">{{ ai_panel_description }}</p>
           </div>
         </div>
 
@@ -291,7 +291,7 @@
             </div>
           </div>
 
-          {% if is_delivery_step %}
+          {% if is_ai_step %}
           <!-- AI result panel (hidden until analysis runs) -->
           <div id="ai-panel-{{ field.name }}" class="mt-4 ai-result-panel px-4 py-3 hidden">
             <div class="flex items-start justify-between gap-3 flex-wrap">
@@ -542,13 +542,13 @@
     }
   });
 
-  {% if is_delivery_step %}
-  // ── Delivery AI Scoring ──────────────────────────────────────────────────
+  {% if is_ai_step %}
+  // ── AI Document Scoring ──────────────────────────────────────────────────
   (function () {
-    const UPLOAD_URL   = "{% url 'gtm:upload_delivery_document' session.uuid %}";
-    const ANALYZE_URL  = "{% url 'gtm:analyze_delivery_documents' session.uuid %}";
-    const DOCS_URL     = "{% url 'gtm:get_delivery_documents' session.uuid %}";
-    const DEL_TPL      = "{% url 'gtm:delete_delivery_document' session.uuid '00000000-0000-0000-0000-000000000000' %}";
+    const UPLOAD_URL   = "{{ ai_upload_url }}";
+    const ANALYZE_URL  = "{{ ai_analyze_url }}";
+    const DOCS_URL     = "{{ ai_docs_url }}";
+    const DEL_TPL      = "{{ ai_delete_tpl }}";
     const csrf = () => document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
 
     let analysisComplete = false;
@@ -758,13 +758,7 @@
     // ── Form submit guard ──
     document.querySelector('form[hx-post]')?.addEventListener('htmx:beforeRequest', function (e) {
       const docs = document.querySelectorAll('#deliveryFileList > div');
-      if (docs.length === 0) {
-        e.preventDefault();
-        const status = document.getElementById('analyzeStatus');
-        if (status) { status.textContent = 'Upload at least one document before finishing.'; status.className = 'text-sm text-red-600'; status.classList.remove('hidden'); }
-        return;
-      }
-      if (!analysisComplete) {
+      if (docs.length > 0 && !analysisComplete) {
         const status = document.getElementById('analyzeStatus');
         if (status) { status.textContent = 'Tip: Click "Analyze Documents" to auto-score with AI, or score manually below.'; status.className = 'text-sm text-amber-600'; status.classList.remove('hidden'); }
       }
