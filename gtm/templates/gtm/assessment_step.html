@@ -552,6 +552,7 @@
     const csrf = () => document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
 
     let analysisComplete = false;
+    let analysisInProgress = false;
 
     // ── Drag-and-drop ──
     function handleDeliveryDragOver(e) {
@@ -638,13 +639,13 @@
         list.appendChild(div);
       });
 
-      if (analyzeBtn) analyzeBtn.disabled = docs.length === 0;
+      if (analyzeBtn) analyzeBtn.disabled = docs.length === 0 || analysisInProgress;
 
-      // If analysis was already run on a previous visit, re-enable submit
-      if (anyComplete && !analysisComplete) {
+      // If docs were previously analysed, re-enable the submit button — but don't show the
+      // badge, since scores haven't been applied to the form fields in this page session.
+      if (anyComplete && !analysisComplete && !analysisInProgress) {
         analysisComplete = true;
         if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = ''; submitBtn.style.pointerEvents = ''; }
-        document.getElementById('analysisDoneBadge')?.classList.remove('hidden');
       }
 
       // If still processing, poll again
@@ -674,7 +675,9 @@
       const status = document.getElementById('analyzeStatus');
       if (!btn || !status) return;
 
+      analysisInProgress = true;
       btn.disabled = true;
+      document.getElementById('analysisDoneBadge')?.classList.add('hidden');
       status.textContent = 'Analyzing documents with AI…';
       status.className = 'text-sm text-indigo-700';
       status.classList.remove('hidden');
@@ -686,12 +689,14 @@
         if (!r.ok || !data.success) {
           status.textContent = data.error || 'Analysis failed. Please try again.';
           status.className = 'text-sm text-red-600';
+          analysisInProgress = false;
           btn.disabled = false;
           return;
         }
 
         applyDeliveryScores(data.scores);
         analysisComplete = true;
+        analysisInProgress = false;
         status.classList.add('hidden');
 
         document.getElementById('analysisDoneBadge')?.classList.remove('hidden');
@@ -702,6 +707,7 @@
       } catch (err) {
         status.textContent = 'Connection error — please try again.';
         status.className = 'text-sm text-red-600';
+        analysisInProgress = false;
         btn.disabled = false;
       }
     }
