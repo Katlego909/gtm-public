@@ -704,9 +704,29 @@
           list.appendChild(div);
         });
         if (analyzeBtn) analyzeBtn.disabled = docs.length === 0 || analysisInProgress;
-        if (anyComplete && !analysisComplete && !analysisInProgress) {
+
+        // A valid analysis exists only when at least one complete doc still has its scores stored.
+        const hasValidAnalysis = docs.some(
+          d => d.analysis_status === 'complete' && d.analysis_result && Object.keys(d.analysis_result || {}).length > 0
+        );
+
+        if (!hasValidAnalysis) {
+          // No valid analysis (new file added, file deleted, or never analysed yet).
+          // Clear any panels that may be visible from a previous run or server render.
+          document.querySelectorAll('.ai-result-panel').forEach(el => el.classList.add('hidden'));
+          document.querySelectorAll('.rating-group').forEach(el => el.classList.remove('ai-locked'));
+          document.getElementById('analysisDoneBadge')?.classList.add('hidden');
+          analysisComplete = false;
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = ''; submitBtn.style.pointerEvents = ''; }
+        } else if (anyComplete && !analysisComplete && !analysisInProgress) {
+          // Valid analysis found on first load — restore panels from stored results.
           analysisComplete = true;
           if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = ''; submitBtn.style.pointerEvents = ''; }
+          const savedDoc = docs.find(d => d.analysis_result && Object.keys(d.analysis_result || {}).length > 0);
+          if (savedDoc) {
+            applyDeliveryScores(savedDoc.analysis_result);
+            document.getElementById('analysisDoneBadge')?.classList.remove('hidden');
+          }
         }
         if (docs.some(d => d.analysis_status === 'uploaded')) {
           setTimeout(() => { if (_aiPollGen === myGen) loadDeliveryDocs(); }, 3500);

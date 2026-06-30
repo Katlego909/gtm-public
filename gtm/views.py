@@ -378,6 +378,21 @@ def assessment_step(request, session_id, step: int):
         'delivery': 'Upload documents and let AI propose scores based on real evidence. Review and override before finishing.',
     }.get(category_slug, 'Upload documents and let AI propose scores based on real evidence. Review and override before finishing.')
 
+    # Load any previously stored analysis so the AI panels survive navigation.
+    prefilled_analysis = {}
+    if is_delivery_step:
+        completed = DeliveryDocument.objects.filter(
+            session=session, analysis_status='complete'
+        ).exclude(analysis_result={}).first()
+        if completed:
+            prefilled_analysis = completed.analysis_result
+    elif category_slug:
+        completed = CategoryDocument.objects.filter(
+            session=session, category=category_slug, analysis_status='complete'
+        ).exclude(analysis_result={}).first()
+        if completed:
+            prefilled_analysis = completed.analysis_result
+
     return render(request, "gtm/assessment_step.html", {
         "session": session, "form": form, "step": step, "total_steps": total_steps,
         "progress_pct": progress_pct, "legend": mark_safe(legend_html),
@@ -393,6 +408,7 @@ def assessment_step(request, session_id, step: int):
         "ai_delete_tpl": ai_delete_tpl,
         "ai_category_label": category_label,
         "ai_panel_description": ai_panel_description,
+        "prefilled_analysis": prefilled_analysis,
     })
 
 
@@ -1173,6 +1189,12 @@ def upload_delivery_document(request, session_id):
         analysis_status='uploaded',
     )
 
+    # New file means any prior analysis is stale — clear it so the server
+    # doesn't serve old results on the next page load.
+    DeliveryDocument.objects.filter(session=session, analysis_status='complete').exclude(id=doc.id).update(
+        analysis_result={}
+    )
+
     def _extract_in_background(doc_id, ftype):
         try:
             from .delivery_analyzer import extract_text_from_path
@@ -1240,11 +1262,14 @@ def get_delivery_documents(request, session_id):
 
     docs = list(
         DeliveryDocument.objects.filter(session=session).values(
-            'id', 'original_filename', 'file_size', 'file_type', 'analysis_status'
+            'id', 'original_filename', 'file_size', 'file_type', 'analysis_status',
+            'analysis_result',
         )
     )
     for d in docs:
         d['id'] = str(d['id'])
+        if d['analysis_status'] != 'complete':
+            d.pop('analysis_result', None)
 
     return JsonResponse({"success": True, "documents": docs})
 
@@ -1263,6 +1288,10 @@ def delete_delivery_document(request, session_id, doc_id):
     except Exception:
         pass
     doc.delete()
+    # File removed means prior analysis is stale — clear it from remaining docs.
+    DeliveryDocument.objects.filter(session=session, analysis_status='complete').update(
+        analysis_result={}
+    )
     return JsonResponse({"success": True})
 
 
@@ -1313,6 +1342,12 @@ def upload_category_document(request, session_id, category):
         file_type=file_type,
         analysis_status='uploaded',
     )
+
+    # New file means any prior analysis is stale — clear it so the server
+    # doesn't serve old results on the next page load.
+    CategoryDocument.objects.filter(
+        session=session, category=category, analysis_status='complete'
+    ).exclude(id=doc.id).update(analysis_result={})
 
     def _extract_in_background(doc_id, ftype):
         try:
@@ -1385,11 +1420,14 @@ def get_category_documents(request, session_id, category):
 
     docs = list(
         CategoryDocument.objects.filter(session=session, category=category).values(
-            'id', 'original_filename', 'file_size', 'file_type', 'analysis_status'
+            'id', 'original_filename', 'file_size', 'file_type', 'analysis_status',
+            'analysis_result',
         )
     )
     for d in docs:
         d['id'] = str(d['id'])
+        if d['analysis_status'] != 'complete':
+            d.pop('analysis_result', None)
 
     return JsonResponse({"success": True, "documents": docs})
 
@@ -1411,6 +1449,10 @@ def delete_category_document(request, session_id, category, doc_id):
     except Exception:
         pass
     doc.delete()
+    # File removed means prior analysis is stale — clear it from remaining docs.
+    CategoryDocument.objects.filter(
+        session=session, category=category, analysis_status='complete'
+    ).update(analysis_result={})
     return JsonResponse({"success": True})
 
 
