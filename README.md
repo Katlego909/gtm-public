@@ -10,7 +10,15 @@ This is the **`internship` branch**. It contains everything in `master`, plus a 
 
 ### 1. Every question's weight — and a lot of its wording — was rebuilt from research
 
-**In plain English:** All 18 assessment questions (6 each for Demand, Conversion, and Delivery) used to be weighted almost equally, as if a question about whether customers occasionally recommend you mattered nearly as much as a question about whether customers are quietly about to cancel. They don't — losing a customer you already have is far more damaging than not yet having a referral program. So every weight was re-derived from research into what actually drives revenue and retention. Picture it as a pyramid: foundational things sit at the base and hold everything above them up. For Delivery, **Health Monitoring** (spotting unhappy customers before they leave) is the base and carries the most weight; **Advocacy** (customers actively referring you) sits at the top and carries the least — if you're not even watching for unhappy customers, it doesn't matter how good your referral program is. The full breakdown:
+**In plain English:** All 18 assessment questions (6 each for Demand, Conversion, and Delivery) used to be weighted almost equally, as if a question about whether customers occasionally recommend you mattered nearly as much as a question about whether customers are quietly about to cancel. They don't — losing a customer you already have is far more damaging than not yet having a referral program. So every weight was re-derived from research into what actually drives revenue and retention. Picture it as a pyramid: foundational things sit at the base and hold everything above them up — each layer above only matters once the layer below it is solid. For Delivery, **Health Monitoring** (spotting unhappy customers before they leave) is the base and carries the most weight; **Advocacy** (customers actively referring you) sits at the top and carries the least — if you're not even watching for unhappy customers, it doesn't matter how good your referral program is. These are the actual priority pyramids the team researched and built, one per pillar:
+
+<p align="center">
+  <img src="docs/images/demand-priority-pyramid.png" alt="Demand Priority Pyramid" width="32%" />
+  <img src="docs/images/conversion-priority-pyramid.png" alt="Conversion Priority Pyramid" width="32%" />
+  <img src="docs/images/delivery-priority-pyramid.png" alt="Delivery Priority Pyramid" width="32%" />
+</p>
+
+Same numbers, in table form:
 
 | Pillar | Dimension | Weight |
 |---|---|---|
