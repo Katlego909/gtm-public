@@ -601,6 +601,10 @@ def results(request, session_id):
         src = _normalize_ai_playbook_markdown(snap.ai_playbook)
         ai_playbook_html = mark_safe(md.markdown(src, extensions=["extra", "sane_lists"]))
 
+    from django.urls import reverse as _reverse
+    next_moves_poll_url = _reverse("gtm:next_moves_content", kwargs={"session_id": session.uuid})
+    snap_status = getattr(snap, "ai_playbook_status", "pending") if snap else "pending"
+
     return render(request, "gtm/results.html", {
         "session": session,
         "overall": round(overall, 1),
@@ -617,6 +621,8 @@ def results(request, session_id):
         "scoring_context": scoring_context,
         "is_htmx": _is_htmx(request),
         "snap": snap,
+        "next_moves_poll_url": next_moves_poll_url,
+        "next_moves_failed": snap_status == "failed" or is_generic_fallback,
     })
 
 def playbook_status(request, session_id):
@@ -644,6 +650,52 @@ def playbook_status(request, session_id):
 
     # Still generating. Return the loading state.
     return render(request, "gtm/partials/playbook_loading_button.html", {"session": session})
+
+
+def playbook_footer_status(request, session_id):
+    """HTMX polling endpoint for the footer 'View Playbook / Preparing' button on the results page."""
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Access denied.")
+    snap = getattr(session, "snapshot", None) or ResultSnapshot.objects.filter(session=session).first()
+    ready = bool(snap and (snap.ai_playbook or "").strip())
+    return render(request, "gtm/partials/playbook_footer_status.html", {
+        "session": session,
+        "ready": ready,
+    })
+
+
+def next_moves_content(request, session_id):
+    """HTMX polling endpoint for the Recommended Next Moves section on the results page."""
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Access denied.")
+
+    snap = getattr(session, "snapshot", None) or ResultSnapshot.objects.filter(session=session).first()
+    band = getattr(session, "band", None) or (snap.band if snap and snap.band_id else None)
+    band_actions_html = _format_band_actions_markdown(getattr(band, "actions_markdown", "") if band else "")
+
+    playbook_raw = (snap.ai_playbook or "").strip() if snap else ""
+    is_generic_fallback = playbook_raw.startswith("No AI-generated playbook available yet.")
+    snap_status = getattr(snap, "ai_playbook_status", "pending") if snap else "pending"
+
+    ai_playbook_html = ""
+    if snap and playbook_raw and not is_generic_fallback:
+        src = _normalize_ai_playbook_markdown(snap.ai_playbook)
+        ai_playbook_html = mark_safe(md.markdown(src, extensions=["extra", "sane_lists"]))
+
+    from django.urls import reverse as _reverse
+    poll_url = _reverse("gtm:next_moves_content", kwargs={"session_id": session.uuid})
+
+    return render(request, "gtm/partials/next_moves_content.html", {
+        "ai_playbook_html": ai_playbook_html,
+        "band_actions_html": band_actions_html,
+        "failed": snap_status == "failed" or is_generic_fallback,
+        "poll_url": poll_url,
+        "company_name": session.company_name or "your company",
+    })
 
 
 def enrichment_status(request, session_id):
