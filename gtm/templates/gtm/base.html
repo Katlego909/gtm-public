@@ -510,6 +510,108 @@
         closeModal();
     });
 
+    // ── Results page charts (radar + score ring) ────────────────────────────
+    // Defined here (not in results.html) so they are always available
+    // regardless of whether HTMX re-executes inline scripts after a swap.
+    function initRadarChart() {
+      const radarCanvas = document.getElementById('radar');
+      if (!radarCanvas) return;
+
+      const labelsEl = document.getElementById('js-radar-labels');
+      const valuesEl = document.getElementById('js-radar-values');
+      if (!labelsEl || !valuesEl) return;
+
+      try {
+          const labels = JSON.parse(labelsEl.textContent);
+          const values = JSON.parse(valuesEl.textContent);
+
+          const existingChart = Chart.getChart(radarCanvas);
+          if (existingChart) existingChart.destroy();
+
+          new Chart(radarCanvas, {
+            type: 'radar',
+            data: {
+              labels: labels,
+              datasets: [{
+                label: 'Your GTM Performance',
+                data: values,
+                fill: true,
+                backgroundColor: 'rgba(79, 70, 229, 0.2)',
+                borderColor: '#4F46E5',
+                borderWidth: 3,
+                pointBackgroundColor: '#4F46E5',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointRadius: 6,
+                pointHoverRadius: 8,
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: '#4F46E5',
+                pointHoverBorderWidth: 3
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: { duration: 1500, easing: 'easeInOutQuart' },
+              scales: {
+                r: {
+                  min: 0, max: 5, beginAtZero: true,
+                  ticks: { backdropColor: 'rgba(255, 255, 255, 0.9)', color: '#6B7280', stepSize: 1, callback: v => v + '/5' },
+                  grid: { color: 'rgba(0, 0, 0, 0.08)' },
+                  angleLines: { color: 'rgba(0, 0, 0, 0.1)' },
+                  pointLabels: { color: '#1F2937', font: { size: 13, weight: '600' }, padding: 10 }
+                }
+              },
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  enabled: true,
+                  backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                  padding: 12,
+                  displayColors: false,
+                  callbacks: {
+                    label: function(context) {
+                      const score = context.parsed.r;
+                      const percentage = ((score / 5) * 100).toFixed(0);
+                      return [`Score: ${score.toFixed(2)}/5.0`, `Performance: ${percentage}%`];
+                    }
+                  }
+                }
+              }
+            }
+          });
+      } catch (e) {
+          console.error("Error parsing radar chart data:", e);
+      }
+    }
+
+    function animateProgressRing() {
+      const progressRing = document.getElementById('progressRing');
+      if (progressRing) {
+        const finalValue = progressRing.getAttribute('stroke-dasharray').split(',')[0];
+        progressRing.setAttribute('stroke-dasharray', '0, 100');
+        progressRing.style.transition = 'none';
+        setTimeout(() => {
+          progressRing.style.transition = 'stroke-dasharray 1.5s ease-out';
+          progressRing.setAttribute('stroke-dasharray', `${finalValue}, 100`);
+        }, 300);
+      }
+
+      document.querySelectorAll('.h-3.rounded-full.transition-all').forEach((bar, index) => {
+        const w = bar.style.width;
+        bar.style.width = '0%';
+        setTimeout(() => {
+          bar.style.transition = 'width 1.2s ease-out';
+          bar.style.width = w;
+        }, 500 + (index * 150));
+      });
+    }
+
+    function initResultsCharts() {
+      initRadarChart();
+      animateProgressRing();
+    }
+
     // ── AI Document Panel ─────────────────────────────────────────────────
     // Defined here (not in the swapped template) so it is always available
     // regardless of whether HTMX re-executes inline scripts after a swap.
@@ -707,15 +809,16 @@
 
     // Call on full page load (script is at end of <body> so DOM is ready).
     initAIPanel();
+    initResultsCharts();
 
     // Re-initialize any charts after HTMX swaps content
     document.body.addEventListener('htmx:afterSwap', function(evt) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
 
-      const radarCanvas = document.getElementById('radar');
-      if (radarCanvas && typeof initRadarChart === 'function') {
-        setTimeout(function() { initRadarChart(); }, 100);
-      }
+      // Re-init results charts (radar + score ring) on every HTMX navigation —
+      // always works since these are defined here in base.html, not in the
+      // swapped content. They no-op internally if the elements aren't present.
+      setTimeout(function() { initResultsCharts(); }, 100);
 
       // Re-init AI panel on every HTMX navigation — always works since
       // initAIPanel is defined here in base.html, not in the swapped content.
