@@ -374,6 +374,51 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
         ))
         content.append(Spacer(1, 0.5 * cm))
 
+    # --- Financial Estimates & Competitive Position (AI enrichment sections)
+    fin_md = (getattr(snap, "ai_financial_summary", "") or "").strip() if snap else ""
+    comp_md = (getattr(snap, "ai_competitor_analysis", "") or "").strip() if snap else ""
+
+    def _boxed_section(heading, body_md, bg_hex, border_hex, title_hex, footnote=None):
+        heading_style = ParagraphStyle(
+            name="BoxHeading", fontName="Helvetica-Bold", fontSize=12,
+            leading=16, spaceAfter=6, textColor=colors.HexColor(title_hex),
+        )
+        inner = [Paragraph(heading, heading_style)]
+        # Strip the leading "## ..." markdown heading since we render our own styled heading
+        body_clean = re.sub(r'(?m)^#{1,3}\s*.+\n?', '', body_md, count=1).strip()
+        inner.extend(_md_to_flowables(body_clean, styles, doc.width - 1.2 * cm))
+        if footnote:
+            inner.append(Paragraph(footnote, ParagraphStyle(
+                name="BoxFootnote", fontName="Helvetica-Oblique", fontSize=8.5,
+                leading=12, textColor=colors.HexColor("#475569"), spaceBefore=4,
+            )))
+        box = Table([[inner]], colWidths=[doc.width])
+        box.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor(bg_hex)),
+            ("BOX", (0, 0), (-1, -1), 1, colors.HexColor(border_hex)),
+            ("LEFTPADDING", (0, 0), (-1, -1), 14),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 14),
+            ("TOPPADDING", (0, 0), (-1, -1), 12),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 12),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ]))
+        return box
+
+    if fin_md:
+        content.append(_boxed_section(
+            "Financial Impact Estimates", fin_md,
+            bg_hex="#ECFDF5", border_hex="#A7F3D0", title_hex="#065F46",
+            footnote="AI-generated estimates based on your company data. Validate with your finance team before making budget decisions.",
+        ))
+        content.append(Spacer(1, 0.4 * cm))
+
+    if comp_md:
+        content.append(_boxed_section(
+            "Competitive Gap Analysis", comp_md,
+            bg_hex="#EFF6FF", border_hex="#BFDBFE", title_hex="#1E3A8A",
+        ))
+        content.append(Spacer(1, 0.5 * cm))
+
     # --- 30-Day Implementation Framework
     content.append(Paragraph("30-Day Implementation Framework", styles["H2"]))
     content.append(Paragraph(
