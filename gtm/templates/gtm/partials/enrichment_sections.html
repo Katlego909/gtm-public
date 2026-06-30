@@ -16,6 +16,14 @@
       AI-generated estimates based on your company data. Validate with your finance team before making budget decisions.
     </p>
   </div>
+  {% elif fin_failed %}
+  <div class="mt-6 mx-8 rounded-xl border border-gray-200 bg-gray-50 px-6 py-5">
+    <h3 class="text-sm font-semibold text-gray-500 mb-2 flex items-center gap-2">
+      <i class="fas fa-chart-line text-gray-400"></i>
+      Financial Impact Estimates
+    </h3>
+    <p class="text-sm text-gray-400 italic">Could not generate financial estimates for this assessment. This sometimes happens due to a temporary API issue — try regenerating your playbook to retry.</p>
+  </div>
   {% else %}
   <div class="mt-6 mx-8 rounded-xl border border-emerald-200 bg-emerald-50 px-6 py-6 animate-pulse">
     <h3 class="text-sm font-semibold text-emerald-800 mb-3 flex items-center gap-2">
@@ -36,6 +44,14 @@
     <div class="text-sm prose prose-slate max-w-none prose-blue">
       {{ comp_html }}
     </div>
+  </div>
+  {% elif comp_failed %}
+  <div class="mt-4 mx-8 rounded-xl border border-gray-200 bg-gray-50 px-6 py-5 mb-6">
+    <h3 class="text-sm font-semibold text-gray-500 mb-2 flex items-center gap-2">
+      <i class="fas fa-shield-alt text-gray-400"></i>
+      Competitive Gap Analysis
+    </h3>
+    <p class="text-sm text-gray-400 italic">Could not generate competitive analysis for this assessment. This sometimes happens due to a temporary API issue — try regenerating your playbook to retry.</p>
   </div>
   {% else %}
   <div class="mt-4 mx-8 rounded-xl border border-blue-200 bg-blue-50 px-6 py-6 mb-6 animate-pulse">

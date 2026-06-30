@@ -37,6 +37,7 @@ from .ai_services import (
     generate_diagnostic_insights_batch,
     _normalize_ai_playbook_markdown,
     rewrite_context_note_with_ai,
+    ENRICHMENT_UNAVAILABLE,
 )
 from .forms import StartAssessmentForm # Added import
 from .services import (_expand_gtm_jargon, _build_question_guidance, _kickoff_playbook_generation, _log_access_denied, safe_get_session_or_403, _format_band_actions_markdown, _paginated_questions, _category_step_map, _first_incomplete_step, _compute_scores, _band_for_score, _is_session_complete, _save_snapshot)
@@ -768,16 +769,25 @@ def enrichment_status(request, session_id):
         snap.refresh_from_db()
 
     fin_html = comp_html = ""
-    if snap.ai_financial_summary:
+    fin_failed = (snap.ai_financial_summary == ENRICHMENT_UNAVAILABLE)
+    comp_failed = (snap.ai_competitor_analysis == ENRICHMENT_UNAVAILABLE)
+
+    if snap.ai_financial_summary and not fin_failed:
         fin_html = mark_safe(md.markdown(_normalize_ai_playbook_markdown(snap.ai_financial_summary), extensions=["extra", "sane_lists"]))
-    if snap.ai_competitor_analysis:
+    if snap.ai_competitor_analysis and not comp_failed:
         comp_html = mark_safe(md.markdown(_normalize_ai_playbook_markdown(snap.ai_competitor_analysis), extensions=["extra", "sane_lists"]))
+
+    # still_loading is True only while fields are genuinely empty (never attempted).
+    # A sentinel value counts as "done" so the HTMX poll stops.
+    still_loading = not (snap.ai_financial_summary and snap.ai_competitor_analysis)
 
     return render(request, "gtm/partials/enrichment_sections.html", {
         "session": session,
         "fin_html": fin_html,
         "comp_html": comp_html,
-        "still_loading": not (snap.ai_financial_summary and snap.ai_competitor_analysis),
+        "fin_failed": fin_failed,
+        "comp_failed": comp_failed,
+        "still_loading": still_loading,
     })
 
 

@@ -468,6 +468,12 @@ Respond ONLY with a valid raw JSON object (no markdown code fences). Use these e
     return prompt
 
 
+# Sentinel written to enrichment fields when generation is attempted but fails.
+# A non-empty value stops the HTMX polling loop; the view/template detect it
+# and render a graceful "unavailable" message instead of the content or spinner.
+ENRICHMENT_UNAVAILABLE = "__unavailable__"
+
+
 def generate_enrichment_sections(snapshot: ResultSnapshot) -> bool:
     """
     Generate ai_financial_summary and ai_competitor_analysis for a snapshot
@@ -512,10 +518,11 @@ Use revenue ranges consistent with {revenue}. Do NOT recommend actions — only 
                     contents=fin_prompt,
                     config=_FAST_CONFIG,
                 )
-                snapshot.ai_financial_summary = (resp.text or "").strip()
-                generated = True
+                snapshot.ai_financial_summary = (resp.text or "").strip() or ENRICHMENT_UNAVAILABLE
             except Exception as e:
                 log_ai_error("generate_enrichment_sections:financial", e, {})
+                snapshot.ai_financial_summary = ENRICHMENT_UNAVAILABLE
+            generated = True
 
         if not snapshot.ai_competitor_analysis:
             try:
@@ -534,10 +541,11 @@ Do NOT recommend actions — only describe competitive risks from the current st
                     contents=comp_prompt,
                     config=_FAST_CONFIG,
                 )
-                snapshot.ai_competitor_analysis = (resp.text or "").strip()
-                generated = True
+                snapshot.ai_competitor_analysis = (resp.text or "").strip() or ENRICHMENT_UNAVAILABLE
             except Exception as e:
                 log_ai_error("generate_enrichment_sections:competitor", e, {})
+                snapshot.ai_competitor_analysis = ENRICHMENT_UNAVAILABLE
+            generated = True
 
         if generated:
             snapshot.save(update_fields=["ai_financial_summary", "ai_competitor_analysis"])
