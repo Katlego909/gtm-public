@@ -8,42 +8,79 @@ This is the **`internship` branch**. It contains everything in `master`, plus a 
 
 ## 🆕 What's New on This Branch
 
-### 1. The AI can now read your own documents and score you automatically
+### 1. Every question's weight — and a lot of its wording — was rebuilt from research
 
-**In plain English:** Up to now, you had to read each assessment question and decide for yourself what score (1–5) your company deserves. Now, for every question, you can instead **upload real evidence** — a sales report, a spreadsheet of pipeline numbers, a CRM export, a marketing deck, a screenshot of a dashboard, even a Word doc — and the AI will read it for you, find the parts that actually answer the question, and propose a score along with a short explanation, a quoted piece of evidence, and how confident it is. You always stay in control: every AI-suggested score can be opened up and changed by hand if you disagree. This started out only available for the "Delivery" questions, and now works for "Demand" and "Conversion" questions too. You also get a live progress indicator while it works, and the result appears automatically once it's done — no need to refresh the page.
+**In plain English:** All 18 assessment questions (6 each for Demand, Conversion, and Delivery) used to be weighted almost equally, as if a question about whether customers occasionally recommend you mattered nearly as much as a question about whether customers are quietly about to cancel. They don't — losing a customer you already have is far more damaging than not yet having a referral program. So every weight was re-derived from research into what actually drives revenue and retention. Picture it as a pyramid: foundational things sit at the base and hold everything above them up. For Delivery, **Health Monitoring** (spotting unhappy customers before they leave) is the base and carries the most weight; **Advocacy** (customers actively referring you) sits at the top and carries the least — if you're not even watching for unhappy customers, it doesn't matter how good your referral program is. The full breakdown:
 
-**Under the hood:** Uploaded files (CSV, Excel, PDF, Word, plain text, JSON, or images, up to 10MB) are parsed with format-specific readers (`openpyxl` for Excel, `pypdf` for PDF, `python-docx` for Word; images are sent straight to Gemini's vision model to be read). The extracted text then goes through a three-stage pipeline before any AI scoring happens:
+| Pillar | Dimension | Weight |
+|---|---|---|
+| Demand | ICP Clarity | 22% |
+| Demand | Channel Strategy | 20% |
+| Demand | Positioning | 18% |
+| Demand | Lead Quality | 16% |
+| Demand | Attribution | 14% |
+| Demand | Execution Cadence | 10% |
+| Conversion | Pipeline Hygiene | 22% |
+| Conversion | Win-Loss Learning | 22% |
+| Conversion | Qualification | 19% |
+| Conversion | Funnel Optimization | 16% |
+| Conversion | Speed to Lead | 13% |
+| Conversion | Deal Enablement | 8% |
+| Delivery | Health Monitoring | 24% |
+| Delivery | Retention | 22% |
+| Delivery | Time to Value | 18% |
+| Delivery | Onboarding Discipline | 16% |
+| Delivery | Success Governance | 12% |
+| Delivery | Advocacy | 8% |
+
+Several questions were also reworded from internal, RevOps-flavored language into plain terms anyone in the business can answer honestly — for example, "Does your business track..." style internal-process phrasing became direct questions like *"Do you have a process for spotting customers at risk of leaving — before they tell you?"* And a few Conversion questions stopped forcing a generic 1–5 rating where a real answer fits better: they now use checkboxes, single-choice pickers, or a frequency selector ("never / monthly / weekly / daily") that maps to a score behind the scenes — checking your numbers weekly scores best, slightly *better* than checking them every single day, which the tool treats as a sign of micromanaging rather than rigor.
+
+**Under the hood:** Weights and wording live in `gtm/management/commands/load_gtm_defaults.py`; the weight table itself is mirrored in `gtm/scoring_engine.py: QUESTION_META` so the scoring engine and the question bank never drift out of sync. The new input types (`single_select`, `multi_select`, `frequency_select`) are backed by three new `Question` model fields — `input_type`, `input_options`, `input_option_labels` — plus a `scoring_logic` map that converts a selected option into a 1–5 score.
+
+### 2. The AI can now read your own documents and score you automatically
+
+**In plain English:** Up to now, every answer was self-reported — a company says "yes, we do health monitoring" and that's taken at face value. Now, for every question, you can instead **upload real evidence** — a sales report, a customer contract, an onboarding guide, a QBR template, a health dashboard, a CRM export, even a screenshot — and the AI reads it, finds the parts that actually answer the question, and proposes a score along with a short explanation, a quoted piece of evidence, and how confident it is. Think of it like the difference between telling your bank you earn $80,000 and actually uploading your payslip — this does the same thing for GTM maturity. You always stay in control: every AI-suggested score can be opened up and changed by hand if you disagree. This started out only available for "Delivery," and now works for "Demand" and "Conversion" too, with a live progress indicator while it works and no need to refresh the page when it's done.
+
+**Under the hood:** Uploaded files (CSV, Excel, PDF, Word, plain text, JSON, or images, up to 10MB) are parsed with format-specific readers (`openpyxl` for Excel, `pypdf` for PDF, `python-docx` for Word; images are sent straight to Gemini's vision model to be read). The extracted text then goes through a three-stage NLP pipeline before any AI scoring happens:
 - A keyword-relevance search (`scikit-learn`'s TF-IDF + cosine similarity) finds passages that share important words with the question.
 - A "meaning-based" search (`sentence-transformers`, a lightweight AI model called MiniLM) catches passages that answer the question in different words — e.g. "we ship every Friday" still matches a question about deployment frequency, even with zero shared keywords.
 - An entity/number spotter (`spaCy`, backed by a regex fallback) automatically pulls out percentages, dollar amounts, dates, and common GTM metrics (CAC, LTV, ARR, NRR, MRR, NPS, etc.) from the text.
 
 Only the most relevant evidence found by these three steps — not the entire document — is then handed to **Google Gemini (`gemini-2.5-flash`)**, which makes the actual scoring judgment and writes the reasoning. This keeps the AI focused, fast, and grounded in your real documents instead of guessing.
 
-### 2. A transparent, math-only scoring engine (no AI guesswork involved)
+### 3. A transparent, math-only recommendation engine (no AI guesswork deciding what matters)
 
-**In plain English:** Separate from the AI, there's now a built-in "calculator" that scores your answers using fixed, published rules — the same answers always produce the exact same score, with no randomness and no AI involved. It does three useful things: it tells you which single question, if improved, would boost your overall score the most (your best "bang for your buck" fix); it recognizes common, named patterns of trouble (for example, "you don't have a clearly defined ideal customer" or "you're losing deals at the qualification stage") and explains each one in a sentence; and it feeds these same priorities to the AI, so the written playbook you get is required to talk about your *actual* top issues rather than generic advice.
+**In plain English:** Before, your overall score just placed you in one of five bands, and everyone in a band got the same three generic bullet points — a company with no pipeline saw the same advice as a company whose customers were quietly churning. Now there's a built-in "calculator" that runs the actual math: same inputs always produce the same output, with zero randomness and zero AI involved in deciding what's wrong. It does two things. First, it works out exactly which single question, if improved, would add the most points to your overall score — your best "bang for your buck" fix, expressed as real points gained, not a vague suggestion. Second, it recognizes about a dozen named patterns of trouble by looking at your actual question-level scores — for example **"ICP Undefined"** (no clear ideal customer), **"Conversion Leak"** (leads come in but don't convert), or **"Delivery Churn Risk"** (customers are leaving and nobody's watching) — and multiple patterns can fire at once, so a company with both a demand problem and a delivery problem gets a plan addressing both, ranked by impact. Gemini is then only allowed to add company- and industry-specific *language* around these already-decided priorities — it never gets to invent its own diagnosis.
 
-**Under the hood:** A new `scoring_engine.py` module computes weighted averages per pillar (Demand/Conversion/Delivery, weighted 40/40/20), ranks "opportunity scores" (the points you'd gain by maxing out each question, scaled by that question's importance), and runs your scores through about a dozen hardcoded pattern-detection rules. This structured output is then passed into the Gemini prompt that writes your playbook, so the AI's narrative is anchored to the same numbers shown on your dashboard.
+**Under the hood:** A new `scoring_engine.py` module computes pillar scores as a true weighted average (`Σ(score × question_weight) / Σ(question_weight)` per pillar, then `Σ((pillar_avg/5) × pillar_weight × 100)` for the 0–100 overall score, where Demand and Conversion are each worth up to 40 points and Delivery up to 20). It ranks "opportunity scores" per question (`(5 − score) × question_weight × pillar_weight`, i.e. exactly how many overall points are on the table) and evaluates the score set against named pattern-detection rules. This structured output (top priorities + fired patterns) is passed into the Gemini prompt that writes the playbook, so the AI's narrative is required to be anchored to the same numbers shown on your dashboard rather than free-associating from a category average.
 
-### 3. Deeper, more personal AI-written insights in your report
+### 4. AI Insights that diagnose your business, not prescribe generic advice
 
-**In plain English:** Your results and playbook pages now include two new boxed sections: **"Financial Impact Estimates"** (a rough estimate of what your current gaps might be costing you) and **"Competitive Gap Analysis"** (how those gaps could let competitors get ahead). Both are written specifically about your company, not generic filler. The "Recommended Next Moves" section is now genuinely tailored to your top priorities, and a matching "Recommended Tools" list is generated to go with it.
+**In plain English:** Under each low-scoring question on your results page there's an "AI Insight" box. It used to hand out recommendations — "Implement a CRM workflow," "Automate your attribution reporting" — which meant every company with a low score on that question got essentially the same advice. It wasn't a diagnosis, it was a generic prescription copy-pasted by an algorithm. It's been rewritten to do one thing only: describe what's specifically wrong at *your* company, by name, referencing your actual CRM, size, revenue range, and country — e.g. *"Ardent SA, a 50-person professional services firm in South Africa operating without a formal CRM, has no consistent method for identifying which marketing channels generate qualified leads."* No suggestions, no "you should." And because AI doesn't always follow instructions perfectly, there's also an automatic safety net that strips out any sentence starting with an action verb ("Implement," "Build," "Set up," "Automate," and ~50 others), regardless of what the AI tries to write.
 
-**Under the hood:** Two additional calls to **Google Gemini** generate the financial and competitive write-ups, with prompts that explicitly forbid the AI from giving recommendations in these two sections (they're meant to describe impact and risk, not prescribe fixes — recommendations live elsewhere). A separate Gemini call extracts a clean, short bullet-point action list out of the longer playbook text for the "Recommended Tools"/action-plan UI.
+**Under the hood:** The diagnostic prompts in `ai_services.py` were rewritten to forbid recommendation language entirely, and a regex-based post-processor, `_strip_imperative_sentences`, scans every generated insight before it's saved and removes any sentence matching an imperative-verb pattern — a deterministic failsafe that runs every time, independent of how well the AI followed its instructions.
 
-### 4. A smarter, more personal downloadable PDF report
+### 5. Your task list now fills itself in automatically
 
-**In plain English:** The "30-Day Implementation Framework" in your downloadable PDF used to be the exact same generic template for every single company. Now it's built from your own AI-generated priorities, so the plan you download actually reflects your specific weak spots. The new Financial Estimates and Competitive Gap sections are included in the PDF too, and the downloaded file is now named after your company (e.g. `Acme Inc_AI_playbook_report_ForgeGTM.pdf`) instead of a generic ID.
+**In plain English:** Previously, when you finished your assessment, you landed on a completely blank to-do list and had to figure out what to put in it yourself. Now it's pre-filled and ranked for you the moment your results are ready — most of it pulled straight from your personalized playbook, plus one extra "quick win" pulled from the recommendation engine's highest-priority pattern. If the same task would otherwise show up twice, the system recognizes the overlap and only keeps one copy.
 
-**Under the hood:** `utils_pdf.py` now parses the AI-generated playbook markdown to pull out its priority sections and builds the week-by-week PDF table from that real content, and adds two new styled boxes (built with `ReportLab` tables) for the financial/competitive sections.
+**Under the hood:** `views.py` auto-populates `ActionItem` rows on first visit if none exist: roughly 90% of tasks come from `ai_services.extract_tasks_from_playbook` (a Gemini call that extracts concrete action items from the playbook text as structured JSON, with a token-limit fix so large playbooks don't silently return empty), and 10% comes from the scoring engine's top-severity pattern's `quick_win` text. A word-overlap check (shared words ÷ total words > 0.6) prevents the quick-win task from duplicating something the AI already extracted.
 
-### 5. Easier navigation — you're no longer stuck moving forward only
+### 6. Deeper, more personal AI-written insight sections in your report
+
+**In plain English:** Your results and playbook pages include two boxed sections: **"Financial Impact Estimates"** (a rough estimate of what your current gaps might be costing you) and **"Competitive Gap Analysis"** (how those gaps could let competitors get ahead). Both are written specifically about your company, not generic filler, and neither is allowed to slip in a recommendation — they're meant to describe impact and risk only. The "Recommended Next Moves" section now shows a clean, personalized "Action Plan" bullet list instead of dense markdown prose, alongside a "Recommended Tools" list automatically matched to your two weakest categories.
+
+**Under the hood:** Two Gemini calls (`generate_enrichment_sections` in `ai_services.py`) generate the financial and competitive write-ups in the background and save them once ready; the page polls itself via HTMX every 6 seconds and swaps in the content automatically, no refresh needed. The "Action Plan" bullets come from `extract_tasks_from_playbook`; "Recommended Tools" comes from the existing `ToolRecommendation` data, now filtered specifically to your two lowest-scoring categories instead of shown generically.
+
+### 7. A smarter, more personal downloadable PDF report
+
+**In plain English:** The "30-Day Implementation Framework" in your downloadable PDF used to be the exact same generic template for every single company — Week 1 Audit, Week 2 Process, same text every time. Now it's built from your own AI-generated priorities, so the plan you download actually reflects your specific weak spots. The Financial Estimates and Competitive Gap sections are included in the PDF too, and the downloaded file is now named after your company (e.g. `Acme Inc_AI_playbook_report_ForgeGTM.pdf`) instead of a generic ID.
+
+**Under the hood:** `utils_pdf.py` (built on the `ReportLab` library, which constructs PDF layouts entirely in code) now parses the AI-generated playbook markdown to pull out its priority sections and builds the week-by-week PDF table from that real content, and adds two new styled boxes for the financial/competitive sections.
+
+### 8. Easier navigation — you're no longer stuck moving forward only
 
 **In plain English:** Added "Back" buttons so you can return to the Delivery questions from your GTM Assessment Report, and return all the way back to your company details from the very first assessment question — useful if you spot a typo or want to update something without restarting the whole assessment.
-
-### 6. Smarter question types, not just 1–5 sliders
-
-**In plain English:** A few of the Conversion questions used to force a generic 1–5 rating even when a real answer would fit better. Some now use checkboxes, single-choice pickers, or a frequency selector ("never / monthly / weekly / daily") that maps to a score behind the scenes — for example, checking your numbers weekly scores best, slightly better than checking them every single day, which the tool treats as a sign of micromanaging rather than rigor.
 
 ---
 
