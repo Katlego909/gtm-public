@@ -220,6 +220,33 @@ def start_assessment(request):
 
 
 @login_required
+def edit_assessment_intro(request, session_id):
+    """Lets the user revisit and update company/contact details (the 'Start Assessment'
+    info) from within an in-progress assessment, then return to step 1."""
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        messages.error(request, "Access denied.")
+        return redirect("gtm:history")
+
+    if request.method == "POST":
+        original_referrer = session.referrer
+        form = StartAssessmentForm(request.POST, instance=session)
+        if form.is_valid():
+            updated_session = form.save(commit=False)
+            updated_session.referrer = original_referrer
+            updated_session.save()
+            return redirect("gtm:assessment_step", session_id=session.uuid, step=1)
+    else:
+        form = StartAssessmentForm(instance=session)
+
+    return render(request, "gtm/start.html", {
+        "form": form,
+        "edit_session": session,
+        "is_htmx": _is_htmx(request),
+    })
+
+
+@login_required
 def resume_assessment(request, session_id):
     session, is_authorized = safe_get_session_or_403(request, session_id)
     if not is_authorized:
@@ -604,9 +631,11 @@ def results(request, session_id):
     from django.urls import reverse as _reverse
     next_moves_poll_url = _reverse("gtm:next_moves_content", kwargs={"session_id": session.uuid})
     snap_status = getattr(snap, "ai_playbook_status", "pending") if snap else "pending"
+    total_steps = len(_paginated_questions())
 
     return render(request, "gtm/results.html", {
         "session": session,
+        "total_steps": total_steps,
         "overall": round(overall, 1),
         "band": band,
         "band_actions_html": band_actions_html,
