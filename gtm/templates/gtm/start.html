@@ -5,17 +5,33 @@
   <!-- Page Header -->
   <div class="app-page-header text-center">
     <h1 class="app-page-title">
-      Start Your GTM Assessment
+      {% if edit_session %}Update Your Company Details{% else %}Start Your GTM Assessment{% endif %}
     </h1>
     <p class="app-page-subtitle max-w-2xl mx-auto">
-      Tell us about your company to get personalized insights and recommendations
+      {% if edit_session %}Review and adjust your company information, then continue your assessment{% else %}Tell us about your company to get personalized insights and recommendations{% endif %}
     </p>
   </div>
 
+  {% if edit_session %}
+  <div class="mb-4">
+    <a href="{% url 'gtm:assessment_step' edit_session.uuid 1 %}"
+       hx-get="{% url 'gtm:assessment_step' edit_session.uuid 1 %}"
+       hx-target="#main-content"
+       hx-select="#main-content"
+       hx-swap="innerHTML swap:200ms"
+       hx-push-url="true"
+       class="inline-flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-gray-900">
+      <i class="fas fa-arrow-left"></i>
+      Cancel and return to assessment
+    </a>
+  </div>
+  {% endif %}
+
   <!-- Form Card -->
-  <form method="post" 
-        hx-post="{% url 'gtm:start' %}" 
-        hx-target="#main-content" 
+  <form method="post"
+        action="{% if edit_session %}{% url 'gtm:edit_assessment_intro' edit_session.uuid %}{% else %}{% url 'gtm:start' %}{% endif %}"
+        hx-post="{% if edit_session %}{% url 'gtm:edit_assessment_intro' edit_session.uuid %}{% else %}{% url 'gtm:start' %}{% endif %}"
+        hx-target="#main-content"
         hx-select="#main-content"
         hx-swap="innerHTML swap:200ms"
         hx-push-url="true"
@@ -35,7 +51,7 @@
         <label class="block text-sm font-semibold text-gray-700 mb-2">
           <i class="fas fa-briefcase text-indigo-600 mr-2"></i>Company Name <span class="text-red-500">*</span>
         </label>
-        <input required name="company_name" class="app-input" placeholder="Acme Inc.">
+        <input required name="company_name" class="app-input" placeholder="Acme Inc." value="{{ edit_session.company_name|default:'' }}">
       </div>
 
       <div class="grid md:grid-cols-2 gap-4">
@@ -43,13 +59,13 @@
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             <i class="fas fa-industry text-blue-600 mr-2"></i>Industry
           </label>
-          <input name="industry" class="app-input" placeholder="SaaS, Fintech, Healthcare, etc.">
+          <input name="industry" class="app-input" placeholder="SaaS, Fintech, Healthcare, etc." value="{{ edit_session.industry|default:'' }}">
         </div>
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             <i class="fas fa-globe text-green-600 mr-2"></i>Website
           </label>
-          <input type="url" name="website" class="app-input" placeholder="https://example.com">
+          <input type="url" name="website" class="app-input" placeholder="https://example.com" value="{{ edit_session.website|default:'' }}">
         </div>
       </div>
     </div>
@@ -68,19 +84,19 @@
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             <i class="fas fa-user-circle text-indigo-600 mr-2"></i>Contact Name
           </label>
-          <input name="contact_name" class="app-input" placeholder="John Doe">
+          <input name="contact_name" class="app-input" placeholder="John Doe" value="{{ edit_session.contact_name|default:'' }}">
         </div>
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             <i class="fas fa-envelope text-blue-600 mr-2"></i>Work Email
           </label>
-          <input type="email" name="contact_email" class="app-input" placeholder="john@example.com">
+          <input type="email" name="contact_email" class="app-input" placeholder="john@example.com" value="{{ edit_session.contact_email|default:'' }}">
         </div>
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             <i class="fas fa-id-badge text-green-600 mr-2"></i>Role / Title
           </label>
-          <input name="contact_role" class="app-input" placeholder="Head of Growth">
+          <input name="contact_role" class="app-input" placeholder="Head of Growth" value="{{ edit_session.contact_role|default:'' }}">
         </div>
       </div>
 
@@ -89,7 +105,7 @@
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             <i class="fas fa-phone text-orange-600 mr-2"></i>Phone
           </label>
-          <input type="tel" name="phone" class="app-input" placeholder="+1 (555) 000-0000">
+          <input type="tel" name="phone" class="app-input" placeholder="+1 (555) 000-0000" value="{{ edit_session.phone|default:'' }}">
         </div>
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
@@ -97,11 +113,11 @@
           </label>
           <select name="company_size" class="app-select">
             <option value="">Select size</option>
-            <option value="1-10">1-10 employees</option>
-            <option value="11-50">11-50 employees</option>
-            <option value="51-200">51-200 employees</option>
-            <option value="201-500">201-500 employees</option>
-            <option value="501+">501+ employees</option>
+            <option value="1-10" {% if edit_session.company_size == "1-10" %}selected{% endif %}>1-10 employees</option>
+            <option value="11-50" {% if edit_session.company_size == "11-50" %}selected{% endif %}>11-50 employees</option>
+            <option value="51-200" {% if edit_session.company_size == "51-200" %}selected{% endif %}>51-200 employees</option>
+            <option value="201-500" {% if edit_session.company_size == "201-500" %}selected{% endif %}>201-500 employees</option>
+            <option value="501+" {% if edit_session.company_size == "501+" %}selected{% endif %}>501+ employees</option>
           </select>
         </div>
         <div>
@@ -110,11 +126,11 @@
           </label>
           <select name="revenue_range" class="app-select">
             <option value="">Select range</option>
-            <option value="<$1M">Less than $1M</option>
-            <option value="$1-5M">$1M - $5M</option>
-            <option value="$5-10M">$5M - $10M</option>
-            <option value="$10-50M">$10M - $50M</option>
-            <option value="$50M+">$50M+</option>
+            <option value="<$1M" {% if edit_session.revenue_range == "<$1M" %}selected{% endif %}>Less than $1M</option>
+            <option value="$1-5M" {% if edit_session.revenue_range == "$1-5M" %}selected{% endif %}>$1M - $5M</option>
+            <option value="$5-10M" {% if edit_session.revenue_range == "$5-10M" %}selected{% endif %}>$5M - $10M</option>
+            <option value="$10-50M" {% if edit_session.revenue_range == "$10-50M" %}selected{% endif %}>$10M - $50M</option>
+            <option value="$50M+" {% if edit_session.revenue_range == "$50M+" %}selected{% endif %}>$50M+</option>
           </select>
         </div>
       </div>
@@ -124,13 +140,13 @@
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             <i class="fas fa-map-marker-alt text-red-600 mr-2"></i>Country
           </label>
-          <input name="country" class="app-input" placeholder="South Africa, United States, etc.">
+          <input name="country" class="app-input" placeholder="South Africa, United States, etc." value="{{ edit_session.country|default:'' }}">
         </div>
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
             <i class="fas fa-database text-blue-600 mr-2"></i>CRM
           </label>
-          <input name="crm" class="app-input" placeholder="HubSpot, Salesforce, etc.">
+          <input name="crm" class="app-input" placeholder="HubSpot, Salesforce, etc." value="{{ edit_session.crm|default:'' }}">
         </div>
       </div>
     </div>
@@ -148,20 +164,20 @@
         <label class="block text-sm font-semibold text-gray-700 mb-2">
           <i class="fas fa-comment-dots text-indigo-600 mr-2"></i>Notes (optional)
         </label>
-        <textarea name="notes" rows="4" class="app-textarea" placeholder="Share any specific goals, challenges, or context about your GTM strategy..."></textarea>
+        <textarea name="notes" rows="4" class="app-textarea" placeholder="Share any specific goals, challenges, or context about your GTM strategy...">{{ edit_session.notes|default:'' }}</textarea>
       </div>
     </div>
 
     <!-- Hidden UTM fields -->
-    <input type="hidden" name="utm_source" value="{{ request.GET.utm_source }}">
-    <input type="hidden" name="utm_medium" value="{{ request.GET.utm_medium }}">
-    <input type="hidden" name="utm_campaign" value="{{ request.GET.utm_campaign }}">
+    <input type="hidden" name="utm_source" value="{% firstof edit_session.utm_source request.GET.utm_source "" %}">
+    <input type="hidden" name="utm_medium" value="{% firstof edit_session.utm_medium request.GET.utm_medium "" %}">
+    <input type="hidden" name="utm_campaign" value="{% firstof edit_session.utm_campaign request.GET.utm_campaign "" %}">
 
     <!-- Submit Button -->
     <div class="pt-6 border-t border-gray-200">
       <button type="submit" class="app-primary-button w-full px-8 py-4 text-lg">
-        <i class="fas fa-rocket"></i>
-        Begin Assessment
+        <i class="fas {% if edit_session %}fa-save{% else %}fa-rocket{% endif %}"></i>
+        {% if edit_session %}Save & Continue{% else %}Begin Assessment{% endif %}
         <i class="fas fa-arrow-right"></i>
       </button>
       <p class="text-sm text-gray-500 text-center mt-4">

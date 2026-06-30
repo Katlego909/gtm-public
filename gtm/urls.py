@@ -10,6 +10,7 @@ urlpatterns = [
     path("resume/latest/", views.resume_latest, name="resume_latest"),
     path("assessment/<uuid:session_id>/<int:step>/", views.assessment_step, name="assessment_step"),
     path("assessment/<uuid:session_id>/rewrite-context-note/", views.rewrite_context_note, name="rewrite_context_note"),
+    path("assessment/<uuid:session_id>/edit-details/", views.edit_assessment_intro, name="edit_assessment_intro"),
     path("results/<uuid:session_id>/", views.results, name="results"),
     path("results/<uuid:session_id>/insight/<int:response_id>/", views.insight_status, name="insight_status"),
     path("playbook/<uuid:session_id>/", views.playbook, name="playbook"),
