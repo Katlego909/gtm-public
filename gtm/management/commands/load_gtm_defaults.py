@@ -156,7 +156,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
     "Conversion": [
         {
             "id_code": "CON-SLA-01",
-            "text": "We set clear response-time targets for new leads by source, and we check every week how quickly reps reply so high-intent leads are not lost.",
+            "text": "How well does your team meet defined response-time targets for new leads by source, and how consistently are rep reply times reviewed each week?",
             "input_type": "frequency_select",
             "input_options": [
                 "never",
@@ -208,7 +208,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "CON-QLF-02",
-            "text": "Are required qualification fields enforced as mandatory gates before opportunities can advance to the next pipeline stage?",
+            "text": "How rigorously does your team apply a shared qualification checklist, and how strictly are required CRM fields enforced before opportunities can advance to the next stage?",
             "input_type": "single_select",
             "input_options": [
                 "no",
@@ -238,7 +238,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "CON-STG-03",
-            "text": "Which of the following are true of how your team manages and monitors pipeline stages?",
+            "text": "How well does your team define and enforce entry and exit criteria for each pipeline stage, and how consistently do sales leaders review stage-to-stage conversion rates to identify bottlenecks?",
             "input_type": "multi_select",
             "input_options": [
                 "defined_stage_criteria",
@@ -293,7 +293,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "CON-OBJ-04",
-            "text": "Which of the following does your team currently have in place for handling objections and competitor questions?",
+            "text": "How effectively does your team maintain and apply a shared objection and competitor playbook, and how consistently do managers coach reps on it?",
             "input_type": "multi_select",
             "input_options": [
                 "written_playbook",
@@ -341,7 +341,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "CON-WNL-05",
-            "text": "How would you best describe your team's current win/loss analysis practice?",
+            "text": "How consistently does your team record structured win/loss reasons and use those patterns in a regular review to run improvement experiments?",
             "input_type": "single_select",
             "input_options": [
                 "no_capture",
@@ -394,7 +394,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "CON-PGE-06",
-            "text": "Which of the following are true of how your team tests and optimizes key conversion pages and forms?",
+            "text": "How consistently does your team run structured tests on key conversion pages and forms, using clear hypotheses and success metrics to track improvement?",
             "input_type": "multi_select",
             "input_options": [
                 "defined_hypotheses",
