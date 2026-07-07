@@ -294,12 +294,38 @@ def assessment_step(request, session_id, step: int):
     class StepForm(Form):
         pass
     for q in questions:
-        StepForm.base_fields[q.id_code] = IntegerField(
-            min_value=1, max_value=5,
-            widget=NumberInput(attrs={"class": "w-full border rounded px-3 py-2", "step": 1}),
-            required=True,
-            label=q.text
-        )
+        input_type = q.input_type if hasattr(q, 'input_type') else 'scale'
+        input_options = q.input_options if hasattr(q, 'input_options') else []
+        input_option_labels = q.input_option_labels if hasattr(q, 'input_option_labels') else {}
+
+        if input_type == 'single_select' and input_options:
+            choices = [(opt, input_option_labels.get(opt, opt)) for opt in input_options]
+            StepForm.base_fields[q.id_code] = forms.ChoiceField(
+                choices=choices,
+                required=True,
+                label=q.text
+            )
+        elif input_type in ('multi_select',) and input_options:
+            choices = [(opt, input_option_labels.get(opt, opt)) for opt in input_options]
+            StepForm.base_fields[q.id_code] = forms.MultipleChoiceField(
+                choices=choices,
+                required=True,
+                label=q.text
+            )
+        elif input_type == 'frequency_select' and input_options:
+            choices = [(opt, input_option_labels.get(opt, opt)) for opt in input_options]
+            StepForm.base_fields[q.id_code] = forms.ChoiceField(
+                choices=choices,
+                required=True,
+                label=q.text
+            )
+        else:
+            StepForm.base_fields[q.id_code] = IntegerField(
+                min_value=1, max_value=5,
+                widget=NumberInput(attrs={"class": "w-full border rounded px-3 py-2", "step": 1}),
+                required=True,
+                label=q.text
+            )
         StepForm.base_fields[f"{q.id_code}_context_note"] = forms.CharField(
             widget=forms.Textarea(attrs={"class": "w-full border rounded px-3 py-2 text-sm", "rows": 3, "placeholder": "Please provide more info on this"}),
             required=False,
@@ -353,8 +379,11 @@ def assessment_step(request, session_id, step: int):
     else:
         form = StepForm(initial=initial)
 
-    progress_pct = int((step - 1) / total_steps * 100)
-    legend_html = "<br>".join([f"<b>{k}</b>: {v}" for k, v in LEGEND.items()])
+        progress_pct = int((step - 1) / total_steps * 100)
+        legend_html = "<br>".join([f"<b>{k}</b>: {v}" for k, v in LEGEND.items()])
+
+        question_input_types = {q.id_code: getattr(q, 'input_type', 'scale') for q in questions}
+        question_input_options = {q.id_code: getattr(q, 'input_option_labels', {}) for q in questions}
 
     # Build per-step AI document analysis URLs
     from django.urls import reverse as _reverse
@@ -401,6 +430,9 @@ def assessment_step(request, session_id, step: int):
         "is_htmx": _is_htmx(request),
         "context_fields": context_fields,
         "question_guidance": question_guidance,
+        "is_delivery_step": step == total_steps,
+        "question_input_types": question_input_types,
+        "question_input_options": question_input_options,
         "is_delivery_step": is_delivery_step,
         "is_ai_step": True,
         "ai_upload_url": ai_upload_url,
