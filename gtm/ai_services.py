@@ -468,6 +468,92 @@ Respond ONLY with a valid raw JSON object (no markdown code fences). Use these e
     return prompt
 
 
+# Sentinel written to enrichment fields when generation is attempted but fails.
+# A non-empty value stops the HTMX polling loop; the view/template detect it
+# and render a graceful "unavailable" message instead of the content or spinner.
+ENRICHMENT_UNAVAILABLE = "__unavailable__"
+
+
+def generate_enrichment_sections(snapshot: ResultSnapshot) -> bool:
+    """
+    Generate ai_financial_summary and ai_competitor_analysis for a snapshot
+    that already has a playbook but is missing these fields.
+    Returns True if at least one section was generated.
+    """
+    if snapshot.ai_financial_summary and snapshot.ai_competitor_analysis:
+        return False
+
+    client = _get_client()
+    if not client or _quota_cooldown_active():
+        return False
+
+    lock_key = f"gtm:ai:enrichment:{snapshot.id}:lock"
+    if not _acquire_lock(lock_key):
+        return False
+
+    try:
+        company  = snapshot.company_name or "the company"
+        industry = snapshot.industry or "B2B"
+        revenue  = snapshot.revenue_range or "undisclosed revenue"
+        size     = snapshot.company_size or "unknown size"
+        stage    = snapshot.band_stage or "growth"
+        score    = round(snapshot.overall or 0, 1)
+        playbook_ctx = (snapshot.ai_playbook or "")[:2000]
+        generated = False
+
+        if not snapshot.ai_financial_summary:
+            try:
+                fin_prompt = f"""You are a GTM financial analyst. Write 3-4 concise bullet points estimating the financial impact of the GTM gaps identified for {company}.
+
+Company: {company} | Industry: {industry} | Revenue range: {revenue} | Size: {size} | GTM Score: {score}/100 | Stage: {stage}
+
+Playbook context:
+{playbook_ctx}
+
+Cover: revenue at risk from current gaps, estimated pipeline uplift from fixes, cost of 12-month inaction, and rough ROI range.
+Use revenue ranges consistent with {revenue}. Do NOT recommend actions — only estimate financial impact of the current state."""
+
+                resp = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=fin_prompt,
+                    config=_FAST_CONFIG,
+                )
+                snapshot.ai_financial_summary = (resp.text or "").strip() or ENRICHMENT_UNAVAILABLE
+            except Exception as e:
+                log_ai_error("generate_enrichment_sections:financial", e, {})
+                snapshot.ai_financial_summary = ENRICHMENT_UNAVAILABLE
+            generated = True
+
+        if not snapshot.ai_competitor_analysis:
+            try:
+                comp_prompt = f"""You are a GTM competitive analyst. Write 3-4 concise bullet points describing the competitive exposure created by {company}'s current GTM gaps.
+
+Company: {company} | Industry: {industry} | Revenue range: {revenue} | Size: {size} | GTM Score: {score}/100 | Stage: {stage}
+
+Playbook context:
+{playbook_ctx}
+
+Cover: where competitors in {industry} typically outperform companies at this GTM maturity stage, and what specific risks these gaps create for {company}.
+Do NOT recommend actions — only describe competitive risks from the current state."""
+
+                resp = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=comp_prompt,
+                    config=_FAST_CONFIG,
+                )
+                snapshot.ai_competitor_analysis = (resp.text or "").strip() or ENRICHMENT_UNAVAILABLE
+            except Exception as e:
+                log_ai_error("generate_enrichment_sections:competitor", e, {})
+                snapshot.ai_competitor_analysis = ENRICHMENT_UNAVAILABLE
+            generated = True
+
+        if generated:
+            snapshot.save(update_fields=["ai_financial_summary", "ai_competitor_analysis"])
+        return generated
+    finally:
+        _release_lock(lock_key)
+
+
 def extract_tasks_from_playbook(playbook_text: str, company_name: str, n: int = 4) -> list[str]:
     """
     Ask Gemini to extract n short actionable tasks from an existing AI playbook.
@@ -689,42 +775,69 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
 # ================================================================
 # DIAGNOSTIC PROMPT GENERATOR
 # ================================================================
+_IMPERATIVE_VERBS = re.compile(
+    r'^(Implement|Establish|Build|Create|Define|Set|Launch|Prioritize|Consider|Develop|Use|Ensure|'
+    r'Track|Review|Automate|Schedule|Conduct|Design|Deploy|Adopt|Leverage|Focus|Start|Begin|Move|'
+    r'Invest|Hire|Align|Map|Identify|Document|Introduce|Address|Fix|Resolve|Update|Upgrade|'
+    r'Integrate|Configure|Run|Execute|Measure|Monitor|Optimize|Streamline|Formalize|Standardize|'
+    r'Initiate|Activate|Assign|Appoint|Engage|Reach|Contact|Request|Ask|Trigger|Add|Remove|'
+    r'Consolidate|Restructure|Revisit|Revisit|Explore|Trial|Test|Pilot|Roll)\b',
+    re.IGNORECASE,
+)
+
+def _strip_imperative_sentences(text: str) -> str:
+    """Remove any sentence that starts with an action/imperative verb."""
+    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+    clean = [s for s in sentences if s and not _IMPERATIVE_VERBS.match(s.strip())]
+    return ' '.join(clean).strip()
+
+
 def _build_diagnostic_prompt(session: AssessmentSession, question: Question, score: int) -> str:
     """Create a structured prompt for AI to generate a question-level diagnostic."""
-    
-    # Contextual data
-    company_name = session.company_name or "a B2B company"
-    industry = session.industry or "a general industry"
-    stage = session.snapshot.band_stage if getattr(session, 'snapshot', None) and session.snapshot.band_stage else "Unspecified"
-    ai_metadata = question.ai_metadata if isinstance(question.ai_metadata, dict) else {}
-    risk_if_low    = ai_metadata.get("risk_if_low")    or "N/A"
-    quick_win      = ai_metadata.get("quick_win_if_low") or "N/A"
 
-    # Score severity mapping
+    company_name = session.company_name or "a B2B company"
+    industry     = session.industry or "a general industry"
+    crm          = getattr(session, "crm", "") or "an unspecified CRM"
+    size         = getattr(session, "company_size", "") or "unknown size"
+    revenue      = getattr(session, "revenue_range", "") or "undisclosed revenue"
+    country      = getattr(session, "country", "") or "an unspecified market"
+    stage        = session.snapshot.band_stage if getattr(session, "snapshot", None) and session.snapshot.band_stage else "Unspecified"
+    ai_metadata  = question.ai_metadata if isinstance(question.ai_metadata, dict) else {}
+    risk_if_low  = ai_metadata.get("risk_if_low") or "N/A"
+    dimension    = ai_metadata.get("dimension", "")
+
     if score >= 4:
         severity  = {4: "Strong Foundation", 5: "Exceptional Performance"}.get(score, "Success")
         task_desc = (
-            f"explain WHY this is a strategic strength for {company_name} and how it "
-            f"provides a competitive advantage at the {stage} stage."
+            f"explain in specific detail WHY this is a strategic strength for {company_name} "
+            f"and how it creates a concrete competitive advantage at the {stage} stage in the {industry} space."
         )
     else:
         severity  = {1: "Critical Failure", 2: "Serious Gap", 3: "Improvement Needed"}.get(score, "Low Priority")
         task_desc = (
-            f"explain the immediate risk of this low score in the context of the "
-            f"{industry} industry and {stage} stage. Known risk: {risk_if_low}. "
-            f"Suggested quick win: {quick_win}."
+            f"diagnose in specific detail what is absent or broken at {company_name} on the '{dimension}' dimension. "
+            f"Reference their industry ({industry}), market ({country}), size ({size}), revenue ({revenue}), "
+            f"and CRM ({crm}) where relevant to explain WHY this gap exists and what it means for their GTM motion. "
+            f"Known downstream risk: {risk_if_low}."
         )
 
     prompt = f"""
-You are a highly experienced Go-To-Market consultant. Provide a brief, actionable insight for the assessment area below.
+You are a GTM diagnostician. Your ONLY job is to describe in detail what is currently absent or broken at a specific company.
 
-Company: {company_name} | Industry: {industry} | GTM Stage: {stage}
+Company: {company_name} | Industry: {industry} | Country: {country} | Size: {size} | Revenue: {revenue} | CRM: {crm} | GTM Stage: {stage}
 Question: {question.text}
 Score: {score}/5 ({severity})
 
 Task: {task_desc}
 
-Write one concise paragraph (3–4 sentences max) in clean professional prose.
+STRICT OUTPUT FORMAT:
+- 3 to 4 sentences.
+- Be specific — name {company_name}, reference their industry, size, CRM, or market where it sharpens the diagnosis.
+- Describe the specific GTM elements that are absent, broken, or immature at {company_name} right now.
+- FORBIDDEN: Do not start any sentence with an action verb (Implement, Establish, Build, Create, Define, Set, Launch, Prioritize, Develop, Use, Ensure, Track, Review, Automate, Schedule, etc.)
+- FORBIDDEN: Do not write "should", "must", "need to", "recommend", "suggest", or any forward-looking instruction.
+- FORBIDDEN: Do not describe what to do. Only describe what is wrong or missing right now.
+- Write in third person about {company_name}.
     """.strip()
 
     return prompt
@@ -770,8 +883,8 @@ def generate_diagnostic_insight(response: Response) -> str:
                 contents=prompt,
                 config=_FAST_CONFIG,
             )
-            text = ai_response.text.strip()
-            
+            text = _strip_imperative_sentences(ai_response.text.strip())
+
             if text:
                 # 🌟 Save the insight directly to the Response object
                 response.ai_insight = text
@@ -843,34 +956,47 @@ def generate_diagnostic_insights_batch(responses: list) -> dict:
 
         ai_metadata = q.ai_metadata if isinstance(q.ai_metadata, dict) else {}
         risk_if_low = ai_metadata.get("risk_if_low") or "N/A"
-        quick_win = ai_metadata.get("quick_win_if_low") or "N/A"
+        dimension   = ai_metadata.get("dimension", "")
+        crm         = getattr(session, "crm", "") or "unspecified CRM"
+        size        = getattr(session, "company_size", "") or "unknown size"
+        revenue     = getattr(session, "revenue_range", "") or "undisclosed revenue"
+        country     = getattr(session, "country", "") or "unspecified market"
 
         score_label = {1: "Critical Failure", 2: "Serious Gap", 3: "Improvement Needed",
                        4: "Strong Foundation", 5: "Exceptional Performance"}.get(resp.score, "Scored")
 
         response_blocks.append(
             f'  "{resp.id}": {{\n'
-            f'    "question": "{q.text[:100]}",\n'
-            f'    "score": {resp.score}/5 ({score_label}),\n'
+            f'    "question": "{q.text[:120]}",\n'
+            f'    "score": "{resp.score}/5 ({score_label})",\n'
             f'    "company": "{company_name}", "industry": "{industry}", "stage": "{stage}",\n'
-            f'    "risk_if_low": "{risk_if_low}", "quick_win": "{quick_win}"\n'
+            f'    "country": "{country}", "size": "{size}", "revenue": "{revenue}", "crm": "{crm}",\n'
+            f'    "dimension": "{dimension}", "risk_if_low": "{risk_if_low}"\n'
             f'  }}'
         )
 
     blocks_text = ",\n".join(response_blocks)
 
-    prompt = f"""You are a Go-To-Market consultant. For each assessment response below, write ONE concise diagnostic paragraph (2-3 sentences max) explaining why the score matters and what specific action to take next.
+    prompt = f"""You are a GTM diagnostician. For each assessment response below, write a detailed diagnostic paragraph (3-4 sentences) describing in specific detail what is currently absent or broken at the named company.
+
+STRICT RULES:
+- Be specific — reference the company's industry, CRM, country, size, and revenue range where it sharpens the diagnosis.
+- Describe the specific GTM elements that are absent, broken, or immature at this company right now.
+- FORBIDDEN: Do not start any sentence with an action verb (Implement, Establish, Build, Create, Automate, Set, Launch, Define, Develop, Use, Ensure, Track, Review, Prioritize, Consider, Start, Schedule, Conduct, etc.)
+- FORBIDDEN: Do not write "should", "must", "need to", "recommend", "suggest", or any forward-looking instruction.
+- FORBIDDEN: Do not describe what to do. Only describe what is wrong or missing right now.
+- Name the company explicitly. Write in third person.
 
 Assessment responses:
 {{
 {blocks_text}
 }}
 
-Respond ONLY with a valid JSON object mapping each response ID (as a string key) to its insight paragraph.
+Respond ONLY with a valid JSON object mapping each response ID (as a string key) to its diagnostic paragraph.
 Example format:
 {{
-  "42": "Your ICP definition is unclear, which means you're wasting sales cycles on poor-fit leads. Start by documenting 3-5 firmographic filters.",
-  "57": "Your attribution model is strong, giving you clear ROI visibility. Extend it to include longer sales cycles."
+  "42": "Ardent SA (Pty) Ltd lacks a unified ICP across its three service lines — Clinical Research, Business Consulting, and Legal Advisory — meaning each team operates with a different definition of an ideal client. HubSpot is in use but qualification fields for industry, buyer role, and company size are inconsistently captured, leaving no reliable data to validate which inbound leads are genuinely well-fitted. This absence of a shared ICP is particularly damaging for a 51-200 person firm in South Africa where referral-driven deal flow can mask poor-fit client acquisition.",
+  "57": "Nexaflow Inc. has no documented attribution model despite running campaigns across LinkedIn Ads, content, and outbound sequences. UTM parameters are inconsistently applied across campaigns in HubSpot, meaning a significant portion of qualified pipeline carries no source tag and is recorded as direct traffic."
 }}
 Do not include markdown code blocks or extra text. Return only the raw JSON object.""".strip()
 
@@ -893,7 +1019,7 @@ Do not include markdown code blocks or extra text. Return only the raw JSON obje
 
         results = {}
         for resp in responses:
-            insight = parsed.get(str(resp.id), "").strip()
+            insight = _strip_imperative_sentences(parsed.get(str(resp.id), "").strip())
             if insight:
                 resp.ai_insight = insight
                 resp.ai_insight_status = "done"

@@ -510,19 +510,339 @@
         closeModal();
     });
 
+    // ── Results page charts (radar + score ring) ────────────────────────────
+    // Defined here (not in results.html) so they are always available
+    // regardless of whether HTMX re-executes inline scripts after a swap.
+    function initRadarChart() {
+      const radarCanvas = document.getElementById('radar');
+      if (!radarCanvas) return;
+
+      const labelsEl = document.getElementById('js-radar-labels');
+      const valuesEl = document.getElementById('js-radar-values');
+      if (!labelsEl || !valuesEl) return;
+
+      try {
+          const labels = JSON.parse(labelsEl.textContent);
+          const values = JSON.parse(valuesEl.textContent);
+
+          const existingChart = Chart.getChart(radarCanvas);
+          if (existingChart) existingChart.destroy();
+
+          new Chart(radarCanvas, {
+            type: 'radar',
+            data: {
+              labels: labels,
+              datasets: [{
+                label: 'Your GTM Performance',
+                data: values,
+                fill: true,
+                backgroundColor: 'rgba(79, 70, 229, 0.2)',
+                borderColor: '#4F46E5',
+                borderWidth: 3,
+                pointBackgroundColor: '#4F46E5',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2,
+                pointRadius: 6,
+                pointHoverRadius: 8,
+                pointHoverBackgroundColor: '#fff',
+                pointHoverBorderColor: '#4F46E5',
+                pointHoverBorderWidth: 3
+              }]
+            },
+            options: {
+              responsive: true,
+              maintainAspectRatio: false,
+              animation: { duration: 1500, easing: 'easeInOutQuart' },
+              scales: {
+                r: {
+                  min: 0, max: 5, beginAtZero: true,
+                  ticks: { backdropColor: 'rgba(255, 255, 255, 0.9)', color: '#6B7280', stepSize: 1, callback: v => v + '/5' },
+                  grid: { color: 'rgba(0, 0, 0, 0.08)' },
+                  angleLines: { color: 'rgba(0, 0, 0, 0.1)' },
+                  pointLabels: { color: '#1F2937', font: { size: 13, weight: '600' }, padding: 10 }
+                }
+              },
+              plugins: {
+                legend: { display: false },
+                tooltip: {
+                  enabled: true,
+                  backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                  padding: 12,
+                  displayColors: false,
+                  callbacks: {
+                    label: function(context) {
+                      const score = context.parsed.r;
+                      const percentage = ((score / 5) * 100).toFixed(0);
+                      return [`Score: ${score.toFixed(2)}/5.0`, `Performance: ${percentage}%`];
+                    }
+                  }
+                }
+              }
+            }
+          });
+      } catch (e) {
+          console.error("Error parsing radar chart data:", e);
+      }
+    }
+
+    function animateProgressRing() {
+      const progressRing = document.getElementById('progressRing');
+      if (progressRing) {
+        const finalValue = progressRing.getAttribute('stroke-dasharray').split(',')[0];
+        progressRing.setAttribute('stroke-dasharray', '0, 100');
+        progressRing.style.transition = 'none';
+        setTimeout(() => {
+          progressRing.style.transition = 'stroke-dasharray 1.5s ease-out';
+          progressRing.setAttribute('stroke-dasharray', `${finalValue}, 100`);
+        }, 300);
+      }
+
+      document.querySelectorAll('.h-3.rounded-full.transition-all').forEach((bar, index) => {
+        const w = bar.style.width;
+        bar.style.width = '0%';
+        setTimeout(() => {
+          bar.style.transition = 'width 1.2s ease-out';
+          bar.style.width = w;
+        }, 500 + (index * 150));
+      });
+    }
+
+    function initResultsCharts() {
+      initRadarChart();
+      animateProgressRing();
+    }
+
+    // ── AI Document Panel ─────────────────────────────────────────────────
+    // Defined here (not in the swapped template) so it is always available
+    // regardless of whether HTMX re-executes inline scripts after a swap.
+    // URLs come from data-* attributes on #delivery-panel (set server-side).
+    let _aiPollGen = 0; // Incremented on each init to cancel stale polls.
+
+    function initAIPanel() {
+      const panel = document.getElementById('delivery-panel');
+      if (!panel) return;
+
+      const myGen = ++_aiPollGen;
+      const UPLOAD_URL  = panel.dataset.uploadUrl;
+      const ANALYZE_URL = panel.dataset.analyzeUrl;
+      const DOCS_URL    = panel.dataset.docsUrl;
+      const DEL_TPL     = panel.dataset.deleteTpl;
+      const csrf = () => document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+
+      let analysisComplete   = false;
+      let analysisInProgress = false;
+
+      function handleDeliveryDragOver(e) {
+        e.preventDefault();
+        document.getElementById('deliveryDropzone')?.classList.add('drag-over');
+      }
+      function handleDeliveryDragLeave(e) {
+        document.getElementById('deliveryDropzone')?.classList.remove('drag-over');
+      }
+      function handleDeliveryDrop(e) {
+        e.preventDefault();
+        document.getElementById('deliveryDropzone')?.classList.remove('drag-over');
+        uploadDeliveryFiles(e.dataTransfer.files);
+      }
+      function handleDeliveryFileSelect(e) {
+        uploadDeliveryFiles(e.target.files);
+        e.target.value = '';
+      }
+      function uploadDeliveryFiles(files) {
+        Array.from(files).forEach(f => uploadDeliveryFile(f));
+      }
+
+      async function uploadDeliveryFile(file) {
+        if (file.size > 10 * 1024 * 1024) { alert(`"${file.name}" is too large (max 10 MB).`); return; }
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('csrfmiddlewaretoken', csrf());
+        try {
+          const r = await fetch(UPLOAD_URL, { method: 'POST', body: fd });
+          const data = await r.json();
+          if (data.success) {
+            setTimeout(() => { if (_aiPollGen === myGen) loadDeliveryDocs(); }, 1200);
+            setTimeout(() => { if (_aiPollGen === myGen) loadDeliveryDocs(); }, 5000);
+          } else { alert(data.error || 'Upload failed.'); }
+        } catch (err) { alert('Upload error — please try again.'); }
+      }
+
+      async function loadDeliveryDocs() {
+        if (_aiPollGen !== myGen) return;
+        try {
+          const r = await fetch(DOCS_URL);
+          const data = await r.json();
+          if (data.success) renderDeliveryFileList(data.documents);
+        } catch (err) {}
+      }
+
+      function renderDeliveryFileList(docs) {
+        if (_aiPollGen !== myGen) return;
+        const list       = document.getElementById('deliveryFileList');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const submitBtn  = document.getElementById('submitBtn');
+        if (!list) return;
+        list.innerHTML = '';
+        let anyComplete = false;
+        docs.forEach(doc => {
+          const ready = doc.analysis_status === 'complete';
+          if (ready) anyComplete = true;
+          const statusHtml = ready
+            ? '<i class="fas fa-check-circle text-green-500"></i> Ready'
+            : '<i class="fas fa-spinner fa-spin text-indigo-400"></i> Processing…';
+          const div = document.createElement('div');
+          div.className = 'flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm';
+          div.innerHTML = `
+            <i class="fas fa-file-alt text-gray-400 shrink-0"></i>
+            <span class="flex-1 truncate font-medium text-gray-800" title="${esc(doc.original_filename)}">${esc(doc.original_filename)}</span>
+            <span class="text-xs text-gray-500 shrink-0">${fmtSize(doc.file_size)}</span>
+            <span class="flex items-center gap-1 text-xs text-gray-600 shrink-0">${statusHtml}</span>
+            <button type="button" onclick="deleteDeliveryDoc('${doc.id}')"
+                    class="text-gray-400 hover:text-red-500 transition ml-1 shrink-0" title="Remove">
+              <i class="fas fa-times"></i>
+            </button>`;
+          list.appendChild(div);
+        });
+        if (analyzeBtn) analyzeBtn.disabled = docs.length === 0 || analysisInProgress;
+
+        // A valid analysis exists only when at least one complete doc still has its scores stored.
+        const hasValidAnalysis = docs.some(
+          d => d.analysis_status === 'complete' && d.analysis_result && Object.keys(d.analysis_result || {}).length > 0
+        );
+
+        if (!hasValidAnalysis) {
+          // No valid analysis (new file added, file deleted, or never analysed yet).
+          // Clear any panels that may be visible from a previous run or server render.
+          document.querySelectorAll('.ai-result-panel').forEach(el => el.classList.add('hidden'));
+          document.querySelectorAll('.rating-group').forEach(el => el.classList.remove('ai-locked'));
+          document.getElementById('analysisDoneBadge')?.classList.add('hidden');
+          analysisComplete = false;
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = ''; submitBtn.style.pointerEvents = ''; }
+        } else if (anyComplete && !analysisComplete && !analysisInProgress) {
+          // Valid analysis found on first load — restore panels from stored results.
+          analysisComplete = true;
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = ''; submitBtn.style.pointerEvents = ''; }
+          const savedDoc = docs.find(d => d.analysis_result && Object.keys(d.analysis_result || {}).length > 0);
+          if (savedDoc) {
+            applyDeliveryScores(savedDoc.analysis_result);
+            document.getElementById('analysisDoneBadge')?.classList.remove('hidden');
+          }
+        }
+        if (docs.some(d => d.analysis_status === 'uploaded')) {
+          setTimeout(() => { if (_aiPollGen === myGen) loadDeliveryDocs(); }, 3500);
+        }
+      }
+
+      function fmtSize(b) {
+        if (b < 1024) return b + ' B';
+        if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+        return (b / 1048576).toFixed(1) + ' MB';
+      }
+      function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+      async function deleteDeliveryDoc(docId) {
+        const url = DEL_TPL.replace('00000000-0000-0000-0000-000000000000', docId);
+        try {
+          const r = await fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrf() } });
+          const data = await r.json();
+          if (data.success) loadDeliveryDocs();
+        } catch (err) {}
+      }
+
+      async function runDeliveryAnalysis() {
+        const btn    = document.getElementById('analyzeBtn');
+        const status = document.getElementById('analyzeStatus');
+        if (!btn || !status) return;
+        analysisInProgress = true;
+        btn.disabled = true;
+        document.getElementById('analysisDoneBadge')?.classList.add('hidden');
+        status.textContent = 'Analyzing documents with AI…';
+        status.className = 'text-sm text-indigo-700';
+        status.classList.remove('hidden');
+        try {
+          const r    = await fetch(ANALYZE_URL, { method: 'POST', headers: { 'X-CSRFToken': csrf() } });
+          const data = await r.json();
+          if (!r.ok || !data.success) {
+            status.textContent = data.error || 'Analysis failed. Please try again.';
+            status.className = 'text-sm text-red-600';
+            analysisInProgress = false;
+            btn.disabled = false;
+            return;
+          }
+          applyDeliveryScores(data.scores);
+          analysisComplete   = true;
+          analysisInProgress = false;
+          btn.disabled = false;
+          status.classList.add('hidden');
+          document.getElementById('analysisDoneBadge')?.classList.remove('hidden');
+          const submitBtn = document.getElementById('submitBtn');
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = ''; submitBtn.style.pointerEvents = ''; }
+        } catch (err) {
+          status.textContent = 'Connection error — please try again.';
+          status.className = 'text-sm text-red-600';
+          analysisInProgress = false;
+          btn.disabled = false;
+        }
+      }
+
+      function applyDeliveryScores(scores) {
+        Object.entries(scores).forEach(([idCode, result]) => {
+          const { score, reasoning, evidence, confidence } = result;
+          const radio = document.getElementById(`${idCode}_${score}`);
+          if (radio) radio.checked = true;
+          document.getElementById(`rating-group-${idCode}`)?.classList.add('ai-locked');
+          const aiPanel = document.getElementById(`ai-panel-${idCode}`);
+          if (aiPanel) {
+            const reasonEl = document.getElementById(`ai-reasoning-${idCode}`);
+            if (reasonEl) reasonEl.textContent = reasoning || '';
+            const evEl = document.getElementById(`ai-evidence-${idCode}`);
+            if (evEl) evEl.textContent = evidence && evidence !== 'No direct evidence found' ? `Evidence: "${evidence}"` : '';
+            const confEl = document.getElementById(`ai-confidence-${idCode}`);
+            if (confEl) {
+              confEl.textContent = confidence ? confidence.charAt(0).toUpperCase() + confidence.slice(1) + ' confidence' : '';
+              confEl.className = `text-xs font-semibold px-2 py-0.5 rounded-full confidence-${confidence || 'medium'}`;
+            }
+            aiPanel.classList.remove('hidden');
+          }
+        });
+      }
+
+      function overrideAiScore(fieldName) {
+        const group = document.getElementById(`rating-group-${fieldName}`);
+        const btn   = document.getElementById(`override-btn-${fieldName}`);
+        if (!group || !btn) return;
+        const isLocked = group.classList.contains('ai-locked');
+        group.classList.toggle('ai-locked', !isLocked);
+        btn.textContent = isLocked ? 'Re-lock AI score' : 'Override AI score';
+      }
+
+      window.handleDeliveryDragOver   = handleDeliveryDragOver;
+      window.handleDeliveryDragLeave  = handleDeliveryDragLeave;
+      window.handleDeliveryDrop       = handleDeliveryDrop;
+      window.handleDeliveryFileSelect = handleDeliveryFileSelect;
+      window.deleteDeliveryDoc        = deleteDeliveryDoc;
+      window.runDeliveryAnalysis      = runDeliveryAnalysis;
+      window.overrideAiScore          = overrideAiScore;
+
+      loadDeliveryDocs();
+    }
+
+    // Call on full page load (script is at end of <body> so DOM is ready).
+    initAIPanel();
+    initResultsCharts();
+
     // Re-initialize any charts after HTMX swaps content
     document.body.addEventListener('htmx:afterSwap', function(evt) {
-      // Scroll to top of page after content swap
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      
-      // Check if radar chart exists in the swapped content
-      const radarCanvas = document.getElementById('radar');
-      if (radarCanvas && typeof initRadarChart === 'function') {
-        // Small delay to ensure DOM is ready
-        setTimeout(function() {
-          initRadarChart();
-        }, 100);
-      }
+
+      // Re-init results charts (radar + score ring) on every HTMX navigation —
+      // always works since these are defined here in base.html, not in the
+      // swapped content. They no-op internally if the elements aren't present.
+      setTimeout(function() { initResultsCharts(); }, 100);
+
+      // Re-init AI panel on every HTMX navigation — always works since
+      // initAIPanel is defined here in base.html, not in the swapped content.
+      initAIPanel();
     });
 
     (function () {

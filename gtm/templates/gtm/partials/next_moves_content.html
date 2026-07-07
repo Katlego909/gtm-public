@@ -1,0 +1,44 @@
+{% if ai_playbook_html %}
+<div id="next-moves-body">
+  <div class="prose prose-base max-w-none
+              prose-headings:text-gray-900 prose-headings:font-bold prose-headings:text-lg prose-headings:mb-3 prose-headings:mt-6 first:prose-headings:mt-0
+              prose-p:text-gray-700 prose-p:text-base prose-p:leading-relaxed prose-p:my-3
+              prose-strong:text-indigo-700 prose-strong:font-semibold prose-strong:text-base
+              prose-ul:my-4 prose-ul:space-y-2.5 prose-ul:ml-6
+              prose-li:text-gray-700 prose-li:text-base prose-li:leading-relaxed prose-li:pl-2
+              prose-li:marker:text-indigo-500 prose-li:marker:font-bold">
+    {{ ai_playbook_html }}
+  </div>
+</div>
+{% elif failed %}
+<div id="next-moves-body">
+  <div class="prose prose-base max-w-none
+              prose-headings:text-gray-900 prose-headings:font-bold prose-headings:text-lg prose-headings:mb-3 prose-headings:mt-6 first:prose-headings:mt-0
+              prose-p:text-gray-700 prose-p:text-base prose-p:leading-relaxed prose-p:my-3
+              prose-strong:text-indigo-700 prose-strong:font-semibold prose-strong:text-base
+              prose-ul:my-4 prose-ul:space-y-2.5 prose-ul:ml-6
+              prose-li:text-gray-700 prose-li:text-base prose-li:leading-relaxed prose-li:pl-2
+              prose-li:marker:text-indigo-500 prose-li:marker:font-bold">
+    {{ band_actions_html|safe }}
+  </div>
+</div>
+{% else %}
+<div id="next-moves-body"
+     hx-get="{{ poll_url }}"
+     hx-trigger="every 4s"
+     hx-swap="outerHTML">
+  <div class="flex items-center gap-3 mb-5 p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-sm text-indigo-700">
+    <div class="animate-spin h-4 w-4 border-2 border-indigo-500 border-t-transparent rounded-full flex-shrink-0"></div>
+    <span>Personalising recommendations for {{ company_name|default:"your company" }}… This will update automatically.</span>
+  </div>
+  <div class="prose prose-base max-w-none
+              prose-headings:text-gray-900 prose-headings:font-bold prose-headings:text-lg prose-headings:mb-3 prose-headings:mt-6 first:prose-headings:mt-0
+              prose-p:text-gray-700 prose-p:text-base prose-p:leading-relaxed prose-p:my-3
+              prose-strong:text-indigo-700 prose-strong:font-semibold prose-strong:text-base
+              prose-ul:my-4 prose-ul:space-y-2.5 prose-ul:ml-6
+              prose-li:text-gray-700 prose-li:text-base prose-li:leading-relaxed prose-li:pl-2
+              prose-li:marker:text-indigo-500 prose-li:marker:font-bold">
+    {{ band_actions_html|safe }}
+  </div>
+</div>
+{% endif %}

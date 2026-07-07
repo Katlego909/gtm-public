@@ -176,36 +176,7 @@
             </div>
         </div>
 
-        {% if ai_playbook_html %}
-          <!-- AI-generated personalised content -->
-          <div class="prose prose-base max-w-none
-                      prose-headings:text-gray-900 prose-headings:font-bold prose-headings:text-lg prose-headings:mb-3 prose-headings:mt-6 first:prose-headings:mt-0
-                      prose-p:text-gray-700 prose-p:text-base prose-p:leading-relaxed prose-p:my-3
-                      prose-strong:text-indigo-700 prose-strong:font-semibold prose-strong:text-base
-                      prose-ul:my-4 prose-ul:space-y-2.5 prose-ul:ml-6
-                      prose-li:text-gray-700 prose-li:text-base prose-li:leading-relaxed prose-li:pl-2
-                      prose-li:marker:text-indigo-500 prose-li:marker:font-bold">
-            {{ ai_playbook_html }}
-          </div>
-        {% else %}
-          <!-- Generating banner shown while AI is working -->
-          {% if snap and snap.ai_playbook_status == "generating" or snap and snap.ai_playbook_status == "pending" %}
-          <div class="flex items-center gap-3 mb-5 p-3 bg-indigo-50 border border-indigo-100 rounded-xl text-sm text-indigo-700">
-            <div class="animate-spin h-4 w-4 border-2 border-indigo-500 border-t-transparent rounded-full flex-shrink-0"></div>
-            <span>Personalising recommendations for {{ session.company_name|default:"your company" }}… Refresh in a few moments to see your AI-generated plan.</span>
-          </div>
-          {% endif %}
-          <!-- Static band content as fallback -->
-          <div class="prose prose-base max-w-none
-                      prose-headings:text-gray-900 prose-headings:font-bold prose-headings:text-lg prose-headings:mb-3 prose-headings:mt-6 first:prose-headings:mt-0
-                      prose-p:text-gray-700 prose-p:text-base prose-p:leading-relaxed prose-p:my-3
-                      prose-strong:text-indigo-700 prose-strong:font-semibold prose-strong:text-base
-                      prose-ul:my-4 prose-ul:space-y-2.5 prose-ul:ml-6
-                      prose-li:text-gray-700 prose-li:text-base prose-li:leading-relaxed prose-li:pl-2
-                      prose-li:marker:text-indigo-500 prose-li:marker:font-bold">
-            {{ band_actions_html|safe }}
-          </div>
-        {% endif %}
+        {% include "gtm/partials/next_moves_content.html" with ai_playbook_html=ai_playbook_html band_actions_html=band_actions_html failed=next_moves_failed poll_url=next_moves_poll_url company_name=session.company_name %}
     </div>
 {% endif %}
 
@@ -407,7 +378,7 @@
     {% for q in weakest_questions %}
       <li class="border rounded-xl p-4 hover:shadow-lg transition">
         <div class="flex items-center justify-between mb-2">
-            <div class="font-medium text-lg text-indigo-700 break-words">{{ q.question.category.name }} â€¢ {{ q.question.id_code }}</div>
+            <div class="font-medium text-lg text-indigo-700 break-words">{{ q.question.category.name }}</div>
             <div class="text-xl font-semibold 
               {% if q.score <= 2 %}text-red-600
               {% elif q.score >= 4 %}text-green-600
@@ -426,7 +397,7 @@
               {% elif q.score == 3 %}bg-yellow-50 border-yellow-400
               {% else %}bg-red-50 border-red-500{% endif %}">
               <div class="flex items-center mb-1">
-                  <span class="text-lg mr-2" role="img" aria-label="lightbulb">ðŸ’¡</span>
+                  <span class="text-lg mr-2" role="img" aria-label="lightbulb">&#128161;</span>
                   <span class="font-semibold {% if q.score >= 4 %}text-green-700{% elif q.score == 3 %}text-yellow-700{% else %}text-red-700{% endif %}">
                     AI Insight:
                   </span>
@@ -457,7 +428,18 @@
 </div>
 
 <div class="mt-6 flex flex-col sm:flex-row gap-2 sm:gap-3 px-2 sm:px-0">
-    <a href="{% url 'dashboard' %}?agent_session={{ session.uuid }}" 
+    <a href="{% url 'gtm:assessment_step' session.uuid total_steps %}"
+       hx-get="{% url 'gtm:assessment_step' session.uuid total_steps %}"
+       hx-target="#main-content"
+       hx-select="#main-content"
+       hx-swap="innerHTML swap:200ms"
+       hx-push-url="true"
+       class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl border-2 border-gray-300 text-sm sm:text-base font-semibold hover:bg-gray-50 transition">
+      <i class="fas fa-arrow-left"></i>
+      <span>Back to Delivery</span>
+    </a>
+
+    <a href="{% url 'dashboard' %}?agent_session={{ session.uuid }}"
        hx-get="{% url 'dashboard' %}?agent_session={{ session.uuid }}" 
        hx-target="#main-content" 
        hx-select="#main-content"
@@ -481,23 +463,7 @@
     </a>
     
     <div id="playbook-footer-action" class="flex-1 sm:flex-none">
-        {% if snap and snap.ai_playbook %}
-            <a href="{% url 'gtm:playbook' session.uuid %}" 
-               hx-get="{% url 'gtm:playbook' session.uuid %}" 
-               hx-target="#main-content" 
-               hx-select="#main-content"
-               hx-swap="innerHTML swap:200ms" 
-               hx-push-url="true"
-               class="w-full inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-gray-900 text-white text-sm sm:text-base font-semibold hover:bg-gray-800 transition">View Playbook</a>
-        {% else %}
-          <div class="w-full inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-gray-200 text-gray-500 text-sm sm:text-base font-semibold cursor-wait">
-                <svg class="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24">
-                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-            Preparing... (status updates above)
-            </div>
-        {% endif %}
+        {% include "gtm/partials/playbook_footer_status.html" with session=session ready=snap.ai_playbook %}
     </div>
 
     <a href="{% url 'gtm:download' session.uuid %}" class="flex-1 sm:flex-none inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl border-2 border-gray-300 text-sm sm:text-base font-semibold hover:bg-gray-50 transition">
@@ -507,119 +473,9 @@
 </div>
 
 <script>
-  function initRadarChart() {
-    const radarCanvas = document.getElementById('radar');
-    if (!radarCanvas) return;
-
-    const labelsEl = document.getElementById('js-radar-labels');
-    const valuesEl = document.getElementById('js-radar-values');
-    if (!labelsEl || !valuesEl) return;
-
-    try {
-        const labels = JSON.parse(labelsEl.textContent);
-        const values = JSON.parse(valuesEl.textContent);
-        
-        const existingChart = Chart.getChart(radarCanvas);
-        if (existingChart) existingChart.destroy();
-        
-        new Chart(radarCanvas, {
-          type: 'radar',
-          data: {
-            labels: labels,
-            datasets: [{
-              label: 'Your GTM Performance',
-              data: values,
-              fill: true,
-              backgroundColor: 'rgba(79, 70, 229, 0.2)',
-              borderColor: '#4F46E5',
-              borderWidth: 3,
-              pointBackgroundColor: '#4F46E5',
-              pointBorderColor: '#fff',
-              pointBorderWidth: 2,
-              pointRadius: 6,
-              pointHoverRadius: 8,
-              pointHoverBackgroundColor: '#fff',
-              pointHoverBorderColor: '#4F46E5',
-              pointHoverBorderWidth: 3
-            }]
-          },
-          options: { 
-            responsive: true, 
-            maintainAspectRatio: false,
-            animation: { duration: 1500, easing: 'easeInOutQuart' },
-            scales: { 
-              r: { 
-                min: 0, max: 5, beginAtZero: true,
-                ticks: { backdropColor: 'rgba(255, 255, 255, 0.9)', color: '#6B7280', stepSize: 1, callback: v => v + '/5' },
-                grid: { color: 'rgba(0, 0, 0, 0.08)' },
-                angleLines: { color: 'rgba(0, 0, 0, 0.1)' },
-                pointLabels: { color: '#1F2937', font: { size: 13, weight: '600' }, padding: 10 }
-              } 
-            },
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                enabled: true,
-                backgroundColor: 'rgba(17, 24, 39, 0.95)',
-                padding: 12,
-                displayColors: false,
-                callbacks: {
-                  label: function(context) {
-                    const score = context.parsed.r;
-                    const percentage = ((score / 5) * 100).toFixed(0);
-                    return [`Score: ${score.toFixed(2)}/5.0`, `Performance: ${percentage}%`];
-                  }
-                }
-              }
-            }
-          }
-        });
-    } catch (e) {
-        console.error("Error parsing radar chart data:", e);
-    }
-  }
-
-  function animateProgress() {
-    // Circle progress
-    const progressRing = document.getElementById('progressRing');
-    if (progressRing) {
-      const finalValue = progressRing.getAttribute('stroke-dasharray').split(',')[0];
-      progressRing.setAttribute('stroke-dasharray', '0, 100');
-      setTimeout(() => {
-        progressRing.style.transition = 'stroke-dasharray 1.5s ease-out';
-        progressRing.setAttribute('stroke-dasharray', `${finalValue}, 100`);
-      }, 300);
-    }
-
-    // Horizontal bars
-    document.querySelectorAll('.h-3.rounded-full.transition-all').forEach((bar, index) => {
-      const w = bar.style.width;
-      bar.style.width = '0%';
-      setTimeout(() => {
-        bar.style.transition = 'width 1.2s ease-out';
-        bar.style.width = w;
-      }, 500 + (index * 150));
-    });
-  }
-
-  function initResultsPage() {
-    initRadarChart();
-    animateProgress();
-  }
-
-  // Handle both initial load and HTMX swaps
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initResultsPage);
-  } else {
-    initResultsPage();
-  }
-
-  // HTMX Cleanup & Re-init
-  document.addEventListener('htmx:afterSwap', function(evt) {
-    if (evt.detail.target.id === 'main-content') {
-      initResultsPage();
-    }
-  });
+  // Radar chart + score ring init now lives permanently in base.html
+  // (initResultsCharts), since HTMX innerHTML swaps don't reliably
+  // re-execute inline <script> tags from this template.
 
   // Copy buttons
   document.querySelectorAll('.copy-action').forEach(btn => {
