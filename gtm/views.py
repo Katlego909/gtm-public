@@ -9,7 +9,7 @@ from datetime import datetime
 from django.utils import timezone
 from datetime import timedelta
 from django.contrib import messages
-from .models import AssessmentSession, Question, Response, Category, RecommendationBand, ActionItem, ToolRecommendation, ResultSnapshot
+from .models import AssessmentSession, Question, Response, Category, RecommendationBand, ActionItem, ToolRecommendation, ResultSnapshot, DeliveryDocument, CategoryDocument
 from django.utils.safestring import mark_safe
 import markdown as md
 import math
@@ -37,6 +37,7 @@ from .ai_services import (
     generate_diagnostic_insights_batch,
     _normalize_ai_playbook_markdown,
     rewrite_context_note_with_ai,
+    ENRICHMENT_UNAVAILABLE,
 )
 from .forms import StartAssessmentForm # Added import
 from .services import (_expand_gtm_jargon, _build_question_guidance, _kickoff_playbook_generation, _log_access_denied, safe_get_session_or_403, _format_band_actions_markdown, _paginated_questions, _category_step_map, _first_incomplete_step, _compute_scores, _band_for_score, _is_session_complete, _save_snapshot)
@@ -220,6 +221,33 @@ def start_assessment(request):
 
 
 @login_required
+def edit_assessment_intro(request, session_id):
+    """Lets the user revisit and update company/contact details (the 'Start Assessment'
+    info) from within an in-progress assessment, then return to step 1."""
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        messages.error(request, "Access denied.")
+        return redirect("gtm:history")
+
+    if request.method == "POST":
+        original_referrer = session.referrer
+        form = StartAssessmentForm(request.POST, instance=session)
+        if form.is_valid():
+            updated_session = form.save(commit=False)
+            updated_session.referrer = original_referrer
+            updated_session.save()
+            return redirect("gtm:assessment_step", session_id=session.uuid, step=1)
+    else:
+        form = StartAssessmentForm(instance=session)
+
+    return render(request, "gtm/start.html", {
+        "form": form,
+        "edit_session": session,
+        "is_htmx": _is_htmx(request),
+    })
+
+
+@login_required
 def resume_assessment(request, session_id):
     session, is_authorized = safe_get_session_or_403(request, session_id)
     if not is_authorized:
@@ -328,6 +356,44 @@ def assessment_step(request, session_id, step: int):
     progress_pct = int((step - 1) / total_steps * 100)
     legend_html = "<br>".join([f"<b>{k}</b>: {v}" for k, v in LEGEND.items()])
 
+    # Build per-step AI document analysis URLs
+    from django.urls import reverse as _reverse
+    is_delivery_step = (step == total_steps)
+    category_slug = (questions[0].category.name.lower() if questions else '')
+
+    if is_delivery_step:
+        ai_upload_url  = _reverse('gtm:upload_delivery_document',  kwargs={'session_id': session.uuid})
+        ai_analyze_url = _reverse('gtm:analyze_delivery_documents', kwargs={'session_id': session.uuid})
+        ai_docs_url    = _reverse('gtm:get_delivery_documents',     kwargs={'session_id': session.uuid})
+        ai_delete_tpl  = _reverse('gtm:delete_delivery_document',  kwargs={'session_id': session.uuid, 'doc_id': '00000000-0000-0000-0000-000000000000'})
+    else:
+        ai_upload_url  = _reverse('gtm:upload_category_document',   kwargs={'session_id': session.uuid, 'category': category_slug})
+        ai_analyze_url = _reverse('gtm:analyze_category_documents', kwargs={'session_id': session.uuid, 'category': category_slug})
+        ai_docs_url    = _reverse('gtm:get_category_documents',     kwargs={'session_id': session.uuid, 'category': category_slug})
+        ai_delete_tpl  = _reverse('gtm:delete_category_document',  kwargs={'session_id': session.uuid, 'category': category_slug, 'doc_id': '00000000-0000-0000-0000-000000000000'})
+
+    category_label = questions[0].category.name if questions else ''
+    ai_panel_description = {
+        'demand': 'Upload marketing plans, ICP docs, channel reports, attribution data, and CRM exports. AI will propose scores based on what it finds.',
+        'conversion': 'Upload CRM pipeline reports, sales playbooks, win/loss data, and conversion analytics. AI will propose scores based on what it finds.',
+        'delivery': 'Upload documents and let AI propose scores based on real evidence. Review and override before finishing.',
+    }.get(category_slug, 'Upload documents and let AI propose scores based on real evidence. Review and override before finishing.')
+
+    # Load any previously stored analysis so the AI panels survive navigation.
+    prefilled_analysis = {}
+    if is_delivery_step:
+        completed = DeliveryDocument.objects.filter(
+            session=session, analysis_status='complete'
+        ).exclude(analysis_result={}).first()
+        if completed:
+            prefilled_analysis = completed.analysis_result
+    elif category_slug:
+        completed = CategoryDocument.objects.filter(
+            session=session, category=category_slug, analysis_status='complete'
+        ).exclude(analysis_result={}).first()
+        if completed:
+            prefilled_analysis = completed.analysis_result
+
     return render(request, "gtm/assessment_step.html", {
         "session": session, "form": form, "step": step, "total_steps": total_steps,
         "progress_pct": progress_pct, "legend": mark_safe(legend_html),
@@ -335,6 +401,15 @@ def assessment_step(request, session_id, step: int):
         "is_htmx": _is_htmx(request),
         "context_fields": context_fields,
         "question_guidance": question_guidance,
+        "is_delivery_step": is_delivery_step,
+        "is_ai_step": True,
+        "ai_upload_url": ai_upload_url,
+        "ai_analyze_url": ai_analyze_url,
+        "ai_docs_url": ai_docs_url,
+        "ai_delete_tpl": ai_delete_tpl,
+        "ai_category_label": category_label,
+        "ai_panel_description": ai_panel_description,
+        "prefilled_analysis": prefilled_analysis,
     })
 
 
@@ -421,6 +496,14 @@ def results(request, session_id):
 
     labels = [c["category"].name for c in cat_scores]
     values = [round(c["avg"], 2) for c in cat_scores]
+
+    # ── Scoring engine: opportunity ranking + pattern detection ──────────────
+    from .scoring_engine import build_recommendation_context
+    _q_scores = {
+        r.question.id_code: r.score
+        for r in Response.objects.filter(session=session).select_related("question")
+    }
+    scoring_context = build_recommendation_context(_q_scores) if _q_scores else {}
 
     # -----------------------------
     # 🧩 Tool Recommendations Logic (Optimized to prevent N+1)
@@ -545,14 +628,35 @@ def results(request, session_id):
     # -----------------------------
     # 🤖 Trigger AI playbook generation in background (non-blocking)
     # -----------------------------
-    if snap and not (snap.ai_playbook or "").strip():
+    playbook_raw = (snap.ai_playbook or "").strip() if snap else ""
+    # The final fallback stored when Gemini fails — treat as if no playbook exists
+    is_generic_fallback = playbook_raw.startswith("No AI-generated playbook available yet.")
+
+    if snap and (not playbook_raw or is_generic_fallback):
+        if is_generic_fallback:
+            snap.ai_playbook = ""
+            snap.ai_playbook_status = "pending"
+            snap.save(update_fields=["ai_playbook", "ai_playbook_status"])
         _kickoff_playbook_generation(snap, session_id=session.uuid)
+
+    # Render AI playbook HTML for the "Recommended Next Moves" card
+    ai_playbook_html = ""
+    if snap and playbook_raw and not is_generic_fallback:
+        src = _normalize_ai_playbook_markdown(snap.ai_playbook)
+        ai_playbook_html = mark_safe(md.markdown(src, extensions=["extra", "sane_lists"]))
+
+    from django.urls import reverse as _reverse
+    next_moves_poll_url = _reverse("gtm:next_moves_content", kwargs={"session_id": session.uuid})
+    snap_status = getattr(snap, "ai_playbook_status", "pending") if snap else "pending"
+    total_steps = len(_paginated_questions())
 
     return render(request, "gtm/results.html", {
         "session": session,
+        "total_steps": total_steps,
         "overall": round(overall, 1),
         "band": band,
         "band_actions_html": band_actions_html,
+        "ai_playbook_html": ai_playbook_html,
         "cat_scores": cat_scores,
         "labels": labels,
         "values": values,
@@ -560,8 +664,11 @@ def results(request, session_id):
         "focus_categories": focus_categories,
         "weakest_questions": weakest_questions,
         "recommendations": recommendations,
+        "scoring_context": scoring_context,
         "is_htmx": _is_htmx(request),
         "snap": snap,
+        "next_moves_poll_url": next_moves_poll_url,
+        "next_moves_failed": snap_status == "failed" or is_generic_fallback,
     })
 
 def playbook_status(request, session_id):
@@ -589,6 +696,99 @@ def playbook_status(request, session_id):
 
     # Still generating. Return the loading state.
     return render(request, "gtm/partials/playbook_loading_button.html", {"session": session})
+
+
+def playbook_footer_status(request, session_id):
+    """HTMX polling endpoint for the footer 'View Playbook / Preparing' button on the results page."""
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Access denied.")
+    snap = getattr(session, "snapshot", None) or ResultSnapshot.objects.filter(session=session).first()
+    ready = bool(snap and (snap.ai_playbook or "").strip())
+    return render(request, "gtm/partials/playbook_footer_status.html", {
+        "session": session,
+        "ready": ready,
+    })
+
+
+def next_moves_content(request, session_id):
+    """HTMX polling endpoint for the Recommended Next Moves section on the results page."""
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        from django.http import HttpResponseForbidden
+        return HttpResponseForbidden("Access denied.")
+
+    snap = getattr(session, "snapshot", None) or ResultSnapshot.objects.filter(session=session).first()
+    band = getattr(session, "band", None) or (snap.band if snap and snap.band_id else None)
+    band_actions_html = _format_band_actions_markdown(getattr(band, "actions_markdown", "") if band else "")
+
+    playbook_raw = (snap.ai_playbook or "").strip() if snap else ""
+    is_generic_fallback = playbook_raw.startswith("No AI-generated playbook available yet.")
+    snap_status = getattr(snap, "ai_playbook_status", "pending") if snap else "pending"
+
+    ai_playbook_html = ""
+    if snap and playbook_raw and not is_generic_fallback:
+        src = _normalize_ai_playbook_markdown(snap.ai_playbook)
+        ai_playbook_html = mark_safe(md.markdown(src, extensions=["extra", "sane_lists"]))
+
+    from django.urls import reverse as _reverse
+    poll_url = _reverse("gtm:next_moves_content", kwargs={"session_id": session.uuid})
+
+    return render(request, "gtm/partials/next_moves_content.html", {
+        "ai_playbook_html": ai_playbook_html,
+        "band_actions_html": band_actions_html,
+        "failed": snap_status == "failed" or is_generic_fallback,
+        "poll_url": poll_url,
+        "company_name": session.company_name or "your company",
+    })
+
+
+def enrichment_status(request, session_id):
+    """HTMX polling endpoint: triggers and returns financial + competitor sections."""
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        return HttpResponse("")
+
+    snap = getattr(session, "snapshot", None) or ResultSnapshot.objects.filter(session=session).first()
+    if not snap:
+        return HttpResponse("")
+
+    if not snap.ai_financial_summary or not snap.ai_competitor_analysis:
+        from .ai_services import generate_enrichment_sections
+        import threading
+        def _run(snap_id):
+            from django.db import connection
+            try:
+                from .models import ResultSnapshot as RS
+                s = RS.objects.get(id=snap_id)
+                generate_enrichment_sections(s)
+            finally:
+                connection.close()
+        threading.Thread(target=_run, args=(snap.id,), daemon=True).start()
+        snap.refresh_from_db()
+
+    fin_html = comp_html = ""
+    fin_failed = (snap.ai_financial_summary == ENRICHMENT_UNAVAILABLE)
+    comp_failed = (snap.ai_competitor_analysis == ENRICHMENT_UNAVAILABLE)
+
+    if snap.ai_financial_summary and not fin_failed:
+        fin_html = mark_safe(md.markdown(_normalize_ai_playbook_markdown(snap.ai_financial_summary), extensions=["extra", "sane_lists"]))
+    if snap.ai_competitor_analysis and not comp_failed:
+        comp_html = mark_safe(md.markdown(_normalize_ai_playbook_markdown(snap.ai_competitor_analysis), extensions=["extra", "sane_lists"]))
+
+    # still_loading is True only while fields are genuinely empty (never attempted).
+    # A sentinel value counts as "done" so the HTMX poll stops.
+    still_loading = not (snap.ai_financial_summary and snap.ai_competitor_analysis)
+
+    return render(request, "gtm/partials/enrichment_sections.html", {
+        "session": session,
+        "fin_html": fin_html,
+        "comp_html": comp_html,
+        "fin_failed": fin_failed,
+        "comp_failed": comp_failed,
+        "still_loading": still_loading,
+    })
 
 
 def playbook_content_status(request, session_id):
@@ -626,6 +826,7 @@ def playbook_content_status(request, session_id):
             "ai_playbook_html": mark_safe(ai_playbook_html),
             "ai_financial_html": mark_safe(ai_financial_html),
             "ai_competitor_html": mark_safe(ai_competitor_html),
+            "enrichment_loading": not (snap.ai_financial_summary and snap.ai_competitor_analysis),
         })
 
     snap_status = getattr(snap, "ai_playbook_status", "pending") if snap else "pending"
@@ -658,6 +859,73 @@ def playbook(request, session_id):
     band_actions_html = _format_band_actions_markdown(
         getattr(band, "actions_markdown", "") if band else ""
     )
+
+    # Scoring engine context for company-specific next moves bullets
+    from .scoring_engine import build_recommendation_context
+    _q_scores = {
+        r.question.id_code: r.score
+        for r in Response.objects.filter(session=session).select_related("question")
+    }
+    scoring_context = build_recommendation_context(_q_scores) if _q_scores else {}
+
+    # Build short action bullets from pattern quick_wins (split into sentences)
+    import re as _re
+    _next_moves = []
+    for _pat in scoring_context.get("patterns", []):
+        _qw = (_pat.get("quick_win") or "").strip()
+        _sentences = [s.strip() for s in _re.split(r'(?<=[.!?])\s+', _qw) if s.strip()]
+        _next_moves.extend(_sentences[:2])
+    next_move_bullets = _next_moves[:6]
+
+    # Tool recommendations for the 2 weakest categories — flatten into bullet strings
+    _weak_cat_ids = [c["category"].id for c in cat_sorted[:2]]
+    _tool_recs = ToolRecommendation.objects.filter(category__id__in=_weak_cat_ids).select_related("category")[:5]
+    playbook_tool_recs = [
+        f"{_tr.tools} — {_tr.description}".strip(" —") if _tr.description else _tr.tools
+        for _tr in _tool_recs if _tr.tools
+    ]
+
+    # Auto-populate task list on first visit (no tasks yet)
+    # 90% from AI playbook via Gemini extraction, 10% from scoring engine quick_win
+    if scoring_context and not session.actions.exists():
+        from .ai_services import extract_tasks_from_playbook
+        _snap_for_tasks = getattr(session, "snapshot", None) or ResultSnapshot.objects.filter(session=session).first()
+        _playbook_text = (_snap_for_tasks.ai_playbook or "").strip() if _snap_for_tasks else ""
+        _company = session.company_name or "your company"
+        _patterns = scoring_context.get("patterns", [])
+        _severity_days = {"Critical": 14, "High": 28, "Medium": 42}
+        _tasks_to_create = []
+
+        # Try 90%: extract ~4 tasks from AI playbook
+        _ai_tasks = extract_tasks_from_playbook(_playbook_text, _company, n=4) if _playbook_text else []
+
+        if _ai_tasks:
+            _default_due = timezone.now().date() + timedelta(days=21)
+            for _t in _ai_tasks:
+                _tasks_to_create.append(ActionItem(session=session, note=_t, status="todo", due_date=_default_due))
+            # 10%: first quick_win sentence from highest-severity pattern
+            if _patterns:
+                _top_pat = _patterns[0]
+                _qw = (_top_pat.get("quick_win") or "").strip()
+                _first = _re.split(r'(?<=[.!?])\s+', _qw)[0].strip() if _qw else ""
+                _due = timezone.now().date() + timedelta(days=_severity_days.get(_top_pat["severity"], 28))
+                _first_words = set(_first.lower().split()) if _first else set()
+                _too_similar = any(
+                    len(_first_words & set(_t.lower().split())) / max(len(_first_words), 1) > 0.6
+                    for _t in _ai_tasks
+                )
+                if _first and len(_first) <= 240 and not _too_similar:
+                    _tasks_to_create.append(ActionItem(session=session, note=_first, status="todo", due_date=_due))
+        else:
+            # Fallback: all scoring engine quick_win sentences
+            for _pat in _patterns:
+                _due = timezone.now().date() + timedelta(days=_severity_days.get(_pat["severity"], 28))
+                _qw = (_pat.get("quick_win") or "").strip()
+                for _s in [s.strip() for s in _re.split(r'(?<=[.!?])\s+', _qw) if s.strip()]:
+                    if len(_s) <= 240:
+                        _tasks_to_create.append(ActionItem(session=session, note=_s, status="todo", due_date=_due))
+
+        ActionItem.objects.bulk_create(_tasks_to_create)
 
     # -----------------------------
     # 🤖 AI Playbook Rendering (+ optional lazy-generate)
@@ -716,6 +984,9 @@ def playbook(request, session_id):
         "cat_scores": cat_scores,
         "cat_sorted": cat_sorted,
         "band_actions_html": band_actions_html,
+        "scoring_context": scoring_context,
+        "next_move_bullets": next_move_bullets,
+        "playbook_tool_recs": playbook_tool_recs,
         "ai_playbook_html": mark_safe(ai_playbook_html),
         "ai_financial_html": mark_safe(ai_financial_html),
         "ai_competitor_html": mark_safe(ai_competitor_html),
@@ -890,6 +1161,310 @@ def upload_strategic_evidence(request, session_id):
     except Exception as e:
         log_error("Evidence Upload Failure", e)
         return JsonResponse({"success": False, "error": "Could not upload file."}, status=500)
+
+@login_required
+@require_POST
+def upload_delivery_document(request, session_id):
+    """Upload a document for the Delivery step AI analysis. Text extraction runs async."""
+    import os as _os
+
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        return JsonResponse({"success": False, "error": "Access denied."}, status=403)
+
+    if 'file' not in request.FILES:
+        return JsonResponse({"success": False, "error": "No file provided."}, status=400)
+
+    uploaded = request.FILES['file']
+
+    if uploaded.size > 10 * 1024 * 1024:
+        return JsonResponse({"success": False, "error": "File too large (max 10 MB)."}, status=400)
+
+    ext_map = {
+        '.csv': 'csv', '.xlsx': 'xlsx', '.xls': 'xlsx',
+        '.pdf': 'pdf', '.docx': 'docx', '.doc': 'docx',
+        '.txt': 'txt', '.md': 'txt', '.log': 'txt',
+        '.json': 'json',
+        '.png': 'image', '.jpg': 'image', '.jpeg': 'image', '.webp': 'image',
+    }
+    ext = _os.path.splitext(uploaded.name.lower())[1]
+    file_type = ext_map.get(ext, 'other')
+
+    doc = DeliveryDocument.objects.create(
+        session=session,
+        file=uploaded,
+        original_filename=uploaded.name,
+        file_size=uploaded.size,
+        file_type=file_type,
+        analysis_status='uploaded',
+    )
+
+    # New file means any prior analysis is stale — clear it so the server
+    # doesn't serve old results on the next page load.
+    DeliveryDocument.objects.filter(session=session, analysis_status='complete').exclude(id=doc.id).update(
+        analysis_result={}
+    )
+
+    def _extract_in_background(doc_id, ftype):
+        try:
+            from .delivery_analyzer import extract_text_from_path
+            from .ai_services import _get_client
+            d = DeliveryDocument.objects.get(id=doc_id)
+            client = _get_client() if ftype == 'image' else None
+            text = extract_text_from_path(d.file.path, ftype, client, "gemini-2.5-flash")
+            d.extracted_text = text
+            d.save(update_fields=['extracted_text'])
+        except Exception as exc:
+            log_error("DeliveryDoc background extraction", exc)
+
+    from threading import Thread
+    Thread(target=_extract_in_background, args=(str(doc.id), file_type), daemon=True).start()
+
+    return JsonResponse({
+        "success": True,
+        "doc_id": str(doc.id),
+        "filename": doc.original_filename,
+        "file_type": file_type,
+        "file_size": doc.file_size,
+    })
+
+
+@login_required
+@require_POST
+def analyze_delivery_documents(request, session_id):
+    """Run Gemini analysis on all uploaded delivery documents and return per-question scores."""
+    from .delivery_analyzer import analyze_delivery_documents as _run_analysis
+
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        return JsonResponse({"success": False, "error": "Access denied."}, status=403)
+
+    docs = DeliveryDocument.objects.filter(session=session)
+    if not docs.exists():
+        return JsonResponse({"success": False, "error": "No documents uploaded yet."}, status=400)
+
+    docs_with_text = docs.filter(extracted_text__gt='')
+    if not docs_with_text.exists():
+        return JsonResponse(
+            {"success": False, "error": "Documents are still being processed. Please wait a moment and try again."},
+            status=400,
+        )
+
+    result = _run_analysis(session)
+    if not result or "_error" in result:
+        error_detail = result.get("_error", "") if result else ""
+        return JsonResponse(
+            {"success": False, "error": f"Analysis failed: {error_detail}" if error_detail else "Could not analyse documents. Please try again."},
+            status=500,
+        )
+
+    docs_with_text.update(analysis_status='complete', analysis_result=result)
+
+    return JsonResponse({"success": True, "scores": result})
+
+
+@login_required
+def get_delivery_documents(request, session_id):
+    """Return the list of uploaded delivery documents for this session (GET)."""
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        return JsonResponse({"success": False, "error": "Access denied."}, status=403)
+
+    docs = list(
+        DeliveryDocument.objects.filter(session=session).values(
+            'id', 'original_filename', 'file_size', 'file_type', 'analysis_status',
+            'analysis_result',
+        )
+    )
+    for d in docs:
+        d['id'] = str(d['id'])
+        if d['analysis_status'] != 'complete':
+            d.pop('analysis_result', None)
+
+    return JsonResponse({"success": True, "documents": docs})
+
+
+@login_required
+@require_POST
+def delete_delivery_document(request, session_id, doc_id):
+    """Delete a previously uploaded delivery document."""
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        return JsonResponse({"success": False, "error": "Access denied."}, status=403)
+
+    doc = get_object_or_404(DeliveryDocument, id=doc_id, session=session)
+    try:
+        doc.file.delete(save=False)
+    except Exception:
+        pass
+    doc.delete()
+    # File removed means prior analysis is stale — clear it from remaining docs.
+    DeliveryDocument.objects.filter(session=session, analysis_status='complete').update(
+        analysis_result={}
+    )
+    return JsonResponse({"success": True})
+
+
+# ---------------------------------------------------------------------------
+# Generic Category Document Analysis (Demand / Conversion)
+# ---------------------------------------------------------------------------
+
+_VALID_CATEGORIES = {'demand', 'conversion'}
+
+_CATEGORY_EXT_MAP = {
+    '.csv': 'csv', '.xlsx': 'xlsx', '.xls': 'xlsx',
+    '.pdf': 'pdf', '.docx': 'docx', '.doc': 'docx',
+    '.txt': 'txt', '.md': 'txt', '.log': 'txt',
+    '.json': 'json',
+    '.png': 'image', '.jpg': 'image', '.jpeg': 'image', '.webp': 'image',
+}
+
+
+@login_required
+@require_POST
+def upload_category_document(request, session_id, category):
+    """Upload a document for Demand or Conversion AI analysis. Text extraction runs async."""
+    import os as _os
+
+    if category not in _VALID_CATEGORIES:
+        return JsonResponse({"success": False, "error": "Invalid category."}, status=400)
+
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        return JsonResponse({"success": False, "error": "Access denied."}, status=403)
+
+    if 'file' not in request.FILES:
+        return JsonResponse({"success": False, "error": "No file provided."}, status=400)
+
+    uploaded = request.FILES['file']
+    if uploaded.size > 10 * 1024 * 1024:
+        return JsonResponse({"success": False, "error": "File too large (max 10 MB)."}, status=400)
+
+    ext = _os.path.splitext(uploaded.name.lower())[1]
+    file_type = _CATEGORY_EXT_MAP.get(ext, 'other')
+
+    doc = CategoryDocument.objects.create(
+        session=session,
+        category=category,
+        file=uploaded,
+        original_filename=uploaded.name,
+        file_size=uploaded.size,
+        file_type=file_type,
+        analysis_status='uploaded',
+    )
+
+    # New file means any prior analysis is stale — clear it so the server
+    # doesn't serve old results on the next page load.
+    CategoryDocument.objects.filter(
+        session=session, category=category, analysis_status='complete'
+    ).exclude(id=doc.id).update(analysis_result={})
+
+    def _extract_in_background(doc_id, ftype):
+        try:
+            from .delivery_analyzer import extract_text_from_path
+            from .ai_services import _get_client
+            d = CategoryDocument.objects.get(id=doc_id)
+            client = _get_client() if ftype == 'image' else None
+            text = extract_text_from_path(d.file.path, ftype, client, "gemini-2.5-flash")
+            d.extracted_text = text
+            d.save(update_fields=['extracted_text'])
+        except Exception as exc:
+            log_error("CategoryDoc background extraction", exc)
+
+    from threading import Thread
+    Thread(target=_extract_in_background, args=(str(doc.id), file_type), daemon=True).start()
+
+    return JsonResponse({
+        "success": True,
+        "doc_id": str(doc.id),
+        "filename": doc.original_filename,
+        "file_type": file_type,
+        "file_size": doc.file_size,
+    })
+
+
+@login_required
+@require_POST
+def analyze_category_documents(request, session_id, category):
+    """Run Gemini analysis on uploaded documents for a Demand or Conversion step."""
+    if category not in _VALID_CATEGORIES:
+        return JsonResponse({"success": False, "error": "Invalid category."}, status=400)
+
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        return JsonResponse({"success": False, "error": "Access denied."}, status=403)
+
+    docs = CategoryDocument.objects.filter(session=session, category=category)
+    if not docs.exists():
+        return JsonResponse({"success": False, "error": "No documents uploaded yet."}, status=400)
+
+    docs_with_text = docs.filter(extracted_text__gt='')
+    if not docs_with_text.exists():
+        return JsonResponse(
+            {"success": False, "error": "Documents are still being processed. Please wait a moment and try again."},
+            status=400,
+        )
+
+    from .category_analyzer import analyze_category_documents as _run_analysis
+    result = _run_analysis(session, category)
+    if not result or "_error" in result:
+        error_detail = result.get("_error", "") if result else ""
+        return JsonResponse(
+            {"success": False, "error": f"Analysis failed: {error_detail}" if error_detail else "Could not analyse documents. Please try again."},
+            status=500,
+        )
+
+    docs_with_text.update(analysis_status='complete', analysis_result=result)
+    return JsonResponse({"success": True, "scores": result})
+
+
+@login_required
+def get_category_documents(request, session_id, category):
+    """Return uploaded category documents for this session (GET)."""
+    if category not in _VALID_CATEGORIES:
+        return JsonResponse({"success": False, "error": "Invalid category."}, status=400)
+
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        return JsonResponse({"success": False, "error": "Access denied."}, status=403)
+
+    docs = list(
+        CategoryDocument.objects.filter(session=session, category=category).values(
+            'id', 'original_filename', 'file_size', 'file_type', 'analysis_status',
+            'analysis_result',
+        )
+    )
+    for d in docs:
+        d['id'] = str(d['id'])
+        if d['analysis_status'] != 'complete':
+            d.pop('analysis_result', None)
+
+    return JsonResponse({"success": True, "documents": docs})
+
+
+@login_required
+@require_POST
+def delete_category_document(request, session_id, category, doc_id):
+    """Delete a previously uploaded category document."""
+    if category not in _VALID_CATEGORIES:
+        return JsonResponse({"success": False, "error": "Invalid category."}, status=400)
+
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
+        return JsonResponse({"success": False, "error": "Access denied."}, status=403)
+
+    doc = get_object_or_404(CategoryDocument, id=doc_id, session=session, category=category)
+    try:
+        doc.file.delete(save=False)
+    except Exception:
+        pass
+    doc.delete()
+    # File removed means prior analysis is stale — clear it from remaining docs.
+    CategoryDocument.objects.filter(
+        session=session, category=category, analysis_status='complete'
+    ).update(analysis_result={})
+    return JsonResponse({"success": True})
+
 
 @require_POST
 @require_session_ownership

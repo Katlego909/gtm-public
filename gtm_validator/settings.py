@@ -187,6 +187,18 @@ if GOOGLE_APPLICATION_CREDENTIALS and not os.environ.get("GOOGLE_APPLICATION_CRE
     if creds_path.exists():
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = str(creds_path)
 
+# Auto-read project ID from service account JSON if env var is missing or still the placeholder
+if not GCP_PROJECT_ID or GCP_PROJECT_ID == "your-gcp-project-id":
+    _creds_file = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "")
+    if _creds_file:
+        try:
+            import json as _json
+            with open(_creds_file) as _f:
+                _sa = _json.load(_f)
+            GCP_PROJECT_ID = _sa.get("project_id", "") or GCP_PROJECT_ID
+        except Exception:
+            pass
+
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
     'allauth.account.auth_backends.AuthenticationBackend',

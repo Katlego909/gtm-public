@@ -16,8 +16,7 @@ from .models import ResultSnapshot, RecommendationBand, AssessmentSession, Quest
 from .utils_logging import log_ai_error
 import re
 import json
-import markdown as md
-from django.utils.safestring import mark_safe
+from .scoring_engine import build_recommendation_context
 
 logger = logging.getLogger(__name__)
 
@@ -330,82 +329,272 @@ def _get_client():
 # PROMPT GENERATOR
 # ================================================================
 def _build_prompt(snapshot: ResultSnapshot) -> str:
-    """Create a structured prompt for AI to generate a personalized GTM playbook."""
-    data = {
-        "company_name": snapshot.company_name or "Unnamed Company",
-        "industry": snapshot.industry or "Unknown Industry",
-        "company_size": snapshot.company_size or "Not specified",
-        "revenue_range": snapshot.revenue_range or "Not specified",
-        "country": snapshot.country or "Not specified",
-        "crm": snapshot.crm or "Not specified",
-        "overall": snapshot.overall,
-        "stage": snapshot.band.stage if snapshot.band else "Unspecified",
-        "headline": snapshot.band.headline if snapshot.band else "",
-        "categories": snapshot.category_breakdown or [],
-    }
+    """
+    Build a constrained, structured prompt for Gemini.
 
-    cat_lines = "\n".join(
-        [f"- {c['category']}: {c['avg']}/5" for c in data["categories"]]
-    )
+    The scoring engine (scoring_engine.py) runs first and identifies:
+      - Top 3 highest-leverage dimensions (by opportunity_pts)
+      - Named GTM failure patterns that fired for this company's scores
 
-    # Fetch context notes for this session
-    context_notes = []
-    if hasattr(snapshot, 'session') and snapshot.session:
-        responses = Response.objects.filter(session=snapshot.session).exclude(context_note="").select_related('question')
-        for r in responses:
-            context_notes.append(f"{r.question.text}: {r.context_note}")
+    Gemini's only job is to write industry- and size-specific prose around the
+    structured findings — not to decide what the priorities are. This makes the
+    output consistent, auditable, and genuinely personalised.
+    """
+    company_name  = snapshot.company_name  or "Unnamed Company"
+    industry      = snapshot.industry      or "Unknown Industry"
+    company_size  = snapshot.company_size  or "Not specified"
+    revenue_range = snapshot.revenue_range or "Not specified"
+    country       = snapshot.country       or "Not specified"
+    crm           = snapshot.crm           or "Not specified"
+    overall       = snapshot.overall
+    stage         = snapshot.band.stage    if snapshot.band else "Unspecified"
 
-    context_notes_text = "\n".join(context_notes)
+    # ── 1. Get question-level scores and run the scoring engine ──────────────
+    rec_ctx: dict = {}
+    if hasattr(snapshot, "session") and snapshot.session:
+        responses = Response.objects.filter(
+            session=snapshot.session
+        ).select_related("question")
+        question_scores = {r.question.id_code: r.score for r in responses}
+        if question_scores:
+            rec_ctx = build_recommendation_context(question_scores)
 
-    prompt = f"""
-You are a Go-To-Market strategy consultant with deep expertise in financial modeling and competitive positioning.
+    # ── 2. Build prompt sections from scoring engine output ──────────────────
+    pillar_lines = "\n".join(
+        f"  {p}: {avg:.2f}/5"
+        for p, avg in rec_ctx.get("pillar_avgs", {}).items()
+    ) or "  (pillar averages unavailable)"
 
-Create a **personalized 30-day GTM improvement playbook** for the company below.
+    priority_lines = ""
+    for i, pri in enumerate(rec_ctx.get("top_priorities", []), 1):
+        priority_lines += (
+            f"\n  {i}. {pri['dimension']} ({pri['pillar']}) — "
+            f"current score {pri['current_score']}/5, "
+            f"improving to 5/5 would add +{pri['opportunity_pts']:.1f} pts to overall score"
+        )
+    if not priority_lines:
+        priority_lines = "\n  (priority data unavailable)"
 
-Respond ONLY with a valid, raw JSON object (do not include markdown codeblocks around the JSON, just the JSON string).
-Ensure the JSON has the following exact keys:
-1. "markdown_playbook": A comprehensive markdown string containing:
-   - A diagnostic summary
-   - Top priority areas
-   - A 4-week action plan with financial estimates and competitive context woven into each recommendation
-   - Success metrics
+    pattern_lines = ""
+    for pat in rec_ctx.get("patterns", []):
+        pattern_lines += (
+            f"\n  [{pat['severity']}] {pat['headline']}\n"
+            f"    Root cause: {pat['root_cause']}\n"
+            f"    Suggested quick win: {pat['quick_win']}\n"
+        )
+    if not pattern_lines:
+        pattern_lines = "\n  No critical patterns detected."
 
-   For EACH recommendation, weave in:
-   - A brief financial estimate (cost range, expected ROI timeframe, or investment level) calibrated to their revenue range and company size
-   - A competitive context line (how companies in their industry/region typically perform here, and whether this company is ahead or behind the curve)
+    total_opp = rec_ctx.get("total_opportunity_pts", "N/A")
 
-2. "financial_summary": A standalone markdown section (150-250 words) titled "Financial Estimates & ROI Projections"
-   - Include the most relevant financial metrics for this company's stage and industry (could be CAC benchmarks, implementation costs, payback periods, revenue impact — whatever is most actionable)
-   - Always show the reasoning ("Based on your {{revenue_range}} revenue range and {{company_size}} company size...")
-   - Include a disclaimer that these are directional estimates and should be validated with their finance team
+    # ── 3. Context notes from the user ───────────────────────────────────────
+    context_notes: list[str] = []
+    if hasattr(snapshot, "session") and snapshot.session:
+        for r in Response.objects.filter(
+            session=snapshot.session
+        ).exclude(context_note="").select_related("question"):
+            context_notes.append(f"  [{r.question.id_code}] {r.context_note[:200]}")
+    context_notes_text = "\n".join(context_notes) or "  None provided."
 
-3. "competitor_analysis": A standalone markdown section (150-250 words) titled "Competitive Gap Analysis"
-   - Based on their industry, country, and market segment — identify 3-4 dimensions where they are strong vs market norms
-   - Identify 2-3 critical gaps to prioritize
-   - Do NOT name specific competitor companies; use industry patterns and benchmarks
-   - Focus on actionable gaps relative to their peers
+    prompt = f"""You are a Go-To-Market strategy consultant. A business has completed a GTM assessment.
+The scoring engine has already identified the top priorities and structural failure patterns.
+Your job is to write PERSONALISED implementation guidance — calibrated to this specific company's
+industry, size, and region — using the structured findings provided below.
+Do NOT ignore the priorities or invent different ones.
 
-4. "risk_status": A single string value of either "High", "Medium", or "Low" representing the company's maturity risk.
+=== COMPANY PROFILE ===
+Company:       {company_name}
+Industry:      {industry}
+Company Size:  {company_size}
+Revenue Range: {revenue_range}
+Region:        {country}
+CRM:           {crm}
+GTM Stage:     {stage}
+Overall Score: {overall}/100
+Points still available (if all questions improve to 5/5): {total_opp}
 
-5. "learning_topics": An array of up to 3 short strings representing specific GTM concepts the company needs to learn/improve based on their weaknesses.
+=== PILLAR AVERAGES ===
+{pillar_lines}
 
-Company: {data['company_name']}
-Industry: {data['industry']}
-Company Size: {data['company_size']}
-Revenue Range: {data['revenue_range']}
-Country/Region: {data['country']}
-CRM in use: {data['crm']}
-Stage: {data['stage']}
-GTM Score: {data['overall']}/100
-Summary: {data['headline']}
+=== TOP 3 HIGHEST-LEVERAGE PRIORITIES ===
+(Ranked by points contributed to overall score — fix these first)
+{priority_lines}
 
-Category Averages:
-{cat_lines}
+=== DETECTED GTM FAILURE PATTERNS ===
+(Structural problems identified by the rules engine from individual question scores)
+{pattern_lines}
 
-Additional Context Provided by User:
-{context_notes_text if context_notes_text else 'No extra context provided.'}
+=== ADDITIONAL CONTEXT FROM THE BUSINESS ===
+{context_notes_text}
+
+=== YOUR OUTPUT ===
+Respond ONLY with a valid raw JSON object (no markdown code fences). Use these exact keys:
+
+1. "markdown_playbook"
+   Structure:
+   ## Priority 1: [exact dimension name from priorities above]
+   [2–3 sentences: why this specific gap matters for a {company_size} company in {industry} in {country}]
+   **What to do in the next 30 days:**
+   - [specific action 1 — concrete, not generic]
+   - [specific action 2]
+   - [specific action 3]
+   **What success looks like:** [one measurable outcome]
+
+   [Repeat for Priority 2 and Priority 3]
+
+   ## Patterns to address
+   [One short paragraph per Critical or High pattern — what it means for THIS company specifically]
+
+   Rules: use the company's industry, size, and region to make every point concrete.
+   Do NOT give generic advice that could apply to any company. Do NOT name competitors.
+
+2. "financial_summary"
+   150–200 word markdown section titled "## Financial Estimates".
+   Quantify the cost of NOT addressing the top 3 priorities (pipeline leakage,
+   churn cost, CAC waste — whichever apply). Calibrate to {revenue_range} revenue.
+   End with: "These are directional estimates — validate with your finance team."
+
+3. "competitor_analysis"
+   150–200 word markdown section titled "## Competitive Position".
+   How do {industry} companies in {country} typically perform on the detected weak dimensions?
+   Where is this company behind versus ahead of regional peers?
+
+4. "risk_status"
+   One of: "High", "Medium", or "Low"
+
+5. "learning_topics"
+   Array of up to 3 specific GTM skill or concept strings to study next.
 """
     return prompt
+
+
+# Sentinel written to enrichment fields when generation is attempted but fails.
+# A non-empty value stops the HTMX polling loop; the view/template detect it
+# and render a graceful "unavailable" message instead of the content or spinner.
+ENRICHMENT_UNAVAILABLE = "__unavailable__"
+
+
+def generate_enrichment_sections(snapshot: ResultSnapshot) -> bool:
+    """
+    Generate ai_financial_summary and ai_competitor_analysis for a snapshot
+    that already has a playbook but is missing these fields.
+    Returns True if at least one section was generated.
+    """
+    if snapshot.ai_financial_summary and snapshot.ai_competitor_analysis:
+        return False
+
+    client = _get_client()
+    if not client or _quota_cooldown_active():
+        return False
+
+    lock_key = f"gtm:ai:enrichment:{snapshot.id}:lock"
+    if not _acquire_lock(lock_key):
+        return False
+
+    try:
+        company  = snapshot.company_name or "the company"
+        industry = snapshot.industry or "B2B"
+        revenue  = snapshot.revenue_range or "undisclosed revenue"
+        size     = snapshot.company_size or "unknown size"
+        stage    = snapshot.band_stage or "growth"
+        score    = round(snapshot.overall or 0, 1)
+        playbook_ctx = (snapshot.ai_playbook or "")[:2000]
+        generated = False
+
+        if not snapshot.ai_financial_summary:
+            try:
+                fin_prompt = f"""You are a GTM financial analyst. Write 3-4 concise bullet points estimating the financial impact of the GTM gaps identified for {company}.
+
+Company: {company} | Industry: {industry} | Revenue range: {revenue} | Size: {size} | GTM Score: {score}/100 | Stage: {stage}
+
+Playbook context:
+{playbook_ctx}
+
+Cover: revenue at risk from current gaps, estimated pipeline uplift from fixes, cost of 12-month inaction, and rough ROI range.
+Use revenue ranges consistent with {revenue}. Do NOT recommend actions — only estimate financial impact of the current state."""
+
+                resp = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=fin_prompt,
+                    config=_FAST_CONFIG,
+                )
+                snapshot.ai_financial_summary = (resp.text or "").strip() or ENRICHMENT_UNAVAILABLE
+            except Exception as e:
+                log_ai_error("generate_enrichment_sections:financial", e, {})
+                snapshot.ai_financial_summary = ENRICHMENT_UNAVAILABLE
+            generated = True
+
+        if not snapshot.ai_competitor_analysis:
+            try:
+                comp_prompt = f"""You are a GTM competitive analyst. Write 3-4 concise bullet points describing the competitive exposure created by {company}'s current GTM gaps.
+
+Company: {company} | Industry: {industry} | Revenue range: {revenue} | Size: {size} | GTM Score: {score}/100 | Stage: {stage}
+
+Playbook context:
+{playbook_ctx}
+
+Cover: where competitors in {industry} typically outperform companies at this GTM maturity stage, and what specific risks these gaps create for {company}.
+Do NOT recommend actions — only describe competitive risks from the current state."""
+
+                resp = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=comp_prompt,
+                    config=_FAST_CONFIG,
+                )
+                snapshot.ai_competitor_analysis = (resp.text or "").strip() or ENRICHMENT_UNAVAILABLE
+            except Exception as e:
+                log_ai_error("generate_enrichment_sections:competitor", e, {})
+                snapshot.ai_competitor_analysis = ENRICHMENT_UNAVAILABLE
+            generated = True
+
+        if generated:
+            snapshot.save(update_fields=["ai_financial_summary", "ai_competitor_analysis"])
+        return generated
+    finally:
+        _release_lock(lock_key)
+
+
+def extract_tasks_from_playbook(playbook_text: str, company_name: str, n: int = 4) -> list[str]:
+    """
+    Ask Gemini to extract n short actionable tasks from an existing AI playbook.
+    Returns a list of task strings (each <= 220 chars). Returns [] on any failure.
+    """
+    client = _get_client()
+    if not client or not playbook_text:
+        return []
+
+    prompt = f"""You are extracting action items from a GTM playbook for {company_name}.
+
+Read the playbook below and extract exactly {n} specific, actionable tasks the company should complete.
+
+Rules:
+- Each task must be a single imperative sentence (start with a verb)
+- Max 200 characters each
+- Be concrete and specific to {company_name} — no generic advice
+- Return ONLY a valid JSON array of strings, e.g. ["Task one.", "Task two."]
+- No markdown, no extra text, just the JSON array
+
+Playbook:
+{playbook_text[:2000]}"""
+
+    try:
+        from google.genai import types as genai_types
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=genai_types.GenerateContentConfig(
+                temperature=0.3,
+                max_output_tokens=2048,
+            ),
+        )
+        raw = (response.text or "").strip()
+        raw = _clean_json_response(raw)
+        tasks = json.loads(raw)
+        if isinstance(tasks, list):
+            return [str(t).strip() for t in tasks if isinstance(t, str) and len(t.strip()) <= 220][:n]
+    except Exception as e:
+        log_ai_error("extract_tasks_from_playbook", e, {})
+    return []
 
 
 # ================================================================
@@ -586,40 +775,69 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
 # ================================================================
 # DIAGNOSTIC PROMPT GENERATOR
 # ================================================================
+_IMPERATIVE_VERBS = re.compile(
+    r'^(Implement|Establish|Build|Create|Define|Set|Launch|Prioritize|Consider|Develop|Use|Ensure|'
+    r'Track|Review|Automate|Schedule|Conduct|Design|Deploy|Adopt|Leverage|Focus|Start|Begin|Move|'
+    r'Invest|Hire|Align|Map|Identify|Document|Introduce|Address|Fix|Resolve|Update|Upgrade|'
+    r'Integrate|Configure|Run|Execute|Measure|Monitor|Optimize|Streamline|Formalize|Standardize|'
+    r'Initiate|Activate|Assign|Appoint|Engage|Reach|Contact|Request|Ask|Trigger|Add|Remove|'
+    r'Consolidate|Restructure|Revisit|Revisit|Explore|Trial|Test|Pilot|Roll)\b',
+    re.IGNORECASE,
+)
+
+def _strip_imperative_sentences(text: str) -> str:
+    """Remove any sentence that starts with an action/imperative verb."""
+    sentences = re.split(r'(?<=[.!?])\s+', text.strip())
+    clean = [s for s in sentences if s and not _IMPERATIVE_VERBS.match(s.strip())]
+    return ' '.join(clean).strip()
+
+
 def _build_diagnostic_prompt(session: AssessmentSession, question: Question, score: int) -> str:
     """Create a structured prompt for AI to generate a question-level diagnostic."""
-    
-    # Contextual data
+
     company_name = session.company_name or "a B2B company"
-    industry = session.industry or "a general industry"
-    stage = session.snapshot.band_stage if getattr(session, 'snapshot', None) and session.snapshot.band_stage else "Unspecified"
-    ai_metadata = question.ai_metadata if isinstance(question.ai_metadata, dict) else {}
-    question_intent = ai_metadata.get("intent") or "N/A"
-    evidence_hint = ai_metadata.get("evidence_hint") or "N/A"
-    risk_if_low = ai_metadata.get("risk_if_low") or "N/A"
-    quick_win_if_low = ai_metadata.get("quick_win_if_low") or "N/A"
-    
-    # Score severity mapping
+    industry     = session.industry or "a general industry"
+    crm          = getattr(session, "crm", "") or "an unspecified CRM"
+    size         = getattr(session, "company_size", "") or "unknown size"
+    revenue      = getattr(session, "revenue_range", "") or "undisclosed revenue"
+    country      = getattr(session, "country", "") or "an unspecified market"
+    stage        = session.snapshot.band_stage if getattr(session, "snapshot", None) and session.snapshot.band_stage else "Unspecified"
+    ai_metadata  = question.ai_metadata if isinstance(question.ai_metadata, dict) else {}
+    risk_if_low  = ai_metadata.get("risk_if_low") or "N/A"
+    dimension    = ai_metadata.get("dimension", "")
+
     if score >= 4:
-        severity = {4: "Strong Foundation", 5: "Exceptional Performance"}.get(score, "Success")
-        task_desc = f"explain WHY this is a strategic strength for {company_name} and how it provides a competitive advantage. Focus on why this specific standard is a critical pillar for a GTM strategy at the {stage} stage."
+        severity  = {4: "Strong Foundation", 5: "Exceptional Performance"}.get(score, "Success")
+        task_desc = (
+            f"explain in specific detail WHY this is a strategic strength for {company_name} "
+            f"and how it creates a concrete competitive advantage at the {stage} stage in the {industry} space."
+        )
     else:
-        severity = {1: "Critical Failure", 2: "Serious Gap", 3: "Improvement Needed"}.get(score, "Low Priority")
-        task_desc = f"explain the **immediate risk** or **consequence** of this low score in the context of the {industry} industry and {stage} stage. Focus on the 'WHY this matters now' and the potential impact of inaction."
+        severity  = {1: "Critical Failure", 2: "Serious Gap", 3: "Improvement Needed"}.get(score, "Low Priority")
+        task_desc = (
+            f"diagnose in specific detail what is absent or broken at {company_name} on the '{dimension}' dimension. "
+            f"Reference their industry ({industry}), market ({country}), size ({size}), revenue ({revenue}), "
+            f"and CRM ({crm}) where relevant to explain WHY this gap exists and what it means for their GTM motion. "
+            f"Known downstream risk: {risk_if_low}."
+        )
 
     prompt = f"""
-You are a highly experienced Go-To-Market consultant. Your task is to provide a brief, actionable insight for a company assessment area.
+You are a GTM diagnostician. Your ONLY job is to describe in detail what is currently absent or broken at a specific company.
 
-Company Context:
-- Company Name: {company_name}
-- Industry: {industry}
-- GTM Stage: {stage}
-- Question Text: {question.text}
-- User Score: {score}/5.0 (Status: {severity})
+Company: {company_name} | Industry: {industry} | Country: {country} | Size: {size} | Revenue: {revenue} | CRM: {crm} | GTM Stage: {stage}
+Question: {question.text}
+Score: {score}/5 ({severity})
 
 Task: {task_desc}
 
-Keep it to a single, concise paragraph (max 3-4 sentences). Respond in clean, professional prose.
+STRICT OUTPUT FORMAT:
+- 3 to 4 sentences.
+- Be specific — name {company_name}, reference their industry, size, CRM, or market where it sharpens the diagnosis.
+- Describe the specific GTM elements that are absent, broken, or immature at {company_name} right now.
+- FORBIDDEN: Do not start any sentence with an action verb (Implement, Establish, Build, Create, Define, Set, Launch, Prioritize, Develop, Use, Ensure, Track, Review, Automate, Schedule, etc.)
+- FORBIDDEN: Do not write "should", "must", "need to", "recommend", "suggest", or any forward-looking instruction.
+- FORBIDDEN: Do not describe what to do. Only describe what is wrong or missing right now.
+- Write in third person about {company_name}.
     """.strip()
 
     return prompt
@@ -665,8 +883,8 @@ def generate_diagnostic_insight(response: Response) -> str:
                 contents=prompt,
                 config=_FAST_CONFIG,
             )
-            text = ai_response.text.strip()
-            
+            text = _strip_imperative_sentences(ai_response.text.strip())
+
             if text:
                 # 🌟 Save the insight directly to the Response object
                 response.ai_insight = text
@@ -738,34 +956,47 @@ def generate_diagnostic_insights_batch(responses: list) -> dict:
 
         ai_metadata = q.ai_metadata if isinstance(q.ai_metadata, dict) else {}
         risk_if_low = ai_metadata.get("risk_if_low") or "N/A"
-        quick_win = ai_metadata.get("quick_win_if_low") or "N/A"
+        dimension   = ai_metadata.get("dimension", "")
+        crm         = getattr(session, "crm", "") or "unspecified CRM"
+        size        = getattr(session, "company_size", "") or "unknown size"
+        revenue     = getattr(session, "revenue_range", "") or "undisclosed revenue"
+        country     = getattr(session, "country", "") or "unspecified market"
 
         score_label = {1: "Critical Failure", 2: "Serious Gap", 3: "Improvement Needed",
                        4: "Strong Foundation", 5: "Exceptional Performance"}.get(resp.score, "Scored")
 
         response_blocks.append(
             f'  "{resp.id}": {{\n'
-            f'    "question": "{q.text[:100]}",\n'
-            f'    "score": {resp.score}/5 ({score_label}),\n'
+            f'    "question": "{q.text[:120]}",\n'
+            f'    "score": "{resp.score}/5 ({score_label})",\n'
             f'    "company": "{company_name}", "industry": "{industry}", "stage": "{stage}",\n'
-            f'    "risk_if_low": "{risk_if_low}", "quick_win": "{quick_win}"\n'
+            f'    "country": "{country}", "size": "{size}", "revenue": "{revenue}", "crm": "{crm}",\n'
+            f'    "dimension": "{dimension}", "risk_if_low": "{risk_if_low}"\n'
             f'  }}'
         )
 
     blocks_text = ",\n".join(response_blocks)
 
-    prompt = f"""You are a Go-To-Market consultant. For each assessment response below, write ONE concise diagnostic paragraph (2-3 sentences max) explaining why the score matters and what specific action to take next.
+    prompt = f"""You are a GTM diagnostician. For each assessment response below, write a detailed diagnostic paragraph (3-4 sentences) describing in specific detail what is currently absent or broken at the named company.
+
+STRICT RULES:
+- Be specific — reference the company's industry, CRM, country, size, and revenue range where it sharpens the diagnosis.
+- Describe the specific GTM elements that are absent, broken, or immature at this company right now.
+- FORBIDDEN: Do not start any sentence with an action verb (Implement, Establish, Build, Create, Automate, Set, Launch, Define, Develop, Use, Ensure, Track, Review, Prioritize, Consider, Start, Schedule, Conduct, etc.)
+- FORBIDDEN: Do not write "should", "must", "need to", "recommend", "suggest", or any forward-looking instruction.
+- FORBIDDEN: Do not describe what to do. Only describe what is wrong or missing right now.
+- Name the company explicitly. Write in third person.
 
 Assessment responses:
 {{
 {blocks_text}
 }}
 
-Respond ONLY with a valid JSON object mapping each response ID (as a string key) to its insight paragraph.
+Respond ONLY with a valid JSON object mapping each response ID (as a string key) to its diagnostic paragraph.
 Example format:
 {{
-  "42": "Your ICP definition is unclear, which means you're wasting sales cycles on poor-fit leads. Start by documenting 3-5 firmographic filters.",
-  "57": "Your attribution model is strong, giving you clear ROI visibility. Extend it to include longer sales cycles."
+  "42": "Ardent SA (Pty) Ltd lacks a unified ICP across its three service lines — Clinical Research, Business Consulting, and Legal Advisory — meaning each team operates with a different definition of an ideal client. HubSpot is in use but qualification fields for industry, buyer role, and company size are inconsistently captured, leaving no reliable data to validate which inbound leads are genuinely well-fitted. This absence of a shared ICP is particularly damaging for a 51-200 person firm in South Africa where referral-driven deal flow can mask poor-fit client acquisition.",
+  "57": "Nexaflow Inc. has no documented attribution model despite running campaigns across LinkedIn Ads, content, and outbound sequences. UTM parameters are inconsistently applied across campaigns in HubSpot, meaning a significant portion of qualified pipeline carries no source tag and is recorded as direct traffic."
 }}
 Do not include markdown code blocks or extra text. Return only the raw JSON object.""".strip()
 
@@ -788,7 +1019,7 @@ Do not include markdown code blocks or extra text. Return only the raw JSON obje
 
         results = {}
         for resp in responses:
-            insight = parsed.get(str(resp.id), "").strip()
+            insight = _strip_imperative_sentences(parsed.get(str(resp.id), "").strip())
             if insight:
                 resp.ai_insight = insight
                 resp.ai_insight_status = "done"

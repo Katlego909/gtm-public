@@ -31,6 +31,9 @@ class Question(models.Model):
     weight = models.FloatField(default=1.0)  # per-question weight (e.g., 1.2)
     diagnostic_note = models.CharField(max_length=200, blank=True)
     ai_metadata = models.JSONField(default=dict, blank=True, encoder=DjangoJSONEncoder)
+    input_type = models.CharField(max_length=50, blank=True, default="scale")
+    input_options = models.JSONField(default=list, blank=True, encoder=DjangoJSONEncoder)
+    input_option_labels = models.JSONField(default=dict, blank=True, encoder=DjangoJSONEncoder)
     def __str__(self): return f"{self.id_code} – {self.text[:60]}"
 
 class AssessmentSession(models.Model):
@@ -323,3 +326,102 @@ class GTMFile(models.Model):
 
     def __str__(self):
         return f"{self.get_file_type_display()} - {self.session_id or self.workspace_id}"
+
+
+class DeliveryDocument(models.Model):
+    """
+    Documents uploaded by a user to auto-score the Delivery section via AI analysis.
+    The AI reads these files, extracts evidence, and proposes a 1-5 score per question.
+    Humans review AI scores and can override any of them before submitting.
+    """
+
+    ANALYSIS_STATUS = [
+        ('uploaded', 'Uploaded'),
+        ('analyzing', 'Analyzing'),
+        ('complete', 'Analysis Complete'),
+        ('failed', 'Analysis Failed'),
+    ]
+
+    FILE_TYPE_CHOICES = [
+        ('csv', 'CSV Spreadsheet'),
+        ('xlsx', 'Excel Spreadsheet'),
+        ('pdf', 'PDF Document'),
+        ('docx', 'Word Document'),
+        ('txt', 'Text / Notepad File'),
+        ('json', 'JSON Data'),
+        ('image', 'Image / Screenshot'),
+        ('other', 'Other'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session = models.ForeignKey(
+        AssessmentSession, on_delete=models.CASCADE, related_name='delivery_docs'
+    )
+    file = models.FileField(upload_to='gtm/delivery/%Y/%m/%d/', max_length=255)
+    original_filename = models.CharField(max_length=255, blank=True)
+    file_size = models.PositiveIntegerField(default=0)
+    file_type = models.CharField(max_length=10, choices=FILE_TYPE_CHOICES, default='other')
+    extracted_text = models.TextField(blank=True, default='')
+    analysis_result = models.JSONField(default=dict, blank=True, encoder=DjangoJSONEncoder)
+    analysis_status = models.CharField(max_length=12, choices=ANALYSIS_STATUS, default='uploaded')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Delivery Evidence Document"
+        verbose_name_plural = "Delivery Evidence Documents"
+
+    def __str__(self):
+        return f"{self.original_filename} ({self.session_id})"
+
+
+class CategoryDocument(models.Model):
+    """
+    Documents uploaded to auto-score Demand or Conversion sections via AI analysis.
+    Mirrors DeliveryDocument but is shared across non-delivery categories.
+    """
+
+    CATEGORY_CHOICES = [
+        ('demand', 'Demand'),
+        ('conversion', 'Conversion'),
+    ]
+
+    ANALYSIS_STATUS = [
+        ('uploaded', 'Uploaded'),
+        ('analyzing', 'Analyzing'),
+        ('complete', 'Analysis Complete'),
+        ('failed', 'Analysis Failed'),
+    ]
+
+    FILE_TYPE_CHOICES = [
+        ('csv', 'CSV Spreadsheet'),
+        ('xlsx', 'Excel Spreadsheet'),
+        ('pdf', 'PDF Document'),
+        ('docx', 'Word Document'),
+        ('txt', 'Text / Notepad File'),
+        ('json', 'JSON Data'),
+        ('image', 'Image / Screenshot'),
+        ('other', 'Other'),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    session = models.ForeignKey(
+        AssessmentSession, on_delete=models.CASCADE, related_name='category_docs'
+    )
+    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    file = models.FileField(upload_to='gtm/category/%Y/%m/%d/', max_length=255)
+    original_filename = models.CharField(max_length=255, blank=True)
+    file_size = models.PositiveIntegerField(default=0)
+    file_type = models.CharField(max_length=10, choices=FILE_TYPE_CHOICES, default='other')
+    extracted_text = models.TextField(blank=True, default='')
+    analysis_result = models.JSONField(default=dict, blank=True, encoder=DjangoJSONEncoder)
+    analysis_status = models.CharField(max_length=12, choices=ANALYSIS_STATUS, default='uploaded')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Category Evidence Document"
+        verbose_name_plural = "Category Evidence Documents"
+
+    def __str__(self):
+        return f"[{self.category}] {self.original_filename} ({self.session_id})"

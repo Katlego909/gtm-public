@@ -59,7 +59,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "DEM-ICP-01",
             "text": "We have a simple written profile of our ideal customer, including who is a strong fit and who is not, and we review it every quarter so all teams stay aligned.",
-            "weight": 1.25,
+            "weight": 0.22,
             "diagnostic_note": "If this is unclear, teams chase more leads instead of the right leads.",
             "ai_metadata": {
                 "pillar": "Demand",
@@ -75,7 +75,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "DEM-FIT-02",
             "text": "At least 6 out of 10 new inbound leads match our ideal customer profile, and we can verify this with clear qualification fields in our CRM.",
-            "weight": 1.2,
+            "weight": 0.16,
             "diagnostic_note": "If lead fit is low, spend goes up and conversion goes down.",
             "ai_metadata": {
                 "pillar": "Demand",
@@ -91,7 +91,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "DEM-MSG-03",
             "text": "Our core value message is easy to understand, tested with each target segment, and used consistently across our website, outbound messages, and sales materials.",
-            "weight": 1.15,
+            "weight": 0.18,
             "diagnostic_note": "If the message is inconsistent, fewer buyers move forward.",
             "ai_metadata": {
                 "pillar": "Demand",
@@ -107,7 +107,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "DEM-CHN-04",
             "text": "We have a clear channel plan that shows expected customer acquisition cost and pipeline contribution for each channel, and we review performance every month.",
-            "weight": 1.1,
+            "weight": 0.2,
             "diagnostic_note": "Without this, channel spend becomes guesswork.",
             "ai_metadata": {
                 "pillar": "Demand",
@@ -122,8 +122,8 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEM-ATT-05",
-            "text": "We can clearly see which channel first brought a lead in and which channels later influenced the deal, using reporting data we trust.",
-            "weight": 1.2,
+            "text": "We can reliably identify which marketing channels generate qualified leads and pipeline, using reporting data we trust.",
+            "weight": 0.14,
             "diagnostic_note": "Without clear attribution, it is hard to know where to invest.",
             "ai_metadata": {
                 "pillar": "Demand",
@@ -139,7 +139,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "DEM-CNT-06",
             "text": "We run content or outbound work on a regular schedule, not randomly, and each activity is tied to target accounts and clear pipeline goals.",
-            "weight": 1.0,
+            "weight": 0.1,
             "diagnostic_note": "If execution is irregular, pipeline becomes harder to predict.",
             "ai_metadata": {
                 "pillar": "Demand",
@@ -156,106 +156,302 @@ QUESTIONS: Dict[str, List[Dict]] = {
     "Conversion": [
         {
             "id_code": "CON-SLA-01",
-            "text": "We set clear response-time targets for new leads by source, and we check every week how quickly reps reply so high-intent leads are not lost.",
-            "weight": 1.2,
+            "text": "How well does your team meet defined response-time targets for new leads by source, and how consistently are rep reply times reviewed each week?",
+            "input_type": "frequency_select",
+            "input_options": [
+                "never",
+                "monthly",
+                "bi_weekly",
+                "weekly",
+                "daily"
+            ],
+            "input_option_labels": {
+                "never": "We do not currently track or review rep response times",
+                "monthly": "We review rep response times once a month",
+                "bi_weekly": "We review rep response times every two weeks",
+                "weekly": "We review rep response times every week",
+                "daily": "We review rep response times every day"
+            },
+            "weight": 0.13,
             "diagnostic_note": "Slow replies reduce meetings and close rates.",
+            "scoring_logic": {
+                "never": 1,
+                "monthly": 2,
+                "bi_weekly": 3,
+                "daily": 4,
+                "weekly": 5
+            },
             "ai_metadata": {
                 "pillar": "Conversion",
                 "dimension": "Speed to Lead",
-                "question_type": "outcome",
+                "question_type": "operational",
                 "evidence_type": "quantitative",
                 "time_horizon": "30d",
                 "owner_role": "sales",
-                "maturity_stage": "repeatable",
+                "maturity_stage": "managed",
                 "quick_win_if_low": "Set source-based SLA targets and trigger alerts for breaches.",
+                "input_options": [
+                    "never",
+                    "monthly",
+                    "bi_weekly",
+                    "weekly",
+                    "daily"
+                ],
+                "input_option_labels": {
+                    "never": "We do not currently track or review rep response times",
+                    "monthly": "We review rep response times once a month",
+                    "bi_weekly": "We review rep response times every two weeks",
+                    "weekly": "We review rep response times every week",
+                    "daily": "We review rep response times every day"
+                },
             },
         },
         {
             "id_code": "CON-QLF-02",
-            "text": "We use one shared qualification checklist for all leads, and required CRM fields must be completed before an opportunity can move to the next stage.",
-            "weight": 1.15,
+            "text": "How rigorously does your team apply a shared qualification checklist, and how strictly are required CRM fields enforced before opportunities can advance to the next stage?",
+            "input_type": "single_select",
+            "input_options": [
+                "no",
+                "yes"
+            ],
+            "weight": 0.19,
             "diagnostic_note": "Weak qualification fills pipeline with poor-fit deals.",
+            "scoring_logic": {
+                "no": 1,
+                "yes": 5
+            },
             "ai_metadata": {
                 "pillar": "Conversion",
                 "dimension": "Qualification",
-                "question_type": "process",
+                "question_type": "structural",
                 "evidence_type": "system-data",
                 "time_horizon": "current",
                 "owner_role": "revops",
-                "maturity_stage": "repeatable",
+                "maturity_stage": "defined",
                 "quick_win_if_low": "Make qualification fields mandatory at stage transition and audit weekly.",
+                "input_type": "single_select",
+                "input_options": [
+                    "no",
+                    "yes"
+                ]
             },
         },
         {
             "id_code": "CON-STG-03",
-            "text": "Each pipeline stage has clear entry and exit rules, and sales leaders review stage-to-stage conversion rates monthly to spot bottlenecks early.",
-            "weight": 1.1,
+            "text": "How well does your team define and enforce entry and exit criteria for each pipeline stage, and how consistently do sales leaders review stage-to-stage conversion rates to identify bottlenecks?",
+            "input_type": "multi_select",
+            "input_options": [
+                "defined_stage_criteria",
+                "criteria_enforced_at_advancement",
+                "conversion_rates_reviewed_regularly",
+                "leaders_act_on_conversion_data",
+                "none"
+            ],
+            "input_option_labels": {
+                "defined_stage_criteria": "Each pipeline stage has clear, documented entry and exit criteria",
+                "criteria_enforced_at_advancement": "Stage criteria are enforced before deals can advance to the next stage",
+                "conversion_rates_reviewed_regularly": "We review stage-to-stage conversion rates on a regular monthly cadence",
+                "leaders_act_on_conversion_data": "Sales leaders use conversion data to identify and act on bottlenecks",
+                "none": "We do not currently have structured pipeline stage management in place"
+            },
+            "weight": 0.22,
             "diagnostic_note": "If stage rules are unclear, forecasts become unreliable.",
+            "scoring_logic": {
+                "0_selected": 1,
+                "1_selected": 2,
+                "2_selected": 3,
+                "3_selected": 4,
+                "4_selected": 5,
+                "none_selected": 1,
+                "conversion_rates_reviewed_regularly_required_for_5": True #needs backend encoding for this line
+            },
             "ai_metadata": {
                 "pillar": "Conversion",
                 "dimension": "Pipeline Hygiene",
-                "question_type": "evidence",
+                "question_type": "structural",
                 "evidence_type": "system-data",
                 "time_horizon": "30d",
                 "owner_role": "sales",
-                "maturity_stage": "optimized",
+                "maturity_stage": "managed",
                 "quick_win_if_low": "Define stage exit criteria and report stage-to-stage conversion by segment.",
+                "input_type": "multi_select",
+                "input_options": [
+                    "defined_stage_criteria",
+                    "criteria_enforced_at_advancement",
+                    "conversion_rates_reviewed_regularly",
+                    "leaders_act_on_conversion_data",
+                    "none"
+                ],
+                "input_option_labels": {
+                    "defined_stage_criteria": "Each pipeline stage has clear, documented entry and exit criteria",
+                    "criteria_enforced_at_advancement": "Stage criteria are enforced before deals can advance to the next stage",
+                    "conversion_rates_reviewed_regularly": "We review stage-to-stage conversion rates on a regular monthly cadence",
+                    "leaders_act_on_conversion_data": "Sales leaders use conversion data to identify and act on bottlenecks",
+                    "none": "We do not currently have structured pipeline stage management in place"
+                },
             },
         },
         {
             "id_code": "CON-OBJ-04",
-            "text": "We keep a simple playbook of common buyer objections and competitor risks, and managers coach the team on it so responses stay consistent.",
-            "weight": 1.0,
+            "text": "How effectively does your team maintain and apply a shared objection and competitor playbook, and how consistently do managers coach reps on it?",
+            "input_type": "multi_select",
+            "input_options": [
+                "written_playbook",
+                "regular_coaching_sessions",
+                "recorded_call_reviews",
+                "competitive_battlecards",
+                "none"
+            ],
+            "input_option_labels": {
+                "written_playbook": "We have a written playbook of common objections and approved responses",
+                "regular_coaching_sessions": "Managers run regular coaching sessions focused on objection handling",
+                "recorded_call_reviews": "We review recorded calls specifically to improve objection handling",
+                "competitive_battlecards": "We maintain competitive battlecards or risk guides for the sales team",
+                "none": "We do not currently have any structured objection handling in place"
+            },
+            "weight": 0.08,
             "diagnostic_note": "Without this, reps answer objections inconsistently.",
+            "scoring_logic": {
+                "0_selected": 1,
+                "1_selected": 2,
+                "2_selected": 3,
+                "3_selected": 4,
+                "4_selected": 5,
+                "none_selected": 1
+            },
             "ai_metadata": {
                 "pillar": "Conversion",
                 "dimension": "Deal Enablement",
-                "question_type": "diagnostic",
+                "question_type": "operational",
                 "evidence_type": "qualitative",
                 "time_horizon": "90d",
                 "owner_role": "sales",
-                "maturity_stage": "foundation",
+                "maturity_stage": "developing",
                 "quick_win_if_low": "Document top five objections with approved responses and examples.",
+                "input_type": "multi_select",
+                "input_options": ["written_playbook", "regular_coaching_sessions", "recorded_call_reviews", "competitive_battlecards"],
+                "input_option_labels": {
+                    "written_playbook": "We have a written playbook of common objections and approved responses",
+                    "regular_coaching_sessions": "Managers run regular coaching sessions focused on objection handling",
+                    "recorded_call_reviews": "We review recorded calls specifically to improve objection handling",
+                    "competitive_battlecards": "We maintain competitive battlecards or risk guides for the sales team",
+                    "none": "We do not currently have any structured objection handling in place"
+                },
             },
         },
         {
             "id_code": "CON-WNL-05",
-            "text": "We capture why deals are won or lost in structured fields, then use those patterns in a monthly review to run focused improvement experiments.",
-            "weight": 1.1,
+            "text": "How consistently does your team record structured win/loss reasons and use those patterns in a regular review to run improvement experiments?",
+            "input_type": "single_select",
+            "input_options": [
+                "no_capture",
+                "capture_no_review",
+                "occasional_review",
+                "structured_monthly_review",
+                "full_loop"
+            ],
+            "input_option_labels": {
+                "no_capture": "We don't currently capture structured win/loss reasons",
+                "capture_no_review": "We capture win/loss reasons but don't review them regularly",
+                "occasional_review": "We capture and review win/loss patterns occasionally but not on a set cadence",
+                "structured_monthly_review": "We run a structured monthly review and use findings to make changes",
+                "full_loop": "We run regular reviews, act on findings, and track whether our experiments are working"
+            },
+            "weight": 0.22,
             "diagnostic_note": "If win/loss reasons are not tracked, the same problems repeat.",
+            "scoring_logic": {
+                "no_capture": 1,
+                "capture_no_review": 2,
+                "occasional_review": 3,
+                "structured_monthly_review": 4,
+                "full_loop": 5
+            },
             "ai_metadata": {
                 "pillar": "Conversion",
                 "dimension": "Win-Loss Learning",
-                "question_type": "evidence",
-                "evidence_type": "system-data",
+                "question_type": "operational",
+                "evidence_type": "qualitative",
                 "time_horizon": "30d",
-                "owner_role": "revops",
-                "maturity_stage": "optimized",
+                "owner_role": "sales",
+                "maturity_stage": "repeatable",
                 "quick_win_if_low": "Add mandatory closed-lost reason taxonomy and run a monthly improvement retro.",
+                "input_type": "single_select",
+                "input_options": [
+                    "no_capture",
+                    "capture_no_review",
+                    "occasional_review",
+                    "structured_monthly_review",
+                    "full_loop"
+                ],
+                "input_option_labels": {
+                    "no_capture": "We don't currently capture structured win/loss reasons",
+                    "capture_no_review": "We capture win/loss reasons but don't review them regularly",
+                    "occasional_review": "We capture and review win/loss patterns occasionally but not on a set cadence",
+                    "structured_monthly_review": "We run a structured monthly review and use findings to make changes",
+                    "full_loop": "We run regular reviews, act on findings, and track whether our experiments are working"
+                }
             },
         },
         {
             "id_code": "CON-PGE-06",
-            "text": "We run regular tests on key conversion pages and forms, using clear hypotheses and success metrics, and we track whether results improve.",
-            "weight": 1.0,
+            "text": "How consistently does your team run structured tests on key conversion pages and forms, using clear hypotheses and success metrics to track improvement?",
+            "input_type": "multi_select",
+            "input_options": [
+                "defined_hypotheses",
+                "clear_success_metrics",
+                "results_tracked_in_shared_system",
+                "results_used_to_document_changes",
+                "no_structured_testing"
+            ],
+            "input_option_labels": {
+                "defined_hypotheses": "We write a clear hypothesis before starting each test",
+                "clear_success_metrics": "We define success metrics before each test begins",
+                "results_tracked_in_shared_system": "We track results in a shared system after each test",
+                "results_used_to_document_changes": "We use test results to make and document changes",
+                "no_structured_testing": "We do not currently run structured conversion tests"
+            },
+            "weight": 0.16,
             "diagnostic_note": "Without regular tests, conversion pages get stale.",
+            "scoring_logic": {
+                "0_selected": 1,
+                "1_selected": 2,
+                "2_selected": 3,
+                "3_selected": 4,
+                "4_selected": 5,
+                "no_structured_testing_selected": 1
+            },
             "ai_metadata": {
                 "pillar": "Conversion",
                 "dimension": "Funnel Optimization",
-                "question_type": "process",
-                "evidence_type": "quantitative",
+                "question_type": "operational",
+                "evidence_type": "qualitative",
                 "time_horizon": "90d",
                 "owner_role": "marketing",
-                "maturity_stage": "repeatable",
+                "maturity_stage": "developing",
                 "quick_win_if_low": "Launch one monthly A/B test on a high-traffic conversion page.",
+                "input_type": "multi_select",
+                "input_options": [
+                    "defined_hypotheses",
+                    "clear_success_metrics",
+                    "results_tracked_in_shared_system",
+                    "results_used_to_document_changes",
+                    "no_structured_testing"
+                ],
+                "input_option_labels": {
+                    "defined_hypotheses": "We write a clear hypothesis before starting each test",
+                    "clear_success_metrics": "We define success metrics before each test begins",
+                    "results_tracked_in_shared_system": "We track results in a shared system after each test",
+                    "results_used_to_document_changes": "We use test results to make and document changes",
+                    "no_structured_testing": "We do not currently run structured conversion tests"
+                }
             },
         },
     ],
     "Delivery": [
         {
             "id_code": "DEL-TTV-01",
-            "text": "We track how long it takes new customers to get their first real value, by segment, and we actively work to shorten that time.",
-            "weight": 1.2,
+            "text": "Does your business track how long it takes new customers to reach their first real value, broken down by segment, and actively work to shorten that time?",
+            "weight": 0.18,
             "diagnostic_note": "If first value takes too long, churn risk rises.",
             "ai_metadata": {
                 "pillar": "Delivery",
@@ -270,8 +466,8 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEL-ONB-02",
-            "text": "Our onboarding process has clear milestones, clear owners, and realistic completion targets, and progress is tracked in one shared system.",
-            "weight": 1.1,
+            "text": "Does your organization's onboarding process have clear milestones, defined owners, and realistic completion targets — with progress tracked in a single shared system?",
+            "weight": 0.16,
             "diagnostic_note": "Poor onboarding slows activation and increases support load.",
             "ai_metadata": {
                 "pillar": "Delivery",
@@ -286,8 +482,8 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEL-HLT-03",
-            "text": "We score customer health using product usage, engagement, and support signals, and we use clear playbooks to act early on at-risk accounts.",
-            "weight": 1.15,
+            "text": "Does your organization score customer health using product usage, engagement, and support signals — and apply clear playbooks to act early on at-risk accounts?",
+            "weight": 0.24,
             "diagnostic_note": "Without health signals, risk is found too late.",
             "ai_metadata": {
                 "pillar": "Delivery",
@@ -302,8 +498,8 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEL-RET-04",
-            "text": "We review gross and net retention by cohort every month, and we launch targeted actions quickly when any segment starts to decline.",
-            "weight": 1.2,
+            "text": "Does your business review gross and net retention by cohort on a monthly basis, and launch targeted actions quickly when any segment starts to decline?",
+            "weight": 0.22,
             "diagnostic_note": "If retention drops go unseen, growth slows quietly.",
             "ai_metadata": {
                 "pillar": "Delivery",
@@ -318,8 +514,8 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEL-QBR-05",
-            "text": "Our high-value customers receive regular business reviews focused on outcomes, roadmap alignment, and practical expansion opportunities.",
-            "weight": 1.0,
+            "text": "Do your high-value customers receive regular business reviews focused on outcomes, roadmap alignment, and practical expansion opportunities?",
+            "weight": 0.12,
             "diagnostic_note": "Without regular reviews, expansion opportunities are missed.",
             "ai_metadata": {
                 "pillar": "Delivery",
@@ -334,8 +530,8 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEL-ADV-06",
-            "text": "After customers achieve clear value, we consistently capture proof points like quotes, case studies, and references to support future selling.",
-            "weight": 0.95,
+            "text": "After customers achieve clear value, does your business consistently capture proof points — such as quotes, case studies, and references — to support future selling?",
+            "weight": 0.08,
             "diagnostic_note": "If proof points are not captured, future buyers trust you less.",
             "ai_metadata": {
                 "pillar": "Delivery",
