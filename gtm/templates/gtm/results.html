@@ -178,7 +178,7 @@
                     prose-ul:my-4 prose-ul:space-y-2.5 prose-ul:ml-6
                     prose-li:text-gray-700 prose-li:text-base prose-li:leading-relaxed prose-li:pl-2
                     prose-li:marker:text-indigo-500 prose-li:marker:font-bold">
-            {{ band_actions_html|safe }}
+            {% if engine_output %}{% for action in engine_output.primary_actions %}<p class="text-gray-700">{{ action }}</p>{% endfor %}{% else %}{{ band_actions_html|safe }}{% endif %}
         </div>
     </div>
 {% endif %}
@@ -209,7 +209,7 @@
                   <div class="flex justify-between items-center text-xs">
                       <span class="text-gray-500 break-words">{{ r.tool_list|join:", " }}</span>
                       {% if r.url %}
-                        <a href="{{ r.url }}" target="_blank" class="text-indigo-600 hover:text-indigo-800 font-medium transition shrink-0">Explore â†’</a>
+                        <a href="{{ r.url }}" target="_blank" class="text-indigo-600 hover:text-indigo-800 font-medium transition shrink-0">Explore →</a>
                       {% endif %}
                   </div>
                 </div>
@@ -242,7 +242,7 @@
                         <div class="font-medium text-indigo-700 break-words">{{ c.category.name }}</div>
                         <div class="text-sm text-gray-700 font-medium shrink-0">{{ c.avg|floatformat:2 }}/5</div>
                     </div>
-                    <p class="text-xs text-gray-500 mt-1">Performing well â€” maintain the rigor in this area.</p>
+                    <p class="text-xs text-gray-500 mt-1">Performing well — maintain the rigor in this area.</p>
                 </li>
             {% empty %}
                 <li class="text-gray-500 text-sm">No clear strengths yet.</li>
@@ -276,7 +276,7 @@
     {% for q in weakest_questions %}
       <li class="border rounded-xl p-4 hover:shadow-lg transition">
         <div class="flex items-center justify-between mb-2">
-            <div class="font-medium text-lg text-indigo-700 break-words">{{ q.question.category.name }} â€¢ {{ q.question.id_code }}</div>
+            <div class="font-medium text-lg text-indigo-700 break-words">{{ q.question.category.name }} • {{ q.question.id_code }}</div>
             <div class="text-xl font-semibold 
               {% if q.score <= 2 %}text-red-600
               {% elif q.score >= 4 %}text-green-600
@@ -295,7 +295,7 @@
               {% elif q.score == 3 %}bg-yellow-50 border-yellow-400
               {% else %}bg-red-50 border-red-500{% endif %}">
               <div class="flex items-center mb-1">
-                  <span class="text-lg mr-2" role="img" aria-label="lightbulb">ðŸ’¡</span>
+                  <span class="text-lg mr-2" role="img" aria-label="lightbulb">💡</span>
                   <span class="font-semibold {% if q.score >= 4 %}text-green-700{% elif q.score == 3 %}text-yellow-700{% else %}text-red-700{% endif %}">
                     AI Insight:
                   </span>
@@ -496,7 +496,7 @@
       const text = "- " + btn.getAttribute('data-check');
       navigator.clipboard.writeText(text);
       const original = btn.textContent;
-      btn.textContent = "Copied âœ“";
+      btn.textContent = "Copied ✓";
       setTimeout(() => btn.textContent = original, 1200);
     };
   });

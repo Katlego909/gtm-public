@@ -161,7 +161,7 @@ def _md_to_flowables(text: str, styles, avail_width: float) -> list:
     return flow
 
 
-def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
+def render_gtm_report_pdf_response(*, session, cat_scores, overall, band, engine_output=None):
     """
     Build a professional, multi-page PDF (with the AI Playbook + 30-Day plan)
     using built-in Helvetica fonts for maximum compatibility.
@@ -307,7 +307,10 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
     # --- Recommended Next Moves (band.actions_markdown) as formatted bullets/sections
     content.append(Spacer(1, 0.6 * cm))
     content.append(Paragraph("Recommended Next Moves", styles["H1"]))
-    if band and band.actions_markdown:
+    if engine_output and engine_output.get("primary_actions"):
+        for action in engine_output["primary_actions"]:
+            content.append(Paragraph(f"• {action}", styles["Body"]))
+    elif band and band.actions_markdown:
         content.extend(_md_to_flowables(band.actions_markdown, styles, doc.width))
     else:
         content.append(Paragraph("No recommendations available for this score range.", styles["Body"]))

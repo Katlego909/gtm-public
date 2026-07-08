@@ -329,7 +329,7 @@ def _get_client():
 # ================================================================
 # PROMPT GENERATOR
 # ================================================================
-def _build_prompt(snapshot: ResultSnapshot) -> str:
+def _build_prompt(snapshot: ResultSnapshot, engine_output: dict = None) -> str:
     """Create a structured prompt for AI to generate a personalized GTM playbook."""
     data = {
         "company_name": snapshot.company_name or "Unnamed Company",
@@ -343,6 +343,11 @@ def _build_prompt(snapshot: ResultSnapshot) -> str:
         "headline": snapshot.band.headline if snapshot.band else "",
         "categories": snapshot.category_breakdown or [],
     }
+    
+    segment_label = (engine_output or {}).get("segment_label", "")
+    primary_actions = "\n".join(
+        f"- {a}" for a in (engine_output or {}).get("primary_actions", [])
+    )
 
     cat_lines = "\n".join(
         [f"- {c['category']}: {c['avg']}/5" for c in data["categories"]]
@@ -404,6 +409,11 @@ Category Averages:
 
 Additional Context Provided by User:
 {context_notes_text if context_notes_text else 'No extra context provided.'}
+
+GTM Segment (detected): {segment_label}
+
+Priority actions already identified — enrich these, do not replace them:
+{primary_actions}
 """
     return prompt
 
@@ -437,7 +447,9 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
         # ---- 1️⃣ Attempt Unified Gemini generation
         client = _get_client()
         if client and not _quota_cooldown_active() and _request_budget_available():
-            prompt = _build_prompt(snapshot)
+            from .recommendation_engine import get_recommendations
+            engine_output = get_recommendations(snapshot)
+            prompt = _build_prompt(snapshot, engine_output)
             model_id = "gemini-2.5-flash"
             try:
                 response = client.models.generate_content(

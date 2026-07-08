@@ -44,9 +44,9 @@ from gtm.models import (
 #    Weights help indicate relative importance in the overall score.
 # ────────────────────────────────────────────────────────────────────────────────
 CATEGORIES: List[Tuple[str, float]] = [
-    ("Demand", 0.4),
-    ("Conversion", 0.4),
-    ("Delivery", 0.2),
+    ("Demand", 0.35),
+    ("Conversion", 0.35),
+    ("Delivery", 0.3),
 ]
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEM-FIT-02",
-            "text": "At least 6 out of 10 new inbound leads match our ideal customer profile, and we can verify this with clear qualification fields in our CRM.",
+            "text": "At least 6 out of 10 new inbound leads match our ideal customer profile, and we can verify this with clear qualification fields captured at lead creation in our CRM.",
             "weight": 1.2,
             "diagnostic_note": "If lead fit is low, spend goes up and conversion goes down.",
             "ai_metadata": {
@@ -122,8 +122,8 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEM-ATT-05",
-            "text": "We can clearly see which channel first brought a lead in and which channels later influenced the deal, using reporting data we trust.",
-            "weight": 1.2,
+            "text": "We can clearly see which channel first touched a lead and which channels later influenced the deal in attribution reporting, we trust.",
+            "weight": 1.1,
             "diagnostic_note": "Without clear attribution, it is hard to know where to invest.",
             "ai_metadata": {
                 "pillar": "Demand",
@@ -139,7 +139,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "DEM-CNT-06",
             "text": "We run content or outbound work on a regular schedule, not randomly, and each activity is tied to target accounts and clear pipeline goals.",
-            "weight": 1.0,
+            "weight": 1.1,
             "diagnostic_note": "If execution is irregular, pipeline becomes harder to predict.",
             "ai_metadata": {
                 "pillar": "Demand",
@@ -172,7 +172,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "CON-QLF-02",
-            "text": "We use one shared qualification checklist for all leads, and required CRM fields must be completed before an opportunity can move to the next stage.",
+            "text": "We use one shared sales-stage qualification checklist, and required CRM fields must be completed before an opportunity advances to the next pipeline stage, distinct from initial inbound lead capture.",
             "weight": 1.15,
             "diagnostic_note": "Weak qualification fills pipeline with poor-fit deals.",
             "ai_metadata": {
@@ -205,7 +205,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "CON-OBJ-04",
             "text": "We keep a simple playbook of common buyer objections and competitor risks, and managers coach the team on it so responses stay consistent.",
-            "weight": 1.0,
+            "weight": 1.1,
             "diagnostic_note": "Without this, reps answer objections inconsistently.",
             "ai_metadata": {
                 "pillar": "Conversion",
@@ -250,12 +250,44 @@ QUESTIONS: Dict[str, List[Dict]] = {
                 "quick_win_if_low": "Launch one monthly A/B test on a high-traffic conversion page.",
             },
         },
-    ],
+        {
+            "id_code": "CON-HND-07",
+            "text": "Marketing and sales agree on formal handoff rules — including when a lead is sales-ready, who owns it, and response-time expectations — and we review compliance monthly.",
+            "weight": 1.10,
+            "diagnostic_note": "Without a clear handoff definition, leads are passed too early or too late, wasting rep time and losing high-intent buyers.",
+            "ai_metadata": {
+                "pillar": "Conversion",
+                "dimension": "Sales-Marketing Handoff",
+                "question_type": "process",
+                "evidence_type": "system-data",
+                "time_horizon": "30d",
+                "owner_role": "revops",
+                "maturity_stage": "foundation",
+                "quick_win_if_low": "Write a one-paragraph MQL definition, get sign-off from both marketing and sales, and add it as a required CRM field before lead transfer.",
+            },
+        },
+        {   
+            "id_code": "CON-CRM-07",
+            "text": "Our CRM data is complete and trustworthy: required fields for ICP fit, source, and stage are enforced, and we audit data quality monthly so reporting and qualification decisions are reliable.",
+            "weight": 1.10,
+            "diagnostic_note": "Incomplete CRM data makes lead scoring, attribution, pipeline reporting, and qualification unreliable — corrupting several other GTM metrics at once.",
+            "ai_metadata": {
+                "pillar": "Conversion",
+                "dimension": "RevOps Data Hygiene",
+                "question_type": "evidence",
+                "evidence_type": "system-data",
+                "time_horizon": "30d",
+                "owner_role": "revops",
+                "maturity_stage": "foundation",
+                "quick_win_if_low": "Run a CRM completeness report on open deals — identify the three most-missed fields and make them mandatory before a deal can advance.",
+            },
+        },
+    ],  
     "Delivery": [
         {
             "id_code": "DEL-TTV-01",
-            "text": "We track how long it takes new customers to get their first real value, by segment, and we actively work to shorten that time.",
-            "weight": 1.2,
+            "text": "We measure and report how long it takes new customers to reach their first documented value milestone, by segment, and we set reduction targets we review monthly.",
+            "weight": 1.15,
             "diagnostic_note": "If first value takes too long, churn risk rises.",
             "ai_metadata": {
                 "pillar": "Delivery",
@@ -270,7 +302,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEL-ONB-02",
-            "text": "Our onboarding process has clear milestones, clear owners, and realistic completion targets, and progress is tracked in one shared system.",
+            "text": "Our onboarding process has documented milestones, assigned owners, and realistic completion targets tracked in one shared system — independent of whether we yet track time-to-value metrics.",
             "weight": 1.1,
             "diagnostic_note": "Poor onboarding slows activation and increases support load.",
             "ai_metadata": {
@@ -319,7 +351,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "DEL-QBR-05",
             "text": "Our high-value customers receive regular business reviews focused on outcomes, roadmap alignment, and practical expansion opportunities.",
-            "weight": 1.0,
+            "weight": 1.1,
             "diagnostic_note": "Without regular reviews, expansion opportunities are missed.",
             "ai_metadata": {
                 "pillar": "Delivery",
@@ -335,7 +367,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         {
             "id_code": "DEL-ADV-06",
             "text": "After customers achieve clear value, we consistently capture proof points like quotes, case studies, and references to support future selling.",
-            "weight": 0.95,
+            "weight": 1.05,
             "diagnostic_note": "If proof points are not captured, future buyers trust you less.",
             "ai_metadata": {
                 "pillar": "Delivery",

@@ -495,7 +495,8 @@ def results(request, session_id):
     # -----------------------------
     # Let _save_snapshot handle update_or_create and return the instance
     snap = _save_snapshot(session, cat_scores, overall, band, labels, values)
-
+    from .recommendation_engine import get_recommendations
+    engine_output = get_recommendations(snap)
     # -----------------------------
     # 🤖 Generate AI insights for low-scoring questions (if not already generated)
     # -----------------------------
@@ -562,6 +563,7 @@ def results(request, session_id):
         "recommendations": recommendations,
         "is_htmx": _is_htmx(request),
         "snap": snap,
+        "engine_output": engine_output,
     })
 
 def playbook_status(request, session_id):
@@ -775,7 +777,11 @@ def download_report_pdf(request, session_id):
     
     cat_scores, overall = _compute_scores(session)
     band = _band_for_score(overall)
-    return render_gtm_report_pdf_response(session=session, cat_scores=cat_scores, overall=overall, band=band)
+    from .models import ResultSnapshot
+    snap = ResultSnapshot.objects.filter(session=session).first()
+    from .recommendation_engine import get_recommendations
+    engine_output = get_recommendations(snap) if snap else None
+    return render_gtm_report_pdf_response(session=session, cat_scores=cat_scores, overall=overall, band=band, engine_output=engine_output)
 
 @login_required
 def history(request):
