@@ -1,0 +1,75 @@
+site_name: GTM Validator Documentation
+site_description: The Go-To-Market Readiness Platform.
+site_author: Katlego
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - content.code.copy
+
+nav:
+  - Start Here (Plain English): plain_english_guide.md
+  - Project Vision & Mission: index.md
+  - System Design Logic: system_design.md
+  - Developer Deep Dive: developer_deep_dive.md
+  - Business Logic & Implementation:
+      - Scoring Math: scoring_logic.md
+      - Core Logic Deep Dives: core_logic.md
+      - AI Engine & Resilience: ai_engine.md
+      - Document Processing: document_processing.md
+  - Data Architecture:
+      - Data Models: data_models.md
+      - Workspaces & RBAC: workspaces.md
+  - Python API Reference:
+      - Module Directory: python_reference.md
+      - API & Views: api_reference.md
+  - Operations & Tools:
+      - CLI Commands: maintenance_tools.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+extra_javascript:
+  - https://unpkg.com/mermaid/dist/mermaid.min.js
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          paths: [.]
+          options:
+            show_source: true
+            show_root_heading: true
+            show_category_heading: true
+            import_identifier_as_member: true
+            merge_init_into_class: true

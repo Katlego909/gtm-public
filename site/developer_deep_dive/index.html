@@ -1,0 +1,1660 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="The Go-To-Market Readiness Platform.">
+      
+      
+        <meta name="author" content="Katlego">
+      
+      
+      
+        <link rel="prev" href="../system_design/">
+      
+      
+        <link rel="next" href="../scoring_logic/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Developer Deep Dive - GTM Validator Documentation</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#developer-deep-dive-master-architecture-implementation" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="GTM Validator Documentation" class="md-header__button md-logo" aria-label="GTM Validator Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            GTM Validator Documentation
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Developer Deep Dive
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../plain_english_guide/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Start Here (Plain English)
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Project Vision & Mission
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../system_design/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  System Design Logic
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Developer Deep Dive
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../scoring_logic/" class="md-tabs__link">
+          
+  
+  
+  Business Logic & Implementation
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../data_models/" class="md-tabs__link">
+          
+  
+  
+  Data Architecture
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../python_reference/" class="md-tabs__link">
+          
+  
+  
+  Python API Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../maintenance_tools/" class="md-tabs__link">
+          
+  
+  
+  Operations & Tools
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="GTM Validator Documentation" class="md-nav__button md-logo" aria-label="GTM Validator Documentation" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    GTM Validator Documentation
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../plain_english_guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Start Here (Plain English)
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project Vision & Mission
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../system_design/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System Design Logic
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Deep Dive
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer Deep Dive
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-the-ui-interaction-model-django-htmx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. The UI Interaction Model: Django + HTMX
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. The UI Interaction Model: Django + HTMX">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-implementation-pattern-partial-rendering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Implementation Pattern: Partial Rendering
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-resilient-ai-engineering-the-playbook-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Resilient AI Engineering: The Playbook Engine
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Resilient AI Engineering: The Playbook Engine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#full-implementation-generate_playbook_with_gemini" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full Implementation: generate_playbook_with_gemini
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-the-scoring-engine-mathematical-accuracy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. The Scoring Engine: Mathematical Accuracy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. The Scoring Engine: Mathematical Accuracy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#full-implementation-_compute_scores" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full Implementation: _compute_scores
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-security-multi-tenant-authorization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Security: Multi-Tenant Authorization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Security: Multi-Tenant Authorization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#full-implementation-safe_get_session_or_403" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full Implementation: safe_get_session_or_403
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-vision-to-scoring-bridge-the-ai-auditor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Vision-to-Scoring Bridge: The AI Auditor
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Vision-to-Scoring Bridge: The AI Auditor">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#full-implementation-perform_resource_audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full Implementation: perform_resource_audit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Business Logic & Implementation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Business Logic & Implementation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../scoring_logic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Scoring Math
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../core_logic/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Core Logic Deep Dives
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ai_engine/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI Engine & Resilience
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../document_processing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Document Processing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Data Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data_models/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data Models
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workspaces/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workspaces & RBAC
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Python API Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Python API Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../python_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Module Directory
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api_reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API & Views
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations & Tools
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations & Tools
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../maintenance_tools/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI Commands
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-the-ui-interaction-model-django-htmx" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. The UI Interaction Model: Django + HTMX
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. The UI Interaction Model: Django + HTMX">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-implementation-pattern-partial-rendering" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The Implementation Pattern: Partial Rendering
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-resilient-ai-engineering-the-playbook-engine" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Resilient AI Engineering: The Playbook Engine
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Resilient AI Engineering: The Playbook Engine">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#full-implementation-generate_playbook_with_gemini" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full Implementation: generate_playbook_with_gemini
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-the-scoring-engine-mathematical-accuracy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. The Scoring Engine: Mathematical Accuracy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. The Scoring Engine: Mathematical Accuracy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#full-implementation-_compute_scores" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full Implementation: _compute_scores
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-security-multi-tenant-authorization" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Security: Multi-Tenant Authorization
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Security: Multi-Tenant Authorization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#full-implementation-safe_get_session_or_403" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full Implementation: safe_get_session_or_403
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-vision-to-scoring-bridge-the-ai-auditor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Vision-to-Scoring Bridge: The AI Auditor
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Vision-to-Scoring Bridge: The AI Auditor">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#full-implementation-perform_resource_audit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Full Implementation: perform_resource_audit
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="developer-deep-dive-master-architecture-implementation">Developer Deep Dive: Master Architecture &amp; Implementation</h1>
+<p>This document provides an exhaustive technical reference for the GTM Validator. It moves beyond high-level summaries to provide the <strong>full, production-grade implementations</strong> of the platform's core engines. This is the definitive "Source of Truth" for how the platform ensures resilience, security, and mathematical accuracy.</p>
+<hr />
+<h2 id="1-the-ui-interaction-model-django-htmx">1. The UI Interaction Model: Django + HTMX</h2>
+<p>We utilize a <strong>Modern Monolith</strong> pattern where Django handles the state and HTMX handles the interactivity. This allows us to maintain a complex multi-step assessment wizard without the overhead of a JavaScript framework.</p>
+<h3 id="the-implementation-pattern-partial-rendering">The Implementation Pattern: Partial Rendering</h3>
+<p>Every assessment view is designed to detect HTMX requests and return only the necessary DOM fragments.</p>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assessment_step</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">session_id</span><span class="p">,</span> <span class="n">step</span><span class="p">:</span> <span class="nb">int</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Manages the multi-step assessment lifecycle.</span>
+<span class="sd">    Detects HX-Request to return only the form partial for a seamless SPA experience.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">session</span><span class="p">,</span> <span class="n">is_authorized</span> <span class="o">=</span> <span class="n">safe_get_session_or_403</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">session_id</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">is_authorized</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">redirect</span><span class="p">(</span><span class="s2">&quot;gtm:history&quot;</span><span class="p">)</span>
+
+    <span class="c1"># Step-based question pagination logic</span>
+    <span class="n">steps</span> <span class="o">=</span> <span class="n">_paginated_questions</span><span class="p">()</span>
+    <span class="n">total_steps</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">steps</span><span class="p">)</span>
+    <span class="n">questions</span> <span class="o">=</span> <span class="n">steps</span><span class="p">[</span><span class="n">step</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+
+    <span class="c1"># Optimized initial data fetch (prefills if answers exist)</span>
+    <span class="n">existing</span> <span class="o">=</span> <span class="p">{</span><span class="n">r</span><span class="o">.</span><span class="n">question_id</span><span class="p">:</span> <span class="n">r</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">Response</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">session</span><span class="o">=</span><span class="n">session</span><span class="p">,</span> <span class="n">question__in</span><span class="o">=</span><span class="n">questions</span><span class="p">)}</span>
+    <span class="n">initial</span> <span class="o">=</span> <span class="p">{</span><span class="n">q</span><span class="o">.</span><span class="n">id_code</span><span class="p">:</span> <span class="n">existing</span><span class="p">[</span><span class="n">q</span><span class="o">.</span><span class="n">id</span><span class="p">]</span><span class="o">.</span><span class="n">score</span> <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="n">questions</span> <span class="k">if</span> <span class="n">q</span><span class="o">.</span><span class="n">id</span> <span class="ow">in</span> <span class="n">existing</span><span class="p">}</span>
+
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">method</span> <span class="o">==</span> <span class="s2">&quot;POST&quot;</span><span class="p">:</span>
+        <span class="n">form</span> <span class="o">=</span> <span class="n">StepForm</span><span class="p">(</span><span class="n">request</span><span class="o">.</span><span class="n">POST</span><span class="p">,</span> <span class="n">initial</span><span class="o">=</span><span class="n">initial</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">form</span><span class="o">.</span><span class="n">is_valid</span><span class="p">():</span>
+            <span class="k">with</span> <span class="n">transaction</span><span class="o">.</span><span class="n">atomic</span><span class="p">():</span>
+                <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="n">questions</span><span class="p">:</span>
+                    <span class="n">Response</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">update_or_create</span><span class="p">(</span>
+                        <span class="n">session</span><span class="o">=</span><span class="n">session</span><span class="p">,</span> <span class="n">question</span><span class="o">=</span><span class="n">q</span><span class="p">,</span>
+                        <span class="n">defaults</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;score&quot;</span><span class="p">:</span> <span class="n">form</span><span class="o">.</span><span class="n">cleaned_data</span><span class="p">[</span><span class="n">q</span><span class="o">.</span><span class="n">id_code</span><span class="p">]}</span>
+                    <span class="p">)</span>
+                <span class="n">session</span><span class="o">.</span><span class="n">current_step</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">step</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">total_steps</span><span class="p">)</span>
+                <span class="n">session</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">update_fields</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;current_step&quot;</span><span class="p">])</span>
+            <span class="k">return</span> <span class="n">redirect</span><span class="p">(</span><span class="s2">&quot;gtm:assessment_step&quot;</span><span class="p">,</span> <span class="n">session_id</span><span class="o">=</span><span class="n">session</span><span class="o">.</span><span class="n">uuid</span><span class="p">,</span> <span class="n">step</span><span class="o">=</span><span class="n">session</span><span class="o">.</span><span class="n">current_step</span><span class="p">)</span>
+
+    <span class="c1"># 🧩 Fragment Switching Logic</span>
+    <span class="n">template</span> <span class="o">=</span> <span class="s2">&quot;gtm/assessment_step.html&quot;</span> <span class="c1"># Full Layout</span>
+    <span class="k">if</span> <span class="n">request</span><span class="o">.</span><span class="n">headers</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">&#39;HX-Request&#39;</span><span class="p">)</span> <span class="o">==</span> <span class="s1">&#39;true&#39;</span><span class="p">:</span>
+        <span class="n">template</span> <span class="o">=</span> <span class="s2">&quot;gtm/partials/step_form.html&quot;</span> <span class="c1"># Partial Form</span>
+
+    <span class="k">return</span> <span class="n">render</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">template</span><span class="p">,</span> <span class="p">{</span>
+        <span class="s2">&quot;session&quot;</span><span class="p">:</span> <span class="n">session</span><span class="p">,</span> <span class="s2">&quot;form&quot;</span><span class="p">:</span> <span class="n">form</span><span class="p">,</span> <span class="s2">&quot;step&quot;</span><span class="p">:</span> <span class="n">step</span><span class="p">,</span> 
+        <span class="s2">&quot;progress_pct&quot;</span><span class="p">:</span> <span class="nb">int</span><span class="p">((</span><span class="n">step</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="n">total_steps</span> <span class="o">*</span> <span class="mi">100</span><span class="p">),</span>
+        <span class="s2">&quot;is_htmx&quot;</span><span class="p">:</span> <span class="kc">True</span>
+    <span class="p">})</span>
+</code></pre></div>
+<hr />
+<h2 id="2-resilient-ai-engineering-the-playbook-engine">2. Resilient AI Engineering: The Playbook Engine</h2>
+<p>AI generation is brittle and slow. Our engine is built with a <strong>three-tier resilience strategy</strong>: Concurrency Guards, JSON Rescuing, and Static Fallbacks.</p>
+<h3 id="full-implementation-generate_playbook_with_gemini">Full Implementation: <code>generate_playbook_with_gemini</code></h3>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">generate_playbook_with_gemini</span><span class="p">(</span><span class="n">snapshot</span><span class="p">:</span> <span class="n">ResultSnapshot</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Exhaustive AI Generation Pipeline:</span>
+<span class="sd">    1. Lock Guard: Prevents duplicate concurrent generation.</span>
+<span class="sd">    2. Status Management: Updates DB status for frontend polling.</span>
+<span class="sd">    3. Content Rescue: Fixes malformed JSON or markdown-wrapped objects.</span>
+<span class="sd">    4. Persistence: Saves cleaned markdown and structured analysis to the snapshot.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># 1️⃣ Concurrency Guard (Distributed Lock Pattern)</span>
+    <span class="n">playbook_lock_key</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;gtm:ai:playbook:</span><span class="si">{</span><span class="n">snapshot</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">:lock&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">cache</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">playbook_lock_key</span><span class="p">,</span> <span class="s2">&quot;1&quot;</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="mi">120</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">snapshot</span><span class="o">.</span><span class="n">ai_playbook</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+    <span class="n">snapshot</span><span class="o">.</span><span class="n">ai_playbook_status</span> <span class="o">=</span> <span class="s2">&quot;generating&quot;</span>
+    <span class="n">snapshot</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">update_fields</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;ai_playbook_status&quot;</span><span class="p">])</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">client</span> <span class="o">=</span> <span class="n">_get_client</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">client</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">_quota_cooldown_active</span><span class="p">():</span>
+            <span class="n">prompt</span> <span class="o">=</span> <span class="n">_build_prompt</span><span class="p">(</span><span class="n">snapshot</span><span class="p">)</span>
+            <span class="n">response</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">models</span><span class="o">.</span><span class="n">generate_content</span><span class="p">(</span><span class="n">model</span><span class="o">=</span><span class="s2">&quot;gemini-2.5-flash&quot;</span><span class="p">,</span> <span class="n">contents</span><span class="o">=</span><span class="n">prompt</span><span class="p">)</span>
+            <span class="n">raw_text</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">text</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+
+            <span class="c1"># 2️⃣ Content Rescuing Pattern</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="c1"># Standard path: Clean markdown tags and parse JSON</span>
+                <span class="n">clean_json</span> <span class="o">=</span> <span class="n">_clean_json_response</span><span class="p">(</span><span class="n">raw_text</span><span class="p">)</span>
+                <span class="n">parsed</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">clean_json</span><span class="p">)</span>
+                <span class="n">final_playbook</span> <span class="o">=</span> <span class="n">parsed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;markdown_playbook&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+                <span class="n">snapshot</span><span class="o">.</span><span class="n">ai_financial_summary</span> <span class="o">=</span> <span class="n">parsed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;financial_summary&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+                <span class="n">snapshot</span><span class="o">.</span><span class="n">ai_competitor_analysis</span> <span class="o">=</span> <span class="n">parsed</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;competitor_analysis&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="c1"># Rescue Path: Regex-based extraction if JSON is malformed</span>
+                <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s1">&#39;[&quot;</span><span class="se">\&#39;</span><span class="s1">]?markdown_playbook[&quot;</span><span class="se">\&#39;</span><span class="s1">]?\s*:\s*[&quot;</span><span class="se">\&#39;</span><span class="s1">]+(.*?)(?=[&quot;</span><span class="se">\&#39;</span><span class="s1">],\s*[&quot;</span><span class="se">\&#39;</span><span class="s1">]|[&quot;</span><span class="se">\&#39;</span><span class="s1">],?\s*\}|$)&#39;</span><span class="p">,</span> <span class="n">raw_text</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">DOTALL</span><span class="p">)</span>
+                <span class="n">final_playbook</span> <span class="o">=</span> <span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">n&#39;</span><span class="p">,</span> <span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\\</span><span class="s1">&quot;&#39;</span><span class="p">,</span> <span class="s1">&#39;&quot;&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">match</span> <span class="k">else</span> <span class="n">raw_text</span>
+
+            <span class="c1"># 3️⃣ Persistence &amp; Status Finalization</span>
+            <span class="n">snapshot</span><span class="o">.</span><span class="n">ai_playbook</span> <span class="o">=</span> <span class="n">final_playbook</span>
+            <span class="n">snapshot</span><span class="o">.</span><span class="n">ai_playbook_status</span> <span class="o">=</span> <span class="s2">&quot;done&quot;</span>
+            <span class="n">snapshot</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+            <span class="k">return</span> <span class="n">snapshot</span><span class="o">.</span><span class="n">ai_playbook</span>
+
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">snapshot</span><span class="o">.</span><span class="n">ai_playbook_status</span> <span class="o">=</span> <span class="s2">&quot;failed&quot;</span>
+        <span class="n">snapshot</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Playbook outer failure for </span><span class="si">{</span><span class="n">snapshot</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="n">cache</span><span class="o">.</span><span class="n">delete</span><span class="p">(</span><span class="n">playbook_lock_key</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="3-the-scoring-engine-mathematical-accuracy">3. The Scoring Engine: Mathematical Accuracy</h2>
+<p>The GTM score is a weighted maturity index. We avoid "N+1" queries by performing the tiered mathematical aggregation directly in the database using SQL expressions.</p>
+<h3 id="full-implementation-_compute_scores">Full Implementation: <code>_compute_scores</code></h3>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">_compute_scores</span><span class="p">(</span><span class="n">session</span><span class="p">:</span> <span class="n">AssessmentSession</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Computes hierarchical weighted maturity index.</span>
+<span class="sd">    Tier 1: Question-level weights normalized within a category.</span>
+<span class="sd">    Tier 2: Category-level weights (Demand: 0.4, Conversion: 0.4, Delivery: 0.2).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">all_cats</span> <span class="o">=</span> <span class="n">Category</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">all</span><span class="p">()</span><span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="s2">&quot;id&quot;</span><span class="p">)</span>
+    <span class="n">total_w</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">c</span><span class="o">.</span><span class="n">weight</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">all_cats</span><span class="p">)</span> <span class="ow">or</span> <span class="mf">1.0</span>
+    <span class="n">cat_weight_map</span> <span class="o">=</span> <span class="p">{</span><span class="n">c</span><span class="o">.</span><span class="n">id</span><span class="p">:</span> <span class="n">c</span><span class="o">.</span><span class="n">weight</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">all_cats</span><span class="p">}</span>
+
+    <span class="c1"># 🧩 Database Aggregation Engine</span>
+    <span class="c1"># Sums (score * weight) and (weight) per category in ONE query.</span>
+    <span class="n">category_results</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">Response</span><span class="o">.</span><span class="n">objects</span>
+        <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">session</span><span class="o">=</span><span class="n">session</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">values</span><span class="p">(</span><span class="s1">&#39;question__category_id&#39;</span><span class="p">)</span>
+        <span class="o">.</span><span class="n">annotate</span><span class="p">(</span>
+            <span class="n">total_weighted_score</span><span class="o">=</span><span class="n">Sum</span><span class="p">(</span><span class="n">F</span><span class="p">(</span><span class="s1">&#39;score&#39;</span><span class="p">)</span> <span class="o">*</span> <span class="n">F</span><span class="p">(</span><span class="s1">&#39;question__weight&#39;</span><span class="p">)),</span>
+            <span class="n">total_weight</span><span class="o">=</span><span class="n">Sum</span><span class="p">(</span><span class="s1">&#39;question__weight&#39;</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="s1">&#39;question__category_id&#39;</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">overall</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">scores_by_id</span> <span class="o">=</span> <span class="p">{</span><span class="n">c</span><span class="o">.</span><span class="n">id</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;category&quot;</span><span class="p">:</span> <span class="n">c</span><span class="p">,</span> <span class="s2">&quot;avg&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">,</span> <span class="s2">&quot;pct&quot;</span><span class="p">:</span> <span class="mf">0.0</span><span class="p">}</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">all_cats</span><span class="p">}</span>
+
+    <span class="k">for</span> <span class="n">row</span> <span class="ow">in</span> <span class="n">category_results</span><span class="p">:</span>
+        <span class="n">cat_id</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;question__category_id&#39;</span><span class="p">]</span>
+        <span class="n">num</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;total_weighted_score&#39;</span><span class="p">]</span>
+        <span class="n">den</span> <span class="o">=</span> <span class="n">row</span><span class="p">[</span><span class="s1">&#39;total_weight&#39;</span><span class="p">]</span>
+        <span class="n">avg</span> <span class="o">=</span> <span class="n">num</span> <span class="o">/</span> <span class="n">den</span> <span class="k">if</span> <span class="n">den</span> <span class="k">else</span> <span class="mf">0.0</span>
+
+        <span class="c1"># Normalize category average (1-5 scale) to percentage (0-100)</span>
+        <span class="n">scores_by_id</span><span class="p">[</span><span class="n">cat_id</span><span class="p">]</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s2">&quot;avg&quot;</span><span class="p">:</span> <span class="n">avg</span><span class="p">,</span> <span class="s2">&quot;pct&quot;</span><span class="p">:</span> <span class="p">(</span><span class="n">avg</span> <span class="o">/</span> <span class="mf">5.0</span><span class="p">)</span> <span class="o">*</span> <span class="mf">100.0</span><span class="p">})</span>
+
+        <span class="c1"># Apply Global Tier-2 Category Weighting</span>
+        <span class="n">weight</span> <span class="o">=</span> <span class="n">cat_weight_map</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">cat_id</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">overall</span> <span class="o">+=</span> <span class="p">(</span><span class="n">avg</span> <span class="o">/</span> <span class="mf">5.0</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">weight</span> <span class="o">/</span> <span class="n">total_w</span><span class="p">)</span> <span class="o">*</span> <span class="mf">100.0</span>
+
+    <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="n">scores_by_id</span><span class="o">.</span><span class="n">values</span><span class="p">()),</span> <span class="nb">round</span><span class="p">(</span><span class="n">overall</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+</code></pre></div>
+<hr />
+<h2 id="4-security-multi-tenant-authorization">4. Security: Multi-Tenant Authorization</h2>
+<p>Our RBAC (Role-Based Access Control) ensures that data is only accessible to the owner or authorized team members. This logic is centralized in a single guard function.</p>
+<h3 id="full-implementation-safe_get_session_or_403">Full Implementation: <code>safe_get_session_or_403</code></h3>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">safe_get_session_or_403</span><span class="p">(</span><span class="n">request</span><span class="p">,</span> <span class="n">session_id</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Centralized Security Guard for all Assessment data.</span>
+<span class="sd">    Implements a three-tier hierarchy of access:</span>
+<span class="sd">    1. Owner Check: Direct ownership via User FK.</span>
+<span class="sd">    2. Workspace Check: Membership in the workspace that owns the session.</span>
+<span class="sd">    3. Anonymous Check: Ownership verified via browser-scoped client_id cookie.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">session</span> <span class="o">=</span> <span class="n">AssessmentSession</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">pk</span><span class="o">=</span><span class="n">session_id</span><span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="n">AssessmentSession</span><span class="o">.</span><span class="n">DoesNotExist</span><span class="p">,</span> <span class="n">ValidationError</span><span class="p">):</span>
+        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">False</span>
+
+    <span class="c1"># Tier 3: Anonymous Access (Cookie-based Client ID)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="o">.</span><span class="n">is_authenticated</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">session</span><span class="o">.</span><span class="n">owner_client_id</span> <span class="o">==</span> <span class="n">_client_id</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">session</span><span class="p">,</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">False</span>
+
+    <span class="c1"># Tier 1: Direct Ownership</span>
+    <span class="k">if</span> <span class="n">session</span><span class="o">.</span><span class="n">user</span> <span class="o">==</span> <span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">session</span><span class="p">,</span> <span class="kc">True</span>
+
+    <span class="c1"># Tier 2: Collaborative Workspace Access</span>
+    <span class="k">if</span> <span class="n">session</span><span class="o">.</span><span class="n">workspace</span><span class="p">:</span>
+        <span class="n">is_member</span> <span class="o">=</span> <span class="n">WorkspaceMembership</span><span class="o">.</span><span class="n">objects</span><span class="o">.</span><span class="n">filter</span><span class="p">(</span>
+            <span class="n">user</span><span class="o">=</span><span class="n">request</span><span class="o">.</span><span class="n">user</span><span class="p">,</span> 
+            <span class="n">workspace</span><span class="o">=</span><span class="n">session</span><span class="o">.</span><span class="n">workspace</span><span class="p">,</span> 
+            <span class="n">is_active</span><span class="o">=</span><span class="kc">True</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">exists</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">is_member</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">session</span><span class="p">,</span> <span class="kc">True</span>
+
+    <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">False</span>
+</code></pre></div>
+<hr />
+<h2 id="5-vision-to-scoring-bridge-the-ai-auditor">5. Vision-to-Scoring Bridge: The AI Auditor</h2>
+<p>The AI Auditor uses multimodal capabilities to turn visual strategic evidence (PDFs/Images) into numeric maturity modifiers.</p>
+<h3 id="full-implementation-perform_resource_audit">Full Implementation: <code>perform_resource_audit</code></h3>
+<div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">perform_resource_audit</span><span class="p">(</span><span class="n">resource</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Orchestrates the lifecycle of a multimodal visual audit:</span>
+<span class="sd">    1. Read: Pulls raw binary bytes from storage.</span>
+<span class="sd">    2. Vision: Streams bytes + prompt to Gemini-Flash.</span>
+<span class="sd">    3. Parse: Extracts &#39;Evidence Score&#39; (1-10) using regex from AI prose.</span>
+<span class="sd">    4. Map: Converts 1-10 score into a GTM Modifier (-3 to +3).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">resource</span><span class="o">.</span><span class="n">resource_type</span> <span class="o">!=</span> <span class="s1">&#39;file&#39;</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">resource</span><span class="o">.</span><span class="n">file</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="c1"># Step 1: Binary Stream Capture</span>
+        <span class="n">resource</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s1">&#39;rb&#39;</span><span class="p">)</span>
+        <span class="n">file_bytes</span> <span class="o">=</span> <span class="n">resource</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+        <span class="n">resource</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+
+        <span class="c1"># Step 2: Multimodal Critique</span>
+        <span class="n">audit_text</span> <span class="o">=</span> <span class="n">_run_multimodal_audit</span><span class="p">(</span>
+            <span class="n">file_bytes</span><span class="p">,</span> 
+            <span class="n">mime_type</span><span class="o">=</span><span class="n">_detect_mime</span><span class="p">(</span><span class="n">resource</span><span class="o">.</span><span class="n">file</span><span class="o">.</span><span class="n">name</span><span class="p">),</span>
+            <span class="n">asset_name</span><span class="o">=</span><span class="n">resource</span><span class="o">.</span><span class="n">get_category_display</span><span class="p">()</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">audit_text</span><span class="p">:</span>
+            <span class="c1"># Step 3: Qualitative-to-Quantitative Bridge</span>
+            <span class="n">match</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">search</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;evidence\s+score[:\s*]+(\d+)&quot;</span><span class="p">,</span> <span class="n">audit_text</span><span class="p">,</span> <span class="n">re</span><span class="o">.</span><span class="n">I</span><span class="p">)</span>
+            <span class="n">score</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">match</span><span class="o">.</span><span class="n">group</span><span class="p">(</span><span class="mi">1</span><span class="p">))</span> <span class="k">if</span> <span class="n">match</span> <span class="k">else</span> <span class="mf">5.0</span>
+
+            <span class="c1"># Step 4: Numeric Mapping</span>
+            <span class="c1"># 1-3 -&gt; -3 (High Risk), 8-10 -&gt; +3 (Strategic Asset)</span>
+            <span class="n">resource</span><span class="o">.</span><span class="n">ai_score_modifier</span> <span class="o">=</span> <span class="n">_map_score_to_modifier</span><span class="p">(</span><span class="n">score</span><span class="p">)</span>
+            <span class="n">resource</span><span class="o">.</span><span class="n">ai_audit_summary</span> <span class="o">=</span> <span class="n">audit_text</span>
+            <span class="n">resource</span><span class="o">.</span><span class="n">audit_status</span> <span class="o">=</span> <span class="s1">&#39;complete&#39;</span>
+            <span class="n">resource</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+            <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Multimodal Audit failure for resource </span><span class="si">{</span><span class="n">resource</span><span class="o">.</span><span class="n">id</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">resource</span><span class="o">.</span><span class="n">audit_status</span> <span class="o">=</span> <span class="s1">&#39;failed&#39;</span>
+        <span class="n">resource</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="kc">False</span>
+</code></pre></div>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "content.code.copy"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+        <script src="https://unpkg.com/mermaid/dist/mermaid.min.js"></script>
+      
+    
+  </body>
+</html>
