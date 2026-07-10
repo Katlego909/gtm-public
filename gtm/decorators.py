@@ -59,7 +59,6 @@ def workspace_permission_required(permission_name, workspace_param='workspace_id
                         'message': f'You need {permission_name.replace("_", " ")} permission to perform this action.'
                     })
                 return JsonResponse({'error': 'Permission denied'}, status=403)
-                return HttpResponseForbidden("You don't have permission for this action")
             
             # Add workspace context to request
             request.workspace = workspace

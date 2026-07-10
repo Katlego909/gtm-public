@@ -69,8 +69,10 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "gtm.middleware_workspace.WorkspaceMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    # Must come after AuthenticationMiddleware (needs request.user) and
+    # MessageMiddleware (uses messages.error on the non-member redirect path).
+    "gtm.middleware_workspace.WorkspaceMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "django_htmx.middleware.HtmxMiddleware",
 ]

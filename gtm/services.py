@@ -11,6 +11,7 @@ import markdown as md
 from .models import Category, Question, AssessmentSession, Response, RecommendationBand, ResultSnapshot
 from .utils_logging import log_error
 from .utils import transfer_firmographics_to_snapshot, _client_id
+from .utils_async import run_in_background
 from .ai_services import generate_playbook_with_gemini
 
 def _expand_gtm_jargon(text: str) -> str:
@@ -111,24 +112,14 @@ def _kickoff_playbook_generation(snapshot, session_id=None):
     if not cache.add(kickoff_key, "1", timeout=20):
         return False
 
-    try:
-        from threading import Thread
+    def generate_async(snapshot_id):
+        fresh_snapshot = ResultSnapshot.objects.filter(id=snapshot_id).first()
+        if not fresh_snapshot or (fresh_snapshot.ai_playbook or "").strip():
+            return
+        generate_playbook_with_gemini(fresh_snapshot)
 
-        def generate_async(snapshot_id, sid):
-            try:
-                fresh_snapshot = ResultSnapshot.objects.filter(id=snapshot_id).first()
-                if not fresh_snapshot or (fresh_snapshot.ai_playbook or "").strip():
-                    return
-                generate_playbook_with_gemini(fresh_snapshot)
-            except Exception as e:
-                log_error("AI Playbook async kickoff", e, {"session_id": str(sid) if sid else ""})
-
-        thread = Thread(target=generate_async, args=(snapshot.id, session_id), daemon=True)
-        thread.start()
-        return True
-    except Exception as e:
-        log_error("AI Playbook thread creation", e, {"session_id": str(session_id) if session_id else ""})
-        return False
+    run_in_background(generate_async, snapshot.id, name=f"playbook_generation:{session_id}")
+    return True
 
 
 def _log_access_denied(request, reason, session_id=None, details=None):

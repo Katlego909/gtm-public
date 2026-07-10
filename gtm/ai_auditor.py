@@ -11,6 +11,8 @@ import threading
 from django.conf import settings
 from django.utils import timezone
 
+from .utils_async import run_in_background
+
 try:
     from google import genai
     from google.genai import types
@@ -297,35 +299,29 @@ def audit_resource_async(resource_id):
     marks it as 'auditing', runs the audit, then saves the result.
     """
     def _run():
+        # Import inside thread to avoid circular import issues
+        from dashboard.models import Resource
         try:
-            # Import inside thread to avoid circular import issues
-            from dashboard.models import Resource
             resource = Resource.objects.get(pk=resource_id)
             resource.audit_status = 'auditing'
             resource.save(update_fields=['audit_status'])
             perform_resource_audit(resource)
         except Exception as e:
             logger.error(f"audit_resource_async failed for {resource_id}: {e}")
-            try:
-                from dashboard.models import Resource
-                Resource.objects.filter(pk=resource_id).update(audit_status='failed')
-            except Exception:
-                pass
+            Resource.objects.filter(pk=resource_id).update(audit_status='failed')
 
-    thread = threading.Thread(target=_run, daemon=True)
-    thread.start()
-    return thread
+    return run_in_background(_run, name="audit_resource")
 
 
 def audit_strategic_evidence_async(gtm_file_id):
     """Background-thread-safe wrapper for performing a GTMFile audit."""
     def _run():
+        from gtm.models import GTMFile
         try:
-            from gtm.models import GTMFile
             session_file = GTMFile.objects.get(pk=gtm_file_id)
             session_file.audit_status = 'auditing'
             session_file.save(update_fields=['audit_status'])
-            
+
             # Get context from session if available
             context = None
             if session_file.session:
@@ -336,12 +332,6 @@ def audit_strategic_evidence_async(gtm_file_id):
             perform_gtm_visual_audit(session_file, session_context=context)
         except Exception as e:
             logger.error(f"audit_strategic_evidence_async failed for {gtm_file_id}: {e}")
-            try:
-                from gtm.models import GTMFile
-                GTMFile.objects.filter(pk=gtm_file_id).update(audit_status='failed')
-            except Exception:
-                pass
+            GTMFile.objects.filter(pk=gtm_file_id).update(audit_status='failed')
 
-    thread = threading.Thread(target=_run, daemon=True)
-    thread.start()
-    return thread
+    return run_in_background(_run, name="audit_strategic_evidence")

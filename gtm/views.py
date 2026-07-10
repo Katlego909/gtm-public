@@ -30,6 +30,7 @@ from django.conf import settings
 from django.core.cache import cache
 from functools import wraps
 from .utils import transfer_firmographics_to_snapshot, _client_id
+from .utils_async import run_in_background
 from .utils_pdf import render_gtm_report_pdf_response
 from .ai_services import (
     generate_playbook_with_gemini,
@@ -606,23 +607,16 @@ def results(request, session_id):
 
     # 🤖 TRIGGER BATCH ASYNC GENERATION (one thread for all insights, not one per response)
     if responses_needing_insight:
-        try:
-            from threading import Thread
-            resp_ids_for_batch = [r.id for r in responses_needing_insight]
+        resp_ids_for_batch = [r.id for r in responses_needing_insight]
 
-            def gen_batch_async(r_ids):
-                try:
-                    from .models import Response as ResponseModel
-                    fresh_responses = list(
-                        ResponseModel.objects.filter(id__in=r_ids).select_related("question", "session__snapshot")
-                    )
-                    generate_diagnostic_insights_batch(fresh_responses)
-                except Exception as e:
-                    log_error("Batch Diagnostic Async", e)
+        def gen_batch_async(r_ids):
+            from .models import Response as ResponseModel
+            fresh_responses = list(
+                ResponseModel.objects.filter(id__in=r_ids).select_related("question", "session__snapshot")
+            )
+            generate_diagnostic_insights_batch(fresh_responses)
 
-            Thread(target=gen_batch_async, args=(resp_ids_for_batch,), daemon=True).start()
-        except Exception as e:
-            log_error("Batch Diagnostic Thread creation", e)
+        run_in_background(gen_batch_async, resp_ids_for_batch, name="batch_diagnostic_insights")
 
     
     # -----------------------------
@@ -755,18 +749,18 @@ def enrichment_status(request, session_id):
         return HttpResponse("")
 
     if not snap.ai_financial_summary or not snap.ai_competitor_analysis:
-        from .ai_services import generate_enrichment_sections
-        import threading
-        def _run(snap_id):
-            from django.db import connection
-            try:
+        # Debounce: HTMX polls this endpoint every few seconds. generate_enrichment_
+        # sections holds its own lock, but this spawn guard stops us creating a fresh
+        # thread on every poll while one is already in flight.
+        spawn_guard = f"gtm:ai:enrichment:{snap.id}:spawn"
+        if cache.add(spawn_guard, "1", timeout=120):
+            from .ai_services import generate_enrichment_sections
+
+            def _run(snap_id):
                 from .models import ResultSnapshot as RS
-                s = RS.objects.get(id=snap_id)
-                generate_enrichment_sections(s)
-            finally:
-                connection.close()
-        threading.Thread(target=_run, args=(snap.id,), daemon=True).start()
-        snap.refresh_from_db()
+                generate_enrichment_sections(RS.objects.get(id=snap_id))
+
+            run_in_background(_run, snap.id, name="enrichment_sections")
 
     fin_html = comp_html = ""
     fin_failed = (snap.ai_financial_summary == ENRICHMENT_UNAVAILABLE)
@@ -1014,21 +1008,13 @@ def insight_status(request, session_id, response_id):
 
         if status == "pending":
             # Only spawn a thread if generation hasn't started yet
-            try:
-                from threading import Thread
+            def gen_diagnostic_async(resp_id):
+                from .models import Response
+                from .ai_services import generate_diagnostic_insight
+                r = Response.objects.select_related("question", "session__snapshot").get(id=resp_id)
+                generate_diagnostic_insight(r)
 
-                def gen_diagnostic_async(resp_id):
-                    try:
-                        from .models import Response
-                        from .ai_services import generate_diagnostic_insight
-                        r = Response.objects.select_related("question", "session__snapshot").get(id=resp_id)
-                        generate_diagnostic_insight(r)
-                    except Exception as e:
-                        log_error("Async Diagnostic Gen (poll)", e)
-
-                Thread(target=gen_diagnostic_async, args=(response.id,), daemon=True).start()
-            except Exception as e:
-                log_error("Diagnostic poll thread creation", e)
+            run_in_background(gen_diagnostic_async, response.id, name="diagnostic_insight_poll")
         # If status is "generating" or "failed", don't spawn another thread
 
     return render(request, "gtm/partials/insight_status.html", {
@@ -1133,24 +1119,18 @@ def upload_strategic_evidence(request, session_id):
         
         # 🤖 TRIGGER ASYNC INITIAL AUDIT
         # This caches the result so the chat agent doesn't have to wait for a 10s API call
-        from .ai_auditor import perform_gtm_visual_audit
-        from threading import Thread
-        
         # Build context for the audit
         cat_scores, overall = _compute_scores(session)
         band = _band_for_score(overall)
         context_str = f"Company GTM Score: {overall}/100. Stage: {band.stage if band else 'N/A'}"
-        
+
         def run_initial_audit(file_id, ctx):
-            try:
-                from .models import GTMFile
-                from .ai_auditor import perform_gtm_visual_audit
-                f = GTMFile.objects.get(id=file_id)
-                perform_gtm_visual_audit(f, session_context=ctx)
-            except Exception as e:
-                log_error("Initial Audit Background Failure", e)
-                
-        Thread(target=run_initial_audit, args=(gtm_file.id, context_str), daemon=True).start()
+            from .models import GTMFile
+            from .ai_auditor import perform_gtm_visual_audit
+            f = GTMFile.objects.get(id=file_id)
+            perform_gtm_visual_audit(f, session_context=ctx)
+
+        run_in_background(run_initial_audit, gtm_file.id, context_str, name="initial_visual_audit")
         
         return JsonResponse({
             "success": True,
@@ -1206,19 +1186,15 @@ def upload_delivery_document(request, session_id):
     )
 
     def _extract_in_background(doc_id, ftype):
-        try:
-            from .delivery_analyzer import extract_text_from_path
-            from .ai_services import _get_client
-            d = DeliveryDocument.objects.get(id=doc_id)
-            client = _get_client() if ftype == 'image' else None
-            text = extract_text_from_path(d.file.path, ftype, client, "gemini-2.5-flash")
-            d.extracted_text = text
-            d.save(update_fields=['extracted_text'])
-        except Exception as exc:
-            log_error("DeliveryDoc background extraction", exc)
+        from .delivery_analyzer import extract_text_from_path
+        from .ai_services import _get_client
+        d = DeliveryDocument.objects.get(id=doc_id)
+        client = _get_client() if ftype == 'image' else None
+        text = extract_text_from_path(d.file.path, ftype, client, "gemini-2.5-flash")
+        d.extracted_text = text
+        d.save(update_fields=['extracted_text'])
 
-    from threading import Thread
-    Thread(target=_extract_in_background, args=(str(doc.id), file_type), daemon=True).start()
+    run_in_background(_extract_in_background, str(doc.id), file_type, name="delivery_doc_extract")
 
     return JsonResponse({
         "success": True,
@@ -1360,19 +1336,15 @@ def upload_category_document(request, session_id, category):
     ).exclude(id=doc.id).update(analysis_result={})
 
     def _extract_in_background(doc_id, ftype):
-        try:
-            from .delivery_analyzer import extract_text_from_path
-            from .ai_services import _get_client
-            d = CategoryDocument.objects.get(id=doc_id)
-            client = _get_client() if ftype == 'image' else None
-            text = extract_text_from_path(d.file.path, ftype, client, "gemini-2.5-flash")
-            d.extracted_text = text
-            d.save(update_fields=['extracted_text'])
-        except Exception as exc:
-            log_error("CategoryDoc background extraction", exc)
+        from .delivery_analyzer import extract_text_from_path
+        from .ai_services import _get_client
+        d = CategoryDocument.objects.get(id=doc_id)
+        client = _get_client() if ftype == 'image' else None
+        text = extract_text_from_path(d.file.path, ftype, client, "gemini-2.5-flash")
+        d.extracted_text = text
+        d.save(update_fields=['extracted_text'])
 
-    from threading import Thread
-    Thread(target=_extract_in_background, args=(str(doc.id), file_type), daemon=True).start()
+    run_in_background(_extract_in_background, str(doc.id), file_type, name="category_doc_extract")
 
     return JsonResponse({
         "success": True,

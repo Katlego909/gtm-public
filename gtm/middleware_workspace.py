@@ -8,6 +8,7 @@ Keeps authorization logic separate from django-allauth authentication.
 from django.shortcuts import redirect, get_object_or_404
 from django.urls import reverse
 from django.contrib import messages
+from django.http import Http404
 from .models_workspace import Workspace, WorkspaceMembership
 from uuid import UUID
 
@@ -70,9 +71,11 @@ class WorkspaceMiddleware:
                     workspace = get_object_or_404(Workspace, id=workspace_identifier, is_active=True)
                 else:
                     workspace = get_object_or_404(Workspace, slug=workspace_identifier, is_active=True)
-                # Store in session for subsequent requests
-                request.session['current_workspace_id'] = str(workspace.id)
-            except:
+                # NOTE: do NOT persist current_workspace_id here — membership is not
+                # verified yet. Storing it before the check below would poison the
+                # session with a workspace the user cannot access, causing an
+                # infinite redirect loop on every subsequent workspace request.
+            except Http404:
                 # Invalid workspace, redirect to workspace selection
                 return redirect('gtm:workspace:list')
         else:
@@ -85,15 +88,15 @@ class WorkspaceMiddleware:
                     # Workspace deleted, clear session
                     del request.session['current_workspace_id']
             
-            # If no workspace in session, get user's default
+            # If no workspace in session, get user's default. The session pointer is
+            # written once below, after membership is confirmed.
             if not workspace:
                 membership = WorkspaceMembership.objects.filter(
-                    user=request.user, 
+                    user=request.user,
                     is_active=True
                 ).first()
                 if membership:
                     workspace = membership.workspace
-                    request.session['current_workspace_id'] = str(workspace.id)
         
         # Add workspace context to request
         request.workspace = workspace
@@ -106,8 +109,14 @@ class WorkspaceMiddleware:
                     workspace=workspace,
                     is_active=True
                 )
+                # Membership confirmed — now it is safe to remember this workspace
+                # for subsequent requests that don't carry an identifier in the URL.
+                request.session['current_workspace_id'] = str(workspace.id)
             except WorkspaceMembership.DoesNotExist:
-                # User not member of this workspace
+                # User not member of this workspace. Clear any stale session pointer
+                # so we don't redirect-loop on the next identifier-less request.
+                if request.session.get('current_workspace_id') == str(workspace.id):
+                    del request.session['current_workspace_id']
                 messages.error(request, "You don't have access to this workspace.")
                 return redirect('gtm:workspace:list')
 

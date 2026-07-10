@@ -781,7 +781,7 @@ _IMPERATIVE_VERBS = re.compile(
     r'Invest|Hire|Align|Map|Identify|Document|Introduce|Address|Fix|Resolve|Update|Upgrade|'
     r'Integrate|Configure|Run|Execute|Measure|Monitor|Optimize|Streamline|Formalize|Standardize|'
     r'Initiate|Activate|Assign|Appoint|Engage|Reach|Contact|Request|Ask|Trigger|Add|Remove|'
-    r'Consolidate|Restructure|Revisit|Revisit|Explore|Trial|Test|Pilot|Roll)\b',
+    r'Consolidate|Restructure|Revisit|Explore|Trial|Test|Pilot|Roll)\b',
     re.IGNORECASE,
 )
 
