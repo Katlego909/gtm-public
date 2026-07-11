@@ -503,7 +503,7 @@
                         </span>
                     </button>
                 </div>
-                <div id="insight-modal-{{ insight.id }}" class="fixed inset-0 z-50 hidden bg-black bg-opacity-50 flex items-center justify-center p-4">
+                <div id="insight-modal-{{ insight.id }}" class="fixed inset-0 z-[1300] hidden bg-black bg-opacity-50 flex items-center justify-center p-4">
                     <div class="bg-white rounded-xl border border-gray-200 max-w-3xl w-full relative flex flex-col" style="max-height:85vh;">
                         <div class="flex items-center justify-between p-6 border-b border-gray-200">
                             <h4 class="text-2xl font-bold text-green-700 flex items-center gap-2">
@@ -579,22 +579,16 @@
 {{ total_sessions|default:0|json_script:"js-total-sessions" }}
 {{ completed_items|default:0|json_script:"js-completed-items" }}
 {{ pending_items|default:0|json_script:"js-pending-items" }}
-{{ days_labels|default:'[]'|json_script:"js-days-labels" }}
-{{ sessions_per_day|default:'[]'|json_script:"js-sessions-per-day" }}
-{{ channel_data|default:'[]'|json_script:"js-channel-data" }}
-{{ score_trend_data|default:'{}'|json_script:"js-score-trend-data" }}
+{{ days_labels|default_if_none:'[]'|json_script:"js-days-labels" }}
+{{ sessions_per_day|default_if_none:'[]'|json_script:"js-sessions-per-day" }}
+{{ channel_data|default_if_none:'[]'|json_script:"js-channel-data" }}
+{{ score_trend_data|default_if_none:'{}'|json_script:"js-score-trend-data" }}
 
 <script>
-// Initialize charts when DOM is ready
-document.addEventListener('DOMContentLoaded', function() {
-    initCharts();
-});
-
-// Also try to initialize immediately in case DOM is already loaded (HTMX partial load)
+// Initialize charts when DOM is ready (HTMX partial loads land with the DOM already parsed)
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initCharts);
 } else {
-    // DOM already loaded, initialize now
     setTimeout(initCharts, 100);
 }
 
@@ -639,6 +633,7 @@ function initCharts() {
     if (chartData.score_trend_data && chartData.score_trend_data.scores && chartData.score_trend_data.scores.length > 1) {
         const scoreTrendCanvas = document.getElementById('scoreTrendChart');
         if (scoreTrendCanvas && typeof Chart !== 'undefined') {
+            Chart.getChart(scoreTrendCanvas)?.destroy();
             new Chart(scoreTrendCanvas, {
                 type: 'line',
                 data: {
@@ -709,7 +704,7 @@ function showWorkspaceList() {
 </script>
 
 <!-- Workspace Management Modal -->
-<div id="workspace-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+<div id="workspace-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-[1300]">
     <div class="bg-white rounded-xl max-w-md w-full mx-4 max-h-96 overflow-y-auto">
         <!-- Workspace List View -->
         <div id="workspace-list-view">
@@ -794,7 +789,7 @@ function showWorkspaceList() {
 
 <!-- Team Invitation Modal -->
 {% if current_workspace %}
-<div id="invite-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+<div id="invite-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-[1300]">
     <div class="bg-white rounded-xl max-w-md w-full mx-4">
         <div class="p-6">
             <div class="flex justify-between items-center mb-4">

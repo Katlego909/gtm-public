@@ -164,11 +164,11 @@ def analyze_risk_and_mitigation(session_uuid: str) -> str:
         for cat in context.get('categories', []):
             if cat['score'] < 2.5:
                 if cat['name'] == 'Demand':
-                    risks.append("🔴 HIGH: Weak demand generation is your biggest risk—you may struggle to build pipeline. Immediate focus: clarify ICP and messaging.")
+                    risks.append("HIGH: Weak demand generation is your biggest risk—you may struggle to build pipeline. Immediate focus: clarify ICP and messaging.")
                 elif cat['name'] == 'Conversion':
-                    risks.append("🔴 HIGH: Poor conversion efficiency means pipeline becomes expensive fast. Focus: tighten qualification and enable sales.")
+                    risks.append("HIGH: Poor conversion efficiency means pipeline becomes expensive fast. Focus: tighten qualification and enable sales.")
                 elif cat['name'] == 'Delivery':
-                    risks.append("🔴 HIGH: Churn risk is elevated. Poor delivery kills expansion revenue. Focus: define TTV milestones.")
+                    risks.append("HIGH: Churn risk is elevated. Poor delivery kills expansion revenue. Focus: define TTV milestones.")
 
         return ("Risk Assessment:\n" + "\n".join(risks)) if risks else f"Your GTM is solid at the {context.get('stage')} stage—no critical risks detected. Keep maintaining momentum."
     except Exception as e:
@@ -188,20 +188,20 @@ def build_implementation_roadmap(session_uuid: str, timeframe: str = "90-day") -
 
         phases = {
             "30-day": [
-                "📍 Week 1-2: Define ICP & messaging",
-                "📍 Week 3: Set up qualification process",
-                "📍 Week 4: Define TTV milestones"
+                "Week 1-2: Define ICP & messaging",
+                "Week 3: Set up qualification process",
+                "Week 4: Define TTV milestones"
             ],
             "60-day": [
-                "🎯 Phase 1 (Week 1-2): Quick wins—fix the most critical gap",
-                "🎯 Phase 2 (Week 3-4): Build process—implement qualification/onboarding",
-                "🎯 Phase 3 (Week 5-8): Test—run small pilots to validate changes",
-                "🎯 Phase 4 (Week 9+): Scale—expand what works"
+                "Phase 1 (Week 1-2): Quick wins—fix the most critical gap",
+                "Phase 2 (Week 3-4): Build process—implement qualification/onboarding",
+                "Phase 3 (Week 5-8): Test—run small pilots to validate changes",
+                "Phase 4 (Week 9+): Scale—expand what works"
             ],
             "90-day": [
-                "📅 Month 1: Diagnostic & quick wins (pick top 2 gaps)",
-                "📅 Month 2: Process implementation & team alignment",
-                "📅 Month 3: Measurement & optimization (review results, adjust)"
+                "Month 1: Diagnostic & quick wins (pick top 2 gaps)",
+                "Month 2: Process implementation & team alignment",
+                "Month 3: Measurement & optimization (review results, adjust)"
             ]
         }
 
@@ -225,10 +225,10 @@ def competitive_benchmarking_analysis(session_uuid: str) -> str:
         score = context.get('overall_score', 0)
         stage = context.get('stage', 'Unknown')
 
-        analysis = f"📊 Your Competitive Position ({stage} stage):\n\n"
+        analysis = f"Your Competitive Position ({stage} stage):\n\n"
         analysis += f"Your GTM Score: {score}/100\n"
         analysis += f"Industry peers at this stage: 45-70\n"
-        analysis += f"Position: {'Ahead of curve ✅' if score > 60 else 'Room to improve 📈'}\n\n"
+        analysis += f"Position: {'Ahead of curve' if score > 60 else 'Room to improve'}\n\n"
 
         cats = sorted(context.get('categories', []), key=lambda x: x.get('score', 0), reverse=True)
         if cats:
@@ -256,20 +256,20 @@ def resource_allocation_guidance(session_uuid: str) -> str:
         session = AssessmentSession.objects.get(uuid=session_uuid)
         context = build_session_context(session)
 
-        guidance = f"💰 Resource Allocation for {context['company_name']}:\n\n"
+        guidance = f"Resource Allocation for {context['company_name']}:\n\n"
 
         cats = sorted(context.get('categories', []), key=lambda x: x.get('score', 0))
 
         if len(cats) >= 3:
-            guidance += f"🔴 HIGH PRIORITY (40-50% budget):\n"
+            guidance += f"HIGH PRIORITY (40-50% budget):\n"
             guidance += f"   {cats[0]['name']} ({cats[0]['score']}/5)\n"
             guidance += f"   Hire, build process, invest in tools\n\n"
 
-            guidance += f"🟡 MEDIUM PRIORITY (30-40% budget):\n"
+            guidance += f"MEDIUM PRIORITY (30-40% budget):\n"
             guidance += f"   {cats[1]['name']} ({cats[1]['score']}/5)\n"
             guidance += f"   Quick wins, measure progress\n\n"
 
-            guidance += f"🟢 MAINTENANCE (10-20% budget):\n"
+            guidance += f"MAINTENANCE (10-20% budget):\n"
             guidance += f"   {cats[2]['name']} ({cats[2]['score']}/5)\n"
             guidance += f"   Keep stable, don't regress\n"
 
@@ -293,18 +293,18 @@ def customer_segment_analysis(session_uuid: str) -> str:
         industry = context.get('industry', 'your industry')
         stage = context.get('stage', 'Growth')
 
-        analysis = f"👥 Customer Segment Strategy for {company}:\n\n"
+        analysis = f"Customer Segment Strategy for {company}:\n\n"
         analysis += f"As a {stage}-stage {industry} player, here's where to focus:\n\n"
-        analysis += "1️⃣ Early Adopters (20% of TAM, 40% of value)\n"
+        analysis += "1. Early Adopters (20% of TAM, 40% of value)\n"
         analysis += "   Lower CAC, faster sales, become advocates\n"
-        analysis += "   👉 Start here: Easier wins + proof points\n\n"
-        analysis += "2️⃣ Fast-Growing SMBs (35% of TAM, 35% of value)\n"
+        analysis += "   Start here: Easier wins + proof points\n\n"
+        analysis += "2. Fast-Growing SMBs (35% of TAM, 35% of value)\n"
         analysis += "   Need quick implementation, price-sensitive\n"
-        analysis += "   👉 Then here: Volume plays, repeatable process\n\n"
-        analysis += "3️⃣ Enterprise (10% of TAM, 25% of value)\n"
+        analysis += "   Then here: Volume plays, repeatable process\n\n"
+        analysis += "3. Enterprise (10% of TAM, 25% of value)\n"
         analysis += "   High LTV, long sales cycle, need support\n"
-        analysis += "   👉 Finally here: Scale when you have proof\n\n"
-        analysis += "💡 Pro tip: Build segment-specific playbooks for messaging & pricing."
+        analysis += "   Finally here: Scale when you have proof\n\n"
+        analysis += "Pro tip: Build segment-specific playbooks for messaging & pricing."
 
         return analysis
     except Exception as e:
@@ -662,7 +662,7 @@ def build_session_context(session: AssessmentSession) -> Dict[str, Any]:
 # ================================================================
 def handle_show_scores(session: AssessmentSession, context: Dict) -> str:
     """Handle request to show scores"""
-    response = f"""📊 **Your GTM Assessment Results**
+    response = f"""**Your GTM Assessment Results**
 
 **Overall Score:** {context['overall_score']}/100
 **Stage:** {context['stage']}
@@ -671,8 +671,7 @@ _{context['headline']}_
 **Category Breakdown:**
 """
     for cat in context['categories']:
-        emoji = "🟢" if cat['score'] >= 4 else "🟡" if cat['score'] >= 3 else "🔴"
-        response += f"\n{emoji} **{cat['name']}:** {cat['score']}/5.0"
+        response += f"\n• **{cat['name']}:** {cat['score']}/5.0"
     
     response += f"\n\n**Action Items:** {context['action_items']['total']} total "
     response += f"({context['action_items']['done']} completed)"
@@ -681,7 +680,7 @@ _{context['headline']}_
 
 def handle_weakest_areas(session: AssessmentSession, context: Dict) -> str:
     """Handle request for weakest areas"""
-    response = f"""🎯 **Areas Needing Focus**
+    response = f"""**Areas Needing Focus**
 
 Your lowest-scoring categories:
 """
@@ -693,26 +692,26 @@ Your lowest-scoring categories:
         for q in context['weak_questions'][:3]:
             response += f"\n• {q['text']} (scored {q['score']}/5)"
     
-    response += "\n\n💡 **Tip:** Focus on improving these areas first for the biggest impact on your overall GTM effectiveness."
+    response += "\n\n**Tip:** Focus on improving these areas first for the biggest impact on your overall GTM effectiveness."
     
     return response
 
 def handle_strongest_areas(session: AssessmentSession, context: Dict) -> str:
     """Handle request for strongest areas"""
-    response = f"""✨ **Your Strengths**
+    response = f"""**Your Strengths**
 
 You're doing well in:
 """
     for cat in context['strongest_categories']:
         response += f"\n• **{cat['name']}:** {cat['score']}/5.0"
     
-    response += "\n\n🎉 Great job! These are your competitive advantages. Consider how you can leverage these strengths to improve weaker areas."
+    response += "\n\nGreat job! These are your competitive advantages. Consider how you can leverage these strengths to improve weaker areas."
     
     return response
 
 def handle_recommendations(session: AssessmentSession, context: Dict) -> str:
     """Handle request for recommendations"""
-    response = f"""💼 **Top Recommendations for {context['company_name']}**
+    response = f"""**Top Recommendations for {context['company_name']}**
 
 Based on your {context['stage']} stage and focus areas:
 
@@ -723,20 +722,20 @@ Based on your {context['stage']} stage and focus areas:
     for cat in context['weakest_categories'][:2]:
         cat_name = cat['name']
         if cat_name == "Demand":
-            recommendations.append("🎯 **Improve Lead Generation:** Set up consistent content marketing and track which channels bring quality leads.")
+            recommendations.append("**Improve Lead Generation:** Set up consistent content marketing and track which channels bring quality leads.")
         elif cat_name == "Conversion":
-            recommendations.append("🔄 **Optimize Sales Process:** Create a standard qualification framework and faster response system.")
+            recommendations.append("**Optimize Sales Process:** Create a standard qualification framework and faster response system.")
         elif cat_name == "Delivery":
-            recommendations.append("🚀 **Enhance Customer Success:** Implement structured onboarding and regular feedback collection.")
-    
+            recommendations.append("**Enhance Customer Success:** Implement structured onboarding and regular feedback collection.")
+
     if not recommendations:
-        recommendations.append("✅ **Maintain Excellence:** Focus on consistency and documenting your processes for scale.")
-    
+        recommendations.append("**Maintain Excellence:** Focus on consistency and documenting your processes for scale.")
+
     for rec in recommendations:
         response += f"\n{rec}\n"
-    
+
     if context['has_playbook']:
-        response += "\n📖 View your full AI-generated playbook for detailed action plans!"
+        response += "\nView your full AI-generated playbook for detailed action plans!"
     
     return response
 
@@ -747,13 +746,13 @@ def handle_execution_plan(session: AssessmentSession, context: Dict, user=None) 
 
     if not plan["has_critical_gaps"]:
         return (
-            "🤖 **Execution Agent**\n\n"
+            "**Execution Agent**\n\n"
             "You do not have any critical low-scoring responses right now, so I did not create new tasks. "
             "Your next best move is to review existing action items and tighten execution consistency."
         )
 
     response = (
-        f"🤖 **Execution Agent Ran for {context['company_name']}**\n\n"
+        f"**Execution Agent Ran for {context['company_name']}**\n\n"
         f"**Current Stage:** {plan['stage']}\n"
         f"**Top Focus Areas:** {', '.join(plan['top_categories']) if plan['top_categories'] else 'General execution'}\n"
         f"**Existing Action Items:** {plan['existing_action_count']}\n"
@@ -785,12 +784,12 @@ def handle_review_action_items(session: AssessmentSession, context: Dict) -> str
 
     if summary["total"] == 0:
         return (
-            "🗂️ **Action Item Review**\n\n"
+            "**Action Item Review**\n\n"
             "You do not have any action items yet. Ask me to `build my action plan` and I will create a prioritized checklist from your weakest GTM gaps."
         )
 
     response = (
-        "🗂️ **Action Item Review**\n\n"
+        "**Action Item Review**\n\n"
         f"**Total:** {summary['total']}\n"
         f"**To Do:** {summary['todo']}\n"
         f"**In Progress:** {summary['in_progress']}\n"
@@ -812,7 +811,7 @@ def handle_review_action_items(session: AssessmentSession, context: Dict) -> str
 
 def handle_roadmap(session: AssessmentSession, context: Dict) -> str:
     """Handle request for roadmap/timeline"""
-    response = f"""🗓️ **30-60-90 Day Roadmap**
+    response = f"""**30-60-90 Day Roadmap**
 
 **Days 1-30: Quick Wins**
 """
@@ -835,7 +834,7 @@ def handle_roadmap(session: AssessmentSession, context: Dict) -> str:
 • Expand improvements to second priority area
 • Document best practices for your team
 
-🎯 **Goal:** Increase your overall score by 10-15 points in 90 days!
+**Goal:** Increase your overall score by 10-15 points in 90 days!
 """
     
     return response
@@ -847,10 +846,10 @@ def handle_export(session: AssessmentSession, context: Dict) -> str:
     pdf_url = reverse('gtm:download', args=[session.uuid])
     playbook_url = reverse('gtm:playbook', args=[session.uuid])
     
-    response = f"""📥 **Export Options**
+    response = f"""**Export Options**
 
-📄 [Download PDF Report]({pdf_url})
-📖 [View Full Playbook]({playbook_url})
+[Download PDF Report]({pdf_url})
+[View Full Playbook]({playbook_url})
 
 You can also share these links with your team or email them directly from the results page.
 """
@@ -858,7 +857,7 @@ You can also share these links with your team or email them directly from the re
 
 def handle_company_info(session: AssessmentSession, context: Dict) -> str:
     """Handle direct questions about company/session info"""
-    response = f"""📋 **Assessment Information**
+    response = f"""**Assessment Information**
 
 **Company:** {context['company_name']}
 **Industry:** {context['industry']}
@@ -918,7 +917,7 @@ Assessment Link: https://yourgdomain.com/results/{session.uuid}/
     }
     google_calendar_url = f"https://calendar.google.com/calendar/render?{urlencode(calendar_params)}"
     
-    response = f"""📅 **Schedule Your GTM Strategy Session**
+    response = f"""**Schedule Your GTM Strategy Session**
 
 Hi {contact_name}! I'd be happy to help you schedule a meeting to discuss your GTM improvement plan.
 
@@ -933,7 +932,7 @@ Hi {contact_name}! I'd be happy to help you schedule a meeting to discuss your G
 • {suggested_times[1]}
 • {suggested_times[2]}
 
-**📆 [Click here to add to Google Calendar]({google_calendar_url})**
+**[Click here to add to Google Calendar]({google_calendar_url})**
 
 Once you add it to your calendar, you can:
 1. Generate a Google Meet link automatically
@@ -1118,7 +1117,7 @@ def process_chat_message(
             if not plan["has_critical_gaps"]:
                 response_text = "You don't have any critical low-scoring responses right now. Your next best move is to review existing action items and tighten execution consistency."
             else:
-                response_text = f"✅ Created {plan['created_count']} new action items for {session.company_name}. " \
+                response_text = f"Created {plan['created_count']} new action items for {session.company_name}. " \
                                 f"Focus areas: {', '.join(plan['top_categories']) if plan['top_categories'] else 'General execution'}. " \
                                 f"Check your action items dashboard to see them!"
         else:

@@ -92,6 +92,7 @@ from .helpers import (
     _resolve_dashboard_workspace,
     _upsert_gap_metric_in_scope,
 )
+from ..parsers import log_workspace_activity
 
 def refresh_action_items(request):
     """Returns the updated action items board - workspace-aware."""
@@ -197,7 +198,7 @@ def add_edit_action_item(request, pk=None):
                     session=instance.session,
                 )
                 
-                # 🔔 Notify assignee
+                # Notify assignee
                 if instance.assigned_to and instance.assigned_to != request.user:
                     send_notification(
                         recipient=instance.assigned_to,

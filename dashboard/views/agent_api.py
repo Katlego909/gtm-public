@@ -135,7 +135,7 @@ def dashboard_agent_api(request):
 
     attachments, attachment_context, attachment_warnings = _process_agent_attachments(uploaded_files)
 
-    # 🔹 [VISION BRIDGE] Save strategic evidence files to GTMFile
+    # [VISION BRIDGE] Save strategic evidence files to GTMFile
     for uploaded_file in uploaded_files:
         suffix = Path(uploaded_file.name or '').suffix.lower()
         # If it's an image or PDF, it's potential strategic evidence
@@ -229,7 +229,7 @@ def dashboard_agent_clear_api(request):
     elif session.user_id != request.user.id:
         return JsonResponse({"success": False, "error": "You do not have access to that assessment."}, status=403)
 
-    # 🔹 [DEEP CLEAR] Wipe chat messages AND strategic evidence files
+    # [DEEP CLEAR] Wipe chat messages AND strategic evidence files
     deleted_count, _ = ChatMessage.objects.filter(session=session).delete()
     session.evidence_files.all().delete()
     return JsonResponse({

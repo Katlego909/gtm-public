@@ -92,6 +92,7 @@ from .helpers import (
     _resolve_dashboard_workspace,
     _upsert_gap_metric_in_scope,
 )
+from ..parsers import log_workspace_activity
 
 @login_required
 @vary_on_headers('HX-Request')

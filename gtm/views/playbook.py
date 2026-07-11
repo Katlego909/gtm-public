@@ -237,7 +237,7 @@ def playbook(request, session_id):
     cat_sorted = sorted(cat_scores, key=lambda x: x["avg"])
 
     # -----------------------------
-    # 🧩 Format Recommended Next Moves (using centralized formatter)
+    # Format Recommended Next Moves (using centralized formatter)
     # -----------------------------
     band_actions_html = _format_band_actions_markdown(
         getattr(band, "actions_markdown", "") if band else ""
@@ -311,7 +311,7 @@ def playbook(request, session_id):
         ActionItem.objects.bulk_create(_tasks_to_create)
 
     # -----------------------------
-    # 🤖 AI Playbook Rendering (+ optional lazy-generate)
+    # AI Playbook Rendering (+ optional lazy-generate)
     # -----------------------------
     # Ensure we actually have a snapshot even if user skips Results page
     snap = getattr(session, "snapshot", None) or ResultSnapshot.objects.filter(session=session).first()

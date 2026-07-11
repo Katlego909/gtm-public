@@ -95,7 +95,7 @@ class ResultSnapshot(models.Model):
     session = models.OneToOneField("AssessmentSession", on_delete=models.CASCADE)
     overall = models.FloatField()
     
-    # ❄️ Strategic Immutability: Denormalized JSON
+    # Strategic Immutability: Denormalized JSON
     # Stores the names, scores, and weights at the second of completion.
     category_breakdown = models.JSONField(encoder=DjangoJSONEncoder)
     

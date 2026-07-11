@@ -82,7 +82,7 @@ class ResultSnapshotAdmin(admin.ModelAdmin):
             "classes": ("collapse",),
             "fields": ("category_breakdown", "radar_labels", "radar_values"),
         }),
-        # ✅ NEW SECTION
+        # New section
         ("AI Output", {
             "classes": ("collapse",),  # optional — remove if you want always visible
             "fields": ("ai_playbook",),

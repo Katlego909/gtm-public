@@ -130,7 +130,7 @@ def _normalize_ai_playbook_markdown(playbook_text: str) -> str:
 
     src = playbook_text.strip()
 
-    # 🛠️ JSON DETECTION (Last Line of Defense)
+    # JSON DETECTION (Last Line of Defense)
     # If the text looks like it might contain a JSON object with our key
     if "markdown_playbook" in src:
         try:
@@ -150,16 +150,16 @@ def _normalize_ai_playbook_markdown(playbook_text: str) -> str:
     # Ensure literal \n from LLM/JSON artifacts are converted to real newlines
     src = src.replace('\\n', '\n').replace('\\"', '"').replace("\r\n", "\n").strip()
 
-    # 1️⃣ Convert inline " * " separators into proper bullet lines
+    # 1. Convert inline " * " separators into proper bullet lines
     src = re.sub(r"\s\*\s+", "\n- ", src)
 
-    # 2️⃣ Make "Week X:" style lines into Markdown headings for consistency
+    # 2. Make "Week X:" style lines into Markdown headings for consistency
     src = re.sub(r"(?m)^(Week\s+\d+:[^\n]*)$", r"### \1", src)
 
-    # 3️⃣ Add blank lines before list, numbered, and heading items for proper block rendering
+    # 3. Add blank lines before list, numbered, and heading items for proper block rendering
     src = re.sub(r"(?m)(?<!\n)\n(?=(?:- |\d+\. |#{1,6}\s))", "\n\n", src)
 
-    # 4️⃣ Clean up extra spaces/newlines
+    # 4. Clean up extra spaces/newlines
     src = re.sub(r"[ \t]+\n", "\n", src)
     src = re.sub(r"\n{3,}", "\n\n", src)
 
@@ -623,7 +623,7 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
     snapshot.save(update_fields=["ai_playbook_status"])
 
     try:
-        # ---- 1️⃣ Attempt Unified Gemini generation
+        # ---- 1. Attempt Unified Gemini generation
         client = _get_client()
         if client and not _quota_cooldown_active() and _request_budget_available():
             prompt = _build_prompt(snapshot)
@@ -661,7 +661,7 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
                                     defaults={'rationale': f"Recommended learning topic based on AI analysis"}
                                 )
                     except Exception as json_err:
-                        # 🚨 REPORT RESCUE: If JSON fails, manually extract the playbook content
+                        # REPORT RESCUE: If JSON fails, manually extract the playbook content
                         logger.error(f"Failed to parse JSON for {snapshot.company_name}: {json_err}. Rescuing playbook text.")
 
                         # Try multiple strategies to extract markdown content from malformed JSON
@@ -715,14 +715,14 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
                             usage = response.usage_metadata
                             total_tokens = usage.total_token_count
                             logger.info(
-                                f"✅ AI playbook generated for {snapshot.company_name} | "
+                                f"AI playbook generated for {snapshot.company_name} | "
                                 f"Tokens: {usage.prompt_token_count} input + {usage.candidates_token_count} output = {total_tokens} total"
                             )
                             # Track usage against quotas
                             if MONITORING_AVAILABLE:
                                 AIUsageTracker.log_usage(total_tokens, 'playbook')
                         else:
-                            logger.info(f"✅ AI playbook generated for {snapshot.company_name}")
+                            logger.info(f"AI playbook generated for {snapshot.company_name}")
             except Exception as e:
                 if _is_quota_error(e):
                     _set_quota_cooldown(_extract_retry_delay_seconds(e))
@@ -735,9 +735,9 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
                     extra={"snapshot_id": snapshot.id},
                 )
 
-        # ---- 2️⃣ Fallback to static recommendation (only if AI failed or was disabled)
+        # ---- Fallback to static recommendation (only if AI failed or was disabled)
         if not final_playbook_text:
-            logger.warning("⚠️ Falling back to static RecommendationBand playbook.")
+            logger.warning("Falling back to static RecommendationBand playbook.")
             
             # Use snapshot.band first, or look it up if it's missing (safer)
             band = snapshot.band
@@ -749,14 +749,14 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
             if band and band.actions_markdown:
                 final_playbook_text = strip_tags(band.actions_markdown)
 
-        # ---- 3️⃣ Final generic fallback (if no content was found at all)
+        # ---- 3. Final generic fallback (if no content was found at all)
         if not final_playbook_text:
             final_playbook_text = (
                 "No AI-generated playbook available yet.\n\n"
                 "We recommend focusing on your lowest-rated GTM categories first."
             )
             
-        # 🌟 CONSOLIDATED SAVE: Persist the final content once
+        # CONSOLIDATED SAVE: Persist the final content once
         snapshot.ai_playbook = final_playbook_text
         snapshot.ai_playbook_status = "done"
         snapshot.save(update_fields=["ai_playbook", "ai_financial_summary", "ai_competitor_analysis", "ai_risk_status", "ai_playbook_status"])
@@ -886,7 +886,7 @@ def generate_diagnostic_insight(response: Response) -> str:
             text = _strip_imperative_sentences(ai_response.text.strip())
 
             if text:
-                # 🌟 Save the insight directly to the Response object
+                # Save the insight directly to the Response object
                 response.ai_insight = text
                 response.ai_insight_status = "done"
                 response.save(update_fields=["ai_insight", "ai_insight_status"])
@@ -898,7 +898,7 @@ def generate_diagnostic_insight(response: Response) -> str:
                     if MONITORING_AVAILABLE:
                         AIUsageTracker.log_usage(total_tokens, 'diagnostic')
                 
-                logger.info(f"✅ Diagnostic insight generated for {response.question.id_code}")
+                logger.info(f"Diagnostic insight generated for {response.question.id_code}")
                 
         except Exception as e:
             if _is_quota_error(e):
@@ -918,7 +918,7 @@ def generate_diagnostic_insight(response: Response) -> str:
                 response.ai_insight = text
                 response.ai_insight_status = "done"
                 response.save(update_fields=["ai_insight", "ai_insight_status"])
-                logger.info(f"📝 Using static diagnostic for {response.question.id_code}")
+                logger.info(f"Using static diagnostic for {response.question.id_code}")
             else:
                 response.ai_insight_status = "failed"
                 response.save(update_fields=["ai_insight_status"])

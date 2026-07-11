@@ -1,0 +1,132 @@
+- generic [ref=f4e1]:
+  - complementary [ref=f4e2]:
+    - generic [ref=f4e3]:
+      - img "ForgeGTM" [ref=f4e5]
+      - button "Toggle sidebar" [ref=f4e6] [cursor=pointer]
+    - navigation [ref=f4e9]:
+      - link "New Assessment" [ref=f4e10] [cursor=pointer]:
+        - /url: /start/
+      - link "Dashboard" [ref=f4e14] [cursor=pointer]:
+        - /url: /dashboard/
+      - link "Tasks" [ref=f4e18] [cursor=pointer]:
+        - /url: /dashboard/tasks/
+      - link "Workspace" [ref=f4e22] [cursor=pointer]:
+        - /url: /dashboard/workspace/hub/
+      - link "Asset Library" [ref=f4e26] [cursor=pointer]:
+        - /url: /dashboard/assets/
+      - link "Agent" [ref=f4e30] [cursor=pointer]:
+        - /url: /dashboard/agent/
+      - link "Analytics" [ref=f4e34] [cursor=pointer]:
+        - /url: /dashboard/analytics/
+      - link "Profile" [ref=f4e38] [cursor=pointer]:
+        - /url: /dashboard/profile/
+      - link "Settings" [ref=f4e42] [cursor=pointer]:
+        - /url: /dashboard/settings/
+  - main [ref=f4e47]:
+    - generic [ref=f4e48]:
+      - generic [ref=f4e49]:
+        - heading "Strategic Asset Library" [level=1] [ref=f4e50]
+        - generic [ref=f4e51]:
+          - generic [ref=f4e52]: "Workspace:"
+          - combobox [ref=f4e53]:
+            - option "Test" [selected]
+      - button "Upload Asset" [active] [ref=f4e55] [cursor=pointer]
+    - generic [ref=f4e58]:
+      - generic [ref=f4e59]:
+        - generic [ref=f4e60]:
+          - paragraph [ref=f4e61]: Total Assets
+          - paragraph [ref=f4e62]: "0"
+        - generic [ref=f4e63]:
+          - paragraph [ref=f4e64]: AI Audited
+          - paragraph [ref=f4e65]: "0"
+        - generic [ref=f4e66]:
+          - paragraph [ref=f4e67]: Pending Audit
+          - paragraph [ref=f4e68]: "0"
+        - generic [ref=f4e69]:
+          - paragraph [ref=f4e70]: Powered by
+          - paragraph [ref=f4e71]: Gemini Vision
+          - paragraph [ref=f4e72]: Multimodal GTM Auditor
+      - generic [ref=f4e77]:
+        - heading "How AI Auditing Works" [level=4] [ref=f4e78]
+        - paragraph [ref=f4e79]:
+          - text: Upload your Landing Pages, Pitch Decks, or Ad Creatives. Click
+          - strong [ref=f4e80]: Audit Now
+          - text: on any file-based asset — Gemini will visually analyse the asset against your GTM strategy and return a structured critique with an advisory score modifier.
+      - generic [ref=f4e81]:
+        - heading "No assets yet" [level=3] [ref=f4e85]
+        - paragraph [ref=f4e86]: Upload your first Landing Page, Pitch Deck, or Ad Creative to get an AI-powered GTM readiness audit.
+        - button "Upload First Asset" [ref=f4e87] [cursor=pointer]
+  - button "Open GTM Agent" [ref=f4e91] [cursor=pointer]
+  - complementary [ref=f4e94]:
+    - heading "Notifications" [level=3] [ref=f4e96]
+    - generic [ref=f4e98]:
+      - generic [ref=f4e101]:
+        - heading "Pending Reviews" [level=4] [ref=f4e102]
+        - paragraph [ref=f4e103]: You have 10 items waiting.
+      - generic [ref=f4e104]:
+        - generic [ref=f4e105]:
+          - heading "Recent Activity" [level=4] [ref=f4e106]
+          - generic [ref=f4e107]: Test
+        - generic [ref=f4e108]:
+          - generic [ref=f4e109]:
+            - paragraph [ref=f4e110]: "test moved task 'One action per pillar: (1) write a one-page ICP, (2) define 3 qualification ques' to To do."
+            - paragraph [ref=f4e111]: 11 minutes ago
+          - generic [ref=f4e112]:
+            - paragraph [ref=f4e113]: "test moved task 'One action per pillar: (1) write a one-page ICP, (2) define 3 qualification ques' to In progress."
+            - paragraph [ref=f4e114]: 11 minutes ago
+          - generic [ref=f4e115]:
+            - paragraph [ref=f4e116]: "test moved task 'One action per pillar: (1) write a one-page ICP, (2) define 3 qualification ques' to To do."
+            - paragraph [ref=f4e117]: 11 minutes ago
+          - generic [ref=f4e118]:
+            - paragraph [ref=f4e119]: "test moved task 'One action per pillar: (1) write a one-page ICP, (2) define 3 qualification ques' to In progress."
+            - paragraph [ref=f4e120]: 11 minutes ago
+          - generic [ref=f4e121]:
+            - paragraph [ref=f4e122]: "test moved task 'One action per pillar: (1) write a one-page ICP, (2) define 3 qualification ques' to To do."
+            - paragraph [ref=f4e123]: 16 minutes ago
+          - generic [ref=f4e124]:
+            - paragraph [ref=f4e125]: "test moved task 'One action per pillar: (1) write a one-page ICP, (2) define 3 qualification ques' to To do."
+            - paragraph [ref=f4e126]: 16 minutes ago
+          - generic [ref=f4e127]:
+            - paragraph [ref=f4e128]: "test moved task 'One action per pillar: (1) write a one-page ICP, (2) define 3 qualification ques' to In progress."
+            - paragraph [ref=f4e129]: 16 minutes ago
+          - generic [ref=f4e130]:
+            - paragraph [ref=f4e131]: test moved task 'Interview 3-5 existing customers to identify common pain points and characterist' to To do.
+            - paragraph [ref=f4e132]: 2 days, 2 hours ago
+          - generic [ref=f4e133]:
+            - paragraph [ref=f4e134]: test moved task 'Interview 3-5 existing customers to identify common pain points and characterist' to In progress.
+            - paragraph [ref=f4e135]: 2 days, 2 hours ago
+          - generic [ref=f4e136]:
+            - paragraph [ref=f4e137]: "test moved task 'One action per pillar: (1) write a one-page ICP, (2) define 3 qualification ques' to To do."
+            - paragraph [ref=f4e138]: 2 days, 2 hours ago
+          - generic [ref=f4e139]:
+            - paragraph [ref=f4e140]: "test moved task 'One action per pillar: (1) write a one-page ICP, (2) define 3 qualification ques' to In progress."
+            - paragraph [ref=f4e141]: 2 days, 2 hours ago
+  - generic [ref=f4e147]:
+    - heading "Add Resource" [level=2] [ref=f4e148]
+    - generic [ref=f4e149]:
+      - generic [ref=f4e150]:
+        - generic [ref=f4e151]: Resource Name
+        - textbox "Resource Name" [ref=f4e152]
+      - generic [ref=f4e153]:
+        - generic [ref=f4e154]:
+          - generic [ref=f4e155]: Type
+          - combobox [ref=f4e156]:
+            - option "File Upload"
+            - option "External Link" [selected]
+        - generic [ref=f4e157]:
+          - generic [ref=f4e158]: Category
+          - combobox [ref=f4e159]:
+            - option "Strategy & Planning"
+            - option "Sales Enablement"
+            - option "Marketing Assets"
+            - option "Product & Tech"
+            - option "Other" [selected]
+      - generic [ref=f4e160]:
+        - generic [ref=f4e161]: Link URL
+        - textbox "https://..." [ref=f4e162]
+      - generic [ref=f4e163]:
+        - generic [ref=f4e164]: Description
+        - textbox "Brief description" [ref=f4e165]
+      - generic [ref=f4e166]:
+        - button "Cancel" [ref=f4e167] [cursor=pointer]
+        - button "Save Resource" [ref=f4e168] [cursor=pointer]

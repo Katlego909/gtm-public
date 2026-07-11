@@ -326,7 +326,10 @@
             </svg>
         </button>
 
-        <section id="global-agent-panel" class="hidden mt-3 w-[min(92vw,420px)] h-[min(72vh,620px)] bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col">
+        <section id="global-agent-panel" class="hidden relative mt-3 w-[min(92vw,420px)] h-[min(72vh,620px)] bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col">
+            <div id="global-agent-confirm-overlay" class="hidden absolute inset-0 z-20 bg-black/40 flex items-center justify-center p-4">
+                <div id="global-agent-confirm-content" class="w-full"></div>
+            </div>
             <header class="px-4 py-3 bg-gray-900">
                 <div class="flex items-center justify-between gap-3">
                     <div>
@@ -781,41 +784,45 @@
                 return;
             }
 
-            const modalContent = document.getElementById('modal-content');
-            if (!modalContent || typeof window.openModal !== 'function' || typeof window.closeModal !== 'function') {
+            const overlay = document.getElementById('global-agent-confirm-overlay');
+            const overlayContent = document.getElementById('global-agent-confirm-content');
+            if (!overlay || !overlayContent) {
                 const shouldClear = window.confirm('Clear chat history for this assessment context?');
                 if (!shouldClear) return;
                 await executeGlobalAgentClear(sessionId);
                 return;
             }
 
-            modalContent.innerHTML = `
-                <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                    <div class="px-6 py-5 border-b border-gray-100">
-                        <h3 class="text-lg font-semibold text-gray-900">Clear Chat History</h3>
-                        <p class="mt-2 text-sm text-gray-600">This will remove all messages for this assessment context.</p>
+            overlayContent.innerHTML = `
+                <div class="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-lg">
+                    <div class="px-5 py-4 border-b border-gray-100">
+                        <h3 class="text-base font-semibold text-gray-900">Clear Chat History</h3>
+                        <p class="mt-1.5 text-sm text-gray-600">This will remove all messages for this assessment context.</p>
                     </div>
-                    <div class="px-6 py-4 flex justify-end gap-3">
+                    <div class="px-5 py-3 flex justify-end gap-3">
                         <button type="button" id="global-agent-clear-cancel" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
                         <button type="button" id="global-agent-clear-confirm" class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition">Clear Chat</button>
                     </div>
                 </div>
             `;
 
+            const closeOverlay = () => {
+                overlay.classList.add('hidden');
+                overlayContent.innerHTML = '';
+            };
+
             const cancelBtn = document.getElementById('global-agent-clear-cancel');
             const confirmBtn = document.getElementById('global-agent-clear-confirm');
             if (!cancelBtn || !confirmBtn) return;
 
-            cancelBtn.addEventListener('click', function () {
-                window.closeModal();
-            }, { once: true });
+            cancelBtn.addEventListener('click', closeOverlay, { once: true });
 
             confirmBtn.addEventListener('click', async function () {
-                window.closeModal();
+                closeOverlay();
                 await executeGlobalAgentClear(sessionId);
             }, { once: true });
 
-            window.openModal();
+            overlay.classList.remove('hidden');
         }
 
         async function executeGlobalAgentClear(sessionId) {
@@ -908,13 +915,13 @@
     </script>
     {% block extra_js %}{% endblock %}
     <!-- HTMX Modal -->
-    <div id="modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div id="modal" class="hidden fixed inset-0 z-[1300] overflow-y-auto">
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
             <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeModal()"></div>
 
             <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-            <div class="inline-block align-bottom bg-white rounded-lg border border-gray-200 text-left overflow-hidden sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div class="relative inline-block align-bottom bg-white rounded-lg border border-gray-200 text-left overflow-hidden sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
                 <div id="modal-content"></div>
             </div>
         </div>

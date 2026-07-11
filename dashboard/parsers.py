@@ -275,13 +275,13 @@ def _run_dashboard_action_command(request, session, current_workspace, message):
 
         if cmd['assignee'] and not assigned_user and current_workspace:
             response_text = (
-                f"✅ Task created: **{item.note}** (To do).\n"
+                f"Task created: **{item.note}** (To do).\n"
                 f"I could not find **{cmd['assignee']}** in this workspace, so it is currently unassigned."
             )
         elif assignee_text:
-            response_text = f"✅ Task created: **{item.note}** and assigned to **{assignee_text}**."
+            response_text = f"Task created: **{item.note}** and assigned to **{assignee_text}**."
         else:
-            response_text = f"✅ Task created: **{item.note}** (To do)."
+            response_text = f"Task created: **{item.note}** (To do)."
 
         return {
             'success': True,
@@ -335,7 +335,7 @@ def _run_dashboard_action_command(request, session, current_workspace, message):
 
         return {
             'success': True,
-            'response': f"✅ Moved **{task.note}** to **{task.get_status_display()}**.",
+            'response': f"Moved **{task.note}** to **{task.get_status_display()}**.",
             'intent': 'dashboard_action',
             'action': {'type': 'move_task', 'task_id': task.id, 'status': task.status},
         }
@@ -360,7 +360,7 @@ def _run_dashboard_action_command(request, session, current_workspace, message):
 
         return {
             'success': True,
-            'response': f"🗑️ Deleted task **{task_note}**.",
+            'response': f"Deleted task **{task_note}**.",
             'intent': 'dashboard_action',
             'action': {'type': 'delete_task', 'task_id': task_id},
         }
@@ -386,7 +386,7 @@ def _run_dashboard_action_command(request, session, current_workspace, message):
 
         return {
             'success': True,
-            'response': f"💬 Added comment to **{task.note}**.",
+            'response': f"Added comment to **{task.note}**.",
             'intent': 'dashboard_action',
             'action': {'type': 'comment_task', 'task_id': task.id, 'comment_id': str(comment.id)},
         }

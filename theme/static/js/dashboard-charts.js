@@ -14,7 +14,8 @@ function initializeDashboardCharts(chartData) {
         // Ensure minimum visible progress for better UX
         const displayValue = Math.max(value || 0, 5);
         const actualValue = value || 0;
-        
+
+        Chart.getChart(ctx)?.destroy();
         new Chart(ctx.getContext('2d'), {
             type: 'doughnut',
             data: {
@@ -43,7 +44,8 @@ function initializeDashboardCharts(chartData) {
     if(ctxBar) {
         const hasData = chartData.sessions_per_day && chartData.sessions_per_day.some(v => v > 0);
         const barData = hasData ? chartData.sessions_per_day : [0, 0, 1, 0, 0, 0, 0]; // Show hint of activity
-        
+
+        Chart.getChart(ctxBar)?.destroy();
         new Chart(ctxBar.getContext('2d'), {
             type: 'bar',
             data: {
@@ -76,7 +78,8 @@ function initializeDashboardCharts(chartData) {
         
         const donutData = hasStatusData ? [completedCount, pendingCount] : [1, 1]; // Equal placeholder
         const donutColors = hasStatusData ? ['#eab308', '#ef4444'] : ['#e2e8f0', '#f1f5f9'];
-        
+
+        Chart.getChart(ctxDonut)?.destroy();
         new Chart(ctxDonut.getContext('2d'), {
             type: 'doughnut',
             data: {
@@ -129,6 +132,7 @@ function initializeDashboardCharts(chartData) {
     
     const channelDonut = document.getElementById('channelDonut');
     if(channelDonut) {
+        Chart.getChart(channelDonut)?.destroy();
         new Chart(channelDonut.getContext('2d'), {
             type: 'doughnut',
             data: channelData,

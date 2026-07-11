@@ -164,7 +164,7 @@ class Resource(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    # 🤖 AI STRATEGIC AUDIT fields
+    # AI STRATEGIC AUDIT fields
     audit_status = models.CharField(max_length=10, choices=AUDIT_STATUS_CHOICES, default='none')
     ai_audit_summary = models.TextField(blank=True, default="")
     ai_score_modifier = models.IntegerField(

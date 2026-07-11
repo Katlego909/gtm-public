@@ -43,7 +43,7 @@ def assessment_step(request, session_id, step: int):
                 session.save(update_fields=["current_step"])
             return redirect("gtm:assessment_step", session_id=session.uuid, step=session.current_step)
 
-    # 🧩 Fragment Switching Logic
+    # Fragment Switching Logic
     template = "gtm/assessment_step.html" # Full Layout
     if request.headers.get('HX-Request') == 'true':
         template = "gtm/partials/step_form.html" # Partial Form
@@ -72,7 +72,7 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
     3. Content Rescue: Fixes malformed JSON or markdown-wrapped objects.
     4. Persistence: Saves cleaned markdown and structured analysis to the snapshot.
     """
-    # 1️⃣ Concurrency Guard (Distributed Lock Pattern)
+    # 1. Concurrency Guard (Distributed Lock Pattern)
     playbook_lock_key = f"gtm:ai:playbook:{snapshot.id}:lock"
     if not cache.add(playbook_lock_key, "1", timeout=120):
         return (snapshot.ai_playbook or "").strip()
@@ -87,7 +87,7 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
             response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
             raw_text = response.text.strip()
             
-            # 2️⃣ Content Rescuing Pattern
+            # 2. Content Rescuing Pattern
             try:
                 # Standard path: Clean markdown tags and parse JSON
                 clean_json = _clean_json_response(raw_text)
@@ -100,7 +100,7 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
                 match = re.search(r'["\']?markdown_playbook["\']?\s*:\s*["\']+(.*?)(?=["\'],\s*["\']|["\'],?\s*\}|$)', raw_text, re.DOTALL)
                 final_playbook = match.group(1).replace('\\n', '\n').replace('\\"', '"') if match else raw_text
 
-            # 3️⃣ Persistence & Status Finalization
+            # 3. Persistence & Status Finalization
             snapshot.ai_playbook = final_playbook
             snapshot.ai_playbook_status = "done"
             snapshot.save()
@@ -134,7 +134,7 @@ def _compute_scores(session: AssessmentSession):
     total_w = sum(c.weight for c in all_cats) or 1.0
     cat_weight_map = {c.id: c.weight for c in all_cats}
 
-    # 🧩 Database Aggregation Engine
+    # Database Aggregation Engine
     # Sums (score * weight) and (weight) per category in ONE query.
     category_results = (
         Response.objects

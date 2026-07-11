@@ -256,6 +256,6 @@ class Command(BaseCommand):
         for rec_data in recommendations:
             ToolRecommendation.objects.create(**rec_data)
             created_count += 1
-            self.stdout.write(self.style.SUCCESS(f"✓ Created: {rec_data['keyword']} for {rec_data['category'].name}"))
+            self.stdout.write(self.style.SUCCESS(f"Created: {rec_data['keyword']} for {rec_data['category'].name}"))
 
-        self.stdout.write(self.style.SUCCESS(f"\n✅ Successfully loaded {created_count} tool recommendations!"))
+        self.stdout.write(self.style.SUCCESS(f"\nSuccessfully loaded {created_count} tool recommendations!"))

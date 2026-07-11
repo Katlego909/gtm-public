@@ -1,0 +1,115 @@
+- generic [ref=f5e1]:
+  - complementary [ref=f5e2]:
+    - generic [ref=f5e3]:
+      - img "ForgeGTM" [ref=f5e5]
+      - button "Toggle sidebar" [ref=f5e6] [cursor=pointer]
+    - navigation [ref=f5e9]:
+      - link "New Assessment" [ref=f5e10] [cursor=pointer]:
+        - /url: /start/
+      - link "Dashboard" [ref=f5e14] [cursor=pointer]:
+        - /url: /dashboard/
+      - link "Tasks" [ref=f5e18] [cursor=pointer]:
+        - /url: /dashboard/tasks/
+      - link "Workspace" [ref=f5e22] [cursor=pointer]:
+        - /url: /dashboard/workspace/hub/
+      - link "Asset Library" [ref=f5e26] [cursor=pointer]:
+        - /url: /dashboard/assets/
+      - link "Agent" [ref=f5e30] [cursor=pointer]:
+        - /url: /dashboard/agent/
+      - link "Analytics" [ref=f5e34] [cursor=pointer]:
+        - /url: /dashboard/analytics/
+      - link "Profile" [ref=f5e38] [cursor=pointer]:
+        - /url: /dashboard/profile/
+      - link "Settings" [ref=f5e42] [cursor=pointer]:
+        - /url: /dashboard/settings/
+  - main [ref=f5e47]:
+    - generic [ref=f5e49]:
+      - generic [ref=f5e50]:
+        - heading "Agent Workspace" [level=1] [ref=f5e51]
+        - paragraph [ref=f5e52]: Talk to your GTM agent with persistent context and history.
+      - generic [ref=f5e53]:
+        - complementary [ref=f5e54]:
+          - generic [ref=f5e55]:
+            - generic [ref=f5e56]: Assessment Context
+            - combobox "Assessment Context" [ref=f5e57]:
+              - option "Ardent SA (Pty) Ltd • Jul 11, 2026" [selected]
+              - option "Test • Jul 09, 2026"
+          - link "Reload Agent Context" [ref=f5e59] [cursor=pointer]:
+            - /url: /dashboard/agent/?agent_session=30253a5a-1372-4934-a243-adbad292c8a3&workspace=fc2ecced-2592-4089-9436-965358165765
+          - generic [ref=f5e60]:
+            - paragraph [ref=f5e61]: Quick Prompts
+            - generic [ref=f5e62]:
+              - button "Show me my scores" [ref=f5e63] [cursor=pointer]
+              - button "What should I focus on?" [ref=f5e64] [cursor=pointer]
+              - button "Build my action plan" [ref=f5e65] [cursor=pointer]
+              - button "Give me a 90-day roadmap" [ref=f5e66] [cursor=pointer]
+              - button "Build my action plan" [ref=f5e67] [cursor=pointer]
+              - button "Review my action items" [ref=f5e68] [cursor=pointer]
+        - generic [ref=f5e69]:
+          - generic [ref=f5e70]: Ask about this assessment, build an action plan, or review the current execution backlog.
+          - generic [ref=f5e73]:
+            - combobox "Asset Type" [ref=f5e74] [cursor=pointer]:
+              - option "General Asset" [selected]
+              - option "🌐 Landing Page"
+              - option "🎨 Ad Creative"
+              - option "📊 Sales Deck"
+              - option "✍️ Marketing Copy"
+            - button "Attach file" [ref=f5e75] [cursor=pointer]:
+              - generic [ref=f5e78]: Attach
+            - textbox "Ask the GTM agent anything about this assessment..." [ref=f5e79]
+            - button "Send message" [ref=f5e80] [cursor=pointer]:
+              - generic [ref=f5e84]: Send
+            - button "Clear chat" [active] [ref=f5e85] [cursor=pointer]:
+              - generic [ref=f5e88]: Clear
+  - button "Open GTM Agent" [ref=f5e90] [cursor=pointer]
+  - complementary [ref=f5e93]:
+    - heading "Notifications" [level=3] [ref=f5e95]
+    - generic [ref=f5e97]:
+      - generic [ref=f5e100]:
+        - heading "Pending Reviews" [level=4] [ref=f5e101]
+        - paragraph [ref=f5e102]: You have 10 items waiting.
+      - generic [ref=f5e103]:
+        - generic [ref=f5e104]:
+          - heading "Recent Activity" [level=4] [ref=f5e105]
+          - generic [ref=f5e106]: Test
+        - generic [ref=f5e107]:
+          - generic [ref=f5e108]:
+            - paragraph [ref=f5e109]: "test moved task 'One action per pillar: (1) write a one-page ICP, (2) define 3 qualification ques' to To do."
+            - paragraph [ref=f5e110]: 12 minutes ago
+          - generic [ref=f5e111]:
+            - paragraph [ref=f5e112]: "test moved task 'One action per pillar: (1) write a one-page ICP, (2) define 3 qualification ques' to In progress."
+            - paragraph [ref=f5e113]: 12 minutes ago
+          - generic [ref=f5e114]:
+            - paragraph [ref=f5e115]: "test moved task 'One action per pillar: (1) write a one-page ICP, (2) define 3 qualification ques' to To do."
+            - paragraph [ref=f5e116]: 12 minutes ago
+          - generic [ref=f5e117]:
+            - paragraph [ref=f5e118]: "test moved task 'One action per pillar: (1) write a one-page ICP, (2) define 3 qualification ques' to In progress."
+            - paragraph [ref=f5e119]: 12 minutes ago
+          - generic [ref=f5e120]:
+            - paragraph [ref=f5e121]: "test moved task 'One action per pillar: (1) write a one-page ICP, (2) define 3 qualification ques' to To do."
+            - paragraph [ref=f5e122]: 17 minutes ago
+          - generic [ref=f5e123]:
+            - paragraph [ref=f5e124]: "test moved task 'One action per pillar: (1) write a one-page ICP, (2) define 3 qualification ques' to To do."
+            - paragraph [ref=f5e125]: 17 minutes ago
+          - generic [ref=f5e126]:
+            - paragraph [ref=f5e127]: "test moved task 'One action per pillar: (1) write a one-page ICP, (2) define 3 qualification ques' to In progress."
+            - paragraph [ref=f5e128]: 17 minutes ago
+          - generic [ref=f5e129]:
+            - paragraph [ref=f5e130]: test moved task 'Interview 3-5 existing customers to identify common pain points and characterist' to To do.
+            - paragraph [ref=f5e131]: 2 days, 2 hours ago
+          - generic [ref=f5e132]:
+            - paragraph [ref=f5e133]: test moved task 'Interview 3-5 existing customers to identify common pain points and characterist' to In progress.
+            - paragraph [ref=f5e134]: 2 days, 2 hours ago
+          - generic [ref=f5e135]:
+            - paragraph [ref=f5e136]: "test moved task 'One action per pillar: (1) write a one-page ICP, (2) define 3 qualification ques' to To do."
+            - paragraph [ref=f5e137]: 2 days, 2 hours ago
+          - generic [ref=f5e138]:
+            - paragraph [ref=f5e139]: "test moved task 'One action per pillar: (1) write a one-page ICP, (2) define 3 qualification ques' to In progress."
+            - paragraph [ref=f5e140]: 2 days, 2 hours ago
+  - generic [ref=f5e146]:
+    - generic [ref=f5e147]:
+      - heading "Clear Chat History" [level=3] [ref=f5e148]
+      - paragraph [ref=f5e149]: This will remove all messages for this assessment context.
+    - generic [ref=f5e150]:
+      - button "Cancel" [ref=f5e151] [cursor=pointer]
+      - button "Clear Chat" [ref=f5e152] [cursor=pointer]

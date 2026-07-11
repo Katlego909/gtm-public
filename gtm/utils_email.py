@@ -15,7 +15,7 @@ def send_snapshot_report_email(snapshot):
     import markdown
     
     session = snapshot.session
-    subject = f"🎯 Your GTM Assessment Results — {snapshot.company_name or 'Untitled'} ({int(round(snapshot.overall))}/100)"
+    subject = f"Your GTM Assessment Results — {snapshot.company_name or 'Untitled'} ({int(round(snapshot.overall))}/100)"
 
     # Recipients
     to_recipients = []

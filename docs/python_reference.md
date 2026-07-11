@@ -4,11 +4,11 @@ This page provides an automated, high-substance reference for the GTM Validator'
 
 ---
 
-## 📂 `gtm` Core Services
+## `gtm` Core Services
 
 The `gtm` package contains the fundamental logic for the assessment engine and AI orchestration.
 
-### 🧠 Assessment Services (`gtm.services`)
+### Assessment Services (`gtm.services`)
 These services handle the mathematical core of the diagnostic, session safety, and UI guidance.
 
 ::: gtm.services
@@ -20,7 +20,7 @@ These services handle the mathematical core of the diagnostic, session safety, a
         - _expand_gtm_jargon
         - _kickoff_playbook_generation
 
-### 🤖 AI Strategy & Resilience (`gtm.ai_services`)
+### AI Strategy & Resilience (`gtm.ai_services`)
 This module manages all interactions with Google Gemini (Vertex AI), including the "Rescue" patterns for malformed JSON and static fallbacks.
 
 ::: gtm.ai_services
@@ -33,7 +33,7 @@ This module manages all interactions with Google Gemini (Vertex AI), including t
         - rewrite_context_note_with_ai
         - _is_quota_error
 
-### 👁️ Multimodal AI Auditor (`gtm.ai_auditor`)
+### Multimodal AI Auditor (`gtm.ai_auditor`)
 Handles the "Vision-to-Scoring" bridge by critiquing PDFs and images to generate numeric modifiers.
 
 ::: gtm.ai_auditor
@@ -46,11 +46,11 @@ Handles the "Vision-to-Scoring" bridge by critiquing PDFs and images to generate
 
 ---
 
-## 📂 `dashboard` Analytics & Processing
+## `dashboard` Analytics & Processing
 
 The `dashboard` app manages the post-assessment experience, including asset parsing and workspace analytics.
 
-### 📊 Workspace Analytics (`dashboard.analytics`)
+### Workspace Analytics (`dashboard.analytics`)
 Logic for calculating KPI trends and task velocity.
 
 ::: dashboard.analytics
@@ -59,7 +59,7 @@ Logic for calculating KPI trends and task velocity.
         - get_dashboard_context
         - calculate_workspace_velocity
 
-### 📄 Document Processing (`dashboard.document_processors`)
+### Document Processing (`dashboard.document_processors`)
 Hybrid OCR logic that combines local parsing with AI-powered vision fallbacks.
 
 ::: dashboard.document_processors
@@ -70,9 +70,9 @@ Hybrid OCR logic that combines local parsing with AI-powered vision fallbacks.
 
 ---
 
-## 🛠️ Utility & Monitoring
+## Utility & Monitoring
 
-### 📈 AI Monitoring (`gtm.utils_ai_monitoring`)
+### AI Monitoring (`gtm.utils_ai_monitoring`)
 Token-aware usage tracking and quota management.
 
 ::: gtm.utils_ai_monitoring

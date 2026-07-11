@@ -39,14 +39,14 @@ class Command(BaseCommand):
                 fixed += 1
                 self.stdout.write(
                     self.style.SUCCESS(
-                        f'✓ Linked "{assessment.company_name or "Untitled"}" '
+                        f'Linked "{assessment.company_name or "Untitled"}" '
                         f'to workspace "{membership.workspace.name}"'
                     )
                 )
             else:
                 self.stdout.write(
                     self.style.WARNING(
-                        f'⚠ No workspace found for user {assessment.user.username}'
+                        f'No workspace found for user {assessment.user.username}'
                     )
                 )
         

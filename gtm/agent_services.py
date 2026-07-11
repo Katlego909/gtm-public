@@ -110,7 +110,7 @@ def build_execution_plan(
         if len(suggested_items) >= limit:
             break
 
-    # 🔹 ADDED: Integrate AI Resource Recommendations as Action Items
+    # Integrate AI Resource Recommendations as Action Items
     from dashboard.models import AIResourceRecommendation
     resource_recs = AIResourceRecommendation.objects.filter(session=session).select_related('resource')[:2]
     for rec in resource_recs:

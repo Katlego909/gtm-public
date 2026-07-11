@@ -357,7 +357,7 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
         # Fallback to band actions if AI text not present
         ai_md = band.actions_markdown
 
-    # ✅ Normalize BEFORE converting to flowables
+    # Normalize BEFORE converting to flowables
     if ai_md.strip():
         ai_md = _normalize_ai_markdown(ai_md)
         content.append(Paragraph(
@@ -516,15 +516,14 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
     content.append(table)
     content.append(Spacer(1, 0.6 * cm))
     
-    # Enhanced tip with icon-like styling
     content.append(Paragraph(
-        "💡 <b>Implementation Tip:</b> Focus on completing one week fully before moving to the next. "
+        "<b>Implementation Tip:</b> Focus on completing one week fully before moving to the next. "
         "Small, consistent improvements compound into significant growth over time.",
         styles["Quote"]
     ))
     content.append(Spacer(1, 0.4 * cm))
     content.append(Paragraph(
-        "📊 <b>Tracking Advice:</b> Review progress weekly and adjust tactics based on what's working. "
+        "<b>Tracking Advice:</b> Review progress weekly and adjust tactics based on what's working. "
         "Document wins and lessons learned to build institutional knowledge.",
         styles["Quote"]
     ))

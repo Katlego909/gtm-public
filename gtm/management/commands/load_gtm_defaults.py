@@ -805,6 +805,6 @@ class Command(BaseCommand):
         _print_summary(self, "Tool hints", t_counts)
 
         if dry:
-            self.stdout.write(self.style.WARNING("\nℹ️  Dry-run complete. Re-run without --dry-run to apply."))
+            self.stdout.write(self.style.WARNING("\nDry-run complete. Re-run without --dry-run to apply."))
         else:
-            self.stdout.write(self.style.SUCCESS("\n✅ Defaults loaded successfully."))
+            self.stdout.write(self.style.SUCCESS("\nDefaults loaded successfully."))

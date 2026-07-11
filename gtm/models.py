@@ -68,7 +68,7 @@ class AssessmentSession(models.Model):
     company_name = models.CharField(max_length=120, blank=True, default="")
     industry = models.CharField(max_length=120, blank=True, default="")
 
-    # 🔹 New firmographic + contact fields
+    # New firmographic + contact fields
     website = models.URLField(blank=True, default="")
     contact_name = models.CharField(max_length=120, blank=True, default="")
     contact_email = models.EmailField(blank=True, default="")
@@ -341,7 +341,7 @@ class GTMFile(models.Model):
         max_length=10, choices=AUDIT_STATUS_CHOICES, default='none'
     )
     
-    # 🤖 AI STRATEGIC AUDIT
+    # AI STRATEGIC AUDIT
     ai_audit_notes = models.TextField(
         blank=True, 
         default="",

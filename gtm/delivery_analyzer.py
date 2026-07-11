@@ -651,8 +651,8 @@ def _build_nlp_evidence(combined_text: str, questions: list = None) -> dict:
     }
     logger.info(
         "NLP Stage 2 complete | TF-IDF: %s · Semantic: %s · NER: %d entities extracted",
-        "✓" if stages_run["tfidf"]    else "✗",
-        "✓" if stages_run["semantic"] else "✗",
+        "yes" if stages_run["tfidf"]    else "no",
+        "yes" if stages_run["semantic"] else "no",
         len(ner_metrics),
     )
 

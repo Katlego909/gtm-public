@@ -5,7 +5,6 @@
       {% elif response.score == 3 %}bg-yellow-50 border-yellow-400
       {% else %}bg-red-50 border-red-500{% endif %}">
       <div class="flex items-center mb-1">
-        <span class="text-lg mr-2" role="img" aria-label="lightbulb">💡</span>
         <span class="font-semibold {% if response.score >= 4 %}text-green-700{% elif response.score == 3 %}text-yellow-700{% else %}text-red-700{% endif %}">
           AI Insight:
         </span>

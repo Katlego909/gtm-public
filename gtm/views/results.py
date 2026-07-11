@@ -118,7 +118,7 @@ def results(request, session_id):
                 "weighted": r.score * q.weight,
                 "note": q.diagnostic_note or "",
                 "step": step_map.get(q.category_id),
-                # 🆕 NEW: Include the AI insight from the Response object
+                # Include the AI insight from the Response object
                 "ai_insight": r.ai_insight or "",
             })
     weakest_questions = sorted(all_rows, key=lambda x: x["weighted"])[:3]
@@ -135,7 +135,7 @@ def results(request, session_id):
     scoring_context = build_recommendation_context(_q_scores) if _q_scores else {}
 
     # -----------------------------
-    # 🧩 Tool Recommendations Logic (Optimized to prevent N+1)
+    # Tool Recommendations Logic (Optimized to prevent N+1)
     # -----------------------------
     recommendations = []
     
@@ -173,7 +173,7 @@ def results(request, session_id):
             uniq.append(r)
     recommendations = uniq[:6]
     
-    # ⚡ FALLBACK: If insufficient recommendations, add generic tools from weakest categories
+    # FALLBACK: If insufficient recommendations, add generic tools from weakest categories
     if len(recommendations) < 5:
         # Get unique weakest categories not already represented
         weak_categories = []
