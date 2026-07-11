@@ -211,8 +211,8 @@
         </div>
 
         <nav class="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-            <a href="{% url 'gtm:start' %}" 
-               class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+            <a href="{% url 'gtm:start' %}"
+               class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg border border-indigo-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
                title="New Assessment">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
@@ -285,6 +285,9 @@
                 </svg>
                 <span class="sidebar-text">Analytics</span>
             </a>
+        </nav>
+
+        <nav class="px-4 py-4 space-y-1 border-t border-gray-100">
             <a href="{% url 'profile' %}"
                hx-get="{% url 'profile' %}"
                hx-target="#main-content"

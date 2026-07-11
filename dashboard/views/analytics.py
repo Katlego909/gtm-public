@@ -78,17 +78,14 @@ from ..document_processors import (
 
 from .helpers import (
     _ai_gap_suggestions_from_assessment,
-    _build_recent_agent_actions,
     _build_sidebar_notifications_context,
     _clean_json_payload,
-    _collect_recent_action_feed,
     _fallback_gap_suggestions,
     _gap_metric_scope_queryset,
     _gap_percent_value,
     _get_gap_scope,
     _load_pending_gap_suggestions,
     _md,
-    _normalize_action_text,
     _resolve_dashboard_workspace,
     _upsert_gap_metric_in_scope,
 )

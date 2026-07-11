@@ -11,7 +11,7 @@ def _md(text):
     return markdown.markdown(text)
 
 def get_dashboard_context(request, current_workspace, user_workspaces, agent_session_id):
-    from dashboard.views import _collect_recent_action_feed, _load_pending_gap_suggestions
+    from dashboard.views import _load_pending_gap_suggestions
     from dashboard.utils import calculate_gap_metric_display_properties
     # Filter data by workspace if selected
     if current_workspace:
@@ -178,18 +178,6 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
         insight.playbook_html = markdown.markdown(insight.ai_playbook or "")
         insights.append(insight)
 
-    # Recent chat messages - WORKSPACE-SCOPED
-    if current_workspace:
-        recent_chats_qs = ChatMessage.objects.filter(
-            session__workspace=current_workspace
-        )
-    else:
-        recent_chats_qs = ChatMessage.objects.filter(
-            session__user=request.user
-        ) if request.user.is_authenticated else ChatMessage.objects.none()
-
-    recent_agent_actions = _collect_recent_action_feed(request, current_workspace, max_items=6)
-
     # GTM Assessment History & Trends (workspace-scoped)
     assessment_history = []
     assessment_stats = None
@@ -353,7 +341,6 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
         'status_breakdown': status_breakdown,
         'top_tools': top_tools,
         'insights': insights,
-        'recent_agent_actions': recent_agent_actions,
         'weekly_activity': weekly_activity,
         'validator_results': validator_results,
         'channel_data': channel_data,

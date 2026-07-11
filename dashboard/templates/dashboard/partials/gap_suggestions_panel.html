@@ -3,7 +3,7 @@
         .gap-suggestions-indicator {
             display: none;
         }
-        .htmx-request .gap-suggestions-indicator {
+        .gap-suggestions-indicator.htmx-request {
             display: flex;
         }
         .action-loading {
@@ -26,11 +26,12 @@
             <h4 class="text-sm font-bold text-indigo-900">AI Suggestions (Drafts)</h4>
             <p class="text-xs text-indigo-700 mt-1">AI proposes candidates from completed assessments. You stay in control by accepting, editing, or rejecting each item.</p>
         </div>
-        <form hx-post="{% url 'generate_gap_suggestions' %}"
+        <form id="gap-generate-form"
+              hx-post="{% url 'generate_gap_suggestions' %}"
               hx-target="#gap-suggestions-panel"
               hx-swap="outerHTML"
               hx-include="#workspace-selector"
-              hx-indicator="#gap-suggestions-indicator"
+              hx-indicator="#gap-suggestions-indicator, #gap-generate-form"
               class="inline-flex">
             {% csrf_token %}
             <button type="submit"
@@ -85,11 +86,12 @@
             {% endif %}
 
             <div class="mt-3 flex items-center gap-2">
-                <form hx-post="{% url 'accept_gap_suggestion' suggestion.id %}"
+                <form id="gap-accept-form-{{ suggestion.id }}"
+                      hx-post="{% url 'accept_gap_suggestion' suggestion.id %}"
                       hx-target="#gap-suggestions-panel"
                       hx-swap="outerHTML"
                       hx-include="#workspace-selector"
-                      hx-indicator="#gap-suggestions-indicator"
+                      hx-indicator="#gap-suggestions-indicator, #gap-accept-form-{{ suggestion.id }}"
                       class="inline-flex">
                     {% csrf_token %}
                     <button type="submit" class="px-2.5 py-1.5 text-xs rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors">
@@ -117,11 +119,12 @@
                         class="px-2.5 py-1.5 text-xs rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors">
                     Edit Before Add
                 </button>
-                <form hx-post="{% url 'reject_gap_suggestion' suggestion.id %}"
+                <form id="gap-reject-form-{{ suggestion.id }}"
+                      hx-post="{% url 'reject_gap_suggestion' suggestion.id %}"
                       hx-target="#gap-suggestions-panel"
                       hx-swap="outerHTML"
                       hx-include="#workspace-selector"
-                      hx-indicator="#gap-suggestions-indicator"
+                      hx-indicator="#gap-suggestions-indicator, #gap-reject-form-{{ suggestion.id }}"
                       class="inline-flex">
                     {% csrf_token %}
                     <button type="submit" class="px-2.5 py-1.5 text-xs rounded-md border border-red-200 text-red-700 hover:bg-red-50 transition-colors">

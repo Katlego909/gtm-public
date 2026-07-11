@@ -64,7 +64,6 @@ class ViewPackageSmokeTests(TestCase):
         "refresh_action_items",       # views/actions.py
         "refresh_resources",          # views/resources.py
         "asset_library",              # views/resources.py
-        "refresh_recent_agent_actions",  # views/hub.py
     ]
 
     def _assert_renders(self, url_name):

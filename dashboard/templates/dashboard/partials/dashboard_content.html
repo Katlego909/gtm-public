@@ -559,21 +559,6 @@
         </div>
     </div>
 
-    <div class="bg-white rounded-xl border border-gray-100 p-6 mt-8 reveal">
-        <h3 class="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
-            <span class="inline-block bg-pink-100 text-pink-600 rounded-full p-2 mr-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8a9 9 0 100-18 9 9 0 000 18z" /></svg>
-            </span>
-            Recent Agent Actions
-        </h3>
-        <div id="recent-agent-actions-panel"
-             hx-get="{% url 'refresh_recent_agent_actions' %}"
-             hx-include="#workspace-selector"
-             hx-trigger="load, every 25s, refreshAgentActions from:body"
-             hx-swap="innerHTML">
-            {% include 'dashboard/partials/recent_agent_actions_panel.html' with recent_agent_actions=recent_agent_actions %}
-        </div>
-    </div>
 </div>
 
 {{ total_sessions|default:0|json_script:"js-total-sessions" }}

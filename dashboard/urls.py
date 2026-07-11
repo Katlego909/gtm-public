@@ -25,7 +25,6 @@ urlpatterns = [
     path('gap-suggestions/generate/', views.generate_gap_suggestions, name='generate_gap_suggestions'),
     path('gap-suggestions/<int:suggestion_id>/accept/', views.accept_gap_suggestion, name='accept_gap_suggestion'),
     path('gap-suggestions/<int:suggestion_id>/reject/', views.reject_gap_suggestion, name='reject_gap_suggestion'),
-    path('agent/actions/recent/', views.refresh_recent_agent_actions, name='refresh_recent_agent_actions'),
 
     # New URL pattern for gap_analysis_table view
     path('gap-analysis-table/', views.gap_analysis_table, name='gap_analysis_table'),

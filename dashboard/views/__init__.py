@@ -7,7 +7,7 @@ re-exports every view so ``from . import views`` / ``views.<name>`` call sites
 
 # Private helpers historically imported from dashboard.views by other modules
 # (dashboard.analytics imports these at function level).
-from .helpers import _collect_recent_action_feed, _load_pending_gap_suggestions
+from .helpers import _load_pending_gap_suggestions
 
 from .gap_analysis import (
     accept_gap_suggestion,
@@ -40,7 +40,6 @@ from .analytics import (
 from .hub import (
     agent_hub,
     dashboard,
-    refresh_recent_agent_actions,
     tasks_board,
     workspace_hub,
 )
