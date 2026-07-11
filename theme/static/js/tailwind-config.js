@@ -7,6 +7,7 @@ tailwind.config = {
     extend: {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        heading: ['Geoform', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
         lg: '0.75rem',

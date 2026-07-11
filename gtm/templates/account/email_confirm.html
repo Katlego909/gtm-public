@@ -1,16 +1,19 @@
 {% extends "gtm/base.html" %}
-{% load allauth i18n %}
+{% load static allauth i18n %}
+
+{% block header %}{% endblock %}
 
 {% block content %}
 <div class="max-w-md mx-auto">
+  {% block logo %}
+    <a href="{% url 'gtm:landing' %}" class="flex items-center justify-center mb-6">
+      <img src="{% static 'images/forge_logo.png' %}" alt="Funti3r GTM" class="h-8 w-auto max-w-[140px] object-contain" />
+    </a>
+  {% endblock %}
   <!-- Page Header -->
   <div class="mb-8 text-center">
-    <div class="inline-flex items-center justify-center mb-4">
-      <div class="h-16 w-16 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-xl">
-        <i class="fas fa-envelope-open text-white text-2xl"></i>
-      </div>
-    </div>
-    <h1 class="text-4xl font-bold mb-3 text-indigo-600">
+    <div class="mb-4"></div>
+    <h1 class="text-4xl font-bold mb-3 text-gray-900">
       {% trans "Confirm Email" %}
     </h1>
     <p class="text-gray-600 text-lg">
@@ -19,53 +22,44 @@
   </div>
 
   <!-- Confirmation Card -->
-  <div class="bg-white rounded-2xl shadow-xl border border-gray-200 p-8">
+  <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
     {% if confirmation %}
       <div class="mb-6">
         <p class="text-gray-700 text-center">
-          {% blocktrans with confirmation.email_address.email as email %}Please confirm that <strong class="text-indigo-600">{{ email }}</strong> is your email address.{% endblocktrans %}
+          {% blocktrans with confirmation.email_address.email as email %}Please confirm that <strong class="text-gray-900">{{ email }}</strong> is your email address.{% endblocktrans %}
         </p>
       </div>
 
       <!-- Confirm Button Form -->
       <form method="post" action="{% url 'account_confirm_email' confirmation.key %}">
         {% csrf_token %}
-        <button type="submit" 
-                class="w-full bg-indigo-600 text-white px-8 py-4 rounded-xl font-bold text-lg hover:shadow-xl transition transform hover:scale-105 flex items-center justify-center gap-3">
-          <i class="fas fa-check-circle"></i>
-          {% trans "Confirm Email" %}
-          <i class="fas fa-arrow-right"></i>
-        </button>
+          <button type="submit" class="w-full bg-gray-900 text-white px-8 py-4 rounded-xl font-bold text-lg hover:bg-gray-800 transition">{% trans "Confirm Email" %}</button>
       </form>
     {% else %}
       <!-- Invalid Confirmation Key -->
       <div class="bg-red-50 border-l-4 border-red-500 rounded-lg p-4 mb-6">
         <div class="flex items-start">
-          <i class="fas fa-exclamation-triangle text-red-500 text-xl mt-1 mr-3"></i>
-          <div class="text-red-800">
-            <p class="font-semibold mb-1">{% trans "Invalid Confirmation Link" %}</p>
-            <p class="text-sm">
-              {% blocktrans %}This email confirmation link expired or is invalid. Please request a new one.{% endblocktrans %}
-            </p>
-          </div>
+            <div class="w-4"></div>
+            <div class="text-red-800">
+              <p class="font-semibold mb-1">{% trans "Invalid Confirmation Link" %}</p>
+              <p class="text-sm">
+                {% blocktrans %}This email confirmation link expired or is invalid. Please request a new one.{% endblocktrans %}
+              </p>
+            </div>
         </div>
       </div>
 
       <!-- Back to Home Button -->
       <a href="{% url 'gtm:landing' %}" 
          class="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl border-2 border-gray-300 font-semibold hover:bg-gray-50 transition">
-        <i class="fas fa-home"></i>
-        {% trans "Back to Home" %}
-      </a>
+        <a href="{% url 'gtm:landing' %}" class="w-full inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl border-2 border-gray-300 font-semibold hover:bg-gray-50 transition">{% trans "Back to Home" %}</a>
     {% endif %}
   </div>
 
   <!-- Info Card -->
-  <div class="mt-6 bg-blue-50 rounded-xl p-6 border border-blue-200">
+  <div class="mt-6 bg-gray-50 rounded-xl p-6 border border-gray-100">
     <div class="flex items-start gap-4">
-      <div class="h-12 w-12 bg-blue-600 rounded-lg flex items-center justify-center shrink-0">
-        <i class="fas fa-info-circle text-white text-xl"></i>
-      </div>
+        <div class="h-12 w-12 bg-gray-200 rounded-lg flex items-center justify-center shrink-0"></div>
       <div>
         <h3 class="font-bold text-gray-900 mb-1">{% trans "Why Verify?" %}</h3>
         <p class="text-sm text-gray-700">

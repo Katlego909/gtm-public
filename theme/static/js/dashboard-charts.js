@@ -4,7 +4,7 @@ function initializeDashboardCharts(chartData) {
     if (!chartData || typeof chartData !== 'object') return;
     // --- Chart Configuration ---
     Chart.defaults.font.family = "'Inter', sans-serif";
-    Chart.defaults.color = '#64748b';
+    Chart.defaults.color = '#262626';
     Chart.defaults.scale.grid.borderColor = '#f1f5f9';
 
     function drawKpiProgress(id, value, color) {
@@ -35,7 +35,7 @@ function initializeDashboardCharts(chartData) {
         });
     }
 
-    drawKpiProgress('kpiSessions', chartData.total_sessions || 0, '#4f46e5');
+    drawKpiProgress('kpiSessions', chartData.total_sessions || 0, '#FFE0AE');
     drawKpiProgress('kpiCompleted', chartData.completed_items || 0, '#eab308');
     drawKpiProgress('kpiPending', chartData.pending_items || 0, '#ef4444');
 
@@ -51,7 +51,7 @@ function initializeDashboardCharts(chartData) {
                 datasets: [{
                     label: 'Sessions',
                     data: barData,
-                    backgroundColor: hasData ? '#6366f1' : '#e2e8f0',
+                    backgroundColor: hasData ? '#FFE0AE' : '#e2e8f0',
                     borderRadius: 4,
                     barThickness: 24,
                 }]

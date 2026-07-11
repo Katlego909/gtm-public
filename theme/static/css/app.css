@@ -4,23 +4,47 @@
  * change values here, never per-template.
  */
 
+@font-face {
+  font-family: 'Geoform';
+  src: url('../fonts/geoform/Geoform.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geoform';
+  src: url('../fonts/geoform/Geoform-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geoform';
+  src: url('../fonts/geoform/Geoform-Italic.ttf') format('truetype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
 :root {
   --font-body: 'Inter', system-ui, sans-serif;
-  --font-heading: 'Inter', system-ui, sans-serif;
+  --font-heading: 'Geoform', system-ui, sans-serif;
 
-  /* Single accent ramp (indigo). No secondary accent. */
-  --accent-50: #eef2ff;
-  --accent-100: #e0e7ff;
-  --accent-200: #c7d2fe;
-  --accent-300: #a5b4fc;
-  --accent-400: #818cf8;
-  --accent-500: #6366f1;
-  --accent-600: #4f46e5;
-  --accent-700: #4338ca;
-  --accent-800: #3730a3;
-  --accent-900: #312e81;
+  /* Accent palette (primary peach, limited purple for sparing highlights) */
+  --accent-50: #FFE0AE;
+  --accent-100: #FFE0AE;
+  --accent-200: #FFE0AE;
+  --accent-300: #FFE0AE;
+  --accent-400: #FFE0AE;
+  --accent-500: #FFE0AE;
+  --accent-600: #FFE0AE;
+  --accent-700: #6F3DFF;
+  --accent-800: #6F3DFF;
+  --accent-900: #6F3DFF;
 
-  /* Semantic colors: dark text on a light tint with a matching border. */
+  /* Semantic colors: keep success/warning/error semantics but tone surfaces down */
   --success: #15803d;
   --success-bg: #f0fdf4;
   --success-border: #bbf7d0;
@@ -30,12 +54,13 @@
   --error: #b91c1c;
   --error-bg: #fef2f2;
   --error-border: #fecaca;
-  --info: #1d4ed8;
-  --info-bg: #eff6ff;
-  --info-border: #bfdbfe;
+  --info: #262626;
+  --info-bg: #E5E5E5;
+  --info-border: #E5E5E5;
 
   /* Surfaces */
-  --border: #e5e7eb;
+  --border: #E5E5E5;
+  --text-color: #262626;
   --radius: 0.75rem;
   --radius-lg: 1rem;
   --radius-sm: 0.5rem;
@@ -43,6 +68,7 @@
 
 body {
   font-family: var(--font-body);
+  color: var(--text-color);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
