@@ -2,13 +2,42 @@ from django import forms
 from .models import AssessmentSession
 from .models_workspace import WorkspaceInvitation
 
+# Curated dropdown options for start.html's "select + Other" fields.
+# Plain string lists (not model choices=) so a legacy/custom value that isn't
+# in the list can still round-trip via the "Other" fallback.
+INDUSTRY_OPTIONS = [
+    "SaaS/Software", "Fintech", "Healthcare/HealthTech", "E-commerce/Retail",
+    "Marketing/AdTech", "EdTech", "Real Estate/PropTech", "Manufacturing",
+    "Professional Services/Consulting", "Media/Entertainment",
+    "Logistics/Supply Chain", "Cybersecurity", "HR/Recruiting", "Non-profit",
+]
+
+ROLE_OPTIONS = [
+    "Founder/CEO", "Co-Founder", "CMO/VP Marketing", "Head of Growth",
+    "VP Sales/CRO", "Head of Product", "Operations Lead", "Consultant/Advisor",
+]
+
+COUNTRY_OPTIONS = [
+    "South Africa", "United States", "United Kingdom", "Canada", "Australia",
+    "Germany", "France", "Netherlands", "Nigeria", "Kenya", "Ghana", "India",
+    "Singapore", "United Arab Emirates", "Brazil", "Ireland", "Sweden",
+    "Spain", "Italy", "New Zealand", "Israel", "Switzerland",
+]
+
+CRM_OPTIONS = [
+    "HubSpot", "Salesforce", "Pipedrive", "Zoho CRM", "Close",
+    "Microsoft Dynamics 365", "Freshsales", "Copper", "ActiveCampaign",
+    "monday.com CRM", "None / Not using a CRM",
+]
+
+
 class StartAssessmentForm(forms.ModelForm):
     class Meta:
         model = AssessmentSession
         fields = [
             "company_name", "industry", "website", "contact_name",
             "contact_email", "contact_role", "phone", "company_size",
-            "revenue_range", "country", "crm", "notes",
+            "revenue_range", "country", "crm", "company_stage", "notes",
             "utm_source", "utm_medium", "utm_campaign", "referrer"
         ]
         # Basic widgets; customize attrs as needed for styling (e.g., 'form-control', Tailwind classes)

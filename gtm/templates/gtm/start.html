@@ -28,7 +28,7 @@
   {% endif %}
 
   <!-- Form Card -->
-  <form method="post"
+  <form id="start-assessment-form" method="post"
         action="{% if edit_session %}{% url 'gtm:edit_assessment_intro' edit_session.uuid %}{% else %}{% url 'gtm:start' %}{% endif %}"
         hx-post="{% if edit_session %}{% url 'gtm:edit_assessment_intro' edit_session.uuid %}{% else %}{% url 'gtm:start' %}{% endif %}"
         hx-target="#main-content"
@@ -42,14 +42,14 @@
     <div class="space-y-4">
       <div class="app-section-header">
         <div class="app-icon-badge app-icon-badge--solid">
-          <i class="fas fa-building text-white"></i>
+          <i class="fas fa-building"></i>
         </div>
         <h2 class="text-xl font-bold text-gray-900">Company Information</h2>
       </div>
 
       <div>
         <label class="block text-sm font-semibold text-gray-700 mb-2">
-          <i class="fas fa-briefcase text-indigo-600 mr-2"></i>Company Name <span class="text-red-500">*</span>
+          Company Name <span class="text-red-500">*</span>
         </label>
         <input required name="company_name" class="app-input" placeholder="Acme Inc." value="{{ edit_session.company_name|default:'' }}">
       </div>
@@ -57,16 +57,42 @@
       <div class="grid md:grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
-            <i class="fas fa-industry text-blue-600 mr-2"></i>Industry
+            Industry
           </label>
-          <input name="industry" class="app-input" placeholder="SaaS, Fintech, Healthcare, etc." value="{{ edit_session.industry|default:'' }}">
+          <select id="industry-select" class="app-select">
+            <option value="">Select industry</option>
+            {% for opt in industry_options %}
+              <option value="{{ opt }}" {% if edit_session.industry == opt %}selected{% endif %}>{{ opt }}</option>
+            {% endfor %}
+            <option value="__other__" {% if edit_session.industry and edit_session.industry not in industry_options %}selected{% endif %}>Other</option>
+          </select>
+          <input type="text" id="industry-other"
+                 class="app-input mt-2 {% if not edit_session.industry or edit_session.industry in industry_options %}hidden{% endif %}"
+                 placeholder="Please specify your industry"
+                 value="{% if edit_session.industry and edit_session.industry not in industry_options %}{{ edit_session.industry }}{% endif %}">
+          <input type="hidden" name="industry" id="industry-final" value="{{ edit_session.industry|default:'' }}">
         </div>
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
-            <i class="fas fa-globe text-green-600 mr-2"></i>Website
+            Website
           </label>
           <input type="url" name="website" class="app-input" placeholder="https://example.com" value="{{ edit_session.website|default:'' }}">
         </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2">
+          Company Stage
+        </label>
+        <select name="company_stage" class="app-select">
+          <option value="">Select stage</option>
+          <option value="idea" {% if edit_session.company_stage == "idea" %}selected{% endif %}>Idea / Pre-launch</option>
+          <option value="pre_revenue" {% if edit_session.company_stage == "pre_revenue" %}selected{% endif %}>Early Stage / Pre-Revenue</option>
+          <option value="early_revenue" {% if edit_session.company_stage == "early_revenue" %}selected{% endif %}>Early Revenue</option>
+          <option value="growth" {% if edit_session.company_stage == "growth" %}selected{% endif %}>Growth</option>
+          <option value="scale" {% if edit_session.company_stage == "scale" %}selected{% endif %}>Scale / Mature</option>
+        </select>
+        <p class="text-xs text-gray-500 mt-1.5">We'll only ask what's relevant to your stage &mdash; early-stage companies won't be scored on retention or pipeline motions they don't have yet.</p>
       </div>
     </div>
 
@@ -74,7 +100,7 @@
     <div class="space-y-4 pt-6 border-t border-gray-200">
       <div class="app-section-header">
         <div class="app-icon-badge app-icon-badge--solid">
-          <i class="fas fa-user text-white"></i>
+          <i class="fas fa-user"></i>
         </div>
         <h2 class="text-xl font-bold text-gray-900">Contact Details</h2>
       </div>
@@ -82,34 +108,45 @@
       <div class="grid md:grid-cols-3 gap-4">
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
-            <i class="fas fa-user-circle text-indigo-600 mr-2"></i>Contact Name
+            Contact Name
           </label>
           <input name="contact_name" class="app-input" placeholder="John Doe" value="{{ edit_session.contact_name|default:'' }}">
         </div>
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
-            <i class="fas fa-envelope text-blue-600 mr-2"></i>Work Email
+            Work Email
           </label>
           <input type="email" name="contact_email" class="app-input" placeholder="john@example.com" value="{{ edit_session.contact_email|default:'' }}">
         </div>
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
-            <i class="fas fa-id-badge text-green-600 mr-2"></i>Role / Title
+            Role / Title
           </label>
-          <input name="contact_role" class="app-input" placeholder="Head of Growth" value="{{ edit_session.contact_role|default:'' }}">
+          <select id="contact_role-select" class="app-select">
+            <option value="">Select role</option>
+            {% for opt in role_options %}
+              <option value="{{ opt }}" {% if edit_session.contact_role == opt %}selected{% endif %}>{{ opt }}</option>
+            {% endfor %}
+            <option value="__other__" {% if edit_session.contact_role and edit_session.contact_role not in role_options %}selected{% endif %}>Other</option>
+          </select>
+          <input type="text" id="contact_role-other"
+                 class="app-input mt-2 {% if not edit_session.contact_role or edit_session.contact_role in role_options %}hidden{% endif %}"
+                 placeholder="Please specify your role"
+                 value="{% if edit_session.contact_role and edit_session.contact_role not in role_options %}{{ edit_session.contact_role }}{% endif %}">
+          <input type="hidden" name="contact_role" id="contact_role-final" value="{{ edit_session.contact_role|default:'' }}">
         </div>
       </div>
 
       <div class="grid md:grid-cols-3 gap-4">
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
-            <i class="fas fa-phone text-orange-600 mr-2"></i>Phone
+            Phone
           </label>
           <input type="tel" name="phone" class="app-input" placeholder="+1 (555) 000-0000" value="{{ edit_session.phone|default:'' }}">
         </div>
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
-            <i class="fas fa-users text-indigo-600 mr-2"></i>Company Size
+            Company Size
           </label>
           <select name="company_size" class="app-select">
             <option value="">Select size</option>
@@ -122,7 +159,7 @@
         </div>
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
-            <i class="fas fa-dollar-sign text-green-600 mr-2"></i>Revenue Range
+            Revenue Range
           </label>
           <select name="revenue_range" class="app-select">
             <option value="">Select range</option>
@@ -138,15 +175,37 @@
       <div class="grid md:grid-cols-2 gap-4">
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
-            <i class="fas fa-map-marker-alt text-red-600 mr-2"></i>Country
+            Country
           </label>
-          <input name="country" class="app-input" placeholder="South Africa, United States, etc." value="{{ edit_session.country|default:'' }}">
+          <select id="country-select" class="app-select">
+            <option value="">Select country</option>
+            {% for opt in country_options %}
+              <option value="{{ opt }}" {% if edit_session.country == opt %}selected{% endif %}>{{ opt }}</option>
+            {% endfor %}
+            <option value="__other__" {% if edit_session.country and edit_session.country not in country_options %}selected{% endif %}>Other</option>
+          </select>
+          <input type="text" id="country-other"
+                 class="app-input mt-2 {% if not edit_session.country or edit_session.country in country_options %}hidden{% endif %}"
+                 placeholder="Please specify your country"
+                 value="{% if edit_session.country and edit_session.country not in country_options %}{{ edit_session.country }}{% endif %}">
+          <input type="hidden" name="country" id="country-final" value="{{ edit_session.country|default:'' }}">
         </div>
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">
-            <i class="fas fa-database text-blue-600 mr-2"></i>CRM
+            CRM
           </label>
-          <input name="crm" class="app-input" placeholder="HubSpot, Salesforce, etc." value="{{ edit_session.crm|default:'' }}">
+          <select id="crm-select" class="app-select">
+            <option value="">Select CRM</option>
+            {% for opt in crm_options %}
+              <option value="{{ opt }}" {% if edit_session.crm == opt %}selected{% endif %}>{{ opt }}</option>
+            {% endfor %}
+            <option value="__other__" {% if edit_session.crm and edit_session.crm not in crm_options %}selected{% endif %}>Other</option>
+          </select>
+          <input type="text" id="crm-other"
+                 class="app-input mt-2 {% if not edit_session.crm or edit_session.crm in crm_options %}hidden{% endif %}"
+                 placeholder="Please specify your CRM"
+                 value="{% if edit_session.crm and edit_session.crm not in crm_options %}{{ edit_session.crm }}{% endif %}">
+          <input type="hidden" name="crm" id="crm-final" value="{{ edit_session.crm|default:'' }}">
         </div>
       </div>
     </div>
@@ -155,14 +214,14 @@
     <div class="space-y-4 pt-6 border-t border-gray-200">
       <div class="app-section-header">
         <div class="app-icon-badge app-icon-badge--solid">
-          <i class="fas fa-sticky-note text-white"></i>
+          <i class="fas fa-sticky-note"></i>
         </div>
         <h2 class="text-xl font-bold text-gray-900">Additional Information</h2>
       </div>
 
       <div>
         <label class="block text-sm font-semibold text-gray-700 mb-2">
-          <i class="fas fa-comment-dots text-indigo-600 mr-2"></i>Notes (optional)
+          Notes (optional)
         </label>
         <textarea name="notes" rows="4" class="app-textarea" placeholder="Share any specific goals, challenges, or context about your GTM strategy...">{{ edit_session.notes|default:'' }}</textarea>
       </div>
@@ -191,26 +250,59 @@
   <div class="grid md:grid-cols-3 gap-4 mt-8">
     <div class="app-accent-panel p-6">
       <div class="app-icon-badge app-icon-badge--solid h-12 w-12 mb-3 rounded-lg">
-        <i class="fas fa-clock text-white text-xl"></i>
+        <i class="fas fa-clock text-xl"></i>
       </div>
       <h3 class="font-bold text-gray-900 mb-1">10 Minutes</h3>
       <p class="text-sm text-gray-600">Quick assessment that fits your schedule</p>
     </div>
     <div class="app-accent-panel p-6">
       <div class="app-icon-badge app-icon-badge--solid h-12 w-12 mb-3 rounded-lg">
-        <i class="fas fa-brain text-white text-xl"></i>
+        <i class="fas fa-brain text-xl"></i>
       </div>
       <h3 class="font-bold text-gray-900 mb-1">AI-Powered</h3>
       <p class="text-sm text-gray-600">Personalized insights from advanced AI</p>
     </div>
     <div class="app-accent-panel p-6">
       <div class="app-icon-badge app-icon-badge--solid h-12 w-12 mb-3 rounded-lg">
-        <i class="fas fa-file-pdf text-white text-xl"></i>
+        <i class="fas fa-file-pdf text-xl"></i>
       </div>
       <h3 class="font-bold text-gray-900 mb-1">Full Report</h3>
       <p class="text-sm text-gray-600">Detailed PDF with actionable playbook</p>
     </div>
   </div>
 </div>
+
+<script>
+(function () {
+  var OTHER_FIELDS = ['industry', 'contact_role', 'country', 'crm'];
+
+  function toggleOther(name) {
+    var select = document.getElementById(name + '-select');
+    var other = document.getElementById(name + '-other');
+    if (!select || !other) return;
+    other.classList.toggle('hidden', select.value !== '__other__');
+  }
+
+  function mergeOtherFields() {
+    OTHER_FIELDS.forEach(function (name) {
+      var select = document.getElementById(name + '-select');
+      var other = document.getElementById(name + '-other');
+      var hidden = document.getElementById(name + '-final');
+      if (!select || !hidden) return;
+      hidden.value = select.value === '__other__' ? (other ? other.value.trim() : '') : select.value;
+    });
+  }
+
+  OTHER_FIELDS.forEach(function (name) {
+    var select = document.getElementById(name + '-select');
+    if (select) select.addEventListener('change', function () { toggleOther(name); });
+  });
+
+  var form = document.getElementById('start-assessment-form');
+  // Capture phase so this always runs before htmx's own (bubble-phase)
+  // submit handler, regardless of script/attribute registration order.
+  if (form) form.addEventListener('submit', mergeOtherFields, true);
+})();
+</script>
 
 {% endblock %}

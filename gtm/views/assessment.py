@@ -42,7 +42,10 @@ from ..ai_services import (
     rewrite_context_note_with_ai,
     ENRICHMENT_UNAVAILABLE,
 )
-from ..forms import StartAssessmentForm # Added import
+from ..forms import (
+    StartAssessmentForm,
+    INDUSTRY_OPTIONS, ROLE_OPTIONS, COUNTRY_OPTIONS, CRM_OPTIONS,
+) # Added import
 from ..services import (_expand_gtm_jargon, _build_question_guidance, _kickoff_playbook_generation, _log_access_denied, safe_get_session_or_403, _format_band_actions_markdown, _paginated_questions, _category_step_map, _first_incomplete_step, _compute_scores, _band_for_score, _is_session_complete, _save_snapshot)
 
 from .helpers import (
@@ -53,6 +56,16 @@ from .helpers import (
     require_action_ownership,
     require_session_ownership,
 )
+
+# Shared into every gtm/start.html render — the curated "select + Other" option
+# lists for Industry/Role/Country/CRM (see gtm/forms.py).
+_START_FORM_OPTIONS_CONTEXT = {
+    "industry_options": INDUSTRY_OPTIONS,
+    "role_options": ROLE_OPTIONS,
+    "country_options": COUNTRY_OPTIONS,
+    "crm_options": CRM_OPTIONS,
+}
+
 
 def landing(request):
     # If user is authenticated and has workspace memberships, redirect to dashboard
@@ -126,7 +139,8 @@ def start_assessment(request):
             # If form is invalid, re-render the page with errors
             return render(request, "gtm/start.html", {
                 "form": form,
-                "is_htmx": _is_htmx(request)
+                "is_htmx": _is_htmx(request),
+                **_START_FORM_OPTIONS_CONTEXT,
             })
 
     else: # GET request
@@ -137,7 +151,11 @@ def start_assessment(request):
             # Referrer is set in save, but can be pre-filled from GET if desired
             "referrer": request.GET.get("referrer", ""),
         })
-    return render(request, "gtm/start.html", {"form": form, "is_htmx": _is_htmx(request)})
+    return render(request, "gtm/start.html", {
+        "form": form,
+        "is_htmx": _is_htmx(request),
+        **_START_FORM_OPTIONS_CONTEXT,
+    })
 
 
 @login_required
@@ -164,6 +182,7 @@ def edit_assessment_intro(request, session_id):
         "form": form,
         "edit_session": session,
         "is_htmx": _is_htmx(request),
+        **_START_FORM_OPTIONS_CONTEXT,
     })
 
 
@@ -194,7 +213,7 @@ def assessment_step(request, session_id, step: int):
         messages.error(request, "Access denied.")
         return redirect("gtm:history")
 
-    steps = _paginated_questions()
+    steps = _paginated_questions(session)
     total_steps = len(steps)
     if total_steps == 0:
         return redirect("gtm:results", session_id=session.uuid)
@@ -278,8 +297,10 @@ def assessment_step(request, session_id, step: int):
 
     # Build per-step AI document analysis URLs
     from django.urls import reverse as _reverse
-    is_delivery_step = (step == total_steps)
     category_slug = (questions[0].category.name.lower() if questions else '')
+    # Match by category, not step position — Delivery may not be the last
+    # (or even a present) step once company-stage exemption skips it.
+    is_delivery_step = (category_slug == 'delivery')
 
     if is_delivery_step:
         ai_upload_url  = _reverse('gtm:upload_delivery_document',  kwargs={'session_id': session.uuid})

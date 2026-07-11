@@ -22,11 +22,22 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Import generation config from ai_services
+# Import generation config + shared quota-cooldown circuit breaker from ai_services
 try:
     from .ai_services import _PLAYBOOK_CONFIG
 except (ImportError, AttributeError):
     _PLAYBOOK_CONFIG = None
+
+try:
+    from .ai_services import (
+        _is_quota_error, _extract_retry_delay_seconds,
+        _set_quota_cooldown, _quota_cooldown_active,
+    )
+except (ImportError, AttributeError):
+    def _is_quota_error(exc): return False
+    def _extract_retry_delay_seconds(exc): return 60
+    def _set_quota_cooldown(seconds): pass
+    def _quota_cooldown_active(): return False
 
 # Cached auditor client to avoid repeated initialization
 _auditor_client = None
@@ -140,8 +151,11 @@ def _run_multimodal_audit(file_bytes: bytes, mime_type: str, asset_name: str, se
     if not client:
         logger.error("Auditor client unavailable for audit.")
         return ""
+    if _quota_cooldown_active():
+        logger.warning("Gemini quota cooldown active — skipping audit for %s", asset_name)
+        return ""
 
-    audit_prompt = f"""You are the 'GTM Strategic Auditor'. 
+    audit_prompt = f"""You are the 'GTM Strategic Auditor'.
 Perform a professional strategic critique of this {asset_name}.
 
 CONTEXT FROM GTM ASSESSMENT:
@@ -176,6 +190,8 @@ REPORT FORMAT:
         )
         return response.text or ""
     except Exception as e:
+        if _is_quota_error(e):
+            _set_quota_cooldown(_extract_retry_delay_seconds(e))
         logger.error(f"Multimodal Audit API call failed: {e}")
         return ""
 

@@ -36,6 +36,14 @@ class Question(models.Model):
     input_option_labels = models.JSONField(default=dict, blank=True, encoder=DjangoJSONEncoder)
     def __str__(self): return f"{self.id_code} – {self.text[:60]}"
 
+COMPANY_STAGE_CHOICES = [
+    ("idea", "Idea / Pre-launch"),
+    ("pre_revenue", "Early Stage / Pre-Revenue"),
+    ("early_revenue", "Early Revenue"),
+    ("growth", "Growth"),
+    ("scale", "Scale / Mature"),
+]
+
 class AssessmentSession(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     owner_client_id = models.CharField(max_length=64, db_index=True)
@@ -75,6 +83,11 @@ class AssessmentSession(models.Model):
     )
     country = models.CharField(max_length=80, blank=True, default="")
     crm = models.CharField(max_length=80, blank=True, default="")  # HubSpot, SFDC, etc.
+
+    # Company lifecycle stage. Blank = unset/legacy → treated as "all pillars
+    # apply" (today's behavior). Drives which assessment pillars are shown
+    # and scored — see STAGE_CATEGORY_APPLICABILITY in services.py.
+    company_stage = models.CharField(max_length=20, choices=COMPANY_STAGE_CHOICES, blank=True, default="")
 
     # Acquisition / attribution
     utm_source = models.CharField(max_length=80, blank=True, default="")
@@ -216,6 +229,7 @@ class ResultSnapshot(models.Model):
     revenue_range  = models.CharField(max_length=20,  blank=True, default="")
     country        = models.CharField(max_length=80,  blank=True, default="")
     crm            = models.CharField(max_length=80,  blank=True, default="")
+    company_stage  = models.CharField(max_length=20,  blank=True, default="")
     utm_source     = models.CharField(max_length=80,  blank=True, default="")
     utm_medium     = models.CharField(max_length=80,  blank=True, default="")
     utm_campaign   = models.CharField(max_length=120, blank=True, default="")
@@ -229,6 +243,27 @@ class ResultSnapshot(models.Model):
 
     def __str__(self):
         return f"Snapshot for {self.session.uuid} – {self.overall}/100"
+
+
+class AIScoringExample(models.Model):
+    """A real Gemini scoring outcome, captured for reuse as a fallback signal
+    when Gemini is unavailable (quota/network/credentials failure).
+
+    Deliberately stores only an embedding of the evidence passage plus the
+    score/confidence Gemini assigned to it — never the raw evidence text,
+    Gemini's reasoning text, or anything identifying the company/session —
+    so this corpus can be safely shared and queried across companies without
+    leaking one company's document content into another's fallback results.
+    """
+    question_id_code = models.CharField(max_length=10, db_index=True)
+    evidence_embedding = models.JSONField(encoder=DjangoJSONEncoder)  # 384-dim MiniLM vector
+    score = models.PositiveSmallIntegerField()
+    confidence = models.CharField(max_length=10, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    def __str__(self):
+        return f"{self.question_id_code}: {self.score} ({self.confidence or 'n/a'})"
+
 
 class ChatMessage(models.Model):
     """Store chat conversation history for AI assistant"""

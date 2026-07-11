@@ -43,7 +43,7 @@ from ..ai_services import (
     ENRICHMENT_UNAVAILABLE,
 )
 from ..forms import StartAssessmentForm # Added import
-from ..services import (_expand_gtm_jargon, _build_question_guidance, _kickoff_playbook_generation, _log_access_denied, safe_get_session_or_403, _format_band_actions_markdown, _paginated_questions, _category_step_map, _first_incomplete_step, _compute_scores, _band_for_score, _is_session_complete, _save_snapshot)
+from ..services import (_expand_gtm_jargon, _build_question_guidance, _kickoff_playbook_generation, _log_access_denied, safe_get_session_or_403, _format_band_actions_markdown, _paginated_questions, _category_step_map, _first_incomplete_step, _compute_scores, _band_for_score, _is_session_complete, _save_snapshot, _applicable_categories)
 
 from .helpers import (
     LEGEND,
@@ -69,9 +69,29 @@ def results(request, session_id):
     cat_scores, overall = _compute_scores(session)
     band = _band_for_score(overall)
 
+    # Mark pillars not applicable to this session's company_stage so the
+    # template can show "not yet applicable" instead of a misleading 0/5,
+    # and so they don't pollute strengths/focus-area ranking below.
+    applicable_names = set(_applicable_categories(session).values_list("name", flat=True))
+    for c in cat_scores:
+        c["is_applicable"] = c["category"].name in applicable_names
+    exempted_names = [c["category"].name for c in cat_scores if not c["is_applicable"]]
+    stage_exemption_note = ""
+    if exempted_names:
+        if len(exempted_names) == 1:
+            joined = exempted_names[0]
+        else:
+            joined = ", ".join(exempted_names[:-1]) + f" & {exempted_names[-1]}"
+        verb = "isn't" if len(exempted_names) == 1 else "aren't"
+        stage_exemption_note = (
+            f"{joined} {verb} scored yet at your company's current stage — "
+            "they'll unlock as you grow."
+        )
+
+    scoreable_cats = [c for c in cat_scores if c["is_applicable"]]
     step_map = {cat.id: idx + 1 for idx, cat in enumerate(Category.objects.all().order_by("id"))}
-    strengths_categories = sorted(cat_scores, key=lambda x: x["avg"], reverse=True)[:3]
-    focus_categories = sorted(cat_scores, key=lambda x: x["avg"])[:3]
+    strengths_categories = sorted(scoreable_cats, key=lambda x: x["avg"], reverse=True)[:3]
+    focus_categories = sorted(scoreable_cats, key=lambda x: x["avg"])[:3]
 
     for it in strengths_categories:
         it["step"] = step_map.get(it["category"].id)
@@ -250,7 +270,7 @@ def results(request, session_id):
     from django.urls import reverse as _reverse
     next_moves_poll_url = _reverse("gtm:next_moves_content", kwargs={"session_id": session.uuid})
     snap_status = getattr(snap, "ai_playbook_status", "pending") if snap else "pending"
-    total_steps = len(_paginated_questions())
+    total_steps = len(_paginated_questions(session))
 
     return render(request, "gtm/results.html", {
         "session": session,
@@ -267,6 +287,7 @@ def results(request, session_id):
         "weakest_questions": weakest_questions,
         "recommendations": recommendations,
         "scoring_context": scoring_context,
+        "stage_exemption_note": stage_exemption_note,
         "is_htmx": _is_htmx(request),
         "snap": snap,
         "next_moves_poll_url": next_moves_poll_url,

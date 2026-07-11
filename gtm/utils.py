@@ -15,7 +15,7 @@ def transfer_firmographics_to_snapshot(session: AssessmentSession, snapshot: Res
     firmographic_fields = [
         "company_name", "industry", "website", "contact_name",
         "contact_email", "contact_role", "phone", "company_size",
-        "revenue_range", "country", "crm", "utm_source",
+        "revenue_range", "country", "crm", "company_stage", "utm_source",
         "utm_medium", "utm_campaign", "referrer"
     ]
     

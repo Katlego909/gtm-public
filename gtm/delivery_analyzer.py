@@ -114,6 +114,116 @@ DELIVERY_QUESTIONS = [
 
 
 # ---------------------------------------------------------------------------
+# Fallback guidance — used only when Gemini is unavailable (see
+# _scoring_memory_fallback below). Written once per question x score-tier,
+# reviewed for quality, never referencing any specific company's evidence —
+# paired at runtime with the *user's own* evidence excerpt, which is safe
+# because it's their own document, not another company's.
+# ---------------------------------------------------------------------------
+QUESTION_SCORE_GUIDANCE = {
+    "DEM-ICP-01": {
+        "low": "Without a written ICP, marketing and sales tend to chase whichever leads show up rather than the ones most likely to close and stay — that scatter shows up later as low win rates and early churn.",
+        "mid": "An ICP exists but isn't consistently reviewed or applied, so teams may drift back to gut-feel targeting between updates.",
+        "high": "A clearly documented and regularly reviewed ICP keeps marketing, sales, and product aligned on exactly who you're building for.",
+    },
+    "DEM-FIT-02": {
+        "low": "Low ICP-fit rates on inbound leads usually mean top-of-funnel messaging or targeting is pulling in the wrong audience, which shows up later as poor sales conversion.",
+        "mid": "Some leads match the ICP but qualification fields aren't consistently filled in, making it hard to verify fit rates with confidence.",
+        "high": "A high, verifiable share of inbound leads matching the ICP is a strong signal that targeting and messaging are working together.",
+    },
+    "DEM-MSG-03": {
+        "low": "Inconsistent or untested messaging across channels usually means prospects hear a different value story depending on where they encounter you, which slows down buying decisions.",
+        "mid": "A messaging framework exists but isn't consistently used across every channel or tested with real segments.",
+        "high": "Consistent, tested messaging across website, outbound, and sales materials shortens the path from first touch to understood value.",
+    },
+    "DEM-CHN-04": {
+        "low": "Without visibility into channel-level CAC and pipeline contribution, budget tends to get allocated by habit rather than performance.",
+        "mid": "Channel performance is tracked in some form but not reviewed on a regular cadence, so underperforming spend can linger.",
+        "high": "A monthly-reviewed channel plan with CAC and pipeline data by source lets you double down on what's actually working.",
+    },
+    "DEM-ATT-05": {
+        "low": "Without reliable attribution, it's hard to tell which channels are actually driving pipeline — decisions end up based on the loudest channel, not the most effective one.",
+        "mid": "Some attribution data exists but isn't fully trusted or consistently used to inform channel decisions.",
+        "high": "Reliable attribution reporting means marketing spend can be defended and reallocated with real data, not guesswork.",
+    },
+    "DEM-CNT-06": {
+        "low": "Ad-hoc content or outbound activity, disconnected from target accounts and pipeline goals, rarely compounds into predictable pipeline.",
+        "mid": "A schedule exists but isn't consistently tied to specific target accounts or pipeline goals.",
+        "high": "A steady, goal-tied content or outbound cadence is one of the most reliable ways to keep pipeline predictable.",
+    },
+    "CON-SLA-01": {
+        "low": "Without response-time targets, high-intent leads often go cold before a rep ever reaches out — this is one of the most common, most fixable pipeline leaks.",
+        "mid": "Response-time targets exist but aren't consistently reviewed, so breaches can go unnoticed.",
+        "high": "Clear SLA targets with weekly review keep response times tight, which reliably lifts lead-to-opportunity conversion.",
+    },
+    "CON-QLF-02": {
+        "low": "Without mandatory qualification gates, unqualified opportunities advance through the pipeline and distort forecasts and rep time allocation.",
+        "mid": "A qualification framework exists but isn't consistently enforced at every stage gate.",
+        "high": "Enforced qualification gates keep the pipeline honest and free up rep time for deals that can actually close.",
+    },
+    "CON-STG-03": {
+        "low": "Without documented entry/exit criteria per stage, deals drift forward without real progress, making forecasts unreliable.",
+        "mid": "Stage definitions exist but stage-to-stage conversion isn't reviewed on a regular cadence, so bottlenecks can go undiagnosed.",
+        "high": "Enforced stage criteria with monthly conversion-rate review makes bottlenecks visible early, before they become a quarter-end surprise.",
+    },
+    "CON-OBJ-04": {
+        "low": "Without a shared objection-handling playbook or battlecards, reps improvise inconsistently against common objections and competitors.",
+        "mid": "Some enablement materials exist but aren't reinforced through coaching or call review.",
+        "high": "A living playbook reinforced by coaching and call review keeps the whole team handling objections consistently, not just your best reps.",
+    },
+    "CON-WNL-05": {
+        "low": "Without structured win/loss capture, the same avoidable losses tend to repeat because nobody is systematically learning from them.",
+        "mid": "Win/loss reasons are captured but reviews aren't regular enough to turn findings into real process or coaching changes.",
+        "high": "Regular win/loss reviews that feed into coaching and process changes turn every closed deal into a feedback loop that improves the next one.",
+    },
+    "CON-PGE-06": {
+        "low": "Without hypothesis-driven testing on key conversion pages and forms, improvements are guesswork and regressions can go unnoticed.",
+        "mid": "Some testing happens but isn't tracked with defined hypotheses or shared results, so learnings don't compound.",
+        "high": "Structured, tracked experimentation on key conversion points compounds over time into a meaningfully better funnel.",
+    },
+    "DEL-TTV-01": {
+        "low": "Without tracking time-to-first-value by segment, slow onboarding often goes unnoticed until it shows up as early churn.",
+        "mid": "TTV is tracked in some form but there's no active initiative to shorten it, so it tends to drift rather than improve.",
+        "high": "Actively tracked and shortened time-to-value is one of the strongest predictors of long-term retention.",
+    },
+    "DEL-ONB-02": {
+        "low": "Without clear milestones, owners, and shared tracking, onboarding quality varies a lot between customers and between CSMs.",
+        "mid": "A process exists but milestones or ownership aren't consistently clear across every account.",
+        "high": "A tracked onboarding process with clear owners and realistic targets makes early customer experience consistent, not luck-dependent.",
+    },
+    "DEL-HLT-03": {
+        "low": "Without a health-score model, at-risk accounts are usually only noticed after they've already started disengaging — too late for an effective save motion.",
+        "mid": "Some health signals are tracked but there's no clear playbook for acting on them early.",
+        "high": "A usage- and support-informed health score with a clear intervention playbook catches risk early enough to actually do something about it.",
+    },
+    "DEL-RET-04": {
+        "low": "Low retention visibility usually means churn is discovered after the fact rather than predicted — teams at this stage typically don't have a defined at-risk signal yet.",
+        "mid": "Retention is reviewed but not consistently by cohort or fast enough to launch targeted saves before a segment's decline compounds.",
+        "high": "Monthly cohort-level retention review with fast, targeted response to decline is what turns retention from a lagging metric into a managed one.",
+    },
+    "DEL-QBR-05": {
+        "low": "Without regular outcome-focused business reviews, high-value accounts can drift without anyone actively managing their trajectory or expansion potential.",
+        "mid": "Reviews happen but aren't consistently tied to outcomes or roadmap alignment, limiting how much they actually influence the relationship.",
+        "high": "Regular, outcome-focused QBRs linked to expansion pipeline keep your highest-value relationships actively managed, not just maintained.",
+    },
+    "DEL-ADV-06": {
+        "low": "Without a structured way to capture testimonials and case studies, even happy customers rarely turn into usable proof points for future selling.",
+        "mid": "Some advocacy content exists but isn't part of a consistent, ongoing programme.",
+        "high": "A consistent advocacy programme turns customer success into a compounding sales asset — proof points that make the next deal easier.",
+    },
+}
+
+
+def _score_guidance(id_code: str, score: int) -> str:
+    """Look up the generic, pre-written guidance line for a question/score."""
+    tiers = QUESTION_SCORE_GUIDANCE.get(id_code)
+    if not tiers:
+        return ""
+    tier = "low" if score <= 2 else ("mid" if score == 3 else "high")
+    return tiers.get(tier, "")
+
+
+# ---------------------------------------------------------------------------
 # Stage 1 — Text extractors
 # ---------------------------------------------------------------------------
 
@@ -556,6 +666,139 @@ def _build_nlp_evidence(combined_text: str, questions: list = None) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Stage 2.5 — Cross-company scoring memory (AI-unavailable fallback)
+#
+# Every successful Gemini scoring call captures the embedding of the passage
+# it scored + the score it assigned into AIScoringExample. When Gemini is
+# unavailable, _scoring_memory_fallback looks up the nearest past examples
+# for the same question (any company) and uses a similarity-weighted vote as
+# the suggested score — a real distillation of Gemini's own accumulated
+# judgments, not a guess. Only embeddings + numeric scores are ever shared
+# across companies; the evidence/reasoning shown to the user always comes
+# from their own document, never another company's.
+# ---------------------------------------------------------------------------
+
+def _embed_one(text: str):
+    """Embed a single passage with the shared sentence-transformer model."""
+    model = _get_sentence_transformer()
+    return model.encode([text], convert_to_numpy=True, show_progress_bar=False)[0]
+
+
+def _capture_scoring_examples(nlp_evidence: dict, result: dict, questions: list):
+    """Persist real Gemini scoring outcomes for reuse as a fallback signal.
+    Never lets a capture failure affect the real analysis response."""
+    from .models import AIScoringExample
+    try:
+        model = _get_sentence_transformer()
+        rows = []
+        for q in questions:
+            q_id = q["id_code"]
+            entry = result.get(q_id)
+            if not entry or entry.get("score") is None:
+                continue
+            evidence = nlp_evidence.get(q_id, {})
+            candidates = evidence.get("semantic") or evidence.get("tfidf") or []
+            if not candidates:
+                continue
+            emb = model.encode([candidates[0]], convert_to_numpy=True, show_progress_bar=False)[0]
+            rows.append(AIScoringExample(
+                question_id_code=q_id,
+                evidence_embedding=emb.tolist(),
+                score=entry.get("score"),
+                confidence=entry.get("confidence", ""),
+            ))
+        if rows:
+            AIScoringExample.objects.bulk_create(rows)
+    except Exception as exc:
+        logger.warning("Failed to capture scoring examples: %s", exc)
+
+
+def _nearest_scoring_examples(question_id_code: str, query_embedding, limit: int = 300, top_k: int = 5):
+    """Return up to top_k (similarity, score) pairs for the given question,
+    ranked by cosine similarity against the query embedding, drawn from the
+    most recent `limit` examples in the shared corpus (any company)."""
+    from .models import AIScoringExample
+    import numpy as np
+
+    rows = list(
+        AIScoringExample.objects
+        .filter(question_id_code=question_id_code)
+        .order_by("-created_at")
+        .values_list("evidence_embedding", "score")[:limit]
+    )
+    if not rows:
+        return []
+
+    embeddings = np.array([r[0] for r in rows])
+    scores = [r[1] for r in rows]
+    query = np.asarray(query_embedding)
+
+    norms = np.linalg.norm(embeddings, axis=1) * (np.linalg.norm(query) or 1e-9)
+    norms[norms == 0] = 1e-9
+    sims = (embeddings @ query) / norms
+    order = np.argsort(sims)[::-1][:top_k]
+    return [(round(float(sims[i]), 4), scores[i]) for i in order if sims[i] >= 0.35]
+
+
+def _scoring_memory_fallback(nlp_evidence: dict, questions: list) -> dict:
+    """AI-unavailable substitute for a Gemini scoring call. For each question,
+    finds this document's most relevant passage (already computed by
+    _build_nlp_evidence) and looks up the nearest past Gemini scoring
+    outcomes for that same question across the shared corpus, using a
+    similarity-weighted vote as the suggested score.
+
+    Falls back to a fixed, low-confidence score of 3 ("in progress") when the
+    corpus has no examples yet for that question (cold start, before the
+    corpus is seeded — see backfill_ai_scoring_examples) but this document
+    does have *some* related evidence. Omits the question entirely when
+    there's no supporting evidence at all — never invents a score with zero
+    signal.
+    """
+    result = {}
+    for q in questions:
+        q_id = q["id_code"]
+        evidence = nlp_evidence.get(q_id, {})
+        candidates = evidence.get("semantic") or evidence.get("tfidf") or []
+        passage = candidates[0] if candidates else None
+        if not passage:
+            continue  # no evidence at all — leave for manual scoring
+
+        neighbors = []
+        try:
+            query_emb = _embed_one(passage)
+            neighbors = _nearest_scoring_examples(q_id, query_emb)
+        except Exception as exc:
+            logger.warning("Scoring memory lookup failed for %s: %s", q_id, exc)
+
+        if neighbors:
+            weights = [sim for sim, _ in neighbors]
+            weighted_score = sum(sim * score for sim, score in neighbors) / sum(weights)
+            score = max(1, min(5, round(weighted_score)))
+            score_spread = max(s for _, s in neighbors) - min(s for _, s in neighbors)
+            confidence = "medium" if len(neighbors) >= 3 and score_spread <= 1 else "low"
+        else:
+            # Cold start for this question — corpus not seeded yet.
+            score, confidence = 3, "low"
+
+        excerpt = passage.strip()
+        if len(excerpt) > 220:
+            excerpt = excerpt[:220].rsplit(" ", 1)[0] + "…"
+
+        result[q_id] = {
+            "score": score,
+            "confidence": confidence,
+            "evidence": excerpt,
+            "reasoning": (
+                "AI scoring is temporarily unavailable — this suggestion is based on "
+                "similar evidence patterns from past assessments. "
+                + _score_guidance(q_id, score)
+            ).strip(),
+        }
+
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Stage 3 — Gemini analysis prompt (enriched with NLP evidence)
 # ---------------------------------------------------------------------------
 
@@ -685,7 +928,10 @@ def analyze_delivery_documents(session) -> dict:
     Returns a dict with "_error" key on failure.
     """
     from .models import DeliveryDocument
-    from .ai_services import _get_client, _clean_json_response
+    from .ai_services import (
+        _get_client, _clean_json_response, _is_quota_error,
+        _extract_retry_delay_seconds, _set_quota_cooldown, _quota_cooldown_active,
+    )
     from google.genai import types as genai_types
 
     docs = DeliveryDocument.objects.filter(session=session).exclude(extracted_text='')
@@ -700,14 +946,16 @@ def analyze_delivery_documents(session) -> dict:
         )
     combined_text = "\n\n".join(combined_parts)[:_COMBINED_TEXT_LIMIT]
 
-    client = _get_client()
-    if not client:
-        logger.warning("Gemini client unavailable for delivery analysis")
-        return {}
-
     # ── Stage 2: NLP / ML pre-processing ────────────────────────────────────
+    # Runs regardless of Gemini availability — it's also what the
+    # AI-unavailable fallback (Stage 2.5) is built on.
     logger.info("Delivery analysis — starting NLP/ML pre-processing…")
     nlp_evidence = _build_nlp_evidence(combined_text, DELIVERY_QUESTIONS)
+
+    client = _get_client()
+    if not client or _quota_cooldown_active():
+        logger.warning("Gemini unavailable for delivery analysis — using scoring memory fallback")
+        return _scoring_memory_fallback(nlp_evidence, DELIVERY_QUESTIONS)
 
     # ── Stage 3: Gemini scoring with enriched prompt ─────────────────────────
     model_id = "gemini-2.5-flash"
@@ -741,6 +989,7 @@ def analyze_delivery_documents(session) -> dict:
             if entry.get('confidence') not in ('high', 'medium', 'low'):
                 entry['confidence'] = 'medium'
 
+        _capture_scoring_examples(nlp_evidence, result, DELIVERY_QUESTIONS)
         return result
 
     except json.JSONDecodeError as exc:
@@ -748,4 +997,9 @@ def analyze_delivery_documents(session) -> dict:
         return {"_error": f"JSON parse failed: {exc}"}
     except Exception as exc:
         logger.warning("Delivery analysis Gemini error: %s", exc)
+        if _is_quota_error(exc):
+            _set_quota_cooldown(_extract_retry_delay_seconds(exc))
+        fallback = _scoring_memory_fallback(nlp_evidence, DELIVERY_QUESTIONS)
+        if fallback:
+            return fallback
         return {"_error": str(exc)}

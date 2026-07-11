@@ -389,9 +389,17 @@ def build_recommendation_context(question_scores: dict[str, int]) -> dict:
     patterns      = detect_patterns(question_scores, pillar_avgs)
     top_3         = opportunities[:3]
 
+    # Renormalize by the weight of only the answered pillars (mirrors the
+    # identical fix in services._compute_scores) — otherwise a company whose
+    # unanswered/stage-exempt pillars are simply absent from question_scores
+    # would have its max possible current_overall capped at the answered
+    # pillars' raw weight instead of being able to reach 100.
+    answered_weight = sum(
+        PILLAR_WEIGHTS[p] for p in PILLAR_WEIGHTS if pillar_avgs[p] > 0
+    ) or 1.0
     current_overall = round(
         sum(
-            (pillar_avgs[p] / 5.0) * PILLAR_WEIGHTS[p] * 100
+            (pillar_avgs[p] / 5.0) * (PILLAR_WEIGHTS[p] / answered_weight) * 100
             for p in PILLAR_WEIGHTS
             if pillar_avgs[p] > 0
         ),

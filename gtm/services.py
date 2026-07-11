@@ -210,21 +210,52 @@ def _format_band_actions_markdown(markdown_text):
         return mark_safe(actions_md.replace("\n", "<br>"))
 
 
-def _paginated_questions():
-    """Return a list of steps, each = list[Question]. One category per step."""
+# Company-stage → applicable pillars. Deliberately small: any stage not
+# listed here (early_revenue, growth, scale, or "" for unset/legacy sessions)
+# is unrestricted — all pillars apply, identical to pre-stage-feature behavior.
+# Pillar names must match Category.name values loaded by load_gtm_defaults.py.
+STAGE_CATEGORY_APPLICABILITY = {
+    "idea": {"Demand"},
+    "pre_revenue": {"Demand", "Conversion"},
+}
+
+
+def _applicable_categories(session=None):
+    """Categories applicable to a session's company_stage, ordered by id.
+
+    A pre-launch company can't meaningfully answer Conversion (pipeline,
+    win-loss) or Delivery (retention, QBRs) questions, so those pillars —
+    and their steps — are skipped entirely for early stages. `session=None`
+    (or a blank/unrecognized company_stage) returns all categories, matching
+    behavior from before this feature existed.
+    """
+    qs = Category.objects.all().order_by("id")
+    if session is None:
+        return qs
+    stage = getattr(session, "company_stage", "") or ""
+    names = STAGE_CATEGORY_APPLICABILITY.get(stage)
+    return qs.filter(name__in=names) if names else qs
+
+
+def _paginated_questions(session=None):
+    """Return a list of steps, each = list[Question]. One category per step.
+
+    When `session` is given, only pillars applicable to its company_stage
+    are included (see `_applicable_categories`).
+    """
     # Prefetch related questions to avoid N+1 queries when accessing cat.questions.all()
-    categories = Category.objects.all().order_by("id").prefetch_related('questions')
+    categories = _applicable_categories(session).prefetch_related('questions')
     return [list(cat.questions.all().order_by("id"))
             for cat in categories]
 
 
-def _category_step_map():
+def _category_step_map(session=None):
     """Map category id → step number (1-based) for deep-linking to the wizard."""
-    return {cat.id: idx + 1 for idx, cat in enumerate(Category.objects.all().order_by("id"))}    
+    return {cat.id: idx + 1 for idx, cat in enumerate(_applicable_categories(session))}
 
 
 def _first_incomplete_step(session):
-    steps = _paginated_questions()
+    steps = _paginated_questions(session)
     for idx, qs in enumerate(steps, start=1):
         answered = Response.objects.filter(session=session, question__in=qs).count()
         if answered < len(qs):
@@ -235,13 +266,12 @@ def _first_incomplete_step(session):
 def _compute_scores(session: AssessmentSession):
     # 1. Fetch all category weights and map to ID for overall calculation
     all_cats = Category.objects.all().order_by("id")
-    total_w = sum(c.weight for c in all_cats) or 1.0
     cat_weight_map = {c.id: c.weight for c in all_cats}
     cat_name_map = {c.id: c.name for c in all_cats}
 
     # 2. Use a single efficient query to get category-level weighted scores
     #    (Groups responses by category and calculates the weighted average per group)
-    category_results = (
+    category_results = list(
         Response.objects
         .filter(session=session)
         .values('question__category_id')
@@ -252,9 +282,19 @@ def _compute_scores(session: AssessmentSession):
         .order_by('question__category_id')
     )
 
+    # Renormalize across only the categories that actually have responses,
+    # not every category unconditionally. This is a no-op for any session
+    # that answered every pillar (all categories are present either way),
+    # but matters for company-stage-exempted pillars (or a genuinely
+    # incomplete assessment): without it, an idea-stage company answering
+    # only Demand would be capped at Demand's raw weight (40) instead of
+    # being able to reach 100 on that pillar alone.
+    answered_cat_ids = {row['question__category_id'] for row in category_results}
+    total_w = sum(cat_weight_map[cid] for cid in answered_cat_ids if cid in cat_weight_map) or 1.0
+
     cat_scores = []
     overall = 0.0
-    
+
     # Pre-populate with all categories (in case some have no responses)
     scores_by_id = {c.id: {"category": c, "avg": 0.0} for c in all_cats}
 
@@ -282,11 +322,12 @@ def _band_for_score(score):
 
 
 def _is_session_complete(session: AssessmentSession) -> bool:
-    total_q = Question.objects.count()
+    applicable_questions = Question.objects.filter(category__in=_applicable_categories(session))
+    total_q = applicable_questions.count()
     if total_q == 0:
         return False
     answered_q = (Response.objects
-                  .filter(session=session)
+                  .filter(session=session, question__in=applicable_questions)
                   .values("question_id").distinct().count())
     return answered_q == total_q
 
@@ -313,7 +354,7 @@ def _save_snapshot(session, cat_scores, overall, band, labels, values):
         snap.save(update_fields=[
             "company_name", "industry", "website", "contact_name",
             "contact_email", "contact_role", "phone", "company_size",
-            "revenue_range", "country", "crm", "utm_source",
+            "revenue_range", "country", "crm", "company_stage", "utm_source",
             "utm_medium", "utm_campaign", "referrer"
         ]) # Save changes made by transfer_firmographics_to_snapshot
     return snap
