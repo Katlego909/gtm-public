@@ -1,0 +1,302 @@
+/*
+ * Shared design tokens and component classes for GTM Validator.
+ * Linked from gtm/base.html, dashboard/base.html and landing.html —
+ * change values here, never per-template.
+ */
+
+:root {
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-heading: 'Inter', system-ui, sans-serif;
+
+  /* Single accent ramp (indigo). No secondary accent. */
+  --accent-50: #eef2ff;
+  --accent-100: #e0e7ff;
+  --accent-200: #c7d2fe;
+  --accent-300: #a5b4fc;
+  --accent-400: #818cf8;
+  --accent-500: #6366f1;
+  --accent-600: #4f46e5;
+  --accent-700: #4338ca;
+  --accent-800: #3730a3;
+  --accent-900: #312e81;
+
+  /* Semantic colors: dark text on a light tint with a matching border. */
+  --success: #15803d;
+  --success-bg: #f0fdf4;
+  --success-border: #bbf7d0;
+  --warning: #a16207;
+  --warning-bg: #fefce8;
+  --warning-border: #fde68a;
+  --error: #b91c1c;
+  --error-bg: #fef2f2;
+  --error-border: #fecaca;
+  --info: #1d4ed8;
+  --info-bg: #eff6ff;
+  --info-border: #bfdbfe;
+
+  /* Surfaces */
+  --border: #e5e7eb;
+  --radius: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-sm: 0.5rem;
+}
+
+body {
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-heading);
+  letter-spacing: -0.02em;
+}
+
+/* ── Layout ─────────────────────────────────────────────── */
+
+.app-shell {
+  max-width: 72rem;
+  margin: 0 auto;
+}
+
+.app-page-header {
+  margin-bottom: 2rem;
+}
+
+.app-page-title {
+  font-size: 2.25rem;
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: #111827;
+}
+
+.app-page-subtitle {
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #6b7280;
+}
+
+.app-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  margin-bottom: 1.25rem;
+}
+
+/* ── Surfaces ───────────────────────────────────────────── */
+
+.app-card {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.app-card-soft {
+  background: #f9fafb;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.app-accent-panel {
+  background: var(--accent-50);
+  border: 1px solid var(--accent-100);
+  border-radius: var(--radius-lg);
+}
+
+.app-muted-note {
+  border: 1px solid var(--accent-100);
+  background: var(--accent-50);
+  border-radius: var(--radius);
+}
+
+.app-icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--radius);
+  background: var(--accent-100);
+  color: var(--accent-600);
+}
+
+.app-icon-badge--solid {
+  background: var(--accent-600);
+  color: #ffffff;
+}
+
+/* ── Buttons ────────────────────────────────────────────── */
+
+.app-primary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  border-radius: var(--radius);
+  background: var(--accent-600);
+  color: #ffffff;
+  font-weight: 600;
+  transition: background-color 0.15s ease;
+}
+
+.app-primary-button:hover {
+  background: var(--accent-700);
+}
+
+.app-secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  border-radius: var(--radius);
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  font-weight: 500;
+  transition: background-color 0.15s ease;
+}
+
+.app-secondary-button:hover {
+  background: #f9fafb;
+}
+
+/* ── Form controls ──────────────────────────────────────── */
+
+.app-input,
+.app-select,
+.app-textarea {
+  width: 100%;
+  border: 1px solid #d1d5db;
+  border-radius: var(--radius);
+  background: #ffffff;
+  color: #111827;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.app-input,
+.app-select {
+  padding: 0.875rem 1rem;
+}
+
+.app-textarea {
+  padding: 0.875rem 1rem;
+  min-height: 7rem;
+  resize: vertical;
+}
+
+.app-input:focus,
+.app-select:focus,
+.app-textarea:focus {
+  outline: none;
+  border-color: var(--accent-500);
+  box-shadow: 0 0 0 3px var(--accent-100);
+}
+
+/* ── Badges & chips ─────────────────────────────────────── */
+
+.app-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.35rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.app-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: #f3f4f6;
+  color: #374151;
+  border: 1px solid var(--border);
+}
+
+.app-badge--accent {
+  background: var(--accent-50);
+  color: var(--accent-700);
+  border-color: var(--accent-100);
+}
+
+.app-badge--success {
+  background: var(--success-bg);
+  color: var(--success);
+  border-color: var(--success-border);
+}
+
+.app-badge--warning {
+  background: var(--warning-bg);
+  color: var(--warning);
+  border-color: var(--warning-border);
+}
+
+.app-badge--error {
+  background: var(--error-bg);
+  color: var(--error);
+  border-color: var(--error-border);
+}
+
+/* ── Toasts (shared by both base templates' JS) ─────────── */
+
+.app-toast {
+  pointer-events: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: #ffffff;
+  color: #374151;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.app-toast--success {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+  color: var(--success);
+}
+
+.app-toast--error {
+  border-color: var(--error-border);
+  background: var(--error-bg);
+  color: var(--error);
+}
+
+.app-toast--warning {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+
+.app-toast--info {
+  border-color: var(--info-border);
+  background: var(--info-bg);
+  color: var(--info);
+}
+
+/* ── HTMX loading indicator ─────────────────────────────── */
+
+.htmx-indicator {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: none;
+  z-index: 9999;
+}
+
+.htmx-request .htmx-indicator {
+  display: block;
+}
+
+.htmx-swapping {
+  opacity: 0;
+  transition: opacity 200ms ease-out;
+}

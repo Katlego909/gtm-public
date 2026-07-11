@@ -1,41 +1,9 @@
 ﻿{% extends "gtm/base.html" %}
 {% block content %}
 
-<style>
-  /* Enhanced chart animations and interactions */
-  @keyframes fadeInUp {
-    from {
-      opacity: 0;
-      transform: translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-  
-  .fade-in-up {
-    animation: fadeInUp 0.6s ease-out forwards;
-  }
-  
-  .stagger-1 { animation-delay: 0.1s; opacity: 0; }
-  .stagger-2 { animation-delay: 0.2s; opacity: 0; }
-  .stagger-3 { animation-delay: 0.3s; opacity: 0; }
-  
-  /* Smooth hover effects for interactive elements */
-  .chart-card {
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
-  }
-  
-  .chart-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-  }
-</style>
-
 <!-- Page Header -->
-<div class="mb-6 sm:mb-8 text-center fade-in-up px-4">
-  <h1 class="text-2xl sm:text-3xl lg:text-4xl font-bold mb-2 text-indigo-600">
+<div class="mb-6 sm:mb-8 text-center px-4">
+  <h1 class="text-2xl sm:text-3xl font-bold mb-2 text-gray-900">
     GTM Assessment Report
   </h1>
   <p class="text-lg sm:text-xl text-gray-600 break-words">{{ session.company_name|default:"Your Company" }}</p>
@@ -43,12 +11,12 @@
 
 <div class="grid lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8 px-2 sm:px-0">
 
-    <div class="lg:col-span-2 bg-white rounded-2xl sm:rounded-3xl shadow-xl p-4 sm:p-6 lg:p-8 border border-gray-100 chart-card fade-in-up stagger-1">
+    <div class="lg:col-span-2 bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6 lg:p-8">
         
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b pb-4 sm:pb-6 mb-4 sm:mb-6 gap-4">
             <div class="flex-1 min-w-0">
                 {% if band %}
-                    <span class="inline-block text-xs font-semibold px-3 sm:px-4 py-1 rounded-full bg-indigo-600 text-white shadow-md uppercase tracking-wider break-words">
+                    <span class="inline-block text-xs font-semibold px-3 sm:px-4 py-1 rounded-full bg-indigo-600 text-white uppercase tracking-wider break-words">
                         {{ band.stage }}
                     </span>
                 {% endif %}
@@ -80,11 +48,11 @@
         </div>
     </div>
 
-    <div class="bg-white rounded-2xl sm:rounded-3xl shadow-xl p-4 sm:p-6 lg:p-8 border border-gray-100 chart-card fade-in-up stagger-2">
+    <div class="bg-white rounded-lg border border-gray-200 shadow-sm p-4 sm:p-6 lg:p-8">
         <!-- Header with icon -->
         <div class="flex items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6 pb-4 sm:pb-5 border-b border-gray-200">
-            <div class="flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-indigo-600 shadow-lg flex-shrink-0">
-                <svg class="w-6 h-6 sm:w-7 sm:h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-indigo-50 flex-shrink-0">
+                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
             </div>
@@ -102,14 +70,9 @@
                         <span class="{% if is_focus %}text-red-600{% endif %} break-words">{{ c.category.name }}</span>
                         <span class="{% if is_focus %}text-red-600 font-bold{% else %}text-indigo-600 font-semibold{% endif %}">{{ c.avg|floatformat:2 }}/5</span>
                     </div>
-                    <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden shadow-inner">
-                        <div class="h-3 rounded-full transition-all duration-500 relative
-                            {% if c.avg >= 4 %}bg-indigo-600
-                            {% elif c.avg >= 3 %}bg-indigo-600
-                            {% elif c.avg >= 2 %}bg-indigo-600
-                            {% else %}bg-indigo-600{% endif %}" 
+                    <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                        <div class="h-3 rounded-full transition-all duration-500 bg-indigo-600"
                             style="width: {{ c.pct }}%;">
-                            <div class="absolute inset-0 bg-white opacity-20 animate-pulse"></div>
                         </div>
                     </div>
                 </div>
@@ -121,8 +84,7 @@
 
 
 {% if band %}
-<div class="mt-6 sm:mt-8 bg-indigo-600 rounded-2xl sm:rounded-3xl p-4 sm:p-6 lg:p-8 shadow-2xl text-white fade-in-up stagger-3 relative overflow-hidden mx-2 sm:mx-0">
-    <div class="absolute inset-0 bg-white opacity-10 transform -skew-x-12 animate-pulse"></div>
+<div class="mt-6 sm:mt-8 bg-indigo-600 rounded-lg p-4 sm:p-6 lg:p-8 text-white relative overflow-hidden mx-2 sm:mx-0">
     <div class="relative z-10">
     <div class="flex flex-col gap-4 sm:gap-6">
         <div>
@@ -139,7 +101,7 @@
              hx-select="#main-content"
              hx-swap="innerHTML swap:200ms"
              hx-push-url="true"
-             class="inline-flex items-center justify-center px-4 sm:px-6 py-3 rounded-xl bg-white text-indigo-700 text-sm sm:text-base font-bold shadow-lg hover:bg-indigo-50 transition w-full sm:w-fit">
+             class="inline-flex items-center justify-center px-4 sm:px-6 py-3 rounded-lg bg-white text-indigo-700 text-sm sm:text-base font-bold hover:bg-indigo-50 transition w-full sm:w-fit">
             Run Execution Agent
           </a>
         
@@ -156,11 +118,11 @@
 {% endif %}
 
 {% if band %}
-    <div class="bg-white rounded-3xl shadow-xl p-8 mt-6 border border-gray-100 fade-in-up">
+    <div class="bg-white rounded-lg shadow-sm p-8 mt-6 border border-gray-200">
         <!-- Header with icon -->
         <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
-            <div class="flex items-center justify-center w-14 h-14 rounded-xl bg-indigo-600 shadow-lg flex-shrink-0">
-                <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-indigo-50 flex-shrink-0">
+                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                 </svg>
             </div>
@@ -185,10 +147,10 @@
 <div class="grid lg:grid-cols-2 gap-6 mt-8">
 
   {# Left: Top 3 Opportunities #}
-  <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 chart-card fade-in-up">
+  <div class="bg-white rounded-lg shadow-sm p-8 border border-gray-200">
     <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
-      <div class="flex items-center justify-center w-14 h-14 rounded-xl bg-indigo-600 shadow-lg flex-shrink-0">
-        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-indigo-50 flex-shrink-0">
+        <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
         </svg>
@@ -206,7 +168,7 @@
 
     <ol class="space-y-4">
       {% for pri in scoring_context.top_priorities %}
-      <li class="flex gap-4 p-4 rounded-xl border border-gray-100 bg-gray-50 hover:border-indigo-200 transition">
+      <li class="flex gap-4 p-4 rounded-lg border border-gray-200 bg-gray-50 hover:border-indigo-200 transition">
         <div class="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-600 text-white text-sm font-bold flex items-center justify-center">
           {{ forloop.counter }}
         </div>
@@ -233,10 +195,10 @@
   </div>
 
   {# Right: Detected Patterns #}
-  <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 chart-card fade-in-up">
+  <div class="bg-white rounded-lg shadow-sm p-8 border border-gray-200">
     <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
-      <div class="flex items-center justify-center w-14 h-14 rounded-xl bg-rose-600 shadow-lg flex-shrink-0">
-        <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-red-50 flex-shrink-0">
+        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
         </svg>
@@ -250,7 +212,7 @@
     {% if scoring_context.patterns %}
     <ul class="space-y-4">
       {% for pat in scoring_context.patterns %}
-      <li class="p-4 rounded-xl border
+      <li class="p-4 rounded-lg border
         {% if pat.severity == 'Critical' %}border-red-200 bg-red-50
         {% elif pat.severity == 'High' %}border-amber-200 bg-amber-50
         {% elif pat.severity == 'Medium' %}border-yellow-100 bg-yellow-50
@@ -273,7 +235,7 @@
       {% endfor %}
     </ul>
     {% else %}
-    <div class="flex items-center gap-3 p-4 rounded-xl bg-green-50 border border-green-200">
+    <div class="flex items-center gap-3 p-4 rounded-lg bg-green-50 border border-green-200">
       <svg class="w-6 h-6 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
       </svg>
@@ -288,11 +250,11 @@
 
 <div class="grid lg:grid-cols-2 gap-6 mt-8">
 
-    <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 chart-card fade-in-up">
+    <div class="bg-white rounded-lg shadow-sm p-8 border border-gray-200">
         <!-- Header with icon -->
         <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
-            <div class="flex items-center justify-center w-14 h-14 rounded-xl bg-indigo-600 shadow-lg flex-shrink-0">
-                <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-indigo-50 flex-shrink-0">
+                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
                 </svg>
             </div>
@@ -311,7 +273,7 @@
                   <div class="flex justify-between items-center text-xs">
                       <span class="text-gray-500 break-words">{{ r.tool_list|join:", " }}</span>
                       {% if r.url %}
-                        <a href="{{ r.url }}" target="_blank" class="text-indigo-600 hover:text-indigo-800 font-medium transition shrink-0">Explore â†’</a>
+                        <a href="{{ r.url }}" target="_blank" class="text-indigo-600 hover:text-indigo-800 font-medium transition shrink-0">Explore</a>
                       {% endif %}
                   </div>
                 </div>
@@ -324,11 +286,11 @@
         </div>
     </div>
 
-    <div class="bg-white rounded-3xl shadow-xl p-8 border border-gray-100 chart-card fade-in-up">
+    <div class="bg-white rounded-lg shadow-sm p-8 border border-gray-200">
         <!-- Header with icon -->
         <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
-            <div class="flex items-center justify-center w-14 h-14 rounded-xl bg-indigo-600 shadow-lg flex-shrink-0">
-                <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-indigo-50 flex-shrink-0">
+                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
             </div>
@@ -344,7 +306,7 @@
                         <div class="font-medium text-indigo-700 break-words">{{ c.category.name }}</div>
                         <div class="text-sm text-gray-700 font-medium shrink-0">{{ c.avg|floatformat:2 }}/5</div>
                     </div>
-                    <p class="text-xs text-gray-500 mt-1">Performing well â€” maintain the rigor in this area.</p>
+                    <p class="text-xs text-gray-500 mt-1">Performing well &mdash; maintain the rigor in this area.</p>
                 </li>
             {% empty %}
                 <li class="text-gray-500 text-sm">No clear strengths yet.</li>
@@ -356,11 +318,11 @@
 </div>
 
 
-<div class="bg-white rounded-3xl shadow-xl p-8 mt-6 chart-card fade-in-up">
+<div class="bg-white rounded-lg border border-gray-200 shadow-sm p-8 mt-6">
   <!-- Header with icon -->
   <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
-      <div class="flex items-center justify-center w-14 h-14 rounded-xl bg-indigo-600 shadow-lg flex-shrink-0">
-          <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-indigo-50 flex-shrink-0">
+          <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
       </div>
@@ -376,7 +338,7 @@
   
   <ul class="space-y-4">
     {% for q in weakest_questions %}
-      <li class="border rounded-xl p-4 hover:shadow-lg transition">
+      <li class="border border-gray-200 rounded-lg p-4">
         <div class="flex items-center justify-between mb-2">
             <div class="font-medium text-lg text-indigo-700 break-words">{{ q.question.category.name }}</div>
             <div class="text-xl font-semibold 
@@ -392,12 +354,11 @@
 
         <div id="insight-{{ q.question.id_code }}">
           {% if q.ai_insight %}
-            <div class="mt-3 p-3 rounded text-sm shadow-inner overflow-hidden border-l-4
+            <div class="mt-3 p-3 rounded text-sm overflow-hidden border-l-4
               {% if q.score >= 4 %}bg-green-50 border-green-500
               {% elif q.score == 3 %}bg-yellow-50 border-yellow-400
               {% else %}bg-red-50 border-red-500{% endif %}">
               <div class="flex items-center mb-1">
-                  <span class="text-lg mr-2" role="img" aria-label="lightbulb">&#128161;</span>
                   <span class="font-semibold {% if q.score >= 4 %}text-green-700{% elif q.score == 3 %}text-yellow-700{% else %}text-red-700{% endif %}">
                     AI Insight:
                   </span>
@@ -405,7 +366,7 @@
               <p class="text-gray-800 mt-1 leading-snug break-words">{{ q.ai_insight }}</p>
             </div>
           {% elif q.ai_insight_loading and q.response_id %}
-            <div class="mt-3 p-3 bg-gray-50 border-l-4 border-indigo-400 rounded text-sm shadow-inner flex items-center gap-3 animate-pulse"
+            <div class="mt-3 p-3 bg-gray-50 border-l-4 border-indigo-400 rounded text-sm flex items-center gap-3 animate-pulse"
                  hx-get="{% url 'gtm:insight_status' session.uuid q.response_id %}"
                  hx-trigger="load, every 3s"
                  hx-target="#insight-{{ q.question.id_code }}"
@@ -434,7 +395,7 @@
        hx-select="#main-content"
        hx-swap="innerHTML swap:200ms"
        hx-push-url="true"
-       class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl border-2 border-gray-300 text-sm sm:text-base font-semibold hover:bg-gray-50 transition">
+       class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg border border-gray-300 text-sm sm:text-base font-semibold hover:bg-gray-50 transition">
       <i class="fas fa-arrow-left"></i>
       <span>Back to Delivery</span>
     </a>
@@ -445,7 +406,7 @@
        hx-select="#main-content"
        hx-swap="innerHTML swap:200ms" 
        hx-push-url="true"
-       class="flex-1 sm:flex-none inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-indigo-600 text-white text-sm sm:text-base font-semibold hover:shadow-xl transition transform hover:scale-105 gap-2">
+       class="flex-1 sm:flex-none inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg bg-indigo-600 text-white text-sm sm:text-base font-semibold hover:bg-indigo-700 transition gap-2">
       <svg class="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
       </svg>
@@ -458,7 +419,7 @@
        hx-select="#main-content"
        hx-swap="innerHTML swap:200ms"
        hx-push-url="true"
-       class="flex-1 sm:flex-none inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl bg-white border-2 border-indigo-200 text-indigo-700 text-sm sm:text-base font-semibold hover:bg-indigo-50 transition">
+       class="flex-1 sm:flex-none inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg bg-white border border-indigo-200 text-indigo-700 text-sm sm:text-base font-semibold hover:bg-indigo-50 transition">
       Run Execution Agent
     </a>
     
@@ -466,7 +427,7 @@
         {% include "gtm/partials/playbook_footer_status.html" with session=session ready=snap.ai_playbook %}
     </div>
 
-    <a href="{% url 'gtm:download' session.uuid %}" class="flex-1 sm:flex-none inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl border-2 border-gray-300 text-sm sm:text-base font-semibold hover:bg-gray-50 transition">
+    <a href="{% url 'gtm:download' session.uuid %}" class="flex-1 sm:flex-none inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg border border-gray-300 text-sm sm:text-base font-semibold hover:bg-gray-50 transition">
       <span class="hidden sm:inline">Download Report (PDF)</span>
       <span class="sm:hidden">Download PDF</span>
     </a>
@@ -483,7 +444,7 @@
       const text = "- " + btn.getAttribute('data-check');
       navigator.clipboard.writeText(text);
       const original = btn.textContent;
-      btn.textContent = "Copied âœ“";
+      btn.textContent = "Copied";
       setTimeout(() => btn.textContent = original, 1200);
     };
   });

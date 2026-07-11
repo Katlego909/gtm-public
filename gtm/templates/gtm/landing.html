@@ -1,48 +1,40 @@
+{% load static %}
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Funti3r GTM Validator - Transform Your Go-to-Market Strategy</title>
-  
-  <!-- Tailwind CDN -->
+
+  <!-- Tailwind CDN + shared design-scale config -->
   <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
-  
+  <script src="{% static 'js/tailwind-config.js' %}"></script>
+
   <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  
-  <style>
-    body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
-    h1, h2, h3 { letter-spacing: -0.02em; }
-  </style>
+
+  <!-- Shared design tokens & component classes -->
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
 </head>
 <body class="bg-white text-gray-900 overflow-x-hidden">
 
-<!-- Animated Background -->
-<div class="fixed inset-0 -z-10 overflow-hidden">
-  <div class="absolute inset-0 bg-indigo-50"></div>
-  <div class="absolute top-0 -left-4 w-72 h-72 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob"></div>
-  <div class="absolute top-0 -right-4 w-72 h-72 bg-yellow-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000"></div>
-  <div class="absolute -bottom-8 left-20 w-72 h-72 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000"></div>
-</div>
-
 <!-- Navigation Bar -->
-<nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-lg border-b border-gray-200 shadow-sm">
+<nav class="sticky top-0 z-50 bg-white/95 border-b border-gray-200">
   <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
     <a href="{% url 'gtm:landing' %}" class="flex items-center gap-2 hover:opacity-80 transition">
-      <div class="h-10 w-10 bg-indigo-600 rounded-xl flex items-center justify-center">
-        <span class="text-white font-bold text-xl">F</span>
+      <div class="h-9 w-9 bg-indigo-600 rounded-lg flex items-center justify-center">
+        <span class="text-white font-bold text-lg">F</span>
       </div>
-      <span class="text-xl font-bold text-indigo-600">Funti3r GTM</span>
+      <span class="text-lg font-bold text-indigo-600">Funti3r GTM</span>
     </a>
     <!-- Desktop Navigation -->
-    <div class="hidden md:flex items-center gap-6">
-      <a href="#features" class="text-gray-700 hover:text-indigo-600 transition font-medium">Features</a>
-      <a href="#how-it-works" class="text-gray-700 hover:text-indigo-600 transition font-medium">How It Works</a>
+    <div class="hidden md:flex items-center gap-7">
+      <a href="#features" class="text-sm text-gray-700 hover:text-gray-900 transition font-medium">Features</a>
+      <a href="#how-it-works" class="text-sm text-gray-700 hover:text-gray-900 transition font-medium">How It Works</a>
       {% if user.is_authenticated %}
-        <a href="{% url 'gtm:history' %}" class="text-gray-700 hover:text-indigo-600 transition font-medium">My Assessments</a>
+        <a href="{% url 'gtm:history' %}" class="text-sm text-gray-700 hover:text-gray-900 transition font-medium">My Assessments</a>
       {% endif %}
-      
+
       {% if user.is_authenticated %}
         <!-- Authenticated User Menu -->
         <div class="relative group">
@@ -50,33 +42,32 @@
             <div class="h-8 w-8 bg-indigo-600 rounded-full flex items-center justify-center">
               <span class="text-white text-sm font-semibold">{{ user.username|slice:":1"|upper }}</span>
             </div>
-            <span>{{ user.username }}</span>
+            <span class="text-sm">{{ user.username }}</span>
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
           </button>
           <!-- Dropdown Menu -->
-          <div class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
-            <a href="{% url 'gtm:profile' %}" class="block px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition rounded-t-xl">
-              <i class="fas fa-user mr-2"></i>Profile
-            </a>
-            <a href="{% url 'gtm:start' %}" class="block px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition">
-              <i class="fas fa-plus-circle mr-2"></i>New Assessment
-            </a>
-            <hr class="border-gray-200">
-            <a href="{% url 'gtm:logout' %}" class="block px-4 py-3 text-red-600 hover:bg-red-50 transition rounded-b-xl">
-              <i class="fas fa-sign-out-alt mr-2"></i>Logout
-            </a>
+          <div class="absolute right-0 mt-2 w-48 bg-white rounded-xl border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-200 z-50 overflow-hidden">
+            <a href="{% url 'gtm:profile' %}" class="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition">Profile</a>
+            <a href="{% url 'gtm:start' %}" class="block px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition">New Assessment</a>
+            <hr class="border-gray-100">
+            <a href="{% url 'gtm:logout' %}" class="block px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition">Logout</a>
           </div>
         </div>
       {% else %}
         <!-- Guest User Actions -->
-        <a href="{% url 'account_login' %}" class="px-5 py-2.5 rounded-xl font-semibold border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition">
-          Login
-        </a>
-        <a href="{% url 'gtm:start' %}" class="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 hover:shadow-lg transition transform hover:scale-105">
-          Start Free →
-        </a>
+        <div class="flex items-center gap-2.5">
+          <a href="{% url 'account_login' %}" class="px-5 py-2 rounded-lg text-sm font-semibold border border-gray-300 text-gray-800 hover:bg-gray-50 transition">
+            Login
+          </a>
+          <a href="{% url 'gtm:start' %}" class="inline-flex items-center gap-1.5 bg-gray-900 text-white pl-5 pr-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-800 transition">
+            Start Free
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+            </svg>
+          </a>
+        </div>
       {% endif %}
     </div>
 
@@ -91,28 +82,25 @@
   <!-- Mobile Menu -->
   <div id="mobile-menu" class="hidden md:hidden">
     <div class="px-4 py-3 space-y-1 bg-white border-t border-gray-200">
-      <a href="#features" class="block px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition font-medium">
+      <a href="#features" class="block px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition font-medium">
         Features
       </a>
-      <a href="#how-it-works" class="block px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition font-medium">
+      <a href="#how-it-works" class="block px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition font-medium">
         How It Works
       </a>
       {% if user.is_authenticated %}
-        <a href="{% url 'gtm:history' %}" class="block px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition font-medium">
+        <a href="{% url 'gtm:history' %}" class="block px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition font-medium">
           My Assessments
         </a>
-      {% endif %}
-      
-      {% if user.is_authenticated %}
-        <a href="{% url 'gtm:profile' %}" class="block px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition font-medium">
-          <i class="fas fa-user mr-3"></i>Profile
+        <a href="{% url 'gtm:profile' %}" class="block px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition font-medium">
+          Profile
         </a>
-        <a href="{% url 'gtm:start' %}" class="block px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 rounded-lg transition font-medium">
-          <i class="fas fa-plus-circle mr-3"></i>New Assessment
+        <a href="{% url 'gtm:start' %}" class="block px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition font-medium">
+          New Assessment
         </a>
-        
+
         <!-- User Info -->
-        <div class="my-2 p-4 bg-indigo-50 rounded-lg border border-indigo-100">
+        <div class="my-2 p-4 bg-indigo-50 rounded-xl border border-indigo-100">
           <div class="flex items-center gap-3">
             <div class="h-10 w-10 bg-indigo-600 rounded-full flex items-center justify-center flex-shrink-0">
               <span class="text-white font-semibold">{{ user.username|slice:":1"|upper }}</span>
@@ -123,17 +111,17 @@
             </div>
           </div>
         </div>
-        
+
         <a href="{% url 'gtm:logout' %}" class="block px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg transition font-medium">
-          <i class="fas fa-sign-out-alt mr-3"></i>Logout
+          Logout
         </a>
       {% else %}
         <!-- Guest User Actions -->
-        <a href="{% url 'account_login' %}" class="block px-4 py-3 text-center rounded-lg font-semibold border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition">
+        <a href="{% url 'account_login' %}" class="block px-4 py-3 text-center rounded-lg font-semibold border border-gray-300 text-gray-800 hover:bg-gray-50 transition">
           Login
         </a>
-        <a href="{% url 'gtm:start' %}" class="block px-4 py-3 bg-indigo-600 text-white text-center rounded-lg font-semibold hover:bg-indigo-700 hover:shadow-lg transition">
-          Start Free Assessment →
+        <a href="{% url 'gtm:start' %}" class="block px-4 py-3 bg-gray-900 text-white text-center rounded-lg font-semibold hover:bg-gray-800 transition">
+          Start Free
         </a>
       {% endif %}
     </div>
@@ -161,80 +149,214 @@
 </script>
 
 <!-- HERO SECTION -->
-<section class="relative max-w-7xl mx-auto px-6 pt-20 pb-24 md:pt-32 md:pb-32">
+<section class="relative max-w-7xl mx-auto px-6 pt-16 pb-24 md:pt-24 md:pb-28">
   <div class="text-center max-w-4xl mx-auto">
-    <!-- Badge -->
-    <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-50 border border-indigo-200 mb-8 animate-fade-in">
-      <span class="relative flex h-2 w-2">
-        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-        <span class="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-      </span>
-      <span class="text-sm font-medium text-indigo-700">Trusted by 500+ businesses worldwide</span>
-    </div>
-
     <!-- Main Headline -->
-    <h1 class="text-5xl md:text-7xl font-extrabold leading-tight mb-6 animate-fade-in-up">
-      Transform Your <span class="text-indigo-600">Go-to-Market</span> Strategy
+    <h1 class="text-5xl md:text-6xl font-extrabold tracking-tight leading-[1.08] mb-6">
+      Transform Your<br>
+      <span class="text-indigo-600">Go-to-Market</span> Strategy
     </h1>
-    
-    <p class="text-xl md:text-2xl text-gray-600 mb-12 max-w-3xl mx-auto animate-fade-in-up animation-delay-200">
+
+    <p class="text-lg md:text-xl text-gray-500 mb-10 max-w-2xl mx-auto leading-relaxed">
       Get your complete GTM health assessment in 10 minutes. Receive AI-powered insights, personalized playbooks, and actionable strategies to accelerate growth.
     </p>
 
     <!-- CTA Buttons -->
-    <div class="flex flex-wrap justify-center gap-4 mb-12 animate-fade-in-up animation-delay-400">
-      <a href="{% url 'gtm:start' %}" class="group relative inline-flex items-center gap-2 bg-indigo-600 text-white px-8 py-4 rounded-xl font-semibold text-lg hover:bg-indigo-700 hover:shadow-2xl transition transform hover:scale-105">
-        <span>Start Free Assessment</span>
-        <svg class="w-5 h-5 group-hover:translate-x-1 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <div class="flex flex-wrap justify-center items-center gap-3 mb-4">
+      <a href="{% url 'gtm:start' %}" class="inline-flex items-center gap-2 bg-gray-900 text-white pl-7 pr-6 py-3.5 rounded-xl font-semibold hover:bg-gray-800 transition">
+        Start Free
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
         </svg>
       </a>
-      <a href="#demo" class="inline-flex items-center gap-2 bg-white text-gray-700 px-8 py-4 rounded-xl font-semibold text-lg border-2 border-gray-300 hover:border-indigo-500 hover:text-indigo-600 transition transform hover:scale-105">
-        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+      <a href="#how-it-works" class="inline-flex items-center gap-2 bg-white text-gray-800 px-7 py-3.5 rounded-xl font-semibold border border-gray-300 hover:bg-gray-50 transition">
+        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
           <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"></path>
           <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"></path>
         </svg>
-        <span>Watch Demo</span>
+        Watch Demo
       </a>
-    </div>
-
-    <!-- Social Proof -->
-    <div class="flex flex-wrap justify-center items-center gap-8 text-sm text-gray-600 animate-fade-in-up animation-delay-600">
-      <div class="flex items-center gap-2">
-        <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-        </svg>
-        <span><strong class="text-gray-900">No credit card</strong> required</span>
-      </div>
-      <div class="flex items-center gap-2">
-        <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-        </svg>
-        <span><strong class="text-gray-900">Instant results</strong> in 10 minutes</span>
-      </div>
-      <div class="flex items-center gap-2">
-        <svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-          <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
-        </svg>
-        <span><strong class="text-gray-900">500+</strong> businesses assessed</span>
-      </div>
     </div>
   </div>
 
-  <!-- Hero Image/Dashboard Preview -->
-  <div class="mt-20 max-w-6xl mx-auto animate-fade-in-up animation-delay-800">
-    <div class="relative rounded-2xl overflow-hidden shadow-2xl border-4 border-white bg-white">
-      <div class="absolute inset-0 bg-indigo-50"></div>
-      <img src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=1200&h=600&fit=crop" alt="GTM Dashboard" class="w-full opacity-90">
-      <div class="absolute inset-0 flex items-center justify-center">
-        <div class="bg-white/95 backdrop-blur-sm rounded-2xl p-8 shadow-xl max-w-md text-center">
-          <div class="text-6xl font-bold text-indigo-600 mb-2">87.5</div>
-          <div class="text-gray-600 font-medium mb-4">Your GTM Health Score</div>
-          <div class="flex justify-center gap-2">
-            <div class="h-2 w-16 bg-green-500 rounded-full"></div>
-            <div class="h-2 w-16 bg-green-500 rounded-full"></div>
-            <div class="h-2 w-16 bg-green-500 rounded-full"></div>
-            <div class="h-2 w-16 bg-gray-300 rounded-full"></div>
+  <!-- Product Preview -->
+  <div class="mt-16 max-w-5xl mx-auto relative">
+    <div class="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+      <div class="flex">
+        <!-- Sidebar -->
+        <div class="hidden sm:flex w-52 flex-col border-r border-gray-100 p-4 gap-4 shrink-0">
+          <div class="flex items-center gap-2">
+            <div class="h-7 w-7 rounded-lg bg-indigo-600 flex items-center justify-center text-white text-[10px] font-bold">FG</div>
+            <span class="text-sm font-bold text-gray-900">ForgeGTM</span>
+          </div>
+          <div class="rounded-lg border border-gray-200 px-3 py-2 text-[11px] font-semibold text-gray-600 text-center">+ New Assessment</div>
+          <div class="space-y-1 pt-1">
+            <div class="rounded-lg bg-indigo-50 px-3 py-2 text-[11px] font-bold text-indigo-600">Dashboard</div>
+            <div class="px-3 py-2 text-[11px] font-medium text-gray-500">Tasks</div>
+            <div class="px-3 py-2 text-[11px] font-medium text-gray-500">Workspace</div>
+            <div class="px-3 py-2 text-[11px] font-medium text-gray-500">Asset Library</div>
+            <div class="px-3 py-2 text-[11px] font-medium text-gray-500">Agent</div>
+            <div class="px-3 py-2 text-[11px] font-medium text-gray-500">Analytics</div>
+            <div class="px-3 py-2 text-[11px] font-medium text-gray-500">Settings</div>
+          </div>
+          <div class="mt-auto rounded-xl bg-indigo-600 p-3.5">
+            <p class="text-[11px] font-bold text-white">GTM Playbook</p>
+            <p class="text-[10px] text-indigo-200 mt-0.5 leading-snug">Your 30-day plan is ready</p>
+            <div class="mt-2.5 rounded-md bg-white text-center py-1.5 text-[10px] font-bold text-indigo-600">View Playbook</div>
+          </div>
+        </div>
+
+        <!-- Main panel -->
+        <div class="flex-1 p-4 sm:p-5 bg-slate-50/60 min-w-0">
+          <!-- Stat tiles -->
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="rounded-xl border border-gray-100 bg-white p-3.5">
+              <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-2">Assessments</p>
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-2xl font-extrabold text-indigo-600">4</span>
+                <svg viewBox="0 0 36 36" class="h-8 w-8 -rotate-90 shrink-0">
+                  <circle cx="18" cy="18" r="15" fill="none" stroke="#e5e7eb" stroke-width="4"/>
+                  <circle cx="18" cy="18" r="15" fill="none" stroke="#4f46e5" stroke-width="4" stroke-dasharray="66,100" stroke-linecap="round" pathLength="100"/>
+                </svg>
+              </div>
+              <p class="text-[10px] text-gray-400 mt-2">+2 this month</p>
+            </div>
+            <div class="rounded-xl border border-gray-100 bg-white p-3.5">
+              <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-2">Data Points</p>
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-2xl font-extrabold text-gray-900">1,248</span>
+                <svg viewBox="0 0 36 36" class="h-8 w-8 -rotate-90 shrink-0">
+                  <circle cx="18" cy="18" r="15" fill="none" stroke="#e5e7eb" stroke-width="4"/>
+                  <circle cx="18" cy="18" r="15" fill="none" stroke="#818cf8" stroke-width="4" stroke-dasharray="42,100" stroke-linecap="round" pathLength="100"/>
+                </svg>
+              </div>
+              <p class="text-[10px] text-gray-400 mt-2">across 4 sessions</p>
+            </div>
+            <div class="rounded-xl border border-gray-100 bg-white p-3.5">
+              <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-2">Pipeline Value</p>
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-2xl font-extrabold text-gray-900">$1.4M</span>
+                <svg viewBox="0 0 36 36" class="h-8 w-8 -rotate-90 shrink-0">
+                  <circle cx="18" cy="18" r="15" fill="none" stroke="#e5e7eb" stroke-width="4"/>
+                  <circle cx="18" cy="18" r="15" fill="none" stroke="#f59e0b" stroke-width="4" stroke-dasharray="55,100" stroke-linecap="round" pathLength="100"/>
+                </svg>
+              </div>
+              <p class="text-[10px] text-gray-400 mt-2">in active deals</p>
+            </div>
+            <div class="rounded-xl border border-gray-100 bg-white p-3.5">
+              <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-2">Actions Done</p>
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-2xl font-extrabold text-gray-900">12</span>
+                <svg viewBox="0 0 36 36" class="h-8 w-8 -rotate-90 shrink-0">
+                  <circle cx="18" cy="18" r="15" fill="none" stroke="#e5e7eb" stroke-width="4"/>
+                  <circle cx="18" cy="18" r="15" fill="none" stroke="#22c55e" stroke-width="4" stroke-dasharray="78,100" stroke-linecap="round" pathLength="100"/>
+                </svg>
+              </div>
+              <p class="text-[10px] text-gray-400 mt-2">this sprint</p>
+            </div>
+          </div>
+
+          <!-- Chart card -->
+          <div class="mt-3.5 rounded-xl border border-gray-100 bg-white p-4">
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+                </svg>
+                <span class="text-xs font-bold text-gray-900">Assessment History &amp; Trends</span>
+              </div>
+              <div class="text-right">
+                <span class="text-lg font-extrabold text-gray-900 leading-none">92</span>
+                <p class="text-[10px] text-green-600 font-semibold">+18 vs last quarter</p>
+              </div>
+            </div>
+            <svg viewBox="0 0 480 110" class="w-full h-24" preserveAspectRatio="none">
+              <path d="M0,95 C60,88 100,82 150,68 C200,54 250,58 300,42 C350,28 420,20 480,10 L480,110 L0,110 Z" fill="#eef2ff"/>
+              <path d="M0,95 C60,88 100,82 150,68 C200,54 250,58 300,42 C350,28 420,20 480,10" fill="none" stroke="#4f46e5" stroke-width="2.5"/>
+            </svg>
+            <div class="flex justify-between text-[9px] text-gray-400 mt-1 px-1">
+              <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span>
+            </div>
+          </div>
+
+          <!-- Pillar performance -->
+          <div class="mt-3.5 rounded-xl border border-gray-100 bg-white p-4">
+            <p class="text-xs font-bold text-gray-900 mb-3">Pillar Performance</p>
+            <div class="space-y-2.5">
+              <div class="flex items-center gap-3">
+                <span class="text-[10px] font-semibold text-gray-500 w-16">Demand</span>
+                <div class="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden"><div class="h-full w-[78%] rounded-full bg-indigo-600"></div></div>
+                <span class="text-[10px] font-bold text-gray-700 w-7 text-right">78</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-[10px] font-semibold text-gray-500 w-16">Conversion</span>
+                <div class="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden"><div class="h-full w-[56%] rounded-full bg-indigo-400"></div></div>
+                <span class="text-[10px] font-bold text-gray-700 w-7 text-right">56</span>
+              </div>
+              <div class="flex items-center gap-3">
+                <span class="text-[10px] font-semibold text-gray-500 w-16">Delivery</span>
+                <div class="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden"><div class="h-full w-[84%] rounded-full bg-green-500"></div></div>
+                <span class="text-[10px] font-bold text-gray-700 w-7 text-right">84</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating agent panel -->
+    <div class="hidden md:block absolute -right-2 lg:-right-6 top-14 w-72 rounded-xl border border-gray-200 bg-white overflow-hidden">
+      <div class="bg-indigo-600 px-4 py-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-white text-xs font-bold">GTM Agent</p>
+            <p class="text-[10px] text-indigo-200">Strategy &amp; Execution Assistant</p>
+          </div>
+          <svg class="w-3.5 h-3.5 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </div>
+        <div class="mt-2.5 rounded-lg bg-white px-2.5 py-1.5 flex items-center justify-between">
+          <span class="text-[10px] font-semibold text-gray-700">Nimbus Analytics &middot; May 2026</span>
+          <svg class="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </div>
+      </div>
+      <div class="p-3 space-y-2.5">
+        <div class="flex flex-wrap gap-1.5">
+          <span class="rounded-full bg-indigo-50 border border-indigo-100 px-2.5 py-1 text-[10px] font-semibold text-indigo-700">Build my plan</span>
+          <span class="rounded-full bg-indigo-50 border border-indigo-100 px-2.5 py-1 text-[10px] font-semibold text-indigo-700">Review tasks</span>
+          <span class="rounded-full bg-indigo-50 border border-indigo-100 px-2.5 py-1 text-[10px] font-semibold text-indigo-700">Top gaps</span>
+        </div>
+        <div class="flex justify-start">
+          <div class="rounded-xl rounded-tl-sm bg-indigo-50 border border-indigo-100 px-3 py-2 max-w-[85%]">
+            <p class="text-[11px] text-gray-700 leading-snug">Hi! I reviewed your assessment. Conversion is your weakest pillar at 2.8/5.</p>
+          </div>
+        </div>
+        <div class="flex justify-end">
+          <div class="rounded-xl rounded-tr-sm bg-gray-900 px-3 py-2 max-w-[75%]">
+            <p class="text-[11px] text-white leading-snug">Where should we start?</p>
+          </div>
+        </div>
+        <div class="flex justify-start">
+          <div class="rounded-xl rounded-tl-sm bg-indigo-50 border border-indigo-100 px-3 py-2 max-w-[85%]">
+            <p class="text-[11px] text-gray-700 leading-snug">Win-loss interviews first &mdash; worth <span class="font-bold text-indigo-700">+4.2 points</span>. I drafted the plan.</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5 pt-1">
+          <div class="h-8 w-8 rounded-lg border border-gray-200 flex items-center justify-center shrink-0">
+            <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l7.071-7.071a4 4 0 00-5.657-5.657l-7.071 7.07a6 6 0 108.485 8.486L19 13"/>
+            </svg>
+          </div>
+          <div class="flex-1 h-8 rounded-lg border border-gray-200 px-3 flex items-center">
+            <span class="text-[10px] text-gray-400">Ask the agent anything...</span>
+          </div>
+          <div class="h-8 w-8 rounded-lg bg-indigo-600 flex items-center justify-center shrink-0">
+            <svg class="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/>
+            </svg>
           </div>
         </div>
       </div>
@@ -242,428 +364,507 @@
   </div>
 </section>
 
-<!-- TRUST BAR -->
-<section class="bg-white/50 backdrop-blur-sm py-16 border-y border-gray-200">
+<!-- HUMAN-IN-THE-LOOP SECTION -->
+<section class="py-24 bg-white">
   <div class="max-w-7xl mx-auto px-6">
-    <p class="text-center text-sm uppercase tracking-wider text-gray-500 font-semibold mb-8">Trusted by innovative teams from</p>
-    <div class="flex flex-wrap items-center justify-center gap-12 opacity-60 grayscale hover:grayscale-0 transition">
-      <img src="https://upload.wikimedia.org/wikipedia/commons/0/08/HubSpot_Logo.svg" class="h-8" alt="HubSpot">
-      <img src="https://upload.wikimedia.org/wikipedia/commons/0/0e/Notion-logo.svg" class="h-8" alt="Notion">
-      <img src="https://upload.wikimedia.org/wikipedia/commons/3/3b/Airtable_Logo.svg" class="h-8" alt="Airtable">
-      <img src="https://upload.wikimedia.org/wikipedia/commons/5/58/Intercom_logo.svg" class="h-8" alt="Intercom">
+    <div class="grid lg:grid-cols-2 gap-16 items-stretch">
+      <!-- Left: headline + expandable-style feature list -->
+      <div>
+        <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight leading-tight mb-6">
+          You make the call.<br>
+          <span class="text-indigo-600">The AI does the reading.</span>
+        </h2>
+
+        <div>
+          <!-- Exclusive accordion: opening one closes the others (native <details name>) -->
+          <details name="hitl-feature" data-panel="score" open class="group pl-4 py-2.5 border-l-2 border-gray-200 open:border-indigo-600 rounded-r-lg transition-colors hover:bg-gray-50">
+            <summary class="flex items-center gap-4 list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+              <div class="h-10 w-10 rounded-full bg-gray-100 group-open:bg-indigo-50 flex items-center justify-center shrink-0 transition-colors">
+                <svg class="w-5 h-5 text-gray-400 group-open:text-indigo-600 transition-colors" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                </svg>
+              </div>
+              <h3 class="font-bold text-gray-500 group-open:text-gray-900 transition-colors">AI-suggested scores, easy to override</h3>
+            </summary>
+            <p class="mt-2 pl-14 text-sm text-gray-600 leading-relaxed">Upload documents and the AI proposes a score for each question, with its reasoning and how confident it is. Change anything before you submit.</p>
+          </details>
+
+          <details name="hitl-feature" data-panel="deterministic" class="group pl-4 py-2.5 border-l-2 border-gray-200 open:border-indigo-600 rounded-r-lg transition-colors hover:bg-gray-50">
+            <summary class="flex items-center gap-4 list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+              <div class="h-10 w-10 rounded-full bg-gray-100 group-open:bg-indigo-50 flex items-center justify-center shrink-0 transition-colors">
+                <svg class="w-5 h-5 text-gray-400 group-open:text-indigo-600 transition-colors" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9M18 7l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"></path>
+                </svg>
+              </div>
+              <h3 class="font-bold text-gray-500 group-open:text-gray-900 transition-colors">Deterministic scoring, every time</h3>
+            </summary>
+            <p class="mt-2 pl-14 text-sm text-gray-600 leading-relaxed">Your score comes from a fixed scoring engine, not a language model. The AI only explains what the numbers mean &mdash; it doesn't invent the diagnosis.</p>
+          </details>
+
+          <details name="hitl-feature" data-panel="agent" class="group pl-4 py-2.5 border-l-2 border-gray-200 open:border-indigo-600 rounded-r-lg transition-colors hover:bg-gray-50">
+            <summary class="flex items-center gap-4 list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+              <div class="h-10 w-10 rounded-full bg-gray-100 group-open:bg-indigo-50 flex items-center justify-center shrink-0 transition-colors">
+                <svg class="w-5 h-5 text-gray-400 group-open:text-indigo-600 transition-colors" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                </svg>
+              </div>
+              <h3 class="font-bold text-gray-500 group-open:text-gray-900 transition-colors">Agent-drafted action plans you edit</h3>
+            </summary>
+            <p class="mt-2 pl-14 text-sm text-gray-600 leading-relaxed">From your lowest-scoring areas, the agent drafts a prioritized plan. You edit, reassign, or remove anything before you run with it.</p>
+          </details>
+        </div>
+      </div>
+
+      <!-- Right: swaps to match whichever tab is open -->
+      <div class="relative">
+        <!-- Panel 1: AI-suggested score for a single question -->
+        <div data-hitl-panel="score" class="h-full rounded-2xl border border-gray-200 p-6 sm:p-7">
+          <div class="flex items-start justify-between gap-3 mb-5">
+            <p class="text-sm font-semibold text-gray-900">Do you have a documented ideal customer profile?</p>
+            <span class="shrink-0 inline-flex items-center gap-1.5 text-xs font-semibold text-indigo-600">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+              </svg>
+              AI analysis
+            </span>
+          </div>
+
+          <div class="grid grid-cols-5 gap-2 mb-5">
+            <div class="rounded-lg border border-gray-200 py-2.5 text-center text-sm font-medium text-gray-400">1</div>
+            <div class="rounded-lg border border-gray-200 py-2.5 text-center text-sm font-medium text-gray-400">2</div>
+            <div class="rounded-lg bg-indigo-600 py-2.5 text-center text-sm font-semibold text-white">3</div>
+            <div class="rounded-lg border border-gray-200 py-2.5 text-center text-sm font-medium text-gray-400">4</div>
+            <div class="rounded-lg border border-gray-200 py-2.5 text-center text-sm font-medium text-gray-400">5</div>
+          </div>
+
+          <div class="rounded-lg bg-indigo-50 border-l-4 border-indigo-600 px-4 py-4">
+            <p class="text-xs font-bold uppercase tracking-wide text-indigo-700 mb-1.5">AI reasoning</p>
+            <p class="text-sm text-gray-800 leading-relaxed mb-2">The uploaded sales deck defines a target segment but doesn't document firmographic or behavioral criteria.</p>
+            <p class="text-xs text-gray-600 italic mb-3">&ldquo;We mostly sell to mid-market SaaS companies&rdquo; &mdash; sales_deck.pdf</p>
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-800">Medium confidence</span>
+              <button type="button" class="text-xs font-semibold text-indigo-600">Override score</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Panel 2: fixed-weight pillar score breakdown -->
+        <div data-hitl-panel="deterministic" class="hidden h-full rounded-2xl border border-gray-200 p-6 sm:p-7">
+          <div class="flex items-center justify-between mb-5">
+            <p class="text-sm font-semibold text-gray-900">Performance breakdown</p>
+            <span class="text-xs text-gray-400">Same weights, every time</span>
+          </div>
+          <div class="space-y-4">
+            <div>
+              <div class="flex justify-between text-sm mb-1.5">
+                <span class="font-medium text-gray-700">Demand</span>
+                <span class="font-semibold text-gray-900">3.4/5</span>
+              </div>
+              <div class="w-full bg-gray-100 rounded-full h-2">
+                <div class="bg-indigo-600 h-2 rounded-full" style="width: 68%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-1.5">
+                <span class="font-medium text-gray-700">Conversion</span>
+                <span class="font-semibold text-gray-900">2.6/5</span>
+              </div>
+              <div class="w-full bg-gray-100 rounded-full h-2">
+                <div class="bg-indigo-600 h-2 rounded-full" style="width: 52%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between text-sm mb-1.5">
+                <span class="font-medium text-gray-700">Delivery</span>
+                <span class="font-semibold text-gray-900">4.1/5</span>
+              </div>
+              <div class="w-full bg-gray-100 rounded-full h-2">
+                <div class="bg-indigo-600 h-2 rounded-full" style="width: 82%"></div>
+              </div>
+            </div>
+          </div>
+          <div class="mt-5 pt-5 border-t border-gray-100 flex items-center justify-between">
+            <span class="text-sm text-gray-600">Overall score</span>
+            <span class="text-lg font-bold text-gray-900">64<span class="text-sm font-normal text-gray-400">/100</span></span>
+          </div>
+        </div>
+
+        <!-- Panel 3: agent-drafted, editable action plan -->
+        <div data-hitl-panel="agent" class="hidden h-full rounded-2xl border border-gray-200 p-6 sm:p-7">
+          <div class="flex items-center justify-between mb-5">
+            <p class="text-sm font-semibold text-gray-900">Action plan</p>
+            <span class="text-xs font-semibold text-indigo-600">3 items</span>
+          </div>
+          <div class="space-y-3">
+            <div class="flex items-start gap-3 rounded-lg border border-gray-200 p-3">
+              <div class="h-5 w-5 rounded border-2 border-gray-300 shrink-0 mt-0.5"></div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-gray-900">Document your ideal customer profile</p>
+                <p class="text-xs text-gray-500 mt-0.5">Demand &middot; due in 7 days</p>
+              </div>
+              <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700 shrink-0">High</span>
+            </div>
+            <div class="flex items-start gap-3 rounded-lg border border-gray-200 p-3">
+              <div class="h-5 w-5 rounded bg-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
+                <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path>
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-gray-400 line-through">Run 3 win-loss interviews</p>
+                <p class="text-xs text-gray-400 mt-0.5">Conversion &middot; completed</p>
+              </div>
+            </div>
+            <div class="flex items-start gap-3 rounded-lg border border-gray-200 p-3">
+              <div class="h-5 w-5 rounded border-2 border-gray-300 shrink-0 mt-0.5"></div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-gray-900">Set up onboarding health checks</p>
+                <p class="text-xs text-gray-500 mt-0.5">Delivery &middot; due in 14 days</p>
+              </div>
+              <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 shrink-0">Medium</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- STATS SECTION -->
-<section class="max-w-7xl mx-auto px-6 py-24">
-  <div class="grid md:grid-cols-4 gap-8 text-center">
-    <div class="p-6">
-      <div class="text-5xl font-bold text-indigo-600 mb-2">500+</div>
-      <div class="text-gray-600 font-medium">Assessments Completed</div>
-    </div>
-    <div class="p-6">
-      <div class="text-5xl font-bold text-indigo-600 mb-2">87%</div>
-      <div class="text-gray-600 font-medium">Average Score Improvement</div>
-    </div>
-    <div class="p-6">
-      <div class="text-5xl font-bold text-indigo-600 mb-2">10min</div>
-      <div class="text-gray-600 font-medium">Average Completion Time</div>
-    </div>
-    <div class="p-6">
-      <div class="text-5xl font-bold text-indigo-600 mb-2">4.9★</div>
-      <div class="text-gray-600 font-medium">User Satisfaction</div>
-    </div>
-  </div>
-</section>
+<script>
+  document.querySelectorAll('details[name="hitl-feature"]').forEach(function (details) {
+    details.addEventListener('toggle', function () {
+      if (!details.open) return;
+      var target = details.dataset.panel;
+      document.querySelectorAll('[data-hitl-panel]').forEach(function (panel) {
+        panel.classList.toggle('hidden', panel.dataset.hitlPanel !== target);
+      });
+    });
+  });
+</script>
 
 <!-- FEATURES SECTION -->
-<section id="features" class="max-w-7xl mx-auto px-6 py-24">
-  <div class="text-center max-w-3xl mx-auto mb-16">
-    <h2 class="text-4xl md:text-5xl font-bold mb-6">Everything You Need to <span class="text-indigo-600">Scale Faster</span></h2>
-    <p class="text-xl text-gray-600">Comprehensive GTM assessment powered by AI, delivering actionable insights in minutes</p>
-  </div>
+<section id="features" class="bg-slate-50 border-y border-gray-100 py-24">
+  <div class="max-w-7xl mx-auto px-6">
+    <div class="text-center max-w-2xl mx-auto mb-12">
+      <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight mb-3">
+        Everything You Need to<br><span class="text-indigo-600">Scale Faster</span>
+      </h2>
+      <p class="text-base text-gray-500">Comprehensive GTM assessment powered by AI, delivering actionable insights in minutes</p>
+    </div>
 
-  <div class="grid md:grid-cols-3 gap-8">
-    <!-- Feature 1 -->
-    <div class="group relative bg-white rounded-2xl p-8 border-2 border-gray-200 hover:border-indigo-500 hover:shadow-xl transition transform hover:-translate-y-2">
-      <div class="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full"></div>
-      <div class="relative">
-        <div class="h-14 w-14 bg-indigo-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition">
-          <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-          </svg>
+    <div class="space-y-4">
+    <!-- Row 1: 1/3 tinted + 2/3 text-left / image-right -->
+    <div class="grid md:grid-cols-3 gap-4 items-stretch">
+      <!-- Card: Comprehensive Scoring (tinted, image pinned to bottom) -->
+      <div class="h-full flex flex-col rounded-2xl bg-sky-50/80 border border-sky-100 p-6">
+        <svg class="w-7 h-7 text-gray-900 mb-4" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+        </svg>
+        <h3 class="text-lg font-bold mb-2">Comprehensive Scoring</h3>
+        <p class="text-sm text-gray-600 leading-relaxed">Get detailed scores across 3 critical GTM categories with visual radar charts and performance breakdowns</p>
+
+        <!-- Embedded score mini-mockup (pinned to card bottom) -->
+        <img src="{% static 'images/img-1.png' %}" alt="Overall GTM Score card showing a score of 60 out of 100" class="mt-auto pt-6 w-full h-auto">
+      </div>
+
+      <!-- Card: Diagnostic Insights (wide, text-left / image-right, both centered) -->
+      <div class="h-full md:col-span-2 rounded-2xl bg-white border border-gray-200 p-6">
+        <div class="h-full grid lg:grid-cols-2 gap-6 items-start">
+          <div>
+            <svg class="w-7 h-7 text-gray-900 mb-4" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+            </svg>
+            <h3 class="text-lg font-bold mb-2">Diagnostic Insights</h3>
+            <p class="text-sm text-gray-600 leading-relaxed mb-4">Automatic AI analysis of low-scoring areas with specific improvement recommendations</p>
+            <ul class="space-y-2 text-sm text-gray-700">
+              <li class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-green-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                <span>Root cause analysis</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-green-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                <span>Quick wins identified</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-green-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                <span>Priority scoring</span>
+              </li>
+            </ul>
+          </div>
+
+          <!-- Embedded priority mini-mockup -->
+          <img src="{% static 'images/img-2.png' %}" alt="Priority Opportunities card ranking ICP Clarity, Win-Loss Learning, and Channel Strategy by score impact" class="w-full h-auto">
         </div>
-        <h3 class="text-xl font-bold mb-3">Comprehensive Scoring</h3>
-        <p class="text-gray-600 mb-4">Get detailed scores across 8 critical GTM categories with visual radar charts and performance breakdowns</p>
-        <ul class="space-y-2 text-sm text-gray-600">
-          <li class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-            <span>Category-level insights</span>
-          </li>
-          <li class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-            <span>Benchmarking data</span>
-          </li>
-          <li class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-            <span>Progress tracking</span>
-          </li>
-        </ul>
       </div>
     </div>
 
-    <!-- Feature 2 -->
-    <div class="group relative bg-white rounded-2xl p-8 border-2 border-gray-200 hover:border-blue-500 hover:shadow-xl transition transform hover:-translate-y-2">
-      <div class="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full"></div>
-      <div class="relative">
-        <div class="h-14 w-14 bg-indigo-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition">
-          <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
-          </svg>
-        </div>
-        <h3 class="text-xl font-bold mb-3">AI-Powered Playbooks</h3>
-        <p class="text-gray-600 mb-4">Receive personalized, AI-generated 30-day action plans tailored to your specific GTM challenges</p>
-        <ul class="space-y-2 text-sm text-gray-600">
-          <li class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-            <span>Google Gemini AI insights</span>
-          </li>
-          <li class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-            <span>Week-by-week roadmap</span>
-          </li>
-          <li class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-            <span>Downloadable PDF report</span>
-          </li>
-        </ul>
-      </div>
-    </div>
+    <!-- Row 2: 2/3 text-left / image-right + 1/3 tinted -->
+    <div class="grid md:grid-cols-3 gap-4 items-stretch">
+      <!-- Card: AI-Powered Playbooks (wide, text-left / image-right, both centered) -->
+      <div class="h-full md:col-span-2 rounded-2xl bg-white border border-gray-200 p-6">
+        <div class="h-full grid lg:grid-cols-2 gap-6 items-start">
+          <div>
+            <svg class="w-7 h-7 text-gray-900 mb-4" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
+            </svg>
+            <h3 class="text-lg font-bold mb-2">AI-Powered Playbooks</h3>
+            <p class="text-sm text-gray-600 leading-relaxed mb-4">Receive personalized, AI-generated 30-day action plans tailored to your specific GTM challenges</p>
+            <ul class="space-y-2 text-sm text-gray-700">
+              <li class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-green-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                <span>Google Gemini AI insights</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-green-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                <span>Week-by-week roadmap</span>
+              </li>
+              <li class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-green-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                <span>Downloadable PDF report</span>
+              </li>
+            </ul>
+          </div>
 
-    <!-- Feature 3 -->
-    <div class="group relative bg-white rounded-2xl p-8 border-2 border-gray-200 hover:border-green-500 hover:shadow-xl transition transform hover:-translate-y-2">
-      <div class="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full"></div>
-      <div class="relative">
-        <div class="h-14 w-14 bg-indigo-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition">
-          <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path>
-          </svg>
+          <!-- Embedded schedule/PDF mini-mockup -->
+          <img src="{% static 'images/img-3.png' %}" alt="Need Help Implementing card with a Download PDF Report button" class="w-full h-auto">
         </div>
-        <h3 class="text-xl font-bold mb-3">AI Chat Assistant</h3>
-        <p class="text-gray-600 mb-4">Get instant answers about your results, schedule follow-ups, and receive real-time strategic guidance</p>
-        <ul class="space-y-2 text-sm text-gray-600">
-          <li class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-            <span>24/7 AI support</span>
-          </li>
-          <li class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-            <span>Meeting scheduling</span>
-          </li>
-          <li class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-            <span>Contextual recommendations</span>
-          </li>
-        </ul>
       </div>
-    </div>
 
-    <!-- Feature 4 -->
-    <div class="group relative bg-white rounded-2xl p-8 border-2 border-gray-200 hover:border-orange-500 hover:shadow-xl transition transform hover:-translate-y-2">
-      <div class="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full"></div>
-      <div class="relative">
-        <div class="h-14 w-14 bg-indigo-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition">
-          <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-          </svg>
-        </div>
-        <h3 class="text-xl font-bold mb-3">Diagnostic Insights</h3>
-        <p class="text-gray-600 mb-4">Automatic AI analysis of low-scoring areas with specific improvement recommendations</p>
-        <ul class="space-y-2 text-sm text-gray-600">
+      <!-- Card: Assessment History (tinted amber) -->
+      <div class="h-full flex flex-col rounded-2xl bg-amber-50/80 border border-amber-100 p-6">
+        <svg class="w-7 h-7 text-gray-900 mb-4" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <h3 class="text-lg font-bold mb-2">Assessment History</h3>
+        <p class="text-sm text-gray-600 leading-relaxed mb-4">Track your GTM improvements over time with historical comparisons and trend analysis</p>
+        <ul class="space-y-2 text-sm text-gray-700">
           <li class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-            <span>Root cause analysis</span>
-          </li>
-          <li class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-            <span>Quick wins identified</span>
-          </li>
-          <li class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-            <span>Priority scoring</span>
-          </li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- Feature 5 -->
-    <div class="group relative bg-white rounded-2xl p-8 border-2 border-gray-200 hover:border-blue-500 hover:shadow-xl transition transform hover:-translate-y-2">
-      <div class="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full"></div>
-      <div class="relative">
-        <div class="h-14 w-14 bg-indigo-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition">
-          <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-          </svg>
-        </div>
-        <h3 class="text-xl font-bold mb-3">Professional Reports</h3>
-        <p class="text-gray-600 mb-4">Beautiful, branded PDF reports perfect for sharing with stakeholders and investors</p>
-        <ul class="space-y-2 text-sm text-gray-600">
-          <li class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-            <span>Executive summary</span>
-          </li>
-          <li class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-            <span>Visual charts & graphs</span>
-          </li>
-          <li class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-            <span>Action plan included</span>
-          </li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- Feature 6 -->
-    <div class="group relative bg-white rounded-2xl p-8 border-2 border-gray-200 hover:border-teal-500 hover:shadow-xl transition transform hover:-translate-y-2">
-      <div class="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-bl-full"></div>
-      <div class="relative">
-        <div class="h-14 w-14 bg-indigo-600 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition">
-          <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-        </div>
-        <h3 class="text-xl font-bold mb-3">Assessment History</h3>
-        <p class="text-gray-600 mb-4">Track your GTM improvements over time with historical comparisons and trend analysis</p>
-        <ul class="space-y-2 text-sm text-gray-600">
-          <li class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+            <svg class="w-4 h-4 text-green-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
             <span>Unlimited assessments</span>
           </li>
           <li class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+            <svg class="w-4 h-4 text-green-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
             <span>Progress visualization</span>
           </li>
           <li class="flex items-center gap-2">
-            <svg class="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+            <svg class="w-4 h-4 text-green-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
             <span>Re-assessment reminders</span>
           </li>
         </ul>
       </div>
     </div>
+    </div>
   </div>
 </section>
 
 <!-- HOW IT WORKS -->
-<section id="how-it-works" class="bg-gray-50 py-24">
+<section id="how-it-works" class="py-24 bg-white">
   <div class="max-w-7xl mx-auto px-6">
-    <div class="text-center max-w-3xl mx-auto mb-16">
-      <h2 class="text-4xl md:text-5xl font-bold mb-6">How It Works</h2>
-      <p class="text-xl text-gray-600">Get your complete GTM assessment in three simple steps</p>
+    <div class="text-center max-w-3xl mx-auto mb-20">
+      <h2 class="text-4xl md:text-5xl font-extrabold tracking-tight mb-5">How It Works</h2>
+      <p class="text-lg text-gray-500">Get your complete GTM assessment in three simple steps</p>
     </div>
 
     <div class="relative">
-      <!-- Connection Line -->
-      <div class="hidden md:block absolute top-1/2 left-0 right-0 h-1 bg-indigo-200 -translate-y-1/2 z-0"></div>
+      <!-- Connection line -->
+      <div class="hidden md:block absolute top-1/2 left-[10%] right-[10%] h-px bg-gray-200 -translate-y-1/2 z-0"></div>
 
-      <div class="grid md:grid-cols-3 gap-12 relative z-10">
+      <div class="grid md:grid-cols-3 gap-10 relative z-10">
         <!-- Step 1 -->
         <div class="relative">
-          <div class="bg-white rounded-2xl p-8 border-2 border-indigo-200 hover:border-indigo-500 hover:shadow-2xl transition transform hover:-translate-y-2">
-            <div class="absolute -top-6 left-1/2 transform -translate-x-1/2">
-              <div class="h-12 w-12 flex items-center justify-center bg-indigo-600 text-white rounded-full font-bold text-xl shadow-lg">1</div>
+          <div class="bg-white rounded-2xl p-8 pt-10 border border-indigo-100 h-full">
+            <div class="absolute -top-5 left-8">
+              <div class="h-10 w-10 flex items-center justify-center bg-gray-900 text-white rounded-full font-bold">1</div>
             </div>
-            <div class="mt-6 text-center">
-              <div class="inline-flex h-16 w-16 items-center justify-center bg-indigo-100 rounded-2xl mb-4">
-                <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                </svg>
-              </div>
-              <h3 class="text-xl font-bold mb-3">Complete Assessment</h3>
-              <p class="text-gray-600 mb-4">Answer 25 strategic questions covering all aspects of your GTM strategy</p>
-              <ul class="text-sm text-left space-y-2 text-gray-600">
-                <li class="flex items-start gap-2">
-                  <svg class="w-5 h-5 text-indigo-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-                  <span>8 GTM categories evaluated</span>
-                </li>
-                <li class="flex items-start gap-2">
-                  <svg class="w-5 h-5 text-indigo-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-                  <span>Takes only 10 minutes</span>
-                </li>
-                <li class="flex items-start gap-2">
-                  <svg class="w-5 h-5 text-indigo-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-                  <span>Progress saved automatically</span>
-                </li>
-              </ul>
+            <div class="h-12 w-12 bg-indigo-600 rounded-xl flex items-center justify-center mb-5">
+              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+              </svg>
             </div>
+            <h3 class="text-lg font-bold mb-2">Complete Assessment</h3>
+            <p class="text-sm text-gray-600 leading-relaxed mb-5">Answer 18 strategic questions covering all aspects of your GTM strategy</p>
+            <ul class="text-sm space-y-2.5 text-gray-700">
+              <li class="flex items-start gap-2.5">
+                <svg class="w-4 h-4 text-indigo-500 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                <span>3 GTM pillars evaluated</span>
+              </li>
+              <li class="flex items-start gap-2.5">
+                <svg class="w-4 h-4 text-indigo-500 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                <span>Takes only 10 minutes</span>
+              </li>
+              <li class="flex items-start gap-2.5">
+                <svg class="w-4 h-4 text-indigo-500 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                <span>Progress saved automatically</span>
+              </li>
+            </ul>
           </div>
         </div>
 
         <!-- Step 2 -->
         <div class="relative">
-          <div class="bg-white rounded-2xl p-8 border-2 border-blue-200 hover:border-blue-500 hover:shadow-2xl transition transform hover:-translate-y-2">
-            <div class="absolute -top-6 left-1/2 transform -translate-x-1/2">
-              <div class="h-12 w-12 flex items-center justify-center bg-indigo-600 text-white rounded-full font-bold text-xl shadow-lg">2</div>
+          <div class="bg-white rounded-2xl p-8 pt-10 border border-blue-100 h-full">
+            <div class="absolute -top-5 left-8">
+              <div class="h-10 w-10 flex items-center justify-center bg-gray-900 text-white rounded-full font-bold">2</div>
             </div>
-            <div class="mt-6 text-center">
-              <div class="inline-flex h-16 w-16 items-center justify-center bg-blue-100 rounded-2xl mb-4">
-                <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                </svg>
-              </div>
-              <h3 class="text-xl font-bold mb-3">View Instant Results</h3>
-              <p class="text-gray-600 mb-4">Get comprehensive scoring with visual dashboards and detailed breakdowns</p>
-              <ul class="text-sm text-left space-y-2 text-gray-600">
-                <li class="flex items-start gap-2">
-                  <svg class="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-                  <span>Overall GTM health score</span>
-                </li>
-                <li class="flex items-start gap-2">
-                  <svg class="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-                  <span>Radar charts & analytics</span>
-                </li>
-                <li class="flex items-start gap-2">
-                  <svg class="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-                  <span>Strengths & focus areas</span>
-                </li>
-              </ul>
+            <div class="h-12 w-12 bg-blue-600 rounded-xl flex items-center justify-center mb-5">
+              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+              </svg>
             </div>
+            <h3 class="text-lg font-bold mb-2">View Instant Results</h3>
+            <p class="text-sm text-gray-600 leading-relaxed mb-5">Get comprehensive scoring with visual dashboards and detailed breakdowns</p>
+            <ul class="text-sm space-y-2.5 text-gray-700">
+              <li class="flex items-start gap-2.5">
+                <svg class="w-4 h-4 text-blue-500 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                <span>Overall GTM health score</span>
+              </li>
+              <li class="flex items-start gap-2.5">
+                <svg class="w-4 h-4 text-blue-500 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                <span>Radar charts &amp; analytics</span>
+              </li>
+              <li class="flex items-start gap-2.5">
+                <svg class="w-4 h-4 text-blue-500 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                <span>Strengths &amp; focus areas</span>
+              </li>
+            </ul>
           </div>
         </div>
 
         <!-- Step 3 -->
         <div class="relative">
-          <div class="bg-white rounded-2xl p-8 border-2 border-cyan-200 hover:border-cyan-500 hover:shadow-2xl transition transform hover:-translate-y-2">
-            <div class="absolute -top-6 left-1/2 transform -translate-x-1/2">
-              <div class="h-12 w-12 flex items-center justify-center bg-indigo-600 text-white rounded-full font-bold text-xl shadow-lg">3</div>
+          <div class="bg-white rounded-2xl p-8 pt-10 border border-cyan-100 h-full">
+            <div class="absolute -top-5 left-8">
+              <div class="h-10 w-10 flex items-center justify-center bg-gray-900 text-white rounded-full font-bold">3</div>
             </div>
-            <div class="mt-6 text-center">
-              <div class="inline-flex h-16 w-16 items-center justify-center bg-cyan-100 rounded-2xl mb-4">
-                <svg class="w-8 h-8 text-cyan-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                </svg>
-              </div>
-              <h3 class="text-xl font-bold mb-3">Get Your Playbook</h3>
-              <p class="text-gray-600 mb-4">Receive AI-powered action plans and downloadable reports via email</p>
-              <ul class="text-sm text-left space-y-2 text-gray-600">
-                <li class="flex items-start gap-2">
-                  <svg class="w-5 h-5 text-cyan-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-                  <span>30-day action roadmap</span>
-                </li>
-                <li class="flex items-start gap-2">
-                  <svg class="w-5 h-5 text-cyan-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-                  <span>Professional PDF report</span>
-                </li>
-                <li class="flex items-start gap-2">
-                  <svg class="w-5 h-5 text-cyan-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
-                  <span>Tool recommendations</span>
-                </li>
-              </ul>
+            <div class="h-12 w-12 bg-cyan-500 rounded-xl flex items-center justify-center mb-5">
+              <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+              </svg>
             </div>
+            <h3 class="text-lg font-bold mb-2">Get Your Playbook</h3>
+            <p class="text-sm text-gray-600 leading-relaxed mb-5">Receive AI-powered action plans and downloadable reports via email</p>
+            <ul class="text-sm space-y-2.5 text-gray-700">
+              <li class="flex items-start gap-2.5">
+                <svg class="w-4 h-4 text-cyan-500 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                <span>30-day action roadmap</span>
+              </li>
+              <li class="flex items-start gap-2.5">
+                <svg class="w-4 h-4 text-cyan-500 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                <span>Professional PDF report</span>
+              </li>
+              <li class="flex items-start gap-2.5">
+                <svg class="w-4 h-4 text-cyan-500 mt-0.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                <span>Tool recommendations</span>
+              </li>
+            </ul>
           </div>
         </div>
       </div>
     </div>
 
     <div class="text-center mt-16">
-      <a href="{% url 'gtm:start' %}" class="inline-flex items-center gap-2 bg-indigo-600 text-white px-10 py-4 rounded-xl font-semibold text-lg shadow-lg hover:bg-indigo-700 hover:shadow-2xl transition transform hover:scale-105">
-        <span>Start Your Free Assessment</span>
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <a href="{% url 'gtm:start' %}" class="inline-flex items-center gap-2 bg-gray-900 text-white pl-8 pr-7 py-4 rounded-xl font-semibold hover:bg-gray-800 transition">
+        Start Your Free Assessment
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
         </svg>
       </a>
-      <p class="mt-4 text-sm text-gray-600">⚡ Results in 10 minutes • 🎯 No credit card required</p>
+      <p class="mt-4 text-sm text-gray-500">Results in 10 minutes &bull; No credit card required</p>
     </div>
   </div>
 </section>
 
-<!-- TESTIMONIALS -->
-<section class="max-w-6xl mx-auto mt-28 px-6">
-  <h2 class="text-3xl font-bold text-center mb-12">What others are saying</h2>
-  <div class="grid md:grid-cols-3 gap-8">
-    <figure class="bg-white rounded-3xl p-8 border shadow-sm hover:shadow-lg transition">
-      <div class="flex items-center gap-3">
-        <img src="https://randomuser.me/api/portraits/women/65.jpg" class="h-10 w-10 rounded-full object-cover" alt="">
-        <div>
-          <div class="font-semibold text-slate-900">Lisa</div>
-          <div class="text-xs text-slate-500">Accelerator Director</div>
-        </div>
-      </div>
-      <blockquote class="mt-4 text-slate-700 italic">
-        “Our accelerator uses the Funti3r GTM Validator to benchmark startup readiness — it’s now part of our onboarding process.”
-      </blockquote>
-      <figcaption class="mt-5 text-xs text-slate-400">★★★★★ Verified feedback</figcaption>
-    </figure>
+<!-- FAQ SECTION -->
+<section id="faq" class="py-24 bg-slate-50 border-y border-gray-100">
+  <div class="max-w-3xl mx-auto px-6">
+    <div class="text-center mb-16">
+      <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight mb-4">Frequently Asked Questions</h2>
+      <p class="text-lg text-gray-500">Everything you need to know before you start</p>
+    </div>
 
-    <figure class="bg-indigo-600 text-white rounded-3xl p-8 shadow-lg">
-      <div class="flex items-center gap-3">
-        <img src="https://randomuser.me/api/portraits/men/33.jpg" class="h-10 w-10 rounded-full object-cover" alt="">
-        <div>
-          <div class="font-semibold">Raj</div>
-          <div class="text-xs text-emerald-100/90">SaaS Founder</div>
-        </div>
-      </div>
-      <blockquote class="mt-4 italic">
-        “It showed exactly where our funnel was leaking and what to fix first.
-        The playbook saved us months of trial and error.”
-      </blockquote>
-      <figcaption class="mt-5 text-xs text-emerald-100/80">★★★★★ Results within two weeks</figcaption>
-    </figure>
+    <div class="space-y-4">
+      <details class="group rounded-2xl border border-gray-200 bg-white px-6 py-5">
+        <summary class="flex items-center justify-between gap-4 cursor-pointer list-none font-semibold text-gray-900">
+          Is this free to use?
+          <svg class="w-5 h-5 text-gray-400 shrink-0 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+          </svg>
+        </summary>
+        <p class="mt-3 text-sm text-gray-600 leading-relaxed">Yes. There's no payment required to take the assessment or view your results.</p>
+      </details>
 
-    <figure class="bg-white rounded-3xl p-8 border shadow-sm hover:shadow-lg transition">
-      <div class="flex items-center gap-3">
-        <img src="https://randomuser.me/api/portraits/women/45.jpg" class="h-10 w-10 rounded-full object-cover" alt="">
-        <div>
-          <div class="font-semibold text-slate-900">Thandi</div>
-          <div class="text-xs text-slate-500">Marketing Consultant</div>
-        </div>
-      </div>
-      <blockquote class="mt-4 text-slate-700 italic">
-        “Super intuitive. I ask clients to take it before workshops — we align faster and get to the real work.”
-      </blockquote>
-      <figcaption class="mt-5 text-xs text-slate-400">★★★★★ Used in client onboarding</figcaption>
-    </figure>
+      <details class="group rounded-2xl border border-gray-200 bg-white px-6 py-5">
+        <summary class="flex items-center justify-between gap-4 cursor-pointer list-none font-semibold text-gray-900">
+          How long does the assessment take?
+          <svg class="w-5 h-5 text-gray-400 shrink-0 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+          </svg>
+        </summary>
+        <p class="mt-3 text-sm text-gray-600 leading-relaxed">Most people finish in about 10 minutes. It's 18 questions across three GTM pillars &mdash; Demand, Conversion, and Delivery.</p>
+      </details>
+
+      <details class="group rounded-2xl border border-gray-200 bg-white px-6 py-5">
+        <summary class="flex items-center justify-between gap-4 cursor-pointer list-none font-semibold text-gray-900">
+          What happens to my answers and any documents I upload?
+          <svg class="w-5 h-5 text-gray-400 shrink-0 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+          </svg>
+        </summary>
+        <p class="mt-3 text-sm text-gray-600 leading-relaxed">Your responses and any uploaded evidence are used to generate your score and playbook, including analysis by Google's Gemini AI. See our <a href="{% url 'gtm:privacy' %}" class="text-indigo-600 hover:text-indigo-700 font-medium">Privacy Policy</a> for details.</p>
+      </details>
+
+      <details class="group rounded-2xl border border-gray-200 bg-white px-6 py-5">
+        <summary class="flex items-center justify-between gap-4 cursor-pointer list-none font-semibold text-gray-900">
+          Do I need to create an account to see my results?
+          <svg class="w-5 h-5 text-gray-400 shrink-0 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+          </svg>
+        </summary>
+        <p class="mt-3 text-sm text-gray-600 leading-relaxed">No &mdash; you can complete the assessment and see your results without signing up. Creating an account lets you save your history and revisit past assessments.</p>
+      </details>
+
+      <details class="group rounded-2xl border border-gray-200 bg-white px-6 py-5">
+        <summary class="flex items-center justify-between gap-4 cursor-pointer list-none font-semibold text-gray-900">
+          Can I retake the assessment to track progress?
+          <svg class="w-5 h-5 text-gray-400 shrink-0 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+          </svg>
+        </summary>
+        <p class="mt-3 text-sm text-gray-600 leading-relaxed">Yes. Assessments are unlimited, and if you're signed in you can compare past results to see what's improved over time.</p>
+      </details>
+
+      <details class="group rounded-2xl border border-gray-200 bg-white px-6 py-5">
+        <summary class="flex items-center justify-between gap-4 cursor-pointer list-none font-semibold text-gray-900">
+          How is my score calculated?
+          <svg class="w-5 h-5 text-gray-400 shrink-0 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+          </svg>
+        </summary>
+        <p class="mt-3 text-sm text-gray-600 leading-relaxed">Scoring is deterministic &mdash; the same answers always produce the same score, based on fixed category weights. AI is only used afterward, to write up insights and recommendations grounded in that score.</p>
+      </details>
+    </div>
   </div>
 </section>
 
 <!-- CTA STRIP -->
-<section class="max-w-6xl mx-auto mt-28 mb-16 rounded-3xl bg-indigo-600 text-white text-center py-20 px-6 shadow-xl">
-  <h2 class="text-3xl md:text-4xl font-bold">Get your Go-to-Market readiness score today</h2>
-  <p class="mt-4 text-blue-100 max-w-xl mx-auto">
-    Join hundreds of founders, marketers, and advisors already using Funti3r GTM to scale smarter and faster.
-  </p>
-  <div class="mt-10">
-    <a href="{% url 'gtm:start' %}" class="inline-block bg-white text-indigo-700 px-8 py-3 rounded-xl font-semibold hover:bg-indigo-50 transition shadow-md">
-      Start Free Assessment
-    </a>
+<section class="max-w-6xl mx-auto mt-4 mb-20 px-6">
+  <div class="rounded-2xl bg-indigo-600 text-white text-center py-16 px-6">
+    <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight">Get your Go-to-Market readiness score today</h2>
+    <p class="mt-4 text-indigo-100 max-w-xl mx-auto">
+      Join founders, marketers, and advisors using Funti3r GTM to scale smarter and faster.
+    </p>
+    <div class="mt-10">
+      <a href="{% url 'gtm:start' %}" class="inline-flex items-center gap-2 bg-white text-gray-900 pl-7 pr-6 py-3.5 rounded-xl font-semibold hover:bg-indigo-50 transition">
+        Start Free Assessment
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+        </svg>
+      </a>
+    </div>
   </div>
 </section>
 
-<style>
-@keyframes blob {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(30px, -50px) scale(1.1); }
-  66% { transform: translate(-20px, 20px) scale(0.9); }
-}
-.animate-blob { animation: blob 7s infinite; }
-.animation-delay-2000 { animation-delay: 2s; }
-.animation-delay-4000 { animation-delay: 4s; }
-.animate-fade-in { animation: fadeIn 0.6s ease-out; }
-.animate-fade-in-up { animation: fadeInUp 0.6s ease-out; }
-.animation-delay-200 { animation-delay: 0.2s; animation-fill-mode: both; }
-.animation-delay-400 { animation-delay: 0.4s; animation-fill-mode: both; }
-.animation-delay-600 { animation-delay: 0.6s; animation-fill-mode: both; }
-.animation-delay-800 { animation-delay: 0.8s; animation-fill-mode: both; }
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-</style>
+{% include "gtm/partials/marketing_footer.html" %}
 
 </body>
 </html>

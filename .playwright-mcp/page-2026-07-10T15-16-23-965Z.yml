@@ -1,0 +1,171 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e3]:
+      - link "F Funti3r GTM" [ref=e4] [cursor=pointer]:
+        - /url: /
+        - generic [ref=e5]: F
+        - generic [ref=e7]: Funti3r GTM
+      - generic [ref=e8]:
+        - link "Features" [ref=e9] [cursor=pointer]:
+          - /url: "#features"
+        - link "How It Works" [ref=e10] [cursor=pointer]:
+          - /url: "#how-it-works"
+        - link "Login" [ref=e11] [cursor=pointer]:
+          - /url: /accounts/login/
+        - link "Start Free" [ref=e12] [cursor=pointer]:
+          - /url: /start/
+  - generic [ref=e15]:
+    - generic [ref=e16]:
+      - generic [ref=e17]: Trusted by 500+ businesses worldwide
+      - heading "Transform Your Go-to-Market Strategy" [level=1] [ref=e21]
+      - paragraph [ref=e22]: Get your complete GTM health assessment in 10 minutes. Receive AI-powered insights, personalized playbooks, and actionable strategies to accelerate growth.
+      - generic [ref=e23]:
+        - link "Start Free" [ref=e24] [cursor=pointer]:
+          - /url: /start/
+        - link "Watch Demo" [ref=e27] [cursor=pointer]:
+          - /url: "#how-it-works"
+    - generic [ref=e31]:
+      - generic [ref=e33]:
+        - generic [ref=e34]:
+          - generic [ref=e35]:
+            - generic [ref=e36]: FG
+            - generic [ref=e37]: ForgeGTM
+          - generic [ref=e38]: + New Assessment
+          - generic [ref=e39]: Dashboard
+        - generic [ref=e51]:
+          - generic [ref=e52]:
+            - generic [ref=e53]: "4"
+            - generic [ref=e61]: 1,248
+            - generic [ref=e69]: $1.4M
+            - generic [ref=e77]: "12"
+          - generic [ref=e86]:
+            - generic [ref=e87]: Assessment History & Trends
+            - generic [ref=e91]: "92"
+      - paragraph [ref=e106]: GTM Agent
+  - generic [ref=e141]:
+    - generic [ref=e142]:
+      - generic [ref=e143]: 500+
+      - generic [ref=e144]: Assessments Completed
+    - generic [ref=e145]:
+      - generic [ref=e146]: 87%
+      - generic [ref=e147]: Average Score Improvement
+    - generic [ref=e148]:
+      - generic [ref=e149]: 10min
+      - generic [ref=e150]: Average Completion Time
+    - generic [ref=e151]:
+      - generic [ref=e152]: "4.9"
+      - generic [ref=e155]: User Satisfaction
+  - generic [ref=e157]:
+    - generic [ref=e158]:
+      - heading "Everything You Need to Scale Faster" [level=2] [ref=e159]: Everything You Need toScale Faster
+      - paragraph [ref=e160]: Comprehensive GTM assessment powered by AI, delivering actionable insights in minutes
+    - generic [ref=e161]:
+      - generic [ref=e162]:
+        - heading "Comprehensive Scoring" [level=3] [ref=e166]
+        - paragraph [ref=e167]: Get detailed scores across 3 critical GTM pillars with visual radar charts and performance breakdowns
+        - generic [ref=e170]:
+          - generic [ref=e171]: "60"
+          - generic [ref=e177]:
+            - paragraph [ref=e178]: Overall GTM Score
+            - paragraph [ref=e179]: Tidy up weak spots and measure changes over time
+      - generic [ref=e181]:
+        - generic [ref=e182]:
+          - heading "Diagnostic Insights" [level=3] [ref=e186]
+          - paragraph [ref=e187]: Automatic AI analysis of low-scoring areas with specific improvement recommendations
+          - list [ref=e188]:
+            - listitem [ref=e189]:
+              - generic [ref=e192]: Root cause analysis
+            - listitem [ref=e193]:
+              - generic [ref=e196]: Quick wins identified
+            - listitem [ref=e197]:
+              - generic [ref=e200]: Priority scoring
+        - generic [ref=e201]:
+          - paragraph [ref=e202]: Priority Opportunities
+          - paragraph [ref=e203]: Ranked by score-point impact +8.6 pts available
+          - generic [ref=e204]:
+            - generic [ref=e205]:
+              - generic [ref=e206]: "1"
+              - generic [ref=e207]: ICP Clarity
+              - generic [ref=e208]: Demand
+            - generic [ref=e209]:
+              - generic [ref=e210]: "2"
+              - generic [ref=e211]: Win-Loss Learning
+              - generic [ref=e212]: Conversion
+            - generic [ref=e213]:
+              - generic [ref=e214]: "3"
+              - generic [ref=e215]: Channel Strategy
+              - generic [ref=e216]: Delivery
+      - generic [ref=e218]:
+        - generic [ref=e219]:
+          - heading "AI-Powered Playbooks" [level=3] [ref=e223]
+          - paragraph [ref=e224]: Receive personalized, AI-generated 30-day action plans tailored to your specific GTM challenges
+          - list [ref=e225]:
+            - listitem [ref=e226]:
+              - generic [ref=e229]: Google Gemini AI insights
+            - listitem [ref=e230]:
+              - generic [ref=e233]: Week-by-week roadmap
+            - listitem [ref=e234]:
+              - generic [ref=e237]: Downloadable PDF report
+        - generic [ref=e238]:
+          - generic [ref=e244]:
+            - paragraph [ref=e245]: Need Help Implementing?
+            - paragraph [ref=e246]: Our AI agent can help you schedule a strategy session to discuss your GTM roadmap.
+            - paragraph [ref=e247]: Ask AI to Schedule Meeting
+          - generic [ref=e248]: Download PDF Report
+      - generic [ref=e250]:
+        - heading "Assessment History" [level=3] [ref=e254]
+        - paragraph [ref=e255]: Track your GTM improvements over time with historical comparisons and trend analysis
+        - list [ref=e256]:
+          - listitem [ref=e257]:
+            - generic [ref=e260]: Unlimited assessments
+          - listitem [ref=e261]:
+            - generic [ref=e264]: Progress visualization
+          - listitem [ref=e265]:
+            - generic [ref=e268]: Re-assessment reminders
+  - generic [ref=e270]:
+    - generic [ref=e271]:
+      - heading "How It Works" [level=2] [ref=e272]
+      - paragraph [ref=e273]: Get your complete GTM assessment in three simple steps
+    - generic [ref=e276]:
+      - generic [ref=e278]:
+        - generic [ref=e279]: "1"
+        - heading "Complete Assessment" [level=3] [ref=e284]
+        - paragraph [ref=e285]: Answer 18 strategic questions covering all aspects of your GTM strategy
+        - list [ref=e286]:
+          - listitem [ref=e287]:
+            - generic [ref=e290]: 3 GTM pillars evaluated
+          - listitem [ref=e291]:
+            - generic [ref=e294]: Takes only 10 minutes
+          - listitem [ref=e295]:
+            - generic [ref=e298]: Progress saved automatically
+      - generic [ref=e300]:
+        - generic [ref=e301]: "2"
+        - heading "View Instant Results" [level=3] [ref=e306]
+        - paragraph [ref=e307]: Get comprehensive scoring with visual dashboards and detailed breakdowns
+        - list [ref=e308]:
+          - listitem [ref=e309]:
+            - generic [ref=e312]: Overall GTM health score
+          - listitem [ref=e313]:
+            - generic [ref=e316]: Radar charts & analytics
+          - listitem [ref=e317]:
+            - generic [ref=e320]: Strengths & focus areas
+      - generic [ref=e322]:
+        - generic [ref=e323]: "3"
+        - heading "Get Your Playbook" [level=3] [ref=e328]
+        - paragraph [ref=e329]: Receive AI-powered action plans and downloadable reports via email
+        - list [ref=e330]:
+          - listitem [ref=e331]:
+            - generic [ref=e334]: 30-day action roadmap
+          - listitem [ref=e335]:
+            - generic [ref=e338]: Professional PDF report
+          - listitem [ref=e339]:
+            - generic [ref=e342]: Tool recommendations
+    - generic [ref=e343]:
+      - link "Start Your Free Assessment" [ref=e344] [cursor=pointer]:
+        - /url: /start/
+      - paragraph [ref=e347]: Results in 10 minutes • No credit card required
+  - generic [ref=e349]:
+    - heading "Get your Go-to-Market readiness score today" [level=2] [ref=e350]
+    - paragraph [ref=e351]: Join founders, marketers, and advisors using Funti3r GTM to scale smarter and faster.
+    - link "Start Free Assessment" [ref=e353] [cursor=pointer]:
+      - /url: /start/

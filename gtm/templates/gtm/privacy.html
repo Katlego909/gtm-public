@@ -1,0 +1,34 @@
+{% extends "gtm/base.html" %}
+{% block content %}
+
+<div class="app-shell max-w-4xl">
+  <div class="app-page-header">
+    <h1 class="app-page-title">Privacy Policy</h1>
+    <p class="app-page-subtitle">Last updated {% now "F Y" %}</p>
+  </div>
+
+  <div class="prose prose-slate max-w-3xl">
+    <p>This page explains what information Funti3r GTM Validator collects and how it's used. It's a plain-language summary, not a substitute for legal advice.</p>
+
+    <h2>What we collect</h2>
+    <p>When you take an assessment, we store your answers, any company details you provide, and any documents you choose to upload as supporting evidence. If you create an account, we store your email address and username.</p>
+
+    <h2>How your data is used</h2>
+    <p>Your assessment answers and uploaded documents are analyzed to calculate your score and to generate a personalized playbook. That analysis is performed using Google's Gemini AI via Google Cloud (Vertex AI). We don't sell your data to third parties.</p>
+
+    <h2>Sessions and cookies</h2>
+    <p>We use a signed session cookie to keep track of your assessment as you work through it. This cookie is required for the app to function and isn't used for advertising or cross-site tracking.</p>
+
+    <h2>Data retention</h2>
+    <p>Assessment results are kept so you can view your history and track progress over time. If you'd like your data removed, contact us using the details on our <a href="{% url 'gtm:contact' %}">Contact page</a>.</p>
+
+    <h2>Questions</h2>
+    <p>If you have questions about this policy, reach out via our <a href="{% url 'gtm:contact' %}">Contact page</a>.</p>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block full_width_footer %}
+{% include "gtm/partials/marketing_footer.html" %}
+{% endblock %}

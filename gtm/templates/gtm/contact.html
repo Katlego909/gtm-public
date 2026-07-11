@@ -1,0 +1,25 @@
+{% extends "gtm/base.html" %}
+{% block content %}
+
+<div class="app-shell max-w-4xl">
+  <div class="app-page-header text-center">
+    <h1 class="app-page-title">Contact</h1>
+    <p class="app-page-subtitle max-w-2xl mx-auto">Have a question, found a bug, or want to talk about your results? Reach out.</p>
+  </div>
+
+  <div class="app-card max-w-xl mx-auto p-8 text-center">
+    <div class="app-icon-badge app-icon-badge--solid h-12 w-12 rounded-lg mx-auto mb-4">
+      <i class="fas fa-envelope text-white text-xl"></i>
+    </div>
+    <p class="text-gray-600 mb-4">Send us an email and we'll get back to you.</p>
+    <a href="mailto:hello@funti3r.xyz" class="app-primary-button px-6 py-3 text-base inline-flex">
+      hello@funti3r.xyz
+    </a>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block full_width_footer %}
+{% include "gtm/partials/marketing_footer.html" %}
+{% endblock %}

@@ -57,3 +57,4 @@ from .actions import (
     cancel_assessment,
 )
 from .profile import history, logout_view, profile
+from .legal import contact, privacy_policy, terms_of_service

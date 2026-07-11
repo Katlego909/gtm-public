@@ -46,6 +46,11 @@ urlpatterns = [
     # User Profile & Auth
     path("profile/", views.profile, name="profile"),
     path("logout/", views.logout_view, name="logout"),
+
+    # Legal / public pages
+    path("privacy/", views.privacy_policy, name="privacy"),
+    path("terms/", views.terms_of_service, name="terms"),
+    path("contact/", views.contact, name="contact"),
     
     # Workspace management
     path("workspace/", include('gtm.urls_workspace')),
