@@ -194,6 +194,10 @@ class Resource(models.Model):
         return 'unknown'
 
     @property
+    def is_image(self):
+        return self.resource_type == 'file' and self.extension in ('png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp')
+
+    @property
     def ai_audit_summary_html(self):
         """Convert markdown audit summary to HTML for display."""
         if not self.ai_audit_summary:

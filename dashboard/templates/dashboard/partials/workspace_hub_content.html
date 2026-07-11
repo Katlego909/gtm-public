@@ -123,7 +123,12 @@
                         Add Asset
                     </button>
                 </div>
-                {% include 'dashboard/partials/resource_list.html' %}
+                <div id="resource-dropzone"
+                     class="rounded-xl transition-colors"
+                     data-resource-url="{% url 'add_resource' %}"
+                     data-refresh-url="{% url 'refresh_resources' %}">
+                    {% include 'dashboard/partials/resource_list.html' %}
+                </div>
             </div>
 
         {% else %}
@@ -189,5 +194,76 @@
 
     // ---- Do NOT close modal on workspaceUpdated — let hx-select on the
     //      #pending-invitations-list handle the background refresh instead. ----
+
+    // ---- Resource Library: drag-and-drop file upload ----
+    var dropzone = document.getElementById('resource-dropzone');
+    if (dropzone) {
+        var resourceUrl = dropzone.getAttribute('data-resource-url');
+        var refreshUrl  = dropzone.getAttribute('data-refresh-url');
+
+        function getCsrfToken() {
+            var value = '; ' + document.cookie;
+            var parts = value.split('; csrftoken=');
+            return parts.length === 2 ? parts.pop().split(';').shift() : '';
+        }
+
+        function refreshResourceGrid() {
+            htmx.ajax('GET', refreshUrl, { target: '#resource-grid', swap: 'outerHTML' });
+        }
+
+        function uploadDroppedFile(file) {
+            var fd = new FormData();
+            var name = file.name.replace(/\.[^/.]+$/, '');
+            fd.append('name', name);
+            fd.append('resource_type', 'file');
+            fd.append('category', 'other');
+            fd.append('file', file);
+            fd.append('csrfmiddlewaretoken', getCsrfToken());
+            return fetch(resourceUrl, { method: 'POST', body: fd, credentials: 'same-origin' })
+                .then(function(r) { return r.ok; })
+                .catch(function() { return false; });
+        }
+
+        function uploadFiles(fileList) {
+            var files = Array.from(fileList || []);
+            if (!files.length || !resourceUrl) return;
+
+            Promise.all(files.map(uploadDroppedFile)).then(function(results) {
+                var failed = results.filter(function(ok) { return !ok; }).length;
+                if (failed) {
+                    showDashboardToast(
+                        failed === results.length ? 'Upload failed.' : (failed + ' of ' + results.length + ' uploads failed.'),
+                        'error'
+                    );
+                } else {
+                    showDashboardToast(results.length > 1 ? 'Assets uploaded.' : 'Asset uploaded.', 'success');
+                }
+                refreshResourceGrid();
+            });
+        }
+
+        dropzone.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            dropzone.classList.add('bg-indigo-50');
+        });
+        dropzone.addEventListener('dragleave', function() {
+            dropzone.classList.remove('bg-indigo-50');
+        });
+        dropzone.addEventListener('drop', function(e) {
+            e.preventDefault();
+            dropzone.classList.remove('bg-indigo-50');
+            uploadFiles(e.dataTransfer.files);
+        });
+
+        // The "click to browse" input lives inside resource_list.html's empty
+        // state, which gets swapped in/out via htmx — delegate from the
+        // persistent wrapper instead of re-wiring on every swap.
+        dropzone.addEventListener('change', function(e) {
+            if (e.target && e.target.id === 'resource-quick-file-input') {
+                uploadFiles(e.target.files);
+                e.target.value = '';
+            }
+        });
+    }
 })();
 </script>

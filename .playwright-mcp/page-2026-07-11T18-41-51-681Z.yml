@@ -1,0 +1,104 @@
+- generic [active] [ref=f54e1]:
+  - complementary [ref=f54e2]:
+    - generic [ref=f54e3]:
+      - img "ForgeGTM" [ref=f54e5]
+      - button "Toggle sidebar" [ref=f54e6] [cursor=pointer]
+    - navigation [ref=f54e9]:
+      - link "New Assessment" [ref=f54e10] [cursor=pointer]:
+        - /url: /start/
+      - link "Dashboard" [ref=f54e14] [cursor=pointer]:
+        - /url: /dashboard/
+      - link "Tasks" [ref=f54e18] [cursor=pointer]:
+        - /url: /dashboard/tasks/
+      - link "Workspace" [ref=f54e22] [cursor=pointer]:
+        - /url: /dashboard/workspace/hub/
+      - link "Asset Library" [ref=f54e26] [cursor=pointer]:
+        - /url: /dashboard/assets/
+      - link "Agent" [ref=f54e30] [cursor=pointer]:
+        - /url: /dashboard/agent/
+      - link "Analytics" [ref=f54e34] [cursor=pointer]:
+        - /url: /dashboard/analytics/
+      - link "Profile" [ref=f54e38] [cursor=pointer]:
+        - /url: /dashboard/profile/
+      - link "Settings" [ref=f54e42] [cursor=pointer]:
+        - /url: /dashboard/settings/
+  - main [ref=f54e47]:
+    - generic [ref=f54e48]:
+      - generic [ref=f54e49]:
+        - generic [ref=f54e50]:
+          - heading "Workspace Hub" [level=1] [ref=f54e51]
+          - generic [ref=f54e52]:
+            - generic [ref=f54e53]: "Workspace:"
+            - combobox [ref=f54e54]:
+              - option "Test" [selected]
+        - generic [ref=f54e55]:
+          - button "Invite Member" [ref=f54e56] [cursor=pointer]
+          - button "New Workspace" [ref=f54e59] [cursor=pointer]
+      - generic [ref=f54e62]:
+        - generic [ref=f54e63]:
+          - heading [level=3] [ref=f54e65]
+          - generic [ref=f54e70]:
+            - generic [ref=f54e71]: TE
+            - generic [ref=f54e72]:
+              - paragraph [ref=f54e73]: test
+              - paragraph [ref=f54e74]: test@email.com
+            - generic [ref=f54e75]: admin
+        - generic [ref=f54e76]:
+          - generic [ref=f54e77]:
+            - generic [ref=f54e78]:
+              - heading [level=3] [ref=f54e79]
+              - paragraph [ref=f54e83]: Shared documents, sales decks, and planning links
+            - button "Add Asset" [ref=f54e84] [cursor=pointer]
+          - generic [ref=f54e90] [cursor=pointer]:
+            - button "Choose File" [ref=f54e91]
+            - heading "Drop files here or click to browse" [level=3] [ref=f54e94]
+            - paragraph [ref=f54e95]: Any file type — up to 10 MB each.
+            - button "Or add a link instead →" [ref=f54e96]
+  - button "Open GTM Agent" [ref=f54e98] [cursor=pointer]
+  - complementary [ref=f54e101]:
+    - heading "Notifications" [level=3] [ref=f54e103]
+    - generic [ref=f54e105]:
+      - generic [ref=f54e107]:
+        - heading "Pending Reviews" [level=4] [ref=f54e108]
+        - paragraph [ref=f54e109]: You have 10 items waiting.
+      - generic [ref=f54e110]:
+        - generic [ref=f54e111]:
+          - heading "Recent Activity" [level=4] [ref=f54e112]
+          - generic [ref=f54e113]: Test
+        - generic [ref=f54e114]:
+          - generic [ref=f54e115]:
+            - paragraph [ref=f54e116]: test deleted resource 'img-1'.
+            - paragraph [ref=f54e117]: 11 minutes ago
+          - generic [ref=f54e118]:
+            - paragraph [ref=f54e119]: test added resource 'img-1'.
+            - paragraph [ref=f54e120]: 11 minutes ago
+          - generic [ref=f54e121]:
+            - paragraph [ref=f54e122]: test deleted resource 'Funti3r GTM Validator Assets'.
+            - paragraph [ref=f54e123]: 11 minutes ago
+          - generic [ref=f54e124]:
+            - paragraph [ref=f54e125]: test added resource 'Funti3r GTM Validator Assets'.
+            - paragraph [ref=f54e126]: 11 minutes ago
+          - generic [ref=f54e127]:
+            - paragraph [ref=f54e128]: test deleted resource 'Funti3r GTM Validator - Transform Your Go-to-Market Strategy'.
+            - paragraph [ref=f54e129]: 12 minutes ago
+          - generic [ref=f54e130]:
+            - paragraph [ref=f54e131]: test added resource 'Funti3r GTM Validator - Transform Your Go-to-Market Strategy'.
+            - paragraph [ref=f54e132]: 13 minutes ago
+          - generic [ref=f54e133]:
+            - paragraph [ref=f54e134]: test deleted resource 'test-drop'.
+            - paragraph [ref=f54e135]: 14 minutes ago
+          - generic [ref=f54e136]:
+            - paragraph [ref=f54e137]: test added resource 'test-drop'.
+            - paragraph [ref=f54e138]: 15 minutes ago
+          - generic [ref=f54e139]:
+            - paragraph [ref=f54e140]: "test commented on task 'One action per pillar: (1) write a one-page ICP, (2) define 3 qualification ques'."
+            - paragraph [ref=f54e141]: 55 minutes ago
+          - generic [ref=f54e142]:
+            - paragraph [ref=f54e143]: "test moved task 'One action per pillar: (1) write a one-page ICP, (2) define 3 qualification ques' to To do."
+            - paragraph [ref=f54e144]: 1 hour, 10 minutes ago
+          - generic [ref=f54e145]:
+            - paragraph [ref=f54e146]: "test moved task 'One action per pillar: (1) write a one-page ICP, (2) define 3 qualification ques' to In progress."
+            - paragraph [ref=f54e147]: 1 hour, 10 minutes ago
+          - generic [ref=f54e148]:
+            - paragraph [ref=f54e149]: "test moved task 'One action per pillar: (1) write a one-page ICP, (2) define 3 qualification ques' to To do."
+            - paragraph [ref=f54e150]: 1 hour, 11 minutes ago

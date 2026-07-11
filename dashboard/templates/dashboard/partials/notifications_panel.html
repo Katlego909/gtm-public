@@ -1,33 +1,32 @@
-<div class="space-y-4">
-    <div class="p-4 rounded-xl bg-yellow-50 border border-yellow-100 flex gap-3">
-        <div class="mt-1 w-2 h-2 rounded-full bg-yellow-500 flex-shrink-0"></div>
+<div class="space-y-5">
+    <div class="flex items-start gap-3 pl-3 border-l-2 border-yellow-400">
         <div>
             <h4 class="text-sm font-bold text-gray-900">Pending Reviews</h4>
-            <p class="text-xs text-gray-600 mt-1 leading-relaxed">You have <span id="sidebar-pending-count">{{ pending_items }}</span> items waiting.</p>
+            <p class="text-xs text-gray-500 mt-0.5">You have <span id="sidebar-pending-count">{{ pending_items }}</span> items waiting.</p>
         </div>
     </div>
 
-    <div class="p-4 rounded-xl bg-indigo-50 border border-indigo-100">
-        <div class="flex items-center justify-between mb-3">
+    <div>
+        <div class="flex items-center justify-between pb-2 mb-1 border-b border-gray-200">
             <h4 class="text-sm font-bold text-gray-900">Recent Activity</h4>
             {% if sidebar_workspace %}
-                <span class="text-[11px] font-medium text-indigo-600">{{ sidebar_workspace.name }}</span>
+                <span class="text-[11px] font-medium text-gray-400">{{ sidebar_workspace.name }}</span>
             {% endif %}
         </div>
 
         {% if sidebar_recent_activity %}
-            <div class="space-y-3 max-h-[440px] overflow-y-auto pr-1">
+            <div class="divide-y divide-gray-100 max-h-[440px] overflow-y-auto pr-1">
                 {% for event in sidebar_recent_activity %}
-                <div class="rounded-lg bg-white border border-indigo-100 p-3">
-                    <p class="text-xs text-gray-700 leading-relaxed">{{ event.summary }}</p>
-                    <p class="text-[11px] text-gray-500 mt-1">{{ event.created_at|timesince }} ago</p>
+                <div class="py-2.5">
+                    <p class="text-xs text-gray-700 truncate" title="{{ event.summary }}">{{ event.summary }}</p>
+                    <p class="text-[11px] text-gray-400 mt-0.5">{{ event.created_at|timesince }} ago</p>
                 </div>
                 {% endfor %}
             </div>
         {% elif sidebar_workspace %}
-            <p class="text-xs text-gray-500">No activity yet for this workspace.</p>
+            <p class="text-xs text-gray-500 pt-2">No activity yet for this workspace.</p>
         {% else %}
-            <p class="text-xs text-gray-500">Select a workspace to see team activity.</p>
+            <p class="text-xs text-gray-500 pt-2">Select a workspace to see team activity.</p>
         {% endif %}
     </div>
 </div>

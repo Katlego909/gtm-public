@@ -78,6 +78,9 @@
     </div>
   </div>
 
+  <div id="asset-library-dropzone"
+       class="rounded-2xl transition-colors"
+       data-add-url="{% url 'add_resource' %}">
   {% if resources %}
     {# Group by category for display #}
     {% regroup resources by get_category_display as resource_groups %}
@@ -97,24 +100,29 @@
     {% endfor %}
 
   {% else %}
-  <div class="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border-2 border-dashed border-gray-200 text-center">
+  <div id="asset-quick-dropzone"
+       class="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border-2 border-dashed border-gray-200 text-center cursor-pointer transition-colors hover:border-indigo-300"
+       onclick="document.getElementById('asset-quick-file-input').click()">
+    <input type="file" id="asset-quick-file-input" class="sr-only" multiple>
     <div class="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center mb-4 mx-auto">
-      <svg class="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+      <svg class="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v9" />
+      </svg>
     </div>
-    <h3 class="text-lg font-bold text-gray-900">No assets yet</h3>
+    <h3 class="text-lg font-bold text-gray-900">Drop files here or click to browse</h3>
     <p class="mt-2 text-sm text-gray-500 max-w-sm">
-      Upload your first Landing Page, Pitch Deck, or Ad Creative to get an AI-powered GTM readiness audit.
+      Upload your first Landing Page, Pitch Deck, or Ad Creative — any file type, up to 10 MB each — to get an AI-powered GTM readiness audit.
     </p>
     <button type="button"
             hx-get="{% url 'add_resource' %}"
             hx-target="#modal-content"
-            onclick="openModal()"
-            class="mt-6 inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 shadow-sm transition-colors">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-      Upload First Asset
+            onclick="event.stopPropagation(); openModal();"
+            class="mt-6 text-sm font-semibold text-indigo-600 hover:text-indigo-800">
+      Or add a link instead →
     </button>
   </div>
   {% endif %}
+  </div>
 
   {% endif %}
 </div>
@@ -145,4 +153,75 @@ function closeAuditDetail() {
   document.getElementById('audit-detail-modal').classList.add('hidden');
   document.getElementById('audit-detail-body').innerHTML = '';
 }
+
+(function() {
+    var dropzone = document.getElementById('asset-library-dropzone');
+    if (!dropzone) return;
+    var addUrl = dropzone.getAttribute('data-add-url');
+
+    function getCsrfToken() {
+        var value = '; ' + document.cookie;
+        var parts = value.split('; csrftoken=');
+        return parts.length === 2 ? parts.pop().split(';').shift() : '';
+    }
+
+    function refreshView() {
+        htmx.ajax('GET', window.location.pathname + window.location.search, {
+            target: '#main-content',
+            swap: 'innerHTML'
+        });
+    }
+
+    function uploadFile(file) {
+        var fd = new FormData();
+        fd.append('name', file.name.replace(/\.[^/.]+$/, ''));
+        fd.append('resource_type', 'file');
+        fd.append('category', 'other');
+        fd.append('file', file);
+        fd.append('csrfmiddlewaretoken', getCsrfToken());
+        return fetch(addUrl, { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function(r) { return r.ok; })
+            .catch(function() { return false; });
+    }
+
+    function uploadFiles(fileList) {
+        var files = Array.from(fileList || []);
+        if (!files.length) return;
+
+        Promise.all(files.map(uploadFile)).then(function(results) {
+            var failed = results.filter(function(ok) { return !ok; }).length;
+            if (failed) {
+                showDashboardToast(
+                    failed === results.length ? 'Upload failed.' : (failed + ' of ' + results.length + ' uploads failed.'),
+                    'error'
+                );
+            } else {
+                showDashboardToast(results.length > 1 ? 'Assets uploaded.' : 'Asset uploaded.', 'success');
+            }
+            refreshView();
+        });
+    }
+
+    dropzone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        dropzone.classList.add('bg-indigo-50');
+    });
+    dropzone.addEventListener('dragleave', function() {
+        dropzone.classList.remove('bg-indigo-50');
+    });
+    dropzone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        dropzone.classList.remove('bg-indigo-50');
+        uploadFiles(e.dataTransfer.files);
+    });
+
+    // The "click to browse" input lives inside the empty-state block, which
+    // gets replaced on refresh — delegate from the persistent wrapper.
+    dropzone.addEventListener('change', function(e) {
+        if (e.target && e.target.id === 'asset-quick-file-input') {
+            uploadFiles(e.target.files);
+            e.target.value = '';
+        }
+    });
+})();
 </script>

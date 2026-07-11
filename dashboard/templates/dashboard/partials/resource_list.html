@@ -1,8 +1,15 @@
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="resource-grid">
     {% for resource in resources %}
-    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition group">
+    <div class="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition group overflow-hidden">
+        {% if resource.is_image %}
+        <a href="{{ resource.file.url }}" target="_blank" class="block h-32 w-full overflow-hidden bg-gray-100">
+            <img src="{{ resource.file.url }}" alt="{{ resource.name }}" class="h-full w-full object-cover">
+        </a>
+        {% endif %}
+        <div class="p-4">
         <div class="flex items-start justify-between">
             <div class="flex items-center gap-3">
+                {% if not resource.is_image %}
                 <div class="p-2 rounded-lg {% if resource.resource_type == 'file' %}bg-blue-50 text-blue-600{% else %}bg-indigo-50 text-indigo-600{% endif %}">
                     {% if resource.resource_type == 'file' %}
                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -14,12 +21,13 @@
                         </svg>
                     {% endif %}
                 </div>
+                {% endif %}
                 <div>
                     <h4 class="font-bold text-gray-900 group-hover:text-indigo-600 transition">{{ resource.name }}</h4>
                     <span class="text-xs font-medium text-gray-500 uppercase tracking-wider">{{ resource.get_category_display }}</span>
                 </div>
             </div>
-            
+
             <div class="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition">
                 <button type="button"
                         hx-get="{% url 'edit_resource' resource.id %}"
@@ -51,18 +59,25 @@
                 <a href="{{ resource.url }}" target="_blank" class="text-sm font-semibold text-indigo-600 hover:text-indigo-800">Open Link →</a>
             {% endif %}
         </div>
+        </div>
     </div>
     {% empty %}
-    <div class="col-span-full py-12 text-center border-2 border-dashed border-gray-200 rounded-2xl">
-        <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-        </svg>
-        <h3 class="mt-2 text-sm font-medium text-gray-900">No resources found</h3>
-        <p class="mt-1 text-sm text-gray-500">Get started by adding a sales deck, brand guide, or strategy link.</p>
-        <div class="mt-6">
-            <button type="button" hx-get="{% url 'add_resource' %}" hx-target="#modal-content" onclick="openModal()" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700">
-                <svg class="-ml-1 mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
-                Add Resource
+    <div class="col-span-full">
+        <div id="resource-quick-dropzone"
+             class="py-12 px-6 text-center border-2 border-dashed border-gray-300 rounded-2xl cursor-pointer transition-colors hover:border-indigo-300"
+             onclick="document.getElementById('resource-quick-file-input').click()">
+            <input type="file" id="resource-quick-file-input" class="sr-only" multiple>
+            <svg class="mx-auto h-10 w-10 text-indigo-400 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v9" />
+            </svg>
+            <h3 class="text-sm font-semibold text-gray-900">Drop files here or click to browse</h3>
+            <p class="mt-1 text-xs text-gray-500">Any file type — up to 10 MB each.</p>
+            <button type="button"
+                    hx-get="{% url 'add_resource' %}"
+                    hx-target="#modal-content"
+                    onclick="event.stopPropagation(); openModal();"
+                    class="mt-4 text-sm font-semibold text-indigo-600 hover:text-indigo-800">
+                Or add a link instead →
             </button>
         </div>
     </div>
