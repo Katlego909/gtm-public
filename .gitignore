@@ -53,3 +53,6 @@ keys/service-account.json
 
 # Test files
 test_documents/
+
+# Playwright MCP debugging artifacts (screenshots, page snapshots)
+.playwright-mcp/

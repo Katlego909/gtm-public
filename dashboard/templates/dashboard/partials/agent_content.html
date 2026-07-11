@@ -72,7 +72,7 @@
                 {% endif %}
             </aside>
 
-            <section class="border border-gray-200 rounded-2xl overflow-hidden bg-slate-50 min-h-[640px] flex flex-col">
+            <section id="dashboard-agent-chat-panel" class="border border-gray-200 rounded-2xl overflow-hidden bg-slate-50 min-h-[640px] flex flex-col transition-colors">
                 <div id="dashboard-agent-messages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 scroll-smooth">
                     {% for chat in dashboard_agent_history %}
                     <div class="flex items-start gap-3 justify-end">
@@ -428,6 +428,32 @@ function initDashboardAgent() {
 
     if (container) {
         container.scrollTop = container.scrollHeight;
+    }
+
+    // Let users drop a file anywhere on the chat panel to attach it — same
+    // effect as the paperclip button, just without a dedicated dropzone
+    // graphic since this is a chat window, not an upload component.
+    const chatPanel = document.getElementById('dashboard-agent-chat-panel');
+    if (chatPanel && fileInput) {
+        chatPanel.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            chatPanel.classList.add('ring-2', 'ring-indigo-200');
+        });
+        chatPanel.addEventListener('dragleave', function() {
+            chatPanel.classList.remove('ring-2', 'ring-indigo-200');
+        });
+        chatPanel.addEventListener('drop', function(e) {
+            e.preventDefault();
+            chatPanel.classList.remove('ring-2', 'ring-indigo-200');
+            const dropped = Array.from(e.dataTransfer.files || []);
+            if (!dropped.length) return;
+
+            const dt = new DataTransfer();
+            Array.from(fileInput.files || []).forEach(f => dt.items.add(f));
+            dropped.forEach(f => dt.items.add(f));
+            fileInput.files = dt.files;
+            updateDashboardAgentFileHint(fileInput);
+        });
     }
 }
 
