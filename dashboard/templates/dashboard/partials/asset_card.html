@@ -2,7 +2,7 @@
 
 {% with status=resource.audit_status %}
 <div id="asset-card-{{ resource.id }}"
-     class="group relative bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col
+     class="group relative bg-white rounded-2xl border border-gray-200 transition-colors overflow-hidden flex flex-col
             {% if status == 'complete' and resource.ai_score_modifier > 0 %}ring-1 ring-emerald-200{% elif status == 'complete' and resource.ai_score_modifier < 0 %}ring-1 ring-rose-200{% endif %}"
      {% if status == 'pending' or status == 'auditing' %}
      hx-get="{% url 'asset_audit_result' resource.id %}{% if current_workspace %}?workspace={{ current_workspace.id }}{% endif %}"
@@ -13,14 +13,14 @@
 
   {% if status == 'complete' %}
     {% if resource.ai_score_modifier > 0 %}
-      <div class="h-1.5 w-full bg-gradient-to-r from-emerald-400 to-teal-400"></div>
+      <div class="h-1.5 w-full bg-emerald-400"></div>
     {% elif resource.ai_score_modifier < 0 %}
-      <div class="h-1.5 w-full bg-gradient-to-r from-rose-400 to-red-400"></div>
+      <div class="h-1.5 w-full bg-rose-400"></div>
     {% else %}
-      <div class="h-1.5 w-full bg-gradient-to-r from-slate-200 to-gray-200"></div>
+      <div class="h-1.5 w-full bg-gray-200"></div>
     {% endif %}
   {% else %}
-    <div class="h-1.5 w-full bg-gradient-to-r from-indigo-200 to-purple-200"></div>
+    <div class="h-1.5 w-full bg-indigo-200"></div>
   {% endif %}
 
   <div class="p-5 flex flex-col flex-1">
@@ -30,7 +30,7 @@
 
         {# File type icon #}
         <div class="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center
-          {% if resource.category == 'marketing' %}bg-purple-100 text-purple-600
+          {% if resource.category == 'marketing' %}bg-rose-100 text-rose-600
           {% elif resource.category == 'sales' %}bg-blue-100 text-blue-600
           {% elif resource.category == 'strategy' %}bg-indigo-100 text-indigo-600
           {% elif resource.category == 'product' %}bg-cyan-100 text-cyan-600

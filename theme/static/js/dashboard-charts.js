@@ -35,7 +35,7 @@ function initializeDashboardCharts(chartData) {
         });
     }
 
-    drawKpiProgress('kpiSessions', chartData.total_sessions || 0, '#FFE0AE');
+    drawKpiProgress('kpiSessions', chartData.total_sessions || 0, '#B8530F');
     drawKpiProgress('kpiCompleted', chartData.completed_items || 0, '#eab308');
     drawKpiProgress('kpiPending', chartData.pending_items || 0, '#ef4444');
 
@@ -51,7 +51,7 @@ function initializeDashboardCharts(chartData) {
                 datasets: [{
                     label: 'Sessions',
                     data: barData,
-                    backgroundColor: hasData ? '#FFE0AE' : '#e2e8f0',
+                    backgroundColor: hasData ? '#B8530F' : '#e2e8f0',
                     borderRadius: 4,
                     barThickness: 24,
                 }]

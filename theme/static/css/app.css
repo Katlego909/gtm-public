@@ -32,17 +32,17 @@
   --font-body: 'Inter', system-ui, sans-serif;
   --font-heading: 'Geoform', system-ui, sans-serif;
 
-  /* Accent palette (primary peach, limited purple for sparing highlights) */
-  --accent-50: #FFE0AE;
-  --accent-100: #FFE0AE;
-  --accent-200: #FFE0AE;
-  --accent-300: #FFE0AE;
-  --accent-400: #FFE0AE;
-  --accent-500: #FFE0AE;
-  --accent-600: #FFE0AE;
-  --accent-700: #6F3DFF;
-  --accent-800: #6F3DFF;
-  --accent-900: #6F3DFF;
+  /* Single accent ramp (burnt copper). No secondary accent. */
+  --accent-50: #FDF4EC;
+  --accent-100: #FAE3CE;
+  --accent-200: #F3C79C;
+  --accent-300: #E9A468;
+  --accent-400: #DD8142;
+  --accent-500: #CC6620;
+  --accent-600: #B8530F;
+  --accent-700: #944110;
+  --accent-800: #743411;
+  --accent-900: #5C2B10;
 
   /* Semantic colors: keep success/warning/error semantics but tone surfaces down */
   --success: #15803d;
@@ -149,8 +149,8 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .app-icon-badge--solid {
-  background: var(--accent-600);
-  color: #ffffff;
+  background: var(--accent-100);
+  color: var(--accent-700);
 }
 
 /* ── Buttons ────────────────────────────────────────────── */

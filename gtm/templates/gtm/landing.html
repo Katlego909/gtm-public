@@ -22,7 +22,7 @@
 <nav class="sticky top-0 z-50 bg-white/95 border-b border-gray-200">
   <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
     <a href="{% url 'gtm:landing' %}" class="flex items-center gap-2 hover:opacity-80 transition">
-      <img src="{% static 'images/forge_logo.png' %}" alt="Funti3r GTM" class="h-12 w-auto max-w-[220px] object-contain" />
+      <img src="{% static 'images/forge_logo.png' %}" alt="ForgeGTM" class="h-9 w-auto object-contain" />
     </a>
     <!-- Desktop Navigation -->
     <div class="hidden md:flex items-center gap-7">
@@ -146,7 +146,8 @@
 </script>
 
 <!-- HERO SECTION -->
-<section class="relative max-w-7xl mx-auto px-6 pt-16 pb-24 md:pt-24 md:pb-28">
+<section class="relative bg-gradient-to-b from-indigo-50 to-white pt-16 pb-24 md:pt-24 md:pb-28">
+  <div class="max-w-7xl mx-auto px-6">
   <div class="text-center max-w-4xl mx-auto">
     <!-- Main Headline -->
     <h1 class="text-5xl md:text-6xl font-extrabold tracking-tight leading-[1.08] mb-6">
@@ -178,27 +179,27 @@
 
   <!-- Product Preview -->
   <div class="mt-16 max-w-5xl mx-auto relative">
-    <div class="rounded-2xl border border-gray-200 bg-white overflow-hidden">
+    <div class="rounded-2xl border-2 border-indigo-100 bg-white overflow-hidden">
       <div class="flex">
         <!-- Sidebar -->
         <div class="hidden sm:flex w-52 flex-col border-r border-gray-100 p-4 gap-4 shrink-0">
           <div class="flex items-center gap-2">
-            <img src="{% static 'images/forge_logo.png' %}" alt="ForgeGTM" class="h-7 w-auto max-w-[120px] object-contain rounded-lg" />
+            <img src="{% static 'images/forge_logo.png' %}" alt="ForgeGTM" class="h-7 w-[140px] object-contain object-left" />
           </div>
           <div class="rounded-lg border border-gray-200 px-3 py-2 text-[11px] font-semibold text-gray-600 text-center">+ New Assessment</div>
             <div class="space-y-1 pt-1">
             <div class="rounded-lg bg-indigo-50 px-3 py-2 text-[11px] font-bold text-indigo-600">Dashboard</div>
-            <div class="px-3 py-2 text-[11px] font-medium text-gray-500">Tasks</div>
-            <div class="px-3 py-2 text-[11px] font-medium text-gray-500">Workspace</div>
-            <div class="px-3 py-2 text-[11px] font-medium text-gray-500">Asset Library</div>
-            <div class="px-3 py-2 text-[11px] font-medium text-gray-500">Agent</div>
-            <div class="px-3 py-2 text-[11px] font-medium text-gray-500">Analytics</div>
-            <div class="px-3 py-2 text-[11px] font-medium text-gray-500">Settings</div>
+            <div class="px-3 py-2 text-[11px] font-medium text-gray-600">Tasks</div>
+            <div class="px-3 py-2 text-[11px] font-medium text-gray-600">Workspace</div>
+            <div class="px-3 py-2 text-[11px] font-medium text-gray-600">Asset Library</div>
+            <div class="px-3 py-2 text-[11px] font-medium text-gray-600">Agent</div>
+            <div class="px-3 py-2 text-[11px] font-medium text-gray-600">Analytics</div>
+            <div class="px-3 py-2 text-[11px] font-medium text-gray-600">Settings</div>
           </div>
-          <div class="mt-auto rounded-xl bg-indigo-600 p-3.5">
-            <p class="text-[11px] font-bold text-white">GTM Playbook</p>
-            <p class="text-[10px] text-indigo-200 mt-0.5 leading-snug">Your 30-day plan is ready</p>
-            <div class="mt-2.5 rounded-md bg-white text-center py-1.5 text-[10px] font-bold text-indigo-600">View Playbook</div>
+          <div class="mt-auto rounded-xl bg-indigo-50 border border-indigo-100 p-3.5">
+            <p class="text-[11px] font-bold text-gray-900">GTM Playbook</p>
+            <p class="text-[10px] text-indigo-700 mt-0.5 leading-snug">Your 30-day plan is ready</p>
+            <div class="mt-2.5 rounded-md bg-indigo-600 text-center py-1.5 text-[10px] font-bold text-white">View Playbook</div>
           </div>
         </div>
 
@@ -212,7 +213,7 @@
                 <span class="text-2xl font-extrabold text-indigo-600">4</span>
                 <svg viewBox="0 0 36 36" class="h-8 w-8 -rotate-90 shrink-0">
                   <circle cx="18" cy="18" r="15" fill="none" stroke="#e5e7eb" stroke-width="4"/>
-                  <circle cx="18" cy="18" r="15" fill="none" stroke="#4f46e5" stroke-width="4" stroke-dasharray="66,100" stroke-linecap="round" pathLength="100"/>
+                  <circle cx="18" cy="18" r="15" fill="none" stroke="#B8530F" stroke-width="4" stroke-dasharray="66,100" stroke-linecap="round" pathLength="100"/>
                 </svg>
               </div>
               <p class="text-[10px] text-gray-400 mt-2">+2 this month</p>
@@ -223,7 +224,7 @@
                 <span class="text-2xl font-extrabold text-gray-900">1,248</span>
                 <svg viewBox="0 0 36 36" class="h-8 w-8 -rotate-90 shrink-0">
                   <circle cx="18" cy="18" r="15" fill="none" stroke="#e5e7eb" stroke-width="4"/>
-                  <circle cx="18" cy="18" r="15" fill="none" stroke="#818cf8" stroke-width="4" stroke-dasharray="42,100" stroke-linecap="round" pathLength="100"/>
+                  <circle cx="18" cy="18" r="15" fill="none" stroke="#944110" stroke-width="4" stroke-dasharray="42,100" stroke-linecap="round" pathLength="100"/>
                 </svg>
               </div>
               <p class="text-[10px] text-gray-400 mt-2">across 4 sessions</p>
@@ -268,7 +269,7 @@
             </div>
             <svg viewBox="0 0 480 110" class="w-full h-24" preserveAspectRatio="none">
               <path d="M0,95 C60,88 100,82 150,68 C200,54 250,58 300,42 C350,28 420,20 480,10 L480,110 L0,110 Z" fill="#E5E5E5"/>
-              <path d="M0,95 C60,88 100,82 150,68 C200,54 250,58 300,42 C350,28 420,20 480,10" fill="none" stroke="#4f46e5" stroke-width="2.5"/>
+              <path d="M0,95 C60,88 100,82 150,68 C200,54 250,58 300,42 C350,28 420,20 480,10" fill="none" stroke="#B8530F" stroke-width="2.5"/>
             </svg>
             <div class="flex justify-between text-[9px] text-gray-400 mt-1 px-1">
               <span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span>
@@ -302,13 +303,13 @@
 
     <!-- Floating agent panel -->
     <div class="hidden md:block absolute -right-2 lg:-right-6 top-14 w-72 rounded-xl border border-gray-200 bg-white overflow-hidden">
-      <div class="bg-indigo-600 px-4 py-3">
+      <div class="bg-gray-900 px-4 py-3">
         <div class="flex items-center justify-between">
           <div>
             <p class="text-white text-xs font-bold">GTM Agent</p>
             <p class="text-[10px] text-indigo-200">Strategy &amp; Execution Assistant</p>
           </div>
-          <svg class="w-3.5 h-3.5 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
           </svg>
         </div>
@@ -357,6 +358,7 @@
         </div>
       </div>
     </div>
+  </div>
   </div>
 </section>
 

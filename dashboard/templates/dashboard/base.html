@@ -24,7 +24,7 @@
         }
         .agent-bubble h1 { font-size: 1.05rem; }
         .agent-bubble h2 { font-size: 1rem; }
-        .agent-bubble h3 { font-size: 0.95rem; border-bottom: 1px solid #e0e7ff; padding-bottom: 0.2rem; }
+        .agent-bubble h3 { font-size: 0.95rem; border-bottom: 1px solid #FAE3CE; padding-bottom: 0.2rem; }
         .agent-bubble h4 { font-size: 0.875rem; }
         .agent-bubble p  { margin-bottom: 0.6rem; line-height: 1.55; }
         .agent-bubble ul,.agent-bubble ol { padding-left: 1.4rem; margin-bottom: 0.6rem; }
@@ -32,7 +32,7 @@
         .agent-bubble ol { list-style-type: decimal; }
         .agent-bubble li { margin-bottom: 0.3rem; line-height: 1.5; }
         .agent-bubble strong { font-weight: 600; color: #111827; }
-        .agent-bubble hr { border: none; border-top: 1px solid #e0e7ff; margin: 0.75rem 0; }
+        .agent-bubble hr { border: none; border-top: 1px solid #FAE3CE; margin: 0.75rem 0; }
         .agent-bubble *:first-child { margin-top: 0; }
         .agent-bubble *:last-child  { margin-bottom: 0; }
 
@@ -74,7 +74,6 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
         /* HTMX Transitions */
@@ -180,8 +179,7 @@
                 </svg>
             </button>
             <div class="flex items-center gap-2">
-                <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">FG</div>
-                <span class="text-lg font-bold text-gray-900">Forge<span class="text-indigo-600">GTM</span></span>
+                <img src="{% static 'images/forge_logo.png' %}" alt="ForgeGTM" class="h-9 w-auto object-contain" />
             </div>
             <div class="w-10"></div> <!-- Spacer for centering -->
         </div>
@@ -196,8 +194,7 @@
         
         <div class="sidebar-header h-16 hidden md:flex items-center px-6 border-b border-gray-100 justify-between relative">
             <div class="flex items-center gap-2 text-indigo-600">
-                <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">FG</div>
-                <span class="sidebar-logo-text text-xl font-bold text-gray-900 tracking-tight">Forge<span class="text-indigo-600">GTM</span></span>
+                <img src="{% static 'images/forge_logo.png' %}" alt="ForgeGTM" class="sidebar-logo-text h-8 w-auto object-contain" />
             </div>
             <button onclick="toggleDesktopSidebar()" class="collapse-btn text-gray-400 hover:text-gray-600 transition-colors" title="Toggle sidebar">
                 <svg id="collapseIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -330,18 +327,18 @@
         </button>
 
         <section id="global-agent-panel" class="hidden mt-3 w-[min(92vw,420px)] h-[min(72vh,620px)] bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col">
-            <header class="px-4 py-3 border-b border-gray-200 bg-indigo-600 text-white">
+            <header class="px-4 py-3 bg-gray-900">
                 <div class="flex items-center justify-between gap-3">
                     <div>
-                        <h3 class="font-semibold">GTM Agent</h3>
-                        <p class="text-xs text-indigo-100">Ask anything across tasks, insights, and execution.</p>
+                        <h3 class="font-semibold text-white">GTM Agent</h3>
+                        <p class="text-xs text-indigo-200">Ask anything across tasks, insights, and execution.</p>
                     </div>
                     <button id="global-agent-close" type="button" class="h-8 w-8 rounded-lg hover:bg-white/10 transition">
-                        <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        <svg class="w-5 h-5 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                 </div>
                 <div class="mt-3">
-                    <label for="global-agent-session" class="block text-[11px] uppercase tracking-wide text-indigo-100 mb-1">Assessment Context</label>
+                    <label for="global-agent-session" class="block text-[11px] uppercase tracking-wide text-indigo-200 mb-1">Assessment Context</label>
                     <select id="global-agent-session" class="w-full rounded-lg border border-indigo-300 bg-white text-gray-800 px-3 py-2 text-sm"></select>
                 </div>
             </header>

@@ -8,7 +8,7 @@
 }
 .agent-bubble h1 { font-size: 1.05rem; }
 .agent-bubble h2 { font-size: 1rem; }
-.agent-bubble h3 { font-size: 0.95rem; border-bottom: 1px solid #e0e7ff; padding-bottom: 0.2rem; }
+.agent-bubble h3 { font-size: 0.95rem; border-bottom: 1px solid #FAE3CE; padding-bottom: 0.2rem; }
 .agent-bubble h4 { font-size: 0.875rem; }
 .agent-bubble p  { margin-bottom: 0.6rem; line-height: 1.55; }
 .agent-bubble ul,.agent-bubble ol { padding-left: 1.4rem; margin-bottom: 0.6rem; }
@@ -16,7 +16,7 @@
 .agent-bubble ol { list-style-type: decimal; }
 .agent-bubble li { margin-bottom: 0.3rem; line-height: 1.5; }
 .agent-bubble strong { font-weight: 600; color: #111827; }
-.agent-bubble hr { border: none; border-top: 1px solid #e0e7ff; margin: 0.75rem 0; }
+.agent-bubble hr { border: none; border-top: 1px solid #FAE3CE; margin: 0.75rem 0; }
 .agent-bubble *:first-child { margin-top: 0; }
 .agent-bubble *:last-child  { margin-bottom: 0; }
 </style>
@@ -73,7 +73,7 @@
             </aside>
 
             <section class="border border-gray-200 rounded-2xl overflow-hidden bg-slate-50 min-h-[640px] flex flex-col">
-                <div id="dashboard-agent-messages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-gradient-to-b from-white to-slate-50 scroll-smooth">
+                <div id="dashboard-agent-messages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 scroll-smooth">
                     {% for chat in dashboard_agent_history %}
                     <div class="flex items-start gap-3 justify-end">
                         <div class="bg-gray-900 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm max-w-3xl whitespace-pre-wrap">{{ chat.message }}</div>

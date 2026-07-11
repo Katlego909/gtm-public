@@ -4,11 +4,11 @@
 {% block content %}
 
 <!-- Hero Section -->
-<div style="background: linear-gradient(135deg, #4F46E5 0%, #6366F1 100%); border-radius: 12px; padding: 24px; margin-bottom: 24px; text-align: center;">
+<div style="background:#B8530F; border-radius: 12px; padding: 24px; margin-bottom: 24px; text-align: center;">
   <h1 style="margin:0 0 8px;font-size:28px;line-height:1.2;color:#ffffff;font-weight:800;">
-    🎯 Your GTM Assessment Results
+    Your GTM Assessment Results
   </h1>
-  <p style="margin:0;color:#E0E7FF;font-size:16px;">
+  <p style="margin:0;color:#FAE3CE;font-size:16px;">
     {{ snap.company_name|default:session.company_name|default:"Your Company" }}
     {% if snap.industry or session.industry %} • {{ snap.industry|default:session.industry }}{% endif %}
   </p>
@@ -22,7 +22,7 @@
     </div>
     {% if band %}
       <div style="margin-top:12px;">
-        <span style="display:inline-block;font-size:14px;background:#4F46E5;color:#ffffff;border-radius:20px;padding:8px 16px;font-weight:600;">
+        <span style="display:inline-block;font-size:14px;background:#B8530F;color:#ffffff;border-radius:20px;padding:8px 16px;font-weight:600;">
           {{ band.stage }}
         </span>
       </div>
@@ -36,26 +36,26 @@
 </div>
 
 <!-- Quick Actions -->
-<div style="background:#EEF2FF;border-left:4px solid #4F46E5;border-radius:8px;padding:16px;margin-bottom:24px;">
-  <p style="margin:0 0 12px;font-weight:600;color:#4F46E5;font-size:14px;">📥 YOUR RESOURCES</p>
+<div style="background:#FDF4EC;border-left:4px solid #B8530F;border-radius:8px;padding:16px;margin-bottom:24px;">
+  <p style="margin:0 0 12px;font-weight:600;color:#B8530F;font-size:14px;">YOUR RESOURCES</p>
   <div style="display:flex;gap:8px;flex-wrap:wrap;">
-    <a href="{{ public_report_url }}" 
-       style="display:inline-block;background:#4F46E5;color:#ffffff;text-decoration:none;border-radius:8px;padding:12px 20px;font-weight:600;font-size:14px;">
-      📊 View Full Dashboard
+    <a href="{{ public_report_url }}"
+       style="display:inline-block;background:#B8530F;color:#ffffff;text-decoration:none;border-radius:8px;padding:12px 20px;font-weight:600;font-size:14px;">
+      View Full Dashboard
     </a>
-    <a href="{{ pdf_download_url }}" 
+    <a href="{{ pdf_download_url }}"
        style="display:inline-block;background:#1F2937;color:#ffffff;text-decoration:none;border-radius:8px;padding:12px 20px;font-weight:600;font-size:14px;">
-      📄 Download PDF Report
+      Download PDF Report
     </a>
-    <a href="{{ playbook_url }}" 
+    <a href="{{ playbook_url }}"
        style="display:inline-block;background:#059669;color:#ffffff;text-decoration:none;border-radius:8px;padding:12px 20px;font-weight:600;font-size:14px;">
-      📖 View Your Playbook
+      View Your Playbook
     </a>
   </div>
 </div>
 
 <!-- Performance Breakdown -->
-<h2 style="margin:24px 0 16px;font-size:20px;font-weight:700;color:#1F2937;">📊 Performance Breakdown</h2>
+<h2 style="margin:24px 0 16px;font-size:20px;font-weight:700;color:#1F2937;">Performance Breakdown</h2>
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-bottom:24px;">
   <thead>
     <tr style="background:#F9FAFB;border-bottom:2px solid #E5E7EB;">
@@ -68,18 +68,18 @@
     {% for c in categories %}
       <tr style="border-bottom:1px solid #F3F4F6;">
         <td style="padding:12px;font-weight:500;color:#1F2937;">{{ c.category }}</td>
-        <td align="right" style="padding:12px;font-weight:700;font-size:16px;color:{% if c.avg >= 4 %}#059669{% elif c.avg >= 3 %}#4F46E5{% elif c.avg >= 2 %}#F59E0B{% else %}#DC2626{% endif %};">
+        <td align="right" style="padding:12px;font-weight:700;font-size:16px;color:{% if c.avg >= 4 %}#059669{% elif c.avg >= 3 %}#B8530F{% elif c.avg >= 2 %}#F59E0B{% else %}#DC2626{% endif %};">
           {{ c.avg|floatformat:2 }}/5.0
         </td>
         <td align="right" style="padding:12px;font-size:13px;">
           {% if c.avg >= 4 %}
-            <span style="background:#D1FAE5;color:#059669;padding:4px 10px;border-radius:12px;font-weight:600;">✓ Strong</span>
+            <span style="background:#D1FAE5;color:#059669;padding:4px 10px;border-radius:12px;font-weight:600;">Strong</span>
           {% elif c.avg >= 3 %}
-            <span style="background:#E0E7FF;color:#4F46E5;padding:4px 10px;border-radius:12px;font-weight:600;">Good</span>
+            <span style="background:#FAE3CE;color:#B8530F;padding:4px 10px;border-radius:12px;font-weight:600;">Good</span>
           {% elif c.avg >= 2 %}
-            <span style="background:#FEF3C7;color:#F59E0B;padding:4px 10px;border-radius:12px;font-weight:600;">⚠ Focus</span>
+            <span style="background:#FEF3C7;color:#F59E0B;padding:4px 10px;border-radius:12px;font-weight:600;">Focus</span>
           {% else %}
-            <span style="background:#FEE2E2;color:#DC2626;padding:4px 10px;border-radius:12px;font-weight:600;">⚡ Critical</span>
+            <span style="background:#FEE2E2;color:#DC2626;padding:4px 10px;border-radius:12px;font-weight:600;">Critical</span>
           {% endif %}
         </td>
       </tr>
@@ -90,11 +90,11 @@
 <!-- Key Insights -->
 {% if weakest_areas %}
 <div style="background:#FEF3C7;border-left:4px solid #F59E0B;border-radius:8px;padding:16px;margin-bottom:24px;">
-  <p style="margin:0 0 8px;font-weight:700;color:#92400E;font-size:15px;">⚠️ Priority Areas for Improvement</p>
+  <p style="margin:0 0 8px;font-weight:700;color:#92400E;font-size:15px;">Priority Areas for Improvement</p>
   <ul style="margin:0;padding-left:20px;color:#78350F;">
     {% for area in weakest_areas %}
       <li style="margin:4px 0;">
-        <strong>{{ area.category }}</strong>: {{ area.avg|floatformat:2 }}/5.0 
+        <strong>{{ area.category }}</strong>: {{ area.avg|floatformat:2 }}/5.0
         <span style="color:#92400E;font-size:13px;">— Focus on this for maximum impact</span>
       </li>
     {% endfor %}
@@ -104,11 +104,11 @@
 
 {% if strongest_areas %}
 <div style="background:#D1FAE5;border-left:4px solid #059669;border-radius:8px;padding:16px;margin-bottom:24px;">
-  <p style="margin:0 0 8px;font-weight:700;color:#065F46;font-size:15px;">✨ Your Competitive Strengths</p>
+  <p style="margin:0 0 8px;font-weight:700;color:#065F46;font-size:15px;">Your Competitive Strengths</p>
   <ul style="margin:0;padding-left:20px;color:#047857;">
     {% for area in strongest_areas %}
       <li style="margin:4px 0;">
-        <strong>{{ area.category }}</strong>: {{ area.avg|floatformat:2 }}/5.0 
+        <strong>{{ area.category }}</strong>: {{ area.avg|floatformat:2 }}/5.0
         <span style="color:#065F46;font-size:13px;">— Keep up the excellent work!</span>
       </li>
     {% endfor %}
@@ -118,7 +118,7 @@
 
 <!-- Recommended Actions -->
 {% if band and band.actions_markdown %}
-<h2 style="margin:24px 0 16px;font-size:20px;font-weight:700;color:#1F2937;">🎯 Your Next Steps</h2>
+<h2 style="margin:24px 0 16px;font-size:20px;font-weight:700;color:#1F2937;">Your Next Steps</h2>
 <div style="background:#ffffff;border:1px solid #E5E7EB;border-radius:8px;padding:20px;margin-bottom:24px;">
   <p style="margin:0 0 12px;color:#4B5563;line-height:1.6;">
     Based on your <strong>{{ band.stage }}</strong> stage, here are the most impactful actions:
@@ -133,16 +133,16 @@
 {% if action_items_count > 0 %}
 <div style="background:#FEF3C7;border-left:4px solid #F59E0B;border-radius:8px;padding:16px;margin-bottom:24px;">
   <p style="margin:0;font-weight:600;color:#92400E;">
-    📝 You have <strong>{{ action_items_count }} action item{{ action_items_count|pluralize }}</strong> waiting in your playbook!
+    You have <strong>{{ action_items_count }} action item{{ action_items_count|pluralize }}</strong> in your playbook.
   </p>
   <p style="margin:8px 0 0;color:#78350F;font-size:13px;">
-    <a href="{{ playbook_url }}" style="color:#92400E;text-decoration:underline;">View your task list →</a>
+    <a href="{{ playbook_url }}" style="color:#92400E;text-decoration:underline;">View your task list</a>
   </p>
 </div>
 {% endif %}
 
 <!-- Company Information -->
-<h2 style="margin:24px 0 16px;font-size:20px;font-weight:700;color:#1F2937;">🏢 Assessment Details</h2>
+<h2 style="margin:24px 0 16px;font-size:20px;font-weight:700;color:#1F2937;">Assessment Details</h2>
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;background:#F9FAFB;border-radius:8px;overflow:hidden;margin-bottom:24px;">
   <tbody>
     <tr>
@@ -150,7 +150,7 @@
       <td align="right" style="padding:12px 16px;font-size:14px;">
         {% with url=snap.website|default:session.website %}
           {% if url %}
-            <a href="{{ url }}" style="color:#4F46E5;text-decoration:none;font-weight:500;">{{ url }}</a>
+            <a href="{{ url }}" style="color:#B8530F;text-decoration:none;font-weight:500;">{{ url }}</a>
           {% else %} — {% endif %}
         {% endwith %}
       </td>
@@ -168,7 +168,7 @@
       <td style="padding:12px 16px;color:#6B7280;font-size:13px;font-weight:600;">Email / Phone</td>
       <td align="right" style="padding:12px 16px;font-size:14px;">
         {% with email=snap.contact_email|default:session.contact_email phone=snap.phone|default:session.phone %}
-          {% if email %}<a href="mailto:{{ email }}" style="color:#4F46E5;text-decoration:none;">{{ email }}</a>{% endif %}
+          {% if email %}<a href="mailto:{{ email }}" style="color:#B8530F;text-decoration:none;">{{ email }}</a>{% endif %}
           {% if phone %}<br><span style="color:#6B7280;">{{ phone }}</span>{% endif %}
           {% if not email and not phone %}—{% endif %}
         {% endwith %}
@@ -202,19 +202,19 @@
 </table>
 
 <!-- Call to Action -->
-<div style="background:linear-gradient(135deg, #4F46E5 0%, #6366F1 100%);border-radius:12px;padding:24px;text-align:center;margin:32px 0 24px;">
+<div style="background:#B8530F;border-radius:12px;padding:24px;text-align:center;margin:32px 0 24px;">
   <h3 style="margin:0 0 8px;font-size:20px;color:#ffffff;font-weight:700;">Ready to Improve Your GTM?</h3>
-  <p style="margin:0 0 20px;color:#E0E7FF;font-size:14px;">
+  <p style="margin:0 0 20px;color:#FAE3CE;font-size:14px;">
     Access your complete playbook, download your PDF report, or schedule a strategy session.
   </p>
   <div style="display:inline-block;">
-    <a href="{{ playbook_url }}" 
-       style="display:inline-block;background:#ffffff;color:#4F46E5;text-decoration:none;border-radius:8px;padding:14px 28px;font-weight:700;margin:4px;font-size:15px;">
-      📖 View Your Playbook
+    <a href="{{ playbook_url }}"
+       style="display:inline-block;background:#ffffff;color:#B8530F;text-decoration:none;border-radius:8px;padding:14px 28px;font-weight:700;margin:4px;font-size:15px;">
+      View Your Playbook
     </a>
-    <a href="{{ pdf_download_url }}" 
+    <a href="{{ pdf_download_url }}"
        style="display:inline-block;background:#1F2937;color:#ffffff;text-decoration:none;border-radius:8px;padding:14px 28px;font-weight:700;margin:4px;font-size:15px;">
-      📥 Download PDF
+      Download PDF
     </a>
   </div>
 </div>
@@ -222,9 +222,9 @@
 <!-- Admin Link -->
 {% if admin_snapshot_url %}
 <div style="text-align:center;margin:16px 0;">
-  <a href="{{ admin_snapshot_url }}" 
+  <a href="{{ admin_snapshot_url }}"
      style="color:#6B7280;text-decoration:none;font-size:13px;font-weight:500;">
-     🔧 Open in Admin Panel
+     Open in Admin Panel
   </a>
 </div>
 {% endif %}
@@ -232,7 +232,7 @@
 <!-- Footer Info -->
 <div style="border-top:2px solid #E5E7EB;padding-top:20px;margin-top:32px;">
   <p style="margin:0 0 8px;font-size:13px;color:#6B7280;text-align:center;">
-    <strong>Assessment ID:</strong> {{ session.uuid|slice:":8" }}... • 
+    <strong>Assessment ID:</strong> {{ session.uuid|slice:":8" }}... •
     <strong>Generated:</strong> {{ snap.created_at|date:"F j, Y" }}
   </p>
   <p style="margin:0;font-size:12px;color:#9CA3AF;text-align:center;">
