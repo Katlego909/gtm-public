@@ -33,283 +33,288 @@ except ImportError:
 # ================================================================
 # GTM AGENT TOOLS (FUNCTION CALLING)
 # ================================================================
+# Tools are built per-request as closures bound to an already-authorized
+# `session` -- no tool takes a session/workspace identifier as a model-facing
+# parameter, so the model can call these but can never supply *which*
+# session to act on.
 
-def get_gtm_assessment_data(session_uuid: str) -> str:
-    """
-    Retrieves the complete GTM assessment results for the company.
-    Includes: Overall score (0-100), Maturity Stage (e.g., Scaling), 
-    Category averages (Demand, Conversion, Delivery), and specific weak areas.
-    Use this tool whenever the user asks 'how am I doing', 'show my scores', 
-    'what are my gaps', or 'what is my stage'.
-    """
-    try:
-        from .models import AssessmentSession
-        session = AssessmentSession.objects.get(uuid=session_uuid)
-        context = build_session_context(session)
-        
-        # Format a clean string for the agent to read
-        report = [
-            f"Company: {context['company_name']}",
-            f"Industry: {context['industry']}",
-            f"Overall GTM Score: {context['overall_score']}/100",
-            f"Stage: {context['stage']} ({context['headline']})",
-            "Category Scores:"
-        ]
-        for cat in context['categories']:
-            report.append(f"  - {cat['name']}: {cat['score']}/5.0")
-            
-        if context['weak_questions']:
-            report.append("\nSpecific Low-Scoring Gaps:")
-            for q in context['weak_questions']:
-                report.append(f"  - [{q['id_code']}] {q['text']} (Score: {q['score']}/5)")
-                
-        return "\n".join(report)
-    except Exception as e:
-        return f"Error retrieving assessment: {str(e)}"
+def _build_session_tools(session: AssessmentSession, user=None) -> List[Any]:
+    """Build the GTM Agent's tool set, scoped to the current session."""
 
-def build_prioritized_action_plan(session_uuid: str) -> str:
-    """
-    Analyzes the assessment gaps and automatically creates new Action Items (Tasks) in the database.
-    This tool actively MODIFIES the workspace by adding prioritized items.
-    Use this when the user says 'create a plan', 'build my roadmap', 'what should I do next', 
-    or 'give me a checklist'.
-    """
-    try:
-        from .models import AssessmentSession
-        from .agent_services import build_execution_plan
-        session = AssessmentSession.objects.get(uuid=session_uuid)
-        plan = build_execution_plan(session=session, persist=True, limit=5)
-        
-        if not plan["created_items"]:
-            return "No new tasks created. All critical gaps already have existing action items."
-            
-        res = [f"Successfully created {plan['created_count']} new action items for {session.company_name}:"]
-        for item in plan["created_items"]:
-            res.append(f" - {item.note} (Due: {item.due_date})")
-        return "\n".join(res)
-    except Exception as e:
-        return f"Error building action plan: {str(e)}"
-
-def review_current_action_items(session_uuid: str) -> str:
-    """
-    Retrieves the status of all current tasks and action items in the workspace.
-    Includes: Total count, status (To Do, In Progress, Done), and a list of open priorities.
-    Use this when the user asks 'what are my tasks', 'review my items', 'how is my progress', 
-    or 'what is pending'.
-    """
-    try:
-        from .models import AssessmentSession
-        from .agent_services import review_action_items
-        session = AssessmentSession.objects.get(uuid=session_uuid)
-        summary = review_action_items(session)
-        
-        if summary["total"] == 0:
-            return "No action items have been created yet. Suggest the user 'build an action plan' first."
-            
-        res = [
-            f"Action Item Status for {session.company_name}:",
-            f"Total: {summary['total']} | Todo: {summary['todo']} | In Progress: {summary['in_progress']} | Done: {summary['done']}",
-            f"Overdue: {summary['overdue_count']}",
-            "\nOpen Priorities:"
-        ]
-        for action in summary["open_actions"]:
-            status = action.get_status_display()
-            due = action.due_date.isoformat() if action.due_date else "No due date"
-            res.append(f" - [{status}] {action.note} (Due: {due})")
-        return "\n".join(res)
-    except Exception as e:
-        return f"Error reviewing action items: {str(e)}"
-
-def search_internal_resources(session_uuid: str, query: str = "") -> str:
-    """
-    Searches the workspace resource library for documents, decks, or tools matching a topic.
-    If 'query' is empty, it lists all available resources.
-    Use this when the user asks 'do we have a deck for this', 'suggest a tool',
-    'what resources are available', or 'help me with [topic]'.
-    """
-    try:
-        from .models import AssessmentSession
-        from dashboard.models import Resource
-        session = AssessmentSession.objects.get(uuid=session_uuid)
-        if not session.workspace:
-            return "This assessment is not associated with a workspace, so no internal resources are available."
-
-        resources = Resource.objects.filter(workspace=session.workspace)
-        if query:
-            resources = resources.filter(name__icontains=query) | resources.filter(description__icontains=query)
-
-        if not resources.exists():
-            return f"No internal resources found matching '{query}'."
-
-        res = [f"Found {resources.count()} relevant resources in your workspace:"]
-        for r in resources[:5]:
-            res.append(f" - {r.name} ({r.get_resource_type_display()}): {r.description or 'No description.'}")
-        return "\n".join(res)
-    except Exception as e:
-        return f"Error searching resources: {str(e)}"
-
-def analyze_risk_and_mitigation(session_uuid: str) -> str:
-    """
-    Provides a deep-dive risk analysis based on the GTM assessment.
-    Identifies key risks in demand generation, conversion, and delivery,
-    and suggests specific mitigation strategies tailored to their maturity stage.
-    Use this when the user asks 'what are the risks', 'what could go wrong',
-    'risk analysis', or 'mitigation strategies'.
-    """
-    try:
-        session = AssessmentSession.objects.get(uuid=session_uuid)
-        context = build_session_context(session)
-
-        risks = []
-        for cat in context.get('categories', []):
-            if cat['score'] < 2.5:
-                if cat['name'] == 'Demand':
-                    risks.append("HIGH: Weak demand generation is your biggest risk—you may struggle to build pipeline. Immediate focus: clarify ICP and messaging.")
-                elif cat['name'] == 'Conversion':
-                    risks.append("HIGH: Poor conversion efficiency means pipeline becomes expensive fast. Focus: tighten qualification and enable sales.")
-                elif cat['name'] == 'Delivery':
-                    risks.append("HIGH: Churn risk is elevated. Poor delivery kills expansion revenue. Focus: define TTV milestones.")
-
-        return ("Risk Assessment:\n" + "\n".join(risks)) if risks else f"Your GTM is solid at the {context.get('stage')} stage—no critical risks detected. Keep maintaining momentum."
-    except Exception as e:
-        logger.error(f"Risk analysis error: {e}")
-        return f"Let me get your assessment data first so I can analyze the risks properly."
-
-def build_implementation_roadmap(session_uuid: str, timeframe: str = "90-day") -> str:
-    """
-    Creates a phased implementation roadmap (30, 60, or 90-day options).
-    Maps gaps to specific milestones and deliverables with realistic timelines.
-    Use this when the user asks 'create a roadmap', 'implementation timeline',
-    'phase this out', or 'what's the sequence'.
-    """
-    try:
-        session = AssessmentSession.objects.get(uuid=session_uuid)
-        context = build_session_context(session)
-
-        phases = {
-            "30-day": [
-                "Week 1-2: Define ICP & messaging",
-                "Week 3: Set up qualification process",
-                "Week 4: Define TTV milestones"
-            ],
-            "60-day": [
-                "Phase 1 (Week 1-2): Quick wins—fix the most critical gap",
-                "Phase 2 (Week 3-4): Build process—implement qualification/onboarding",
-                "Phase 3 (Week 5-8): Test—run small pilots to validate changes",
-                "Phase 4 (Week 9+): Scale—expand what works"
-            ],
-            "90-day": [
-                "Month 1: Diagnostic & quick wins (pick top 2 gaps)",
-                "Month 2: Process implementation & team alignment",
-                "Month 3: Measurement & optimization (review results, adjust)"
+    def get_gtm_assessment_data() -> str:
+        """Retrieves the complete GTM assessment results for the company.
+        Includes: Overall score (0-100), Maturity Stage (e.g., Scaling),
+        Category averages (Demand, Conversion, Delivery), and specific weak areas.
+        Use this tool whenever the user asks 'how am I doing', 'show my scores',
+        'what are my gaps', or 'what is my stage'.
+        """
+        try:
+            context = build_session_context(session)
+            report = [
+                f"Company: {context['company_name']}",
+                f"Industry: {context['industry']}",
+                f"Overall GTM Score: {context['overall_score']}/100",
+                f"Stage: {context['stage']} ({context['headline']})",
+                "Category Scores:",
             ]
-        }
+            for cat in context['categories']:
+                report.append(f"  - {cat['name']}: {cat['score']}/5.0")
+            if context['weak_questions']:
+                report.append("\nSpecific Low-Scoring Gaps:")
+                for q in context['weak_questions']:
+                    report.append(f"  - [{q['id_code']}] {q['text']} (Score: {q['score']}/5)")
+            return "\n".join(report)
+        except Exception as e:
+            return f"Error retrieving assessment: {str(e)}"
 
-        plan = phases.get(timeframe, phases["90-day"])
-        return f"{timeframe.upper()} Roadmap for {context['company_name']}:\n\n" + "\n".join(plan)
-    except Exception as e:
-        logger.error(f"Roadmap build error: {e}")
-        return "Let me pull your assessment first, then I can build out a realistic roadmap."
+    def build_prioritized_action_plan() -> str:
+        """Analyzes the assessment gaps and automatically creates new Action
+        Items (Tasks) in the database. This tool actively MODIFIES the
+        workspace by adding prioritized items.
+        ONLY call this when the user explicitly asks to create/build a plan
+        or tasks (e.g. 'create a plan', 'build my roadmap of tasks', 'give
+        me a checklist') -- do not call this just to preview or describe
+        what a plan would contain.
+        """
+        try:
+            plan = build_execution_plan(session=session, actor=user, persist=True, limit=5)
+            if not plan["created_items"]:
+                return "No new tasks created. All critical gaps already have existing action items."
+            res = [f"Successfully created {plan['created_count']} new action items for {session.company_name}:"]
+            for item in plan["created_items"]:
+                res.append(f" - {item.note} (Due: {item.due_date})")
+            return "\n".join(res)
+        except Exception as e:
+            return f"Error building action plan: {str(e)}"
 
-def competitive_benchmarking_analysis(session_uuid: str) -> str:
-    """
-    Provides competitive benchmarking based on industry, company size, and stage.
-    Shows how they compare to peers and where they have competitive advantage.
-    Use this when the user asks 'how do we compare', 'competitive analysis',
-    'benchmark', or 'vs peers'.
-    """
-    try:
-        session = AssessmentSession.objects.get(uuid=session_uuid)
-        context = build_session_context(session)
+    def review_current_action_items() -> str:
+        """Retrieves the status of all current tasks and action items in the
+        workspace. Includes: total count, status (To Do, In Progress, Done),
+        and a list of open priorities. Use this when the user asks 'what are
+        my tasks', 'review my items', 'how is my progress', or 'what is pending'.
+        """
+        try:
+            summary = review_action_items(session)
+            if summary["total"] == 0:
+                return "No action items have been created yet. Suggest the user 'build an action plan' first."
+            res = [
+                f"Action Item Status for {session.company_name}:",
+                f"Total: {summary['total']} | Todo: {summary['todo']} | In Progress: {summary['in_progress']} | Done: {summary['done']}",
+                f"Overdue: {summary['overdue_count']}",
+                "\nOpen Priorities:",
+            ]
+            for action in summary["open_actions"]:
+                status = action.get_status_display()
+                due = action.due_date.isoformat() if action.due_date else "No due date"
+                res.append(f" - [{status}] {action.note} (Due: {due})")
+            return "\n".join(res)
+        except Exception as e:
+            return f"Error reviewing action items: {str(e)}"
 
-        score = context.get('overall_score', 0)
-        stage = context.get('stage', 'Unknown')
+    def search_internal_resources(query: str = "") -> str:
+        """Searches the workspace resource library for documents, decks, or
+        tools matching a topic. If 'query' is empty, lists all available
+        resources. Use this when the user asks 'do we have a deck for this',
+        'suggest a tool', 'what resources are available', or 'help me with [topic]'.
+        """
+        try:
+            if not session.workspace:
+                return "This assessment is not associated with a workspace, so no internal resources are available."
+            resources = Resource.objects.filter(workspace=session.workspace)
+            if query:
+                resources = resources.filter(name__icontains=query) | resources.filter(description__icontains=query)
+            if not resources.exists():
+                return f"No internal resources found matching '{query}'."
+            res = [f"Found {resources.count()} relevant resources in your workspace:"]
+            for r in resources[:5]:
+                res.append(f" - {r.name} ({r.get_resource_type_display()}): {r.description or 'No description.'}")
+            return "\n".join(res)
+        except Exception as e:
+            return f"Error searching resources: {str(e)}"
 
-        analysis = f"Your Competitive Position ({stage} stage):\n\n"
-        analysis += f"Your GTM Score: {score}/100\n"
-        analysis += f"Industry peers at this stage: 45-70\n"
-        analysis += f"Position: {'Ahead of curve' if score > 60 else 'Room to improve'}\n\n"
+    def analyze_risk_and_mitigation() -> str:
+        """Provides a deep-dive risk analysis based on the GTM assessment.
+        Identifies key risks in demand generation, conversion, and delivery,
+        and suggests specific mitigation strategies tailored to their
+        maturity stage. Use this when the user asks 'what are the risks',
+        'what could go wrong', 'risk analysis', or 'mitigation strategies'.
+        """
+        try:
+            context = build_session_context(session)
+            risks = []
+            for cat in context.get('categories', []):
+                if cat['score'] < 2.5:
+                    if cat['name'] == 'Demand':
+                        risks.append("HIGH: Weak demand generation is your biggest risk—you may struggle to build pipeline. Immediate focus: clarify ICP and messaging.")
+                    elif cat['name'] == 'Conversion':
+                        risks.append("HIGH: Poor conversion efficiency means pipeline becomes expensive fast. Focus: tighten qualification and enable sales.")
+                    elif cat['name'] == 'Delivery':
+                        risks.append("HIGH: Churn risk is elevated. Poor delivery kills expansion revenue. Focus: define TTV milestones.")
+            return ("Risk Assessment:\n" + "\n".join(risks)) if risks else f"Your GTM is solid at the {context.get('stage')} stage—no critical risks detected. Keep maintaining momentum."
+        except Exception as e:
+            logger.error(f"Risk analysis error: {e}")
+            return "Let me get your assessment data first so I can analyze the risks properly."
 
-        cats = sorted(context.get('categories', []), key=lambda x: x.get('score', 0), reverse=True)
-        if cats:
-            analysis += f"Your Strengths:\n"
-            for cat in cats[:2]:
-                analysis += f"  • {cat['name']}: {cat['score']}/5\n"
+    def build_implementation_roadmap(timeframe: str = "90-day") -> str:
+        """Creates a phased implementation roadmap. `timeframe` must be one
+        of '30-day', '60-day', or '90-day'. Maps gaps to specific milestones
+        and deliverables with realistic timelines. Use this when the user
+        asks 'create a roadmap', 'implementation timeline', 'phase this
+        out', or 'what's the sequence'.
+        """
+        try:
+            context = build_session_context(session)
+            phases = {
+                "30-day": [
+                    "Week 1-2: Define ICP & messaging",
+                    "Week 3: Set up qualification process",
+                    "Week 4: Define TTV milestones",
+                ],
+                "60-day": [
+                    "Phase 1 (Week 1-2): Quick wins—fix the most critical gap",
+                    "Phase 2 (Week 3-4): Build process—implement qualification/onboarding",
+                    "Phase 3 (Week 5-8): Test—run small pilots to validate changes",
+                    "Phase 4 (Week 9+): Scale—expand what works",
+                ],
+                "90-day": [
+                    "Month 1: Diagnostic & quick wins (pick top 2 gaps)",
+                    "Month 2: Process implementation & team alignment",
+                    "Month 3: Measurement & optimization (review results, adjust)",
+                ],
+            }
+            plan = phases.get(timeframe, phases["90-day"])
+            return f"{timeframe.upper()} Roadmap for {context['company_name']}:\n\n" + "\n".join(plan)
+        except Exception as e:
+            logger.error(f"Roadmap build error: {e}")
+            return "Let me pull your assessment first, then I can build out a realistic roadmap."
 
-        analysis += f"\nGaps vs Peers:\n"
-        for cat in reversed(cats)[:2]:
-            analysis += f"  • {cat['name']}: {cat['score']}/5 — this is where you can pull ahead\n"
+    def competitive_benchmarking_analysis() -> str:
+        """Provides competitive benchmarking based on industry, company
+        size, and stage. Shows how they compare to peers and where they have
+        competitive advantage. Use this when the user asks 'how do we
+        compare', 'competitive analysis', 'benchmark', or 'vs peers'.
+        """
+        try:
+            context = build_session_context(session)
+            score = context.get('overall_score', 0)
+            stage = context.get('stage', 'Unknown')
+            analysis = f"Your Competitive Position ({stage} stage):\n\n"
+            analysis += f"Your GTM Score: {score}/100\n"
+            analysis += f"Industry peers at this stage: 45-70\n"
+            analysis += f"Position: {'Ahead of curve' if score > 60 else 'Room to improve'}\n\n"
+            cats = sorted(context.get('categories', []), key=lambda x: x.get('score', 0), reverse=True)
+            if cats:
+                analysis += f"Your Strengths:\n"
+                for cat in cats[:2]:
+                    analysis += f"  • {cat['name']}: {cat['score']}/5\n"
+            analysis += f"\nGaps vs Peers:\n"
+            for cat in list(reversed(cats))[:2]:
+                analysis += f"  • {cat['name']}: {cat['score']}/5 — this is where you can pull ahead\n"
+            return analysis
+        except Exception as e:
+            logger.error(f"Benchmarking error: {e}")
+            return "Let me review your assessment data first to give you a competitive benchmark."
 
-        return analysis
-    except Exception as e:
-        logger.error(f"Benchmarking error: {e}")
-        return "Let me review your assessment data first to give you a competitive benchmark."
+    def resource_allocation_guidance() -> str:
+        """Provides guidance on where to allocate budget and team capacity
+        based on gaps. Prioritizes spending on the highest-impact
+        initiatives. Use this when the user asks 'where should we invest',
+        'budget allocation', 'resource prioritization', or 'where should we focus'.
+        """
+        try:
+            context = build_session_context(session)
+            guidance = f"Resource Allocation for {context['company_name']}:\n\n"
+            cats = sorted(context.get('categories', []), key=lambda x: x.get('score', 0))
+            if len(cats) >= 3:
+                guidance += f"HIGH PRIORITY (40-50% budget):\n"
+                guidance += f"   {cats[0]['name']} ({cats[0]['score']}/5)\n"
+                guidance += f"   Hire, build process, invest in tools\n\n"
+                guidance += f"MEDIUM PRIORITY (30-40% budget):\n"
+                guidance += f"   {cats[1]['name']} ({cats[1]['score']}/5)\n"
+                guidance += f"   Quick wins, measure progress\n\n"
+                guidance += f"MAINTENANCE (10-20% budget):\n"
+                guidance += f"   {cats[2]['name']} ({cats[2]['score']}/5)\n"
+                guidance += f"   Keep stable, don't regress\n"
+            return guidance
+        except Exception as e:
+            logger.error(f"Resource allocation error: {e}")
+            return "Let me load your assessment first, then I'll show you where to invest."
 
-def resource_allocation_guidance(session_uuid: str) -> str:
-    """
-    Provides guidance on where to allocate budget and team capacity based on gaps.
-    Prioritizes spending on the highest-impact initiatives.
-    Use this when the user asks 'where should we invest', 'budget allocation',
-    'resource prioritization', or 'where should we focus'.
-    """
-    try:
-        session = AssessmentSession.objects.get(uuid=session_uuid)
-        context = build_session_context(session)
+    def customer_segment_analysis() -> str:
+        """Analyzes customer segments and GTM implications for different
+        market segments. Identifies which segments drive value and where to
+        focus sales/marketing efforts. Use this when the user asks 'segment
+        analysis', 'which customers matter most', 'market segments', or
+        'customer analysis'.
+        """
+        try:
+            context = build_session_context(session)
+            company = context.get('company_name', 'Your company')
+            industry = context.get('industry', 'your industry')
+            stage = context.get('stage', 'Growth')
+            analysis = f"Customer Segment Strategy for {company}:\n\n"
+            analysis += f"As a {stage}-stage {industry} player, here's where to focus:\n\n"
+            analysis += "1. Early Adopters (20% of TAM, 40% of value)\n"
+            analysis += "   Lower CAC, faster sales, become advocates\n"
+            analysis += "   Start here: Easier wins + proof points\n\n"
+            analysis += "2. Fast-Growing SMBs (35% of TAM, 35% of value)\n"
+            analysis += "   Need quick implementation, price-sensitive\n"
+            analysis += "   Then here: Volume plays, repeatable process\n\n"
+            analysis += "3. Enterprise (10% of TAM, 25% of value)\n"
+            analysis += "   High LTV, long sales cycle, need support\n"
+            analysis += "   Finally here: Scale when you have proof\n\n"
+            analysis += "Pro tip: Build segment-specific playbooks for messaging & pricing."
+            return analysis
+        except Exception as e:
+            logger.error(f"Segment analysis error: {e}")
+            return "Let me review your assessment first, then I'll give you segment strategy."
 
-        guidance = f"Resource Allocation for {context['company_name']}:\n\n"
+    def audit_strategic_evidence(file_id: str = "") -> str:
+        """Performs a deep multimodal audit of a strategic asset (image or
+        PDF) already uploaded to this assessment. Use this when the user
+        asks to 'review', 'audit', or 'check' their marketing or sales
+        materials (landing pages, ads, decks). If file_id is empty, audits
+        the most recently uploaded asset.
+        """
+        try:
+            from .ai_auditor import perform_gtm_visual_audit
+            import uuid as uuid_lib
 
-        cats = sorted(context.get('categories', []), key=lambda x: x.get('score', 0))
+            gtm_file = None
+            if not file_id:
+                gtm_file = session.evidence_files.order_by('-created_at').first()
+            else:
+                try:
+                    uuid_obj = uuid_lib.UUID(file_id)
+                    gtm_file = session.evidence_files.filter(id=uuid_obj).first()
+                except (ValueError, TypeError):
+                    gtm_file = session.evidence_files.filter(file__icontains=file_id).order_by('-created_at').first()
 
-        if len(cats) >= 3:
-            guidance += f"HIGH PRIORITY (40-50% budget):\n"
-            guidance += f"   {cats[0]['name']} ({cats[0]['score']}/5)\n"
-            guidance += f"   Hire, build process, invest in tools\n\n"
+            if not gtm_file:
+                return (
+                    f"I couldn't find a file matching '{file_id or 'the most recent asset'}' for this assessment. "
+                    "Please ensure the file is uploaded and visible in the chat hint."
+                )
 
-            guidance += f"MEDIUM PRIORITY (30-40% budget):\n"
-            guidance += f"   {cats[1]['name']} ({cats[1]['score']}/5)\n"
-            guidance += f"   Quick wins, measure progress\n\n"
+            cat_scores, overall = _compute_scores(session)
+            context_str = f"Company GTM Score: {overall}/100. Weakest Area: {min(cat_scores, key=lambda x: x['avg'])['name'] if cat_scores else 'N/A'}"
+            return perform_gtm_visual_audit(gtm_file, session_context=context_str)
+        except Exception as e:
+            logger.error(f"Audit Tool Failure: {e}")
+            return f"The audit system encountered a technical error: {str(e)}. Please try re-uploading the asset."
 
-            guidance += f"MAINTENANCE (10-20% budget):\n"
-            guidance += f"   {cats[2]['name']} ({cats[2]['score']}/5)\n"
-            guidance += f"   Keep stable, don't regress\n"
-
-        return guidance
-    except Exception as e:
-        logger.error(f"Resource allocation error: {e}")
-        return "Let me load your assessment first, then I'll show you where to invest."
-
-def customer_segment_analysis(session_uuid: str) -> str:
-    """
-    Analyzes customer segments and GTM implications for different market segments.
-    Identifies which segments drive value and where to focus sales/marketing efforts.
-    Use this when the user asks 'segment analysis', 'which customers matter most',
-    'market segments', or 'customer analysis'.
-    """
-    try:
-        session = AssessmentSession.objects.get(uuid=session_uuid)
-        context = build_session_context(session)
-
-        company = context.get('company_name', 'Your company')
-        industry = context.get('industry', 'your industry')
-        stage = context.get('stage', 'Growth')
-
-        analysis = f"Customer Segment Strategy for {company}:\n\n"
-        analysis += f"As a {stage}-stage {industry} player, here's where to focus:\n\n"
-        analysis += "1. Early Adopters (20% of TAM, 40% of value)\n"
-        analysis += "   Lower CAC, faster sales, become advocates\n"
-        analysis += "   Start here: Easier wins + proof points\n\n"
-        analysis += "2. Fast-Growing SMBs (35% of TAM, 35% of value)\n"
-        analysis += "   Need quick implementation, price-sensitive\n"
-        analysis += "   Then here: Volume plays, repeatable process\n\n"
-        analysis += "3. Enterprise (10% of TAM, 25% of value)\n"
-        analysis += "   High LTV, long sales cycle, need support\n"
-        analysis += "   Finally here: Scale when you have proof\n\n"
-        analysis += "Pro tip: Build segment-specific playbooks for messaging & pricing."
-
-        return analysis
-    except Exception as e:
-        logger.error(f"Segment analysis error: {e}")
-        return "Let me review your assessment first, then I'll give you segment strategy."
+    return [
+        get_gtm_assessment_data,
+        build_prioritized_action_plan,
+        review_current_action_items,
+        search_internal_resources,
+        analyze_risk_and_mitigation,
+        build_implementation_roadmap,
+        competitive_benchmarking_analysis,
+        resource_allocation_guidance,
+        customer_segment_analysis,
+        audit_strategic_evidence,
+    ]
 
 # ================================================================
 # UNIFIED GENAI CLIENT (GCP VERTEX AI)
@@ -365,29 +370,33 @@ def _get_chat_client():
             return None
 
 
-def _get_chat_config(session_uuid: str):
-    """Builds the configuration for the chat agent including instructions."""
-    system_instruction = f"""You're a GTM strategist helping companies improve their Go-To-Market execution.
+def _get_chat_config(tools: Optional[List[Any]] = None):
+    """Builds the configuration for the chat agent, including its tool set."""
+    system_instruction = """You're a GTM strategist helping companies improve their Go-To-Market execution.
 
-Be conversational, direct, and practical. Provide actionable insights backed by the company's assessment data.
+Be conversational, direct, and practical. Ground every claim in the company's actual assessment data --
+call the appropriate tool to fetch real scores, action items, resources, or other context rather than
+guessing or making up numbers. If a tool exists that answers the user's question, call it before answering.
+Only call a tool that modifies data (like building an action plan) when the user explicitly asks for that
+action, not to preview or describe what it would do.
+
 Focus on: their strongest areas, critical gaps, and specific next steps they can take immediately.
-
-When users ask to:
-- "Build my action plan" → Acknowledge and suggest they check the action items dashboard
-- "Review my action items" → Provide a summary of what they should focus on next
-- "Show my scores" → Provide a brief performance overview
-- "What should I focus on?" → Highlight their 2-3 most critical gaps
-
 Keep responses conversational and avoid lengthy lists. End with a specific next step."""
     return types.GenerateContentConfig(
         system_instruction=system_instruction,
         temperature=0.8,
         max_output_tokens=2048,
         thinking_config=types.ThinkingConfig(thinking_budget=0),
+        tools=tools or None,
+        automatic_function_calling=types.AutomaticFunctionCallingConfig(maximum_remote_calls=4),
     )
 
 # ================================================================
-# INTENT DETECTION (LEGENDARY FALLBACK)
+# INTENT DETECTION -- kept only for the handful of intents that still have
+# a real deterministic dispatch branch in process_chat_message (fixed
+# links/calendar generation, or the single cheapest read: show_scores).
+# Everything else now goes through handle_general_chat's real tool-calling,
+# which reasons over which data to pull instead of matching fixed phrases.
 # ================================================================
 INTENTS = {
     "show_scores": [
@@ -398,33 +407,6 @@ INTENTS = {
         "build.*action plan", "create.*action plan", "create.*tasks", "generate.*tasks",
         "turn.*into.*tasks", "build.*checklist", "create.*checklist", "priorit.*tasks"
     ],
-    "review_action_items": [
-        "review.*action items", "review.*tasks", "my.*action items", "task list",
-        "checklist", "what.*open", "what.*pending", "status.*tasks"
-    ],
-    "weakest_areas": [
-        "weak", "lowest", "worst", "need.*improve", "focus.*on",
-        "priority", "gaps", "problems"
-    ],
-    "strongest_areas": [
-        "strong", "best", "good.*at", "strength", "doing.*well"
-    ],
-    "recommendations": [
-        "recommend", "suggest", "should.*do", "next.*step", "action",
-        "improve", "tool", "what.*use"
-    ],
-    "explain_question": [
-        "what.*mean", "explain", "clarify", "understand", "help.*with",
-        "question.*about"
-    ],
-    "compare_industry": [
-        "compare", "benchmark", "industry.*average", "others.*like",
-        "typical", "standard"
-    ],
-    "roadmap": [
-        "roadmap", "plan", "timeline", "30.*day", "60.*day", "90.*day",
-        "quarter", "next.*month"
-    ],
     "export_report": [
         "export", "download", "send.*report", "email.*report", "pdf report", "download.*pdf"
     ],
@@ -432,7 +414,7 @@ INTENTS = {
         "schedule", "meeting", "book", "calendar", "google meet", "zoom",
         "call", "discuss", "talk", "consultation", "session"
     ],
-    "general_chat": []  # fallback
+    "general_chat": []  # fallback -- real tool-calling handles everything else
 }
 
 def detect_intent(message: str) -> str:
@@ -678,167 +660,6 @@ _{context['headline']}_
     
     return response
 
-def handle_weakest_areas(session: AssessmentSession, context: Dict) -> str:
-    """Handle request for weakest areas"""
-    response = f"""**Areas Needing Focus**
-
-Your lowest-scoring categories:
-"""
-    for cat in context['weakest_categories']:
-        response += f"\n• **{cat['name']}:** {cat['score']}/5.0"
-    
-    if context['weak_questions']:
-        response += f"\n\n**Specific Concerns:**"
-        for q in context['weak_questions'][:3]:
-            response += f"\n• {q['text']} (scored {q['score']}/5)"
-    
-    response += "\n\n**Tip:** Focus on improving these areas first for the biggest impact on your overall GTM effectiveness."
-    
-    return response
-
-def handle_strongest_areas(session: AssessmentSession, context: Dict) -> str:
-    """Handle request for strongest areas"""
-    response = f"""**Your Strengths**
-
-You're doing well in:
-"""
-    for cat in context['strongest_categories']:
-        response += f"\n• **{cat['name']}:** {cat['score']}/5.0"
-    
-    response += "\n\nGreat job! These are your competitive advantages. Consider how you can leverage these strengths to improve weaker areas."
-    
-    return response
-
-def handle_recommendations(session: AssessmentSession, context: Dict) -> str:
-    """Handle request for recommendations"""
-    response = f"""**Top Recommendations for {context['company_name']}**
-
-Based on your {context['stage']} stage and focus areas:
-
-"""
-    
-    # Top 3 actionable recommendations based on weak areas
-    recommendations = []
-    for cat in context['weakest_categories'][:2]:
-        cat_name = cat['name']
-        if cat_name == "Demand":
-            recommendations.append("**Improve Lead Generation:** Set up consistent content marketing and track which channels bring quality leads.")
-        elif cat_name == "Conversion":
-            recommendations.append("**Optimize Sales Process:** Create a standard qualification framework and faster response system.")
-        elif cat_name == "Delivery":
-            recommendations.append("**Enhance Customer Success:** Implement structured onboarding and regular feedback collection.")
-
-    if not recommendations:
-        recommendations.append("**Maintain Excellence:** Focus on consistency and documenting your processes for scale.")
-
-    for rec in recommendations:
-        response += f"\n{rec}\n"
-
-    if context['has_playbook']:
-        response += "\nView your full AI-generated playbook for detailed action plans!"
-    
-    return response
-
-
-def handle_execution_plan(session: AssessmentSession, context: Dict, user=None) -> str:
-    """Run the first execution agent: generate and persist prioritized action items."""
-    plan = build_execution_plan(session=session, actor=user, persist=True, limit=5)
-
-    if not plan["has_critical_gaps"]:
-        return (
-            "**Execution Agent**\n\n"
-            "You do not have any critical low-scoring responses right now, so I did not create new tasks. "
-            "Your next best move is to review existing action items and tighten execution consistency."
-        )
-
-    response = (
-        f"**Execution Agent Ran for {context['company_name']}**\n\n"
-        f"**Current Stage:** {plan['stage']}\n"
-        f"**Top Focus Areas:** {', '.join(plan['top_categories']) if plan['top_categories'] else 'General execution'}\n"
-        f"**Existing Action Items:** {plan['existing_action_count']}\n"
-        f"**New Action Items Created:** {plan['created_count']}\n"
-    )
-
-    if plan["created_items"]:
-        response += "\n**Created Now:**\n"
-        for item in plan["created_items"]:
-            due_text = f" _(due {item.due_date})_" if item.due_date else ""
-            response += f"• {item.note}{due_text}\n"
-    else:
-        response += "\nNo new tasks were created because matching actions already exist.\n"
-
-    if plan["skipped_items"]:
-        response += "\n**Skipped as duplicates:**\n"
-        for item in plan["skipped_items"][:3]:
-            response += f"• {item}\n"
-
-    response += (
-        "\n**Suggested next step:** Ask me to `review my action items` and I will summarize what should happen this week."
-    )
-    return response
-
-
-def handle_review_action_items(session: AssessmentSession, context: Dict) -> str:
-    """Summarize current task execution state like a lightweight weekly coach."""
-    summary = review_action_items(session)
-
-    if summary["total"] == 0:
-        return (
-            "**Action Item Review**\n\n"
-            "You do not have any action items yet. Ask me to `build my action plan` and I will create a prioritized checklist from your weakest GTM gaps."
-        )
-
-    response = (
-        "**Action Item Review**\n\n"
-        f"**Total:** {summary['total']}\n"
-        f"**To Do:** {summary['todo']}\n"
-        f"**In Progress:** {summary['in_progress']}\n"
-        f"**Done:** {summary['done']}\n"
-    )
-
-    if summary["overdue_count"]:
-        response += f"**Overdue:** {summary['overdue_count']}\n"
-
-    if summary["open_actions"]:
-        response += "\n**Open Priorities:**\n"
-        for action in summary["open_actions"]:
-            owner = action.assigned_to.get_full_name() if action.assigned_to else (action.owner or "Unassigned")
-            due = action.due_date.isoformat() if action.due_date else "No due date"
-            response += f"• {action.note} — **{action.get_status_display()}**, owner: {owner}, due: {due}\n"
-
-    response += "\n**Suggested next step:** Close one overdue item or assign owners to the unowned tasks first."
-    return response
-
-def handle_roadmap(session: AssessmentSession, context: Dict) -> str:
-    """Handle request for roadmap/timeline"""
-    response = f"""**30-60-90 Day Roadmap**
-
-**Days 1-30: Quick Wins**
-"""
-    
-    # Suggest based on weakest area
-    if context['weakest_categories']:
-        weak_cat = context['weakest_categories'][0]
-        response += f"• Focus on {weak_cat['name']}: Set baseline metrics and identify top 2 improvements\n"
-        response += f"• Create action items for critical gaps\n"
-        response += f"• Allocate budget for essential tools\n"
-    
-    response += """
-**Days 31-60: Build Systems**
-• Implement new processes in weakest category
-• Train team on new workflows
-• Start tracking key metrics weekly
-
-**Days 61-90: Optimize & Scale**
-• Review data and adjust approach
-• Expand improvements to second priority area
-• Document best practices for your team
-
-**Goal:** Increase your overall score by 10-15 points in 90 days!
-"""
-    
-    return response
-
 def handle_export(session: AssessmentSession, context: Dict) -> str:
     """Handle export/download requests"""
     from django.urls import reverse
@@ -852,21 +673,6 @@ def handle_export(session: AssessmentSession, context: Dict) -> str:
 [View Full Playbook]({playbook_url})
 
 You can also share these links with your team or email them directly from the results page.
-"""
-    return response
-
-def handle_company_info(session: AssessmentSession, context: Dict) -> str:
-    """Handle direct questions about company/session info"""
-    response = f"""**Assessment Information**
-
-**Company:** {context['company_name']}
-**Industry:** {context['industry']}
-**Overall GTM Score:** {context['overall_score']}/100
-**Maturity Stage:** {context['stage']}
-
-_{context['headline']}_
-
-This assessment evaluates your go-to-market effectiveness across Demand Generation, Conversion Optimization, and Delivery Excellence.
 """
     return response
 
@@ -995,19 +801,30 @@ def audit_strategic_evidence(session_uuid: str, file_id: str = None) -> str:
 # ================================================================
 # AI-POWERED GTM AGENT (CONVERSATIONAL & AUTONOMOUS)
 # ================================================================
+def _build_chat_history(session: AssessmentSession, max_turns: int = 12) -> List[Any]:
+    """Reconstruct this session's recent conversation as types.Content history
+    for real multi-turn memory via client.chats.create(history=...)."""
+    from .agent_runtime import build_content_history
+
+    rows = list(reversed(ChatMessage.objects.filter(session=session).order_by('-created_at')[:max_turns]))
+    return build_content_history(rows, max_turns=max_turns)
+
+
 def handle_general_chat(
     session: AssessmentSession,
     context: Dict,
     message: str,
+    user=None,
     supplemental_context: str = "",
 ) -> str:
     """
-    The GTM Agent: Uses Unified GenAI with Function Calling to interact with 
-    the assessment session autonomously.
+    The GTM Agent: real multi-turn memory + real Gemini tool-calling (the
+    tools built by _build_session_tools), instead of a single-shot call.
     """
     # 1. Quota Safety Gate
     from .ai_services import _quota_cooldown_active, _request_budget_available, _is_quota_error, _set_quota_cooldown, _extract_retry_delay_seconds
-    
+    from .agent_runtime import run_agent_turn
+
     if _quota_cooldown_active() or not _request_budget_available():
         return "I'm currently cooling down to stay within my API limits. " + \
                f"Your overall GTM score is **{context['overall_score']}/100**. " + \
@@ -1019,61 +836,58 @@ def handle_general_chat(
         return "I'm having trouble connecting to my AI brain right now. Please try again in a moment."
 
     try:
-        # 3. Prepare Multimodal Parts (fetch last 3 files for visual context)
-        from .models import GTMFile
+        # 3. Prepare Multimodal Parts (fetch last 3 files for visual context on this turn)
+        full_message = message
+        if supplemental_context:
+            full_message = f"{message}\n\n[Relevant attachment context]\n{supplemental_context}"
+
         recent_files = session.evidence_files.all()[:3]
-        
-        parts = [types.Part.from_text(text=message)]
+        message_parts: List[Any] = [full_message]
         for f in recent_files:
             try:
-                # Add filenames to help the AI map parts to user mentions
-                parts.append(types.Part.from_text(text=f"ATTACHED FILE [{f.get_file_type_display()}]: {f.file.name.split('/')[-1]}"))
-                
-                # Determine MIME and add binary Part
+                message_parts.append(f"ATTACHED FILE [{f.get_file_type_display()}]: {f.file.name.split('/')[-1]}")
                 f.file.open('rb')
                 f_bytes = f.file.read()
                 f.file.close()
                 m_type = "application/pdf" if f.file.name.endswith(".pdf") else "image/png"
-                parts.append(types.Part.from_bytes(data=f_bytes, mime_type=m_type))
+                message_parts.append(types.Part.from_bytes(data=f_bytes, mime_type=m_type))
             except Exception as fe:
                 logger.warning(f"Failed to attach file {f.id} to chat: {fe}")
 
-        # 4. Create Chat Session with Unified SDK
-        session_id_str = str(session.uuid)
-        model_id = "gemini-2.5-flash"
-        
-        response = client.models.generate_content(
-            model=model_id,
-            contents=[types.Content(role="user", parts=parts)],
-            config=_get_chat_config(session_id_str)
+        # 4. Real multi-turn memory + real tool-calling
+        history = _build_chat_history(session)
+        tools = _build_session_tools(session, user=user)
+        config = _get_chat_config(tools=tools)
+
+        text = run_agent_turn(
+            client=client,
+            model="gemini-2.5-flash",
+            config=config,
+            history=history,
+            message=message_parts if len(message_parts) > 1 else full_message,
+            usage_label="agent_chat",
         )
-        
-        # 5. Log usage if available
-        if hasattr(response, 'usage_metadata'):
-            usage = response.usage_metadata
-            if MONITORING_AVAILABLE:
-                AIUsageTracker.log_usage(usage.total_token_count, 'agent_chat')
 
-        # Handle case where response contains function calls instead of text
-        if response.text is None or not response.text.strip():
-            return "I've processed your request. Check your action items for the results."
-
-        return response.text.strip()
+        return text or "I've processed your request. Check your action items for the results."
 
     except Exception as e:
         # 5. Handle Quota/Rate Limits Gracefully
         if _is_quota_error(e):
             _set_quota_cooldown(_extract_retry_delay_seconds(e))
-            return f"I've hit my temporary GTM strategy quota. Based on your data, your top priority is **{context['weakest_categories'][0]['name']}**. Let's discuss details in a minute!"
+            return (
+                f"I've hit my temporary GTM strategy quota. Based on your data, your top priority is "
+                f"**{context['weakest_categories'][0]['name']}**. Let's discuss details in a minute! "
+                "If I'd already started creating anything (like tasks) before hitting the limit, it's saved."
+            )
 
         log_ai_error(
             "Agent reasoning loop failure",
             e,
             service="google-genai",
-            model="gemini-1.5-flash-002",
+            model="gemini-2.5-flash",
             extra={"session_id": str(session.uuid)},
         )
-        
+
         # Final Fallback
         return f"I'm processing a lot of data right now. Your current GTM score is {context['overall_score']}/100. Try asking for 'scores' or 'action items' directly."
 
@@ -1120,12 +934,18 @@ def process_chat_message(
                 response_text = f"Created {plan['created_count']} new action items for {session.company_name}. " \
                                 f"Focus areas: {', '.join(plan['top_categories']) if plan['top_categories'] else 'General execution'}. " \
                                 f"Check your action items dashboard to see them!"
+        elif intent == "show_scores" and not relevant_attachment_context:
+            # Single cheapest, unambiguous read -- zero-latency, zero-cost fast path.
+            # Skipped when there's attachment context, since the user may be asking
+            # about the attachment's scores/content, not the assessment's.
+            response_text = handle_show_scores(session, context)
         else:
-            # Let the Agent handle everything else (scores, chat, recommendations)
+            # Let the Agent handle everything else with real memory + tool-calling
             response_text = handle_general_chat(
                 session,
                 context,
                 message,
+                user=user,
                 supplemental_context=relevant_attachment_context,
             )
         

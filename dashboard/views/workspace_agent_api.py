@@ -9,7 +9,8 @@ import logging
 
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
+from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_http_methods
 
 from dashboard.utils_notifications import send_notification
@@ -20,12 +21,15 @@ from gtm.utils_async import run_in_background
 from gtm.utils_logging import log_ai_error
 from gtm.workspace_agent_chat import (
     AGENT_TYPES,
+    CLIENT_SUMMARY_AGENT_TYPE,
     build_insights_context,
+    draft_client_summary_text,
     format_insights_digest_text,
     get_suggested_prompts_for_agent,
     process_workspace_chat_message,
 )
 
+from ..parsers import log_workspace_activity
 from .helpers import _md, _parse_agent_request_payload, _resolve_dashboard_workspace
 
 logger = logging.getLogger(__name__)
@@ -259,3 +263,153 @@ def dashboard_agent_insights_status(request):
         "latest_digest_html": _md(latest.response) if latest else None,
         "generated_at": latest.created_at.isoformat() if latest else None,
     })
+
+
+# ================================================================
+# CLIENT SUMMARY (client-facing deliverable) -- same on-demand refresh +
+# poll pattern as the insights digest above, plus an export endpoint.
+# Always persisted with agent_type="insights" regardless of which agent's
+# tool triggered it, so exports don't need to know which agent generated it.
+# CLIENT_SUMMARY_AGENT_TYPE is imported from gtm.workspace_agent_chat, the
+# single source of truth both this module and the conversational tool use.
+# ================================================================
+
+
+def _client_summary_status_cache_key(workspace_id) -> str:
+    return f"gtm:agent:client_summary:{workspace_id}:status"
+
+
+def _client_summary_lock_key(workspace_id) -> str:
+    return f"gtm:ai:client_summary:{workspace_id}:lock"
+
+
+def _generate_client_summary_background(workspace_id, user_id):
+    """Background job: draft a client summary, persist it, log activity, and notify."""
+    from django.contrib.auth import get_user_model
+
+    from gtm.models_workspace import Workspace
+
+    status_key = _client_summary_status_cache_key(workspace_id)
+    lock_key = _client_summary_lock_key(workspace_id)
+    try:
+        workspace = Workspace.objects.get(id=workspace_id)
+        summary_text = draft_client_summary_text(workspace)
+
+        chat_message = WorkspaceChatMessage.objects.create(
+            workspace=workspace,
+            agent_type=CLIENT_SUMMARY_AGENT_TYPE,
+            user_id=user_id,
+            message="[System] Generate client summary",
+            response=summary_text,
+            intent="client_summary",
+        )
+
+        User = get_user_model()
+        actor = User.objects.filter(id=user_id).first() if user_id else None
+        log_workspace_activity(
+            workspace, actor, "client_summary_generated",
+            f"Generated a client-facing summary ({len(summary_text)} chars)",
+            object_type="workspace_chat_message", object_id=str(chat_message.pk),
+        )
+
+        recipients = WorkspaceMembership.objects.filter(
+            workspace=workspace, role__in=INSIGHTS_NOTIFY_ROLES, is_active=True
+        ).select_related("user")
+        for membership in recipients:
+            send_notification(
+                recipient=membership.user,
+                title=f"Client summary ready for {workspace.name}",
+                message="A new client-ready summary has been drafted and is ready to review and export.",
+                notification_type="ai_report",
+                level="info",
+                workspace=workspace,
+            )
+
+        cache.set(status_key, "done", timeout=3600)
+    except Exception as e:
+        log_ai_error(
+            "Client summary generation failed",
+            e,
+            service="google-genai",
+            extra={"workspace_id": str(workspace_id)},
+        )
+        cache.set(status_key, "failed", timeout=600)
+    finally:
+        _release_lock(lock_key)
+
+
+@require_http_methods(["POST"])
+@login_required
+def dashboard_client_summary_refresh(request):
+    """Kick off a client summary draft in the background (explicit trigger only)."""
+    current_workspace, _ = _resolve_dashboard_workspace(request)
+    if not current_workspace:
+        return JsonResponse({"success": False, "error": "Select a workspace first."}, status=400)
+
+    lock_key = _client_summary_lock_key(current_workspace.id)
+    if not _acquire_lock(lock_key, ttl_seconds=180):
+        return JsonResponse({"success": True, "status": "generating", "message": "A client summary is already being drafted."})
+
+    status_key = _client_summary_status_cache_key(current_workspace.id)
+    cache.set(status_key, "generating", timeout=600)
+
+    run_in_background(
+        _generate_client_summary_background,
+        current_workspace.id,
+        request.user.id,
+        name=f"workspace_client_summary:{current_workspace.id}",
+    )
+
+    return JsonResponse({"success": True, "status": "generating"})
+
+
+@require_http_methods(["GET"])
+@login_required
+def dashboard_client_summary_status(request):
+    """HTMX/JSON polling endpoint for the client summary draft."""
+    current_workspace, _ = _resolve_dashboard_workspace(request)
+    if not current_workspace:
+        return JsonResponse({"success": False, "error": "Select a workspace first."}, status=400)
+
+    status_key = _client_summary_status_cache_key(current_workspace.id)
+    status = cache.get(status_key)
+
+    latest = WorkspaceChatMessage.objects.filter(
+        workspace=current_workspace, agent_type=CLIENT_SUMMARY_AGENT_TYPE, intent="client_summary"
+    ).order_by('-created_at').first()
+
+    if status is None:
+        status = "done" if latest else "idle"
+
+    return JsonResponse({
+        "success": True,
+        "status": status,
+        "latest_summary": latest.response if latest else None,
+        "latest_summary_html": _md(latest.response) if latest else None,
+        "latest_summary_id": latest.pk if latest else None,
+        "generated_at": latest.created_at.isoformat() if latest else None,
+    })
+
+
+@require_http_methods(["GET"])
+@login_required
+def client_summary_export(request, pk, fmt):
+    """Export a drafted client summary as PDF or Word, scoped to the
+    requester's current workspace."""
+    from gtm.utils_docx import render_insight_docx_response
+    from gtm.utils_pdf import render_insight_pdf_response
+
+    current_workspace, _ = _resolve_dashboard_workspace(request)
+    if not current_workspace:
+        return JsonResponse({"success": False, "error": "Select a workspace first."}, status=400)
+
+    message = get_object_or_404(
+        WorkspaceChatMessage, pk=pk, intent="client_summary", workspace=current_workspace
+    )
+
+    if fmt == 'pdf':
+        return render_insight_pdf_response(company_name=message.workspace.name, ai_playbook_md=message.response)
+    elif fmt == 'docx':
+        return render_insight_docx_response(company_name=message.workspace.name, ai_playbook_md=message.response)
+    else:
+        raise Http404("Unsupported export format.")

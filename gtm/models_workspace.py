@@ -175,6 +175,7 @@ class WorkspaceActivityEvent(models.Model):
         ('resource_created', 'Resource created'),
         ('resource_updated', 'Resource updated'),
         ('resource_deleted', 'Resource deleted'),
+        ('client_summary_generated', 'Client summary generated'),
     ]
 
     workspace = models.ForeignKey(

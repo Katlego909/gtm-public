@@ -170,6 +170,19 @@
                 </div>
                 {% endif %}
 
+                {% if active_agent_type == 'portfolio' or active_agent_type == 'insights' %}
+                <div class="mt-4 pt-4 border-t border-gray-100">
+                    <button type="button" id="client-summary-button" onclick="refreshClientSummary()" class="inline-flex items-center justify-center w-full px-4 py-2 rounded-lg border border-emerald-200 text-sm font-medium text-emerald-700 hover:bg-emerald-50 transition">
+                        Generate Client Summary
+                    </button>
+                    <p id="client-summary-status" class="mt-2 text-xs text-gray-500"></p>
+                    <div id="client-summary-exports" class="mt-2 hidden flex flex-col gap-1 text-xs">
+                        <a id="client-summary-export-pdf" href="#" target="_blank" class="text-indigo-600 hover:underline">Download PDF</a>
+                        <a id="client-summary-export-docx" href="#" target="_blank" class="text-indigo-600 hover:underline">Download Word</a>
+                    </div>
+                </div>
+                {% endif %}
+
                 {% if workspace_agent_prompts %}
                 <div class="mt-6">
                     <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Quick Prompts</p>
@@ -746,6 +759,85 @@ function pollWorkspaceInsightsStatus(button, statusEl, attempt) {
         })
         .catch(() => {
             statusEl.textContent = 'Could not check refresh status.';
+            button.disabled = false;
+        });
+}
+
+async function refreshClientSummary() {
+    const button = document.getElementById('client-summary-button');
+    const statusEl = document.getElementById('client-summary-status');
+    if (!button || !statusEl) return;
+
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
+    button.disabled = true;
+    statusEl.textContent = 'Drafting...';
+
+    try {
+        const response = await fetch(`/dashboard/agent/client-summary/refresh/${window.location.search || ''}`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': csrfToken },
+        });
+        const data = await response.json();
+        if (!data.success) {
+            statusEl.textContent = data.error || 'Could not generate a client summary.';
+            button.disabled = false;
+            return;
+        }
+        pollClientSummaryStatus(button, statusEl);
+    } catch (error) {
+        statusEl.textContent = 'Could not generate a client summary.';
+        button.disabled = false;
+    }
+}
+
+function pollClientSummaryStatus(button, statusEl, attempt) {
+    attempt = attempt || 0;
+    if (attempt > 30) {
+        statusEl.textContent = 'Still working — check back shortly.';
+        button.disabled = false;
+        return;
+    }
+    fetch(`/dashboard/agent/client-summary/status/${window.location.search || ''}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'generating') {
+                statusEl.textContent = 'Drafting...';
+                setTimeout(() => pollClientSummaryStatus(button, statusEl, attempt + 1), 2000);
+                return;
+            }
+            button.disabled = false;
+            if (data.status === 'failed') {
+                statusEl.textContent = 'Draft failed — please try again.';
+                return;
+            }
+            statusEl.textContent = data.generated_at ? `Drafted ${new Date(data.generated_at).toLocaleString()}` : '';
+
+            if (data.latest_summary_id) {
+                const exportsEl = document.getElementById('client-summary-exports');
+                const pdfLink = document.getElementById('client-summary-export-pdf');
+                const docxLink = document.getElementById('client-summary-export-docx');
+                const qs = window.location.search || '';
+                if (pdfLink) pdfLink.href = `/dashboard/client-summary/${data.latest_summary_id}/export/pdf/${qs}`;
+                if (docxLink) docxLink.href = `/dashboard/client-summary/${data.latest_summary_id}/export/docx/${qs}`;
+                if (exportsEl) exportsEl.classList.remove('hidden');
+            }
+
+            if (data.latest_summary_html) {
+                const container = document.getElementById('workspace-agent-messages');
+                if (container) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'flex items-start gap-3';
+                    const bubble = document.createElement('div');
+                    bubble.className = 'agent-bubble bg-emerald-50 border border-emerald-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl';
+                    bubble.innerHTML = data.latest_summary_html;
+                    wrapper.appendChild(bubble);
+                    container.appendChild(wrapper);
+                    container.scrollTop = container.scrollHeight;
+                }
+            }
+        })
+        .catch(() => {
+            statusEl.textContent = 'Could not check draft status.';
             button.disabled = false;
         });
 }
