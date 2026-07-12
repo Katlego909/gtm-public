@@ -103,31 +103,27 @@
                 </div>
             </div>
 
-            <!-- Resource Library Section -->
+            <!-- Library link (Resources + Documents now live on one unified page) -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
                         <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
                             <span class="inline-block bg-blue-100 text-blue-600 rounded-full p-2">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
                             </span>
-                            Resource Library
+                            Library
                         </h3>
-                        <p class="text-sm text-gray-500 mt-1">Shared documents, sales decks, and planning links</p>
+                        <p class="text-sm text-gray-500 mt-1">Shared resources, sales decks, planning links, and AI-authored documents</p>
                     </div>
-                    <button type="button"
-                            id="hub-add-resource-btn"
-                            data-resource-url="{% url 'add_resource' %}"
-                            class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm transition-colors flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                        Add Asset
-                    </button>
-                </div>
-                <div id="resource-dropzone"
-                     class="rounded-xl transition-colors"
-                     data-resource-url="{% url 'add_resource' %}"
-                     data-refresh-url="{% url 'refresh_resources' %}">
-                    {% include 'dashboard/partials/resource_list.html' %}
+                    <a href="{% url 'asset_library' %}{% if current_workspace %}?workspace={{ current_workspace.id }}{% endif %}"
+                       hx-get="{% url 'asset_library' %}{% if current_workspace %}?workspace={{ current_workspace.id }}{% endif %}"
+                       hx-target="#main-content"
+                       hx-swap="innerHTML swap:200ms"
+                       hx-push-url="true"
+                       class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm transition-colors flex items-center gap-2">
+                        Open Library
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                    </a>
                 </div>
             </div>
 
@@ -187,83 +183,11 @@
     wireBtn('hub-invite-btn');
     wireBtn('hub-create-ws-btn');
     wireBtn('hub-create-ws-btn-empty');
-    wireBtn('hub-add-resource-btn');
 
     // ---- Prevent the global base.html afterRequest from closing OUR modal ----
     // (base.html checks for #modal, we use #hub-modal-overlay, so no conflict)
 
     // ---- Do NOT close modal on workspaceUpdated — let hx-select on the
     //      #pending-invitations-list handle the background refresh instead. ----
-
-    // ---- Resource Library: drag-and-drop file upload ----
-    var dropzone = document.getElementById('resource-dropzone');
-    if (dropzone) {
-        var resourceUrl = dropzone.getAttribute('data-resource-url');
-        var refreshUrl  = dropzone.getAttribute('data-refresh-url');
-
-        function getCsrfToken() {
-            var value = '; ' + document.cookie;
-            var parts = value.split('; csrftoken=');
-            return parts.length === 2 ? parts.pop().split(';').shift() : '';
-        }
-
-        function refreshResourceGrid() {
-            htmx.ajax('GET', refreshUrl, { target: '#resource-grid', swap: 'outerHTML' });
-        }
-
-        function uploadDroppedFile(file) {
-            var fd = new FormData();
-            var name = file.name.replace(/\.[^/.]+$/, '');
-            fd.append('name', name);
-            fd.append('resource_type', 'file');
-            fd.append('category', 'other');
-            fd.append('file', file);
-            fd.append('csrfmiddlewaretoken', getCsrfToken());
-            return fetch(resourceUrl, { method: 'POST', body: fd, credentials: 'same-origin' })
-                .then(function(r) { return r.ok; })
-                .catch(function() { return false; });
-        }
-
-        function uploadFiles(fileList) {
-            var files = Array.from(fileList || []);
-            if (!files.length || !resourceUrl) return;
-
-            Promise.all(files.map(uploadDroppedFile)).then(function(results) {
-                var failed = results.filter(function(ok) { return !ok; }).length;
-                if (failed) {
-                    showDashboardToast(
-                        failed === results.length ? 'Upload failed.' : (failed + ' of ' + results.length + ' uploads failed.'),
-                        'error'
-                    );
-                } else {
-                    showDashboardToast(results.length > 1 ? 'Assets uploaded.' : 'Asset uploaded.', 'success');
-                }
-                refreshResourceGrid();
-            });
-        }
-
-        dropzone.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            dropzone.classList.add('bg-indigo-50');
-        });
-        dropzone.addEventListener('dragleave', function() {
-            dropzone.classList.remove('bg-indigo-50');
-        });
-        dropzone.addEventListener('drop', function(e) {
-            e.preventDefault();
-            dropzone.classList.remove('bg-indigo-50');
-            uploadFiles(e.dataTransfer.files);
-        });
-
-        // The "click to browse" input lives inside resource_list.html's empty
-        // state, which gets swapped in/out via htmx — delegate from the
-        // persistent wrapper instead of re-wiring on every swap.
-        dropzone.addEventListener('change', function(e) {
-            if (e.target && e.target.id === 'resource-quick-file-input') {
-                uploadFiles(e.target.files);
-                e.target.value = '';
-            }
-        });
-    }
 })();
 </script>

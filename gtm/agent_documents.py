@@ -83,9 +83,11 @@ def edit_agent_document(
     return document
 
 
-def list_agent_documents(*, workspace=None, session=None, doc_type=None):
+def list_agent_documents(*, workspace=None, session=None, doc_type=None, exclude_doc_type=None):
     """List documents in scope, newest-updated first."""
     qs = _scope_queryset(workspace=workspace, session=session)
     if doc_type:
         qs = qs.filter(doc_type=doc_type)
+    if exclude_doc_type:
+        qs = qs.exclude(doc_type=exclude_doc_type)
     return qs

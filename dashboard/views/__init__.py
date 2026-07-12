@@ -63,6 +63,8 @@ from .actions import (
     add_action_item_comment,
     add_edit_action_item,
     assign_action_item,
+    complete_action_item_ai,
+    complete_action_item_ai_status,
     delete_action_item,
     delete_action_item_comment,
     move_action_item,

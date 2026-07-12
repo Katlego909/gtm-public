@@ -142,20 +142,11 @@ def _build_consult_tools_for_session(session: AssessmentSession, user=None, _han
     ]
 
 
-def _build_session_tools(
-    session: AssessmentSession,
-    user=None,
-    _handoff_depth: int = 0,
-    include_consult: bool = True,
-) -> List[Any]:
-    """Build the GTM Agent's tool set, scoped to the current session.
-
-    `include_consult=False` omits the consult_* tools -- used by Team mode
-    (gtm/team_chat.py), which gives an agent transfer_to_* tools instead.
-    The two mechanisms are deliberately mutually exclusive per agent turn:
-    offering both invites the model to pick inconsistently between "get an
-    answer and keep talking" and "hand off entirely" for similar requests.
-    """
+def _make_get_gtm_assessment_data_tool(session: AssessmentSession):
+    """Factory for the get_gtm_assessment_data tool, scoped to `session`.
+    Extracted to module level (rather than nested in _build_session_tools)
+    so gtm/action_item_completion.py can reuse the exact same tool without
+    duplicating its logic."""
 
     def get_gtm_assessment_data() -> str:
         """Retrieves the complete GTM assessment results for the company.
@@ -182,6 +173,56 @@ def _build_session_tools(
             return "\n".join(report)
         except Exception as e:
             return f"Error retrieving assessment: {str(e)}"
+
+    return get_gtm_assessment_data
+
+
+def _make_search_internal_resources_tool(session: AssessmentSession):
+    """Factory for the search_internal_resources tool, scoped to `session`.
+    Extracted to module level for the same reason as
+    _make_get_gtm_assessment_data_tool above."""
+
+    def search_internal_resources(query: str = "") -> str:
+        """Searches the workspace resource library for documents, decks, or
+        tools matching a topic. If 'query' is empty, lists all available
+        resources. Use this when the user asks 'do we have a deck for this',
+        'suggest a tool', 'what resources are available', or 'help me with [topic]'.
+        """
+        try:
+            if not session.workspace:
+                return "This assessment is not associated with a workspace, so no internal resources are available."
+            resources = Resource.objects.filter(workspace=session.workspace)
+            if query:
+                resources = resources.filter(name__icontains=query) | resources.filter(description__icontains=query)
+            if not resources.exists():
+                return f"No internal resources found matching '{query}'."
+            res = [f"Found {resources.count()} relevant resources in your workspace:"]
+            for r in resources[:5]:
+                res.append(f" - {r.name} ({r.get_resource_type_display()}): {r.description or 'No description.'}")
+            return "\n".join(res)
+        except Exception as e:
+            return f"Error searching resources: {str(e)}"
+
+    return search_internal_resources
+
+
+def _build_session_tools(
+    session: AssessmentSession,
+    user=None,
+    _handoff_depth: int = 0,
+    include_consult: bool = True,
+) -> List[Any]:
+    """Build the GTM Agent's tool set, scoped to the current session.
+
+    `include_consult=False` omits the consult_* tools -- used by Team mode
+    (gtm/team_chat.py), which gives an agent transfer_to_* tools instead.
+    The two mechanisms are deliberately mutually exclusive per agent turn:
+    offering both invites the model to pick inconsistently between "get an
+    answer and keep talking" and "hand off entirely" for similar requests.
+    """
+
+    get_gtm_assessment_data = _make_get_gtm_assessment_data_tool(session)
+    search_internal_resources = _make_search_internal_resources_tool(session)
 
     def build_prioritized_action_plan() -> str:
         """Analyzes the assessment gaps and automatically creates new Action
@@ -226,27 +267,6 @@ def _build_session_tools(
             return "\n".join(res)
         except Exception as e:
             return f"Error reviewing action items: {str(e)}"
-
-    def search_internal_resources(query: str = "") -> str:
-        """Searches the workspace resource library for documents, decks, or
-        tools matching a topic. If 'query' is empty, lists all available
-        resources. Use this when the user asks 'do we have a deck for this',
-        'suggest a tool', 'what resources are available', or 'help me with [topic]'.
-        """
-        try:
-            if not session.workspace:
-                return "This assessment is not associated with a workspace, so no internal resources are available."
-            resources = Resource.objects.filter(workspace=session.workspace)
-            if query:
-                resources = resources.filter(name__icontains=query) | resources.filter(description__icontains=query)
-            if not resources.exists():
-                return f"No internal resources found matching '{query}'."
-            res = [f"Found {resources.count()} relevant resources in your workspace:"]
-            for r in resources[:5]:
-                res.append(f" - {r.name} ({r.get_resource_type_display()}): {r.description or 'No description.'}")
-            return "\n".join(res)
-        except Exception as e:
-            return f"Error searching resources: {str(e)}"
 
     def analyze_risk_and_mitigation() -> str:
         """Provides a deep-dive risk analysis based on the GTM assessment.

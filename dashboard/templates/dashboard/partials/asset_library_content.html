@@ -1,7 +1,7 @@
 {% load humanize %}
 <header class="hidden md:flex h-16 bg-white border-b border-gray-200 justify-between items-center px-8 flex-shrink-0">
   <div class="flex items-center gap-6">
-    <h1 class="text-xl font-bold text-gray-800">Strategic Asset Library</h1>
+    <h1 class="text-xl font-bold text-gray-800">Library</h1>
 
     {% if user_workspaces %}
     <div class="flex items-center gap-3">
@@ -25,6 +25,7 @@
   </div>
 
   <div class="flex items-center gap-3">
+    {% if active_tab == 'resources' %}
     <button type="button"
             hx-get="{% url 'add_resource' %}"
             hx-target="#modal-content"
@@ -33,8 +34,28 @@
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
       Upload Asset
     </button>
+    {% endif %}
   </div>
 </header>
+
+<div class="px-4 md:px-8 pt-4 bg-white border-b border-gray-200 flex gap-2">
+  <a href="{% url 'asset_library' %}?tab=resources{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
+     hx-get="{% url 'asset_library' %}?tab=resources{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
+     hx-target="#main-content"
+     hx-swap="innerHTML swap:200ms"
+     hx-push-url="true"
+     class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition {% if active_tab == 'resources' %}border-indigo-600 text-indigo-700{% else %}border-transparent text-gray-500 hover:text-gray-700{% endif %}">
+    Resources{% if total_assets %} ({{ total_assets }}){% endif %}
+  </a>
+  <a href="{% url 'asset_library' %}?tab=documents{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
+     hx-get="{% url 'asset_library' %}?tab=documents{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
+     hx-target="#main-content"
+     hx-swap="innerHTML swap:200ms"
+     hx-push-url="true"
+     class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition {% if active_tab == 'documents' %}border-indigo-600 text-indigo-700{% else %}border-transparent text-gray-500 hover:text-gray-700{% endif %}">
+    Documents{% if total_documents %} ({{ total_documents }}){% endif %}
+  </a>
+</div>
 
 <div class="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50 space-y-8">
 
@@ -42,8 +63,46 @@
   <div class="flex flex-col items-center justify-center py-24 bg-white rounded-2xl border-2 border-dashed border-gray-200">
     <svg class="w-14 h-14 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
     <h3 class="text-lg font-bold text-gray-900">Select a Workspace</h3>
-    <p class="mt-1 text-sm text-gray-500">Choose a workspace above to view your strategic assets.</p>
+    <p class="mt-1 text-sm text-gray-500">Choose a workspace above to view your library.</p>
   </div>
+
+  {% elif active_tab == 'documents' %}
+  {% if document_groups %}
+    {% for group in document_groups %}
+    <div>
+      <h2 class="text-sm font-bold text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+        <span class="w-5 h-0.5 bg-gray-300 inline-block"></span>
+        {{ group.label }}
+        <span class="text-gray-300 font-normal">({{ group.documents|length }})</span>
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        {% for doc in group.documents %}
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-2">
+          <p class="text-sm font-semibold text-gray-800">{{ doc.title }}</p>
+          <p class="text-xs text-gray-400">{{ doc.get_agent_type_display }} &middot; v{{ doc.version }} &middot; {{ doc.updated_at|date:"M d, Y" }}</p>
+          {% for action_item in doc.completed_action_items.all %}
+          <a href="{% url 'tasks_board' %}{% if current_workspace %}?workspace={{ current_workspace.id }}{% endif %}" class="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:underline w-fit">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+            Completes: {{ action_item.note|truncatechars:60 }}
+          </a>
+          {% endfor %}
+          <div class="mt-2 flex flex-wrap gap-3 text-xs pt-2 border-t border-gray-50">
+            <button type="button" onclick="openLibraryDocumentEditor('{{ doc.id }}', '{{ current_workspace.id }}')" class="text-indigo-600 hover:underline font-medium">Edit</button>
+            <a href="{% url 'document_export' pk=doc.id fmt='pdf' %}?workspace={{ current_workspace.id }}" target="_blank" class="text-indigo-600 hover:underline">PDF</a>
+            <a href="{% url 'document_export' pk=doc.id fmt='docx' %}?workspace={{ current_workspace.id }}" target="_blank" class="text-indigo-600 hover:underline">Word</a>
+            <a href="{% url 'document_export' pk=doc.id fmt='md' %}?workspace={{ current_workspace.id }}" target="_blank" class="text-indigo-600 hover:underline">Markdown</a>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+  <div class="flex flex-col items-center justify-center py-24 bg-white rounded-2xl border-2 border-dashed border-gray-200 text-center">
+    <h3 class="text-lg font-bold text-gray-900">No documents yet</h3>
+    <p class="mt-2 text-sm text-gray-500 max-w-sm">Documents any of your agents create or complete for you — client summaries, roadmaps, action item deliverables — will show up here.</p>
+  </div>
+  {% endif %}
 
   {% else %}
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -140,6 +199,67 @@
 </div>
 
 <script>
+function escapeHtml(str) {
+  return String(str || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+}
+
+async function openLibraryDocumentEditor(docId, workspaceId) {
+  const modalContent = document.getElementById('modal-content');
+  if (!modalContent || typeof window.openModal !== 'function') return;
+  const scopeQs = `?workspace=${workspaceId}`;
+
+  const response = await fetch(`/dashboard/documents/${docId}/${scopeQs}`);
+  const data = await response.json();
+  if (!data.success) return;
+
+  modalContent.innerHTML = `
+    <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden w-full max-w-2xl">
+      <div class="px-6 py-5 border-b border-gray-100">
+        <h3 class="text-lg font-semibold text-gray-900">${escapeHtml(data.title)}</h3>
+        <p class="mt-1 text-xs text-gray-500">Version ${data.version}</p>
+      </div>
+      <div class="px-6 py-4">
+        <textarea id="document-edit-textarea" rows="14" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-indigo-500 focus:ring-indigo-500">${escapeHtml(data.content)}</textarea>
+      </div>
+      <div class="px-6 py-4 flex justify-end gap-3 border-t border-gray-100">
+        <button type="button" id="document-edit-cancel" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
+        <button type="button" id="document-edit-save" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition">Save</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('document-edit-cancel').addEventListener('click', function() {
+    window.closeModal();
+  }, { once: true });
+
+  document.getElementById('document-edit-save').addEventListener('click', async function() {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+    const content = document.getElementById('document-edit-textarea').value;
+    const saveResponse = await fetch(`/dashboard/documents/${docId}/${scopeQs}`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfToken,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: `content=${encodeURIComponent(content)}`,
+    });
+    const saveData = await saveResponse.json();
+    window.closeModal();
+    if (saveData.success) {
+      htmx.ajax('GET', window.location.pathname + window.location.search, {
+        target: '#main-content',
+        swap: 'innerHTML'
+      });
+    }
+  }, { once: true });
+
+  window.openModal();
+}
+
 function openAuditDetail(resourceId) {
   var previewEl = document.getElementById('audit-preview-' + resourceId);
   var modal = document.getElementById('audit-detail-modal');

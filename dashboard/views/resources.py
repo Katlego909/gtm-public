@@ -94,8 +94,15 @@ from ..parsers import log_workspace_activity
 @login_required
 @vary_on_headers('HX-Request')
 def asset_library(request):
-    """Full-page Strategic Asset Library — shows all auditable workspace resources."""
+    """Full-page Library — workspace Resources (assets) and AI-authored
+    Documents (client summaries, roadmaps, action-item deliverables) as two
+    tabs over the same page. Resources and Documents are unrelated models
+    that happen to share one browsing page now; each tab is independent."""
     current_workspace, user_workspaces = _resolve_dashboard_workspace(request)
+
+    active_tab = request.GET.get('tab', 'resources')
+    if active_tab not in ('resources', 'documents'):
+        active_tab = 'resources'
 
     if current_workspace:
         resources = Resource.objects.filter(workspace=current_workspace).order_by('category', '-created_at')
@@ -107,14 +114,36 @@ def asset_library(request):
     audited = resources.filter(audit_status='complete').count()
     pending = resources.filter(audit_status__in=['pending', 'auditing']).count()
 
+    document_groups = []
+    total_documents = 0
+    if current_workspace:
+        from gtm.agent_documents import list_agent_documents
+        from gtm.models import AgentDocument
+
+        docs = list(
+            list_agent_documents(workspace=current_workspace)
+            .select_related('created_by')
+            .prefetch_related('completed_action_items')
+        )
+        total_documents = len(docs)
+        docs_by_type = {}
+        for doc in docs:
+            docs_by_type.setdefault(doc.doc_type, []).append(doc)
+        for type_value, type_label in AgentDocument.DOC_TYPE_CHOICES:
+            if type_value in docs_by_type:
+                document_groups.append({'label': type_label, 'documents': docs_by_type[type_value]})
+
     context = {
         'current_workspace': current_workspace,
         'user_workspaces': user_workspaces,
+        'active_tab': active_tab,
         'resources': resources,
         'total_assets': total,
         'audited_assets': audited,
         'pending_audits': pending,
-        'page_title': 'Asset Library',
+        'document_groups': document_groups,
+        'total_documents': total_documents,
+        'page_title': 'Library',
     }
 
     if request.htmx:

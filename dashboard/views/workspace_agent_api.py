@@ -372,14 +372,24 @@ def _get_scoped_document(pk, workspace, session):
 @require_http_methods(["GET"])
 @login_required
 def document_list_api(request):
-    """List documents in scope, for the sidebar Documents panel."""
+    """List documents in scope, for the sidebar Documents panel.
+
+    Accepts an optional `exclude_doc_type` -- the chat sidebar (meant for
+    quick reference mid-conversation) passes `action_item_deliverable` so
+    completed-task deliverables don't clutter it; they live on their action
+    item's card and in the Library page's Documents tab instead, which
+    calls list_agent_documents directly without this exclusion.
+    """
     from gtm.agent_documents import list_agent_documents
 
     workspace, session = _resolve_document_scope(request)
     if not workspace and not session:
         return JsonResponse({"success": False, "error": "Select a workspace or assessment first."}, status=400)
 
-    docs = list_agent_documents(workspace=workspace, session=session)[:50]
+    exclude_doc_type = (request.GET.get('exclude_doc_type') or '').strip()
+    docs = list_agent_documents(
+        workspace=workspace, session=session, exclude_doc_type=exclude_doc_type or None
+    )[:50]
     return JsonResponse({
         "success": True,
         "documents": [

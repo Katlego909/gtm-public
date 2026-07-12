@@ -92,7 +92,7 @@
                         <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Documents</p>
                         <button type="button" onclick="refreshDocumentsPanel()" class="text-xs text-indigo-600 hover:underline">Refresh</button>
                     </div>
-                    <div id="documents-list" data-scope-qs="?session_id={{ dashboard_agent_session.uuid }}{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}" class="space-y-2 text-sm text-gray-500">Loading...</div>
+                    <div id="documents-list" data-scope-qs="?session_id={{ dashboard_agent_session.uuid }}{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}&exclude_doc_type=action_item_deliverable" class="space-y-2 text-sm text-gray-500">Loading...</div>
                 </div>
             </aside>
 
@@ -176,7 +176,7 @@
                         <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Documents</p>
                         <button type="button" onclick="refreshDocumentsPanel()" class="text-xs text-indigo-600 hover:underline">Refresh</button>
                     </div>
-                    <div id="documents-list" data-scope-qs="?{% if current_workspace %}workspace={{ current_workspace.id }}{% if team_selected_session %}&session_id={{ team_selected_session.uuid }}{% endif %}{% elif team_selected_session %}session_id={{ team_selected_session.uuid }}{% endif %}" class="space-y-2 text-sm text-gray-500">Loading...</div>
+                    <div id="documents-list" data-scope-qs="?{% if current_workspace %}workspace={{ current_workspace.id }}{% if team_selected_session %}&session_id={{ team_selected_session.uuid }}{% endif %}{% elif team_selected_session %}session_id={{ team_selected_session.uuid }}{% endif %}&exclude_doc_type=action_item_deliverable" class="space-y-2 text-sm text-gray-500">Loading...</div>
                 </div>
             </aside>
 
@@ -277,7 +277,7 @@
                         <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Documents</p>
                         <button type="button" onclick="refreshDocumentsPanel()" class="text-xs text-indigo-600 hover:underline">Refresh</button>
                     </div>
-                    <div id="documents-list" data-scope-qs="?workspace={{ current_workspace.id }}" class="space-y-2 text-sm text-gray-500">Loading...</div>
+                    <div id="documents-list" data-scope-qs="?workspace={{ current_workspace.id }}&exclude_doc_type=action_item_deliverable" class="space-y-2 text-sm text-gray-500">Loading...</div>
                 </div>
             </aside>
 

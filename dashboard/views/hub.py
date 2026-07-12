@@ -115,16 +115,12 @@ def workspace_hub(request):
         if current_workspace:
             request.session['current_workspace_id'] = str(current_workspace.id)
 
-    # Resource Library
-    resources = []
     team_members = []
     workspace_memberships = []
     pending_invites = []
     accepted_awaiting = []
 
     if current_workspace:
-        resources = Resource.objects.filter(workspace=current_workspace).order_by('category', '-created_at')
-        
         # Auto-create memberships for accepted invitations
         accepted_invites = WorkspaceInvitation.objects.filter(workspace=current_workspace).filter(
             models.Q(is_accepted=True) | models.Q(accepted_at__isnull=False)
@@ -151,7 +147,6 @@ def workspace_hub(request):
     context = {
         'current_workspace': current_workspace,
         'user_workspaces': user_workspaces,
-        'resources': resources,
         'team_members': team_members,
         'workspace_memberships': workspace_memberships,
         'pending_invites': pending_invites,
@@ -193,9 +188,9 @@ def tasks_board(request):
     else:
         action_items_qs = ActionItem.objects.filter(session__user=request.user, workspace__isnull=True) if request.user.is_authenticated else ActionItem.objects.none()
     
-    top_todo = action_items_qs.filter(status='todo').order_by('due_date').select_related('assigned_to')
-    top_doing = action_items_qs.filter(status='doing').order_by('due_date').select_related('assigned_to')
-    top_done = action_items_qs.filter(status='done').order_by('-created_at').select_related('assigned_to')
+    top_todo = action_items_qs.filter(status='todo').order_by('due_date').select_related('assigned_to', 'deliverable_document')
+    top_doing = action_items_qs.filter(status='doing').order_by('due_date').select_related('assigned_to', 'deliverable_document')
+    top_done = action_items_qs.filter(status='done').order_by('-created_at').select_related('assigned_to', 'deliverable_document')
     
     # Team members for assignment dropdowns
     team_members = []

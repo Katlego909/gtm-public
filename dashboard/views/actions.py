@@ -24,6 +24,7 @@ from django.db import transaction
 from django.http import HttpResponse, JsonResponse, Http404
 from django.utils import timezone
 from django.conf import settings
+from django.core.cache import cache
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.vary import vary_on_headers
 from django.contrib.auth.decorators import login_required
@@ -48,7 +49,10 @@ from gtm.models import (
 )
 from gtm.models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation, WorkspaceActivityEvent
 from gtm.ai_chat import get_suggested_prompts, process_chat_message
+from gtm.ai_services import _acquire_lock, _release_lock
 from gtm.decorators import workspace_permission_required, workspace_admin_required, workspace_member_required
+from gtm.utils_async import run_in_background
+from gtm.utils_logging import log_ai_error
 from dashboard.models import Channel, ChannelAnalytics, GapAnalysisMetric, GapAnalysisSuggestion, Resource, Notification, UserSettings
 from dashboard.forms import GapAnalysisMetricForm, ActionItemForm, UserProfileForm, UserSettingsForm
 from dashboard.utils_notifications import send_notification
@@ -113,10 +117,10 @@ def refresh_action_items(request):
         action_items_qs = ActionItem.objects.filter(session__user=request.user, workspace__isnull=True) if request.user.is_authenticated else ActionItem.objects.none()
 
     action_items_qs = action_items_qs.prefetch_related('comments__user')
-    
-    top_todo = action_items_qs.filter(status='todo').order_by('due_date').select_related('assigned_to')
-    top_doing = action_items_qs.filter(status='doing').order_by('due_date').select_related('assigned_to')
-    top_done = action_items_qs.filter(status='done').order_by('-created_at').select_related('assigned_to')
+
+    top_todo = action_items_qs.filter(status='todo').order_by('due_date').select_related('assigned_to', 'deliverable_document')
+    top_doing = action_items_qs.filter(status='doing').order_by('due_date').select_related('assigned_to', 'deliverable_document')
+    top_done = action_items_qs.filter(status='done').order_by('-created_at').select_related('assigned_to', 'deliverable_document')
     
     # Get team members for assignments
     team_members = []
@@ -368,6 +372,134 @@ def move_action_item(request, pk, new_status):
 
             return refresh_action_items(request)
     return HttpResponse(status=400)
+
+
+# ================================================================
+# AI COMPLETION -- an agent actually performs the task an ActionItem
+# describes (gtm/action_item_completion.py), rather than just moving the
+# card. Runs as a background job with polling, same pattern as the
+# Insights-refresh flow in dashboard/views/workspace_agent_api.py.
+# ================================================================
+
+def _resolve_action_item_for_user(request, pk):
+    """Same workspace-or-personal resolution + permission check as
+    move_action_item -- AI-completing an item is at least as consequential
+    as manually moving it, so it's gated by the same can_assign_tasks
+    permission. Returns (item, current_workspace, error_response); callers
+    should return error_response immediately if it is not None."""
+    workspace_id = request.GET.get('workspace') or request.session.get('current_workspace_id')
+    current_workspace = None
+    if workspace_id:
+        try:
+            current_workspace = Workspace.objects.get(id=workspace_id)
+        except Workspace.DoesNotExist:
+            pass
+
+    if current_workspace:
+        membership = WorkspaceMembership.objects.filter(
+            user=request.user,
+            workspace=current_workspace,
+            is_active=True,
+        ).first()
+        if not membership or not membership.can_assign_tasks:
+            return None, None, JsonResponse({'error': 'Permission denied'}, status=403)
+        item = get_object_or_404(ActionItem, pk=pk, workspace=current_workspace)
+    else:
+        item = get_object_or_404(ActionItem, pk=pk, session__user=request.user, workspace__isnull=True)
+
+    return item, current_workspace, None
+
+
+def _action_item_complete_status_cache_key(action_item_id) -> str:
+    return f"gtm:agent:action_item_complete:{action_item_id}:status"
+
+
+def _action_item_complete_lock_key(action_item_id) -> str:
+    return f"gtm:ai:action_item_complete:{action_item_id}:lock"
+
+
+def _complete_action_item_background(action_item_id, user_id, workspace_id):
+    """Background job: run the real completion turn and cache its outcome
+    for the polling endpoint below."""
+    from gtm.action_item_completion import complete_action_item
+
+    status_key = _action_item_complete_status_cache_key(action_item_id)
+    lock_key = _action_item_complete_lock_key(action_item_id)
+    try:
+        action_item = ActionItem.objects.select_related('session').get(pk=action_item_id)
+        user = User.objects.filter(pk=user_id).first()
+        result = complete_action_item(action_item, user=user)
+        if result.get("success"):
+            cache.set(status_key, {"state": "done", "status": result["status"], "summary": result["summary"]}, timeout=3600)
+            log_workspace_activity(
+                Workspace.objects.filter(id=workspace_id).first() if workspace_id else None,
+                user,
+                'task_moved',
+                f"AI completed task '{action_item.note[:80]}'.",
+                object_type='action_item',
+                object_id=action_item.id,
+                metadata={'status': result["status"], 'ai_completed': True},
+                session=action_item.session,
+            )
+        else:
+            cache.set(status_key, {"state": "failed", "error": result.get("error", "Unknown error.")}, timeout=600)
+    except Exception as e:
+        log_ai_error(
+            "Action item AI completion background job failed",
+            e,
+            extra={"action_item_id": action_item_id},
+        )
+        cache.set(status_key, {"state": "failed", "error": "Unexpected error completing this task."}, timeout=600)
+    finally:
+        _release_lock(lock_key)
+
+
+@login_required
+def complete_action_item_ai(request, pk):
+    """Kick off AI completion of one action item in the background."""
+    if request.method != 'POST':
+        return HttpResponse(status=400)
+
+    item, current_workspace, error_response = _resolve_action_item_for_user(request, pk)
+    if error_response:
+        return error_response
+
+    if item.session_id is None:
+        return JsonResponse(
+            {'success': False, 'error': "This action item has no linked assessment, so AI can't complete it yet."},
+            status=400,
+        )
+    if item.status != 'todo':
+        return JsonResponse({'success': False, 'error': 'This item is not in To Do.'}, status=400)
+
+    lock_key = _action_item_complete_lock_key(item.id)
+    if not _acquire_lock(lock_key, ttl_seconds=180):
+        return JsonResponse({'success': True, 'status': 'running'})
+
+    status_key = _action_item_complete_status_cache_key(item.id)
+    cache.set(status_key, {"state": "running"}, timeout=600)
+
+    run_in_background(
+        _complete_action_item_background,
+        item.id,
+        request.user.id,
+        current_workspace.id if current_workspace else None,
+        name=f"action_item_complete:{item.id}",
+    )
+
+    return JsonResponse({'success': True, 'status': 'running'})
+
+
+@login_required
+def complete_action_item_ai_status(request, pk):
+    """Polling endpoint for the AI-completion background job."""
+    item, current_workspace, error_response = _resolve_action_item_for_user(request, pk)
+    if error_response:
+        return error_response
+
+    status_key = _action_item_complete_status_cache_key(item.id)
+    status = cache.get(status_key) or {"state": "idle"}
+    return JsonResponse({'success': True, **status})
 
 
 # ================================================================
