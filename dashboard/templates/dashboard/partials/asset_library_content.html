@@ -77,20 +77,79 @@
       </h2>
       <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         {% for doc in group.documents %}
-        <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-2">
-          <p class="text-sm font-semibold text-gray-800">{{ doc.title }}</p>
-          <p class="text-xs text-gray-400">{{ doc.get_agent_type_display }} &middot; v{{ doc.version }} &middot; {{ doc.updated_at|date:"M d, Y" }}</p>
-          {% for action_item in doc.completed_action_items.all %}
-          <a href="{% url 'tasks_board' %}{% if current_workspace %}?workspace={{ current_workspace.id }}{% endif %}" class="inline-flex items-center gap-1.5 text-xs text-indigo-600 hover:underline w-fit">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-            Completes: {{ action_item.note|truncatechars:60 }}
-          </a>
-          {% endfor %}
-          <div class="mt-2 flex flex-wrap gap-3 text-xs pt-2 border-t border-gray-50">
-            <button type="button" onclick="openLibraryDocumentEditor('{{ doc.id }}', '{{ current_workspace.id }}')" class="text-indigo-600 hover:underline font-medium">Edit</button>
-            <a href="{% url 'document_export' pk=doc.id fmt='pdf' %}?workspace={{ current_workspace.id }}" target="_blank" class="text-indigo-600 hover:underline">PDF</a>
-            <a href="{% url 'document_export' pk=doc.id fmt='docx' %}?workspace={{ current_workspace.id }}" target="_blank" class="text-indigo-600 hover:underline">Word</a>
-            <a href="{% url 'document_export' pk=doc.id fmt='md' %}?workspace={{ current_workspace.id }}" target="_blank" class="text-indigo-600 hover:underline">Markdown</a>
+        <div class="group relative bg-white rounded-2xl border border-gray-200 transition-colors overflow-hidden flex flex-col">
+          <div class="h-1.5 w-full {{ doc.accent_class }}"></div>
+          <div class="p-5 flex flex-col flex-1">
+
+            <div class="flex items-start justify-between gap-3 mb-3">
+              <div class="flex items-start gap-3 min-w-0">
+                <div class="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center {{ doc.badge_class }}">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </div>
+                <div class="min-w-0">
+                  <h3 class="font-bold text-gray-900 leading-snug group-hover:text-indigo-600 transition-colors">{{ doc.title }}</h3>
+                  <span class="inline-flex items-center gap-1 text-xs font-medium text-gray-500 uppercase tracking-wider mt-1">
+                    {{ doc.get_agent_type_display }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button type="button"
+                        onclick="openLibraryDocumentEditor('{{ doc.id }}', '{{ current_workspace.id }}')"
+                        class="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                        aria-label="Edit">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                </button>
+                <button type="button"
+                        hx-get="{% url 'document_delete_api' pk=doc.id %}?workspace={{ current_workspace.id }}"
+                        hx-target="#modal-content"
+                        onclick="openModal()"
+                        class="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        aria-label="Delete">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </div>
+            </div>
+
+            {% if doc.preview %}
+            <p class="text-xs text-gray-500 leading-relaxed mb-3 flex-1">{{ doc.preview }}</p>
+            {% else %}
+            <div class="flex-1"></div>
+            {% endif %}
+
+            {% for action_item in doc.completed_action_items.all %}
+            <a href="{% url 'tasks_board' %}{% if current_workspace %}?workspace={{ current_workspace.id }}{% endif %}"
+               title="Completes this task"
+               class="inline-flex items-start gap-1.5 text-xs text-indigo-600 hover:underline w-fit mb-3">
+              <svg class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+              {{ action_item.note }}
+            </a>
+            {% endfor %}
+
+            <div class="border-t border-gray-100 pt-3 mt-auto flex items-center justify-between gap-2">
+              <span class="text-[11px] text-gray-400">v{{ doc.version }} &middot; {{ doc.updated_at|date:"M d, Y" }}</span>
+              <div class="flex items-center gap-0.5">
+                <a href="{% url 'document_export' pk=doc.id fmt='pdf' %}?workspace={{ current_workspace.id }}" target="_blank"
+                   class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                   title="Export as PDF">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+                  PDF
+                </a>
+                <a href="{% url 'document_export' pk=doc.id fmt='docx' %}?workspace={{ current_workspace.id }}" target="_blank"
+                   class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                   title="Export as Word">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+                  Word
+                </a>
+                <a href="{% url 'document_export' pk=doc.id fmt='md' %}?workspace={{ current_workspace.id }}" target="_blank"
+                   class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                   title="Export as Markdown">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+                  MD
+                </a>
+              </div>
+            </div>
           </div>
         </div>
         {% endfor %}
@@ -209,21 +268,27 @@ function escapeHtml(str) {
 
 async function openLibraryDocumentEditor(docId, workspaceId) {
   const modalContent = document.getElementById('modal-content');
-  if (!modalContent || typeof window.openModal !== 'function') return;
+  if (!modalContent || typeof window.openModal !== 'function' || typeof toastui === 'undefined') return;
   const scopeQs = `?workspace=${workspaceId}`;
 
   const response = await fetch(`/dashboard/documents/${docId}/${scopeQs}`);
   const data = await response.json();
   if (!data.success) return;
 
+  // The shared #modal wrapper caps width at sm:max-w-lg -- too narrow for
+  // a WYSIWYG toolbar. Widen it for this modal only; closeModal() (in
+  // base.html) always resets it back, however this modal gets dismissed.
+  modalContent.parentElement.classList.remove('sm:max-w-lg');
+  modalContent.parentElement.classList.add('sm:max-w-3xl');
+
   modalContent.innerHTML = `
-    <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden w-full max-w-2xl">
+    <div class="bg-white rounded-2xl overflow-hidden w-full">
       <div class="px-6 py-5 border-b border-gray-100">
         <h3 class="text-lg font-semibold text-gray-900">${escapeHtml(data.title)}</h3>
         <p class="mt-1 text-xs text-gray-500">Version ${data.version}</p>
       </div>
       <div class="px-6 py-4">
-        <textarea id="document-edit-textarea" rows="14" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-indigo-500 focus:ring-indigo-500">${escapeHtml(data.content)}</textarea>
+        <div id="document-editor-mount"></div>
       </div>
       <div class="px-6 py-4 flex justify-end gap-3 border-t border-gray-100">
         <button type="button" id="document-edit-cancel" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
@@ -232,13 +297,23 @@ async function openLibraryDocumentEditor(docId, workspaceId) {
     </div>
   `;
 
+  const editor = new toastui.Editor({
+    el: document.getElementById('document-editor-mount'),
+    height: '420px',
+    initialEditType: 'wysiwyg',
+    hideModeSwitch: true,
+    initialValue: data.content || ' ',
+  });
+
   document.getElementById('document-edit-cancel').addEventListener('click', function() {
+    editor.destroy();
     window.closeModal();
   }, { once: true });
 
   document.getElementById('document-edit-save').addEventListener('click', async function() {
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
-    const content = document.getElementById('document-edit-textarea').value;
+    const content = editor.getMarkdown();
+    editor.destroy();
     const saveResponse = await fetch(`/dashboard/documents/${docId}/${scopeQs}`, {
       method: 'POST',
       headers: {
@@ -258,6 +333,34 @@ async function openLibraryDocumentEditor(docId, workspaceId) {
   }, { once: true });
 
   window.openModal();
+}
+
+async function confirmDeleteLibraryDocument(docId, scopeQs) {
+  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+  try {
+    const response = await fetch(`/dashboard/documents/${docId}/delete/${scopeQs}`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrfToken },
+    });
+    const data = await response.json();
+    window.closeModal();
+    if (data.success) {
+      if (typeof showDashboardToast === 'function') {
+        showDashboardToast(`"${data.title}" deleted.`, 'success');
+      }
+      htmx.ajax('GET', window.location.pathname + window.location.search, {
+        target: '#main-content',
+        swap: 'innerHTML'
+      });
+    } else if (typeof showDashboardToast === 'function') {
+      showDashboardToast(data.error || 'Could not delete document.', 'error');
+    }
+  } catch (error) {
+    window.closeModal();
+    if (typeof showDashboardToast === 'function') {
+      showDashboardToast('Could not delete document.', 'error');
+    }
+  }
 }
 
 function openAuditDetail(resourceId) {

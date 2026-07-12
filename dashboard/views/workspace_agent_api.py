@@ -10,6 +10,7 @@ import logging
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.http import Http404, JsonResponse
+from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
 
 from dashboard.utils_notifications import send_notification
@@ -442,6 +443,34 @@ def document_edit_api(request, pk):
         return JsonResponse({"success": False, "error": "Document not found."}, status=404)
 
     return JsonResponse({"success": True, "version": updated.version})
+
+
+@require_http_methods(["GET", "POST"])
+@login_required
+def document_delete_api(request, pk):
+    """Confirm-then-delete a document -- GET renders a confirmation modal,
+    POST performs the delete. Mirrors delete_resource/delete_action_item's
+    modal-confirm convention (no JS alerts); the delete itself reuses
+    _get_scoped_document's ownership check, same as edit/export above."""
+    workspace, session = _resolve_document_scope(request)
+    if not workspace and not session:
+        return JsonResponse({"success": False, "error": "Select a workspace or assessment first."}, status=400)
+
+    document = _get_scoped_document(pk, workspace, session)
+    if not document:
+        return JsonResponse({"success": False, "error": "Document not found."}, status=404)
+
+    if request.method == "GET":
+        scope_qs = f"?workspace={workspace.id}" if workspace else f"?session_id={session.uuid}"
+        return render(
+            request,
+            'dashboard/partials/document_confirm_delete.html',
+            {'document': document, 'scope_qs': scope_qs},
+        )
+
+    title = document.title
+    document.delete()
+    return JsonResponse({"success": True, "title": title})
 
 
 @require_http_methods(["GET"])

@@ -13,11 +13,23 @@
     <script src="{% static 'js/dashboard-charts.js' %}" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-    
+
+    <!-- Document editor (WYSIWYG, markdown-backed) -->
+    <link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css" />
+    <script src="https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"></script>
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <!-- Shared design tokens & component classes -->
     <link rel="stylesheet" href="{% static 'css/app.css' %}">
+
+    <style>
+        /* Flatten the editor's default elevation to match this app's
+           flat-color, no-shadow/no-gradient visual language. */
+        .toastui-editor-defaultUI { box-shadow: none; border: 1px solid #e5e7eb; }
+        .toastui-editor-popup { box-shadow: none; border: 1px solid #e5e7eb; }
+        .toastui-editor-toolbar { box-shadow: none; border-bottom: 1px solid #e5e7eb; }
+    </style>
 
     <style>
         .agent-bubble h1,.agent-bubble h2,.agent-bubble h3,.agent-bubble h4 {
@@ -266,16 +278,27 @@
                 </svg>
                 <span class="sidebar-text">Library</span>
             </a>
-                <a href="/dashboard/agent/" 
-                    hx-get="/dashboard/agent/" 
-               hx-target="#main-content" 
+                <a href="{% url 'agent_hub' %}"
+                    hx-get="{% url 'agent_hub' %}"
+               hx-target="#main-content"
                hx-push-url="true"
                class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
-               title="Agent">
+               title="Team">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
-                <span class="sidebar-text">Agent</span>
+                <span class="sidebar-text">Team</span>
+            </a>
+            <a href="{% url 'agent_impact_hub' %}"
+               hx-get="{% url 'agent_impact_hub' %}"
+               hx-target="#main-content"
+               hx-push-url="true"
+               class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+               title="Impact">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <span class="sidebar-text">Impact</span>
             </a>
             <a href="{% url 'analytics' %}"
                hx-get="{% url 'analytics' %}"
@@ -496,6 +519,16 @@
     window.openModal = openModal;
 
     function closeModal() {
+        // Some modals (e.g. the document editor) temporarily widen this
+        // wrapper past its default sm:max-w-lg -- always reset it here so
+        // that override can never leak into the next, unrelated modal
+        // regardless of how this one was dismissed (button, backdrop click,
+        // htmx auto-close, etc).
+        const modalWrapper = document.getElementById('modal-content')?.parentElement;
+        if (modalWrapper) {
+            modalWrapper.classList.remove('sm:max-w-3xl');
+            modalWrapper.classList.add('sm:max-w-lg');
+        }
         document.getElementById('modal').classList.add('hidden');
         document.getElementById('modal-content').innerHTML = '';
     }

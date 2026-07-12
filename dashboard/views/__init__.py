@@ -39,6 +39,7 @@ from .analytics import (
 )
 from .hub import (
     agent_hub,
+    agent_impact_hub,
     dashboard,
     tasks_board,
     workspace_hub,
@@ -55,6 +56,7 @@ from .workspace_agent_api import (
     dashboard_workspace_agent_api,
     dashboard_workspace_agent_clear_api,
     dashboard_workspace_agent_context_api,
+    document_delete_api,
     document_edit_api,
     document_export,
     document_list_api,

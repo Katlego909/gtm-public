@@ -356,7 +356,7 @@ def agent_hub(request):
         'team_selected_session': team_selected_session,
         'team_agent_names_display': team_agent_names_display,
         'pending_items': pending_items,
-        'page_title': 'Agent',
+        'page_title': 'Team',
     }
 
     if request.htmx:
@@ -364,6 +364,35 @@ def agent_hub(request):
         response['HX-Trigger'] = 'refreshNotifications, refreshAgentActions'
         return response
     return render(request, 'dashboard/agent.html', context)
+
+
+@vary_on_headers('HX-Request')
+@login_required
+def agent_impact_hub(request):
+    """Standalone page showing what the AI team has measurably produced
+    (documents, completed tasks, speed, cost) plus estimated time/cost
+    saved for the current workspace. Kept as its own page rather than a
+    tab inside agent_hub -- mixing a report-style view into the same tab
+    bar as the conversational agent/chat UIs blurred the distinction
+    between "talk to an agent" and "see the agent team's impact"."""
+    current_workspace, user_workspaces = _resolve_dashboard_workspace(request)
+
+    from dashboard.agent_value import get_agent_value_context
+    agent_value_context = get_agent_value_context(current_workspace)
+
+    context = {
+        'current_workspace': current_workspace,
+        'user_workspaces': user_workspaces,
+        'agent_value_context': agent_value_context,
+        'page_title': 'Impact',
+    }
+
+    if request.htmx:
+        response = render(request, 'dashboard/partials/agent_impact_content.html', context)
+        response['HX-Trigger'] = 'refreshNotifications'
+        return response
+    return render(request, 'dashboard/agent_impact.html', context)
+
 
 @vary_on_headers('HX-Request')
 @login_required

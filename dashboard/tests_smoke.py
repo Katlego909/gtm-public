@@ -15,9 +15,9 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
 
-from gtm.models import ActionItem, AgentDocument
+from gtm.models import ActionItem, AgentDocument, ChatMessage, WorkspaceChatMessage
 from gtm.models import AssessmentSession
-from gtm.models_workspace import Workspace, WorkspaceMembership
+from gtm.models_workspace import Workspace, WorkspaceActivityEvent, WorkspaceMembership
 
 User = get_user_model()
 
@@ -68,6 +68,7 @@ class ViewPackageSmokeTests(TestCase):
         "refresh_action_items",       # views/actions.py
         "refresh_resources",          # views/resources.py
         "asset_library",              # views/resources.py
+        "agent_impact_hub",           # views/hub.py
     ]
 
     def _assert_renders(self, url_name):
@@ -104,6 +105,48 @@ class ViewPackageSmokeTests(TestCase):
         response = self.client.get(
             reverse("agent_hub"), {"agent_type": "team", "agent_session": str(session.uuid)}
         )
+        self.assertEqual(response.status_code, 200)
+
+    def test_agent_impact_hub_renders_with_data(self):
+        """The standalone Impact page (dashboard/agent_value.py) -- kept
+        separate from the Team chat hub -- must render once real
+        AgentDocument/ActionItem/chat/activity data exists, to exercise the
+        aggregation queries (including the metadata__source JSONField
+        lookup for chat-driven task actions) beyond the empty state already
+        covered by test_dashboard_pages_render."""
+        session = AssessmentSession.objects.create(
+            owner_client_id="smoke-client",
+            user=self.user,
+            workspace=self.workspace,
+            company_name="Smoke Co",
+        )
+        document = AgentDocument.objects.create(
+            workspace=self.workspace,
+            session=session,
+            agent_type="gtm_strategist",
+            doc_type="action_item_deliverable",
+            title="Smoke Deliverable",
+            content="Some content.",
+        )
+        ActionItem.objects.create(
+            session=session,
+            workspace=self.workspace,
+            note="Smoke task",
+            status="done",
+            deliverable_document=document,
+        )
+        ChatMessage.objects.create(session=session, user=self.user, message="hi", response="hello")
+        WorkspaceChatMessage.objects.create(
+            workspace=self.workspace, agent_type="portfolio", user=self.user, message="hi", response="hello"
+        )
+        WorkspaceActivityEvent.objects.create(
+            workspace=self.workspace,
+            actor=self.user,
+            event_type="task_created",
+            summary="smoke created task via chat",
+            metadata={"source": "dashboard_agent"},
+        )
+        response = self.client.get(reverse("agent_impact_hub"))
         self.assertEqual(response.status_code, 200)
 
     def test_team_agent_chat_url_resolves(self):
@@ -257,6 +300,55 @@ class UnifiedLibraryTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context["active_tab"], "documents")
         self.assertContains(response, "Seeded ICP One-Pager")
+
+    def test_documents_tab_shows_preview_and_badge(self):
+        AgentDocument.objects.create(
+            workspace=self.workspace,
+            agent_type="gtm_strategist",
+            doc_type="action_item_deliverable",
+            title="ICP With Content",
+            content="# ICP\n\nThis is the real deliverable body text.",
+            created_by=self.user,
+        )
+        response = self.client.get(reverse("asset_library"), {"tab": "documents"})
+        self.assertEqual(response.status_code, 200)
+        doc = response.context["document_groups"][0]["documents"][0]
+        self.assertIn("real deliverable body text", doc.preview)
+        self.assertTrue(doc.badge_class)
+        self.assertTrue(doc.accent_class)
+
+    def test_document_delete_confirm_and_delete(self):
+        doc = AgentDocument.objects.create(
+            workspace=self.workspace,
+            agent_type="gtm_strategist",
+            doc_type="other",
+            title="Deletable Doc",
+            content="# Doc",
+            created_by=self.user,
+        )
+        confirm_url = reverse("document_delete_api", args=[doc.id]) + f"?workspace={self.workspace.id}"
+        confirm_response = self.client.get(confirm_url)
+        self.assertEqual(confirm_response.status_code, 200)
+        self.assertContains(confirm_response, "Deletable Doc")
+
+        delete_response = self.client.post(confirm_url)
+        self.assertEqual(delete_response.status_code, 200)
+        self.assertTrue(delete_response.json()["success"])
+        self.assertFalse(AgentDocument.objects.filter(pk=doc.id).exists())
+
+    def test_document_delete_requires_scope_ownership(self):
+        other_workspace = Workspace.objects.create(name="Someone Else's Workspace")
+        doc = AgentDocument.objects.create(
+            workspace=other_workspace,
+            agent_type="gtm_strategist",
+            doc_type="other",
+            title="Not Yours",
+            content="# Doc",
+        )
+        url = reverse("document_delete_api", args=[doc.id]) + f"?workspace={self.workspace.id}"
+        response = self.client.post(url)
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(AgentDocument.objects.filter(pk=doc.id).exists())
 
     def test_document_list_api_excludes_action_item_deliverables(self):
         AgentDocument.objects.create(

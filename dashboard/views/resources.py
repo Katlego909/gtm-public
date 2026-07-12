@@ -91,6 +91,58 @@ from .helpers import (
 )
 from ..parsers import log_workspace_activity
 
+# doc_type -> (icon badge classes, top accent bar classes), for the Library
+# page's Documents tab cards -- keyed to AgentDocument.DOC_TYPE_CHOICES.
+_DOCUMENT_TYPE_STYLES = {
+    'client_summary': ('bg-emerald-100 text-emerald-600', 'bg-emerald-400'),
+    'action_plan': ('bg-blue-100 text-blue-600', 'bg-blue-400'),
+    'roadmap': ('bg-purple-100 text-purple-600', 'bg-purple-400'),
+    'resource_brief': ('bg-amber-100 text-amber-600', 'bg-amber-400'),
+    'action_item_deliverable': ('bg-indigo-100 text-indigo-600', 'bg-indigo-400'),
+    'other': ('bg-gray-100 text-gray-500', 'bg-gray-200'),
+}
+
+
+def _sentence_preview(text: str, max_chars: int = 200) -> str:
+    """Build a preview out of whole sentences only, growing until the next
+    sentence would exceed `max_chars` -- never cuts a sentence off mid-way,
+    so what's shown always reads as a complete thought (even a single long
+    sentence beats a fragment ending nowhere).
+
+    Skips label:value metadata paragraphs (e.g. "Document ID: ... Author:
+    AI Assistant") that some documents open with -- otherwise those glue
+    onto the first real sentence since they have no terminal punctuation
+    of their own, producing an oddly long, metadata-heavy preview."""
+    import re
+
+    from django.utils.text import Truncator
+
+    text = text.strip()
+    paragraphs = [p.strip() for p in re.split(r'\n\s*\n', text) if p.strip()]
+
+    for paragraph in paragraphs:
+        word_count = len(paragraph.split())
+        looks_like_labels = paragraph.count(':') >= 2 and word_count < 25
+        if looks_like_labels:
+            continue
+
+        sentences = re.split(r'(?<=[.!?])\s+', paragraph)
+        preview = ''
+        for sentence in sentences:
+            if not sentence:
+                continue
+            candidate = f"{preview} {sentence}".strip() if preview else sentence
+            if preview and len(candidate) > max_chars:
+                break
+            preview = candidate
+        if preview:
+            return preview
+
+    # Every paragraph looked like metadata -- fall back to a word-safe cut
+    # of the raw text rather than showing nothing.
+    return Truncator(text).words(28, truncate='')
+
+
 @login_required
 @vary_on_headers('HX-Request')
 def asset_library(request):
@@ -117,6 +169,9 @@ def asset_library(request):
     document_groups = []
     total_documents = 0
     if current_workspace:
+        import re
+
+        from django.utils.html import strip_tags
         from gtm.agent_documents import list_agent_documents
         from gtm.models import AgentDocument
 
@@ -126,6 +181,16 @@ def asset_library(request):
             .prefetch_related('completed_action_items')
         )
         total_documents = len(docs)
+        for doc in docs:
+            # Drop heading elements first -- otherwise the preview repeats
+            # the document's own title/section headers (already shown in
+            # the card header) before any real body text appears.
+            body_html = re.sub(r'<h[1-6][^>]*>.*?</h[1-6]>', '', _md(doc.content), flags=re.IGNORECASE | re.DOTALL)
+            doc.preview = _sentence_preview(strip_tags(body_html))
+            doc.badge_class, doc.accent_class = _DOCUMENT_TYPE_STYLES.get(
+                doc.doc_type, _DOCUMENT_TYPE_STYLES['other']
+            )
+
         docs_by_type = {}
         for doc in docs:
             docs_by_type.setdefault(doc.doc_type, []).append(doc)

@@ -192,6 +192,13 @@ class ActionItemComment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    duration_ms = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Wall-clock time for the AI completion turn that produced this comment, if any."
+    )
+    prompt_token_count = models.PositiveIntegerField(null=True, blank=True)
+    candidates_token_count = models.PositiveIntegerField(null=True, blank=True)
+
     class Meta:
         ordering = ['created_at']
 

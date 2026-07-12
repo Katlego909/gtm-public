@@ -1,0 +1,269 @@
+{% load humanize %}
+<header class="hidden md:flex h-16 bg-white border-b border-gray-200 justify-between items-center px-8 flex-shrink-0">
+    <h1 class="text-xl font-bold text-gray-800">Impact</h1>
+</header>
+
+<div class="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50">
+{% if not agent_value_context.has_workspace %}
+<div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center">
+    <p class="text-gray-700 font-medium">Select a workspace to see your team's impact.</p>
+    <p class="text-sm text-gray-500 mt-2">Documents created and tasks completed by Charlie, Nora, Theo, and Milo are tracked per workspace.</p>
+</div>
+{% else %}
+{% with m=agent_value_context.measured e=agent_value_context.estimated %}
+<div class="mb-6">
+    <p class="text-sm text-gray-500">What the team has actually produced in {{ current_workspace.name }}.</p>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
+    <div class="bg-white rounded-xl p-5 md:p-6 border border-gray-100 flex items-center justify-between gap-3">
+        <div>
+            <p class="text-xs md:text-sm font-medium text-gray-500 uppercase tracking-wider">Documents Created</p>
+            <p class="text-2xl md:text-3xl font-bold text-gray-900 mt-1">{{ m.documents_total }}</p>
+            <div class="flex items-center mt-2 text-xs font-medium {% if m.documents_this_week > 0 %}text-green-600 bg-green-50{% else %}text-gray-600 bg-gray-50{% endif %} px-2 py-1 rounded w-fit">
+                {{ m.documents_this_week }} this week
+            </div>
+        </div>
+        <div class="w-10 h-10 md:w-12 md:h-12 flex-shrink-0 flex items-center justify-center bg-indigo-50 rounded-full">
+            <svg class="w-5 h-5 md:w-6 md:h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl p-5 md:p-6 border border-gray-100 flex items-center justify-between gap-3">
+        <div>
+            <p class="text-xs md:text-sm font-medium text-gray-500 uppercase tracking-wider">Tasks Completed by AI</p>
+            <p class="text-2xl md:text-3xl font-bold text-gray-900 mt-1">{{ m.tasks_completed }}</p>
+            <div class="flex items-center mt-2 text-xs font-medium {% if m.tasks_attempted_not_completed > 0 %}text-orange-600 bg-orange-50{% else %}text-green-600 bg-green-50{% endif %} px-2 py-1 rounded w-fit">
+                {% if m.tasks_attempted_not_completed > 0 %}{{ m.tasks_attempted_not_completed }} attempted, no deliverable{% else %}All attempts delivered{% endif %}
+            </div>
+        </div>
+        <div class="w-10 h-10 md:w-12 md:h-12 flex-shrink-0 flex items-center justify-center bg-green-50 rounded-full">
+            <svg class="w-5 h-5 md:w-6 md:h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl p-5 md:p-6 border border-gray-100 flex items-center justify-between gap-3">
+        <div>
+            <p class="text-xs md:text-sm font-medium text-gray-500 uppercase tracking-wider">Avg. Speed</p>
+            <p class="text-2xl md:text-3xl font-bold text-gray-900 mt-1">
+                {% if m.avg_duration_seconds %}{{ m.avg_duration_seconds }}<span class="text-sm font-medium text-gray-500">s</span>{% else %}&mdash;{% endif %}
+            </p>
+            <div class="flex items-center mt-2 text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded w-fit">
+                per completed task
+            </div>
+        </div>
+        <div class="w-10 h-10 md:w-12 md:h-12 flex-shrink-0 flex items-center justify-center bg-blue-50 rounded-full">
+            <svg class="w-5 h-5 md:w-6 md:h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl p-5 md:p-6 border border-gray-100 flex items-center justify-between gap-3">
+        <div>
+            <p class="text-xs md:text-sm font-medium text-gray-500 uppercase tracking-wider">Actual AI Cost</p>
+            <p class="text-2xl md:text-3xl font-bold text-gray-900 mt-1">${{ m.ai_cost_usd }}</p>
+            <div class="flex items-center mt-2 text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded w-fit">
+                measured token usage
+            </div>
+        </div>
+        <div class="w-10 h-10 md:w-12 md:h-12 flex-shrink-0 flex items-center justify-center bg-amber-50 rounded-full">
+            <svg class="w-5 h-5 md:w-6 md:h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+        </div>
+    </div>
+</div>
+
+<div class="bg-indigo-50 rounded-xl p-6 border border-indigo-100 mb-6">
+    <div class="flex justify-between items-start mb-4">
+        <div>
+            <h3 class="text-lg font-bold text-indigo-900 flex items-center gap-2">
+                <span class="inline-block bg-indigo-100 text-indigo-600 rounded-full p-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                </span>
+                Estimated Value
+            </h3>
+            <p class="text-sm text-indigo-600 mt-1">What this work would have cost with a human GTM consultant</p>
+        </div>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-indigo-100 text-indigo-700">Estimate</span>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+        <div class="bg-white rounded-lg p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Time Saved</p>
+            <p class="text-3xl font-bold text-indigo-900">{{ e.hours_saved }} <span class="text-base font-medium text-gray-400">hrs</span></p>
+        </div>
+        <div class="bg-white rounded-lg p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Cost Avoided</p>
+            <p class="text-3xl font-bold text-indigo-900">${{ e.cost_avoided_usd }}</p>
+        </div>
+        <div class="bg-white rounded-lg p-4">
+            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Return on AI Spend</p>
+            <p class="text-3xl font-bold text-green-600">
+                {% if e.roi_multiple %}{{ e.roi_multiple|intcomma }}<span class="text-base font-medium text-gray-400">&times;</span>{% else %}&mdash;{% endif %}
+            </p>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-lg p-4">
+        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">How this is calculated</p>
+        <p class="text-sm text-gray-700">
+            {{ m.documents_total }} document{{ m.documents_total|pluralize }} &times; {{ e.hours_per_document }} hrs/document (professional business-writing-speed benchmark) = <strong>{{ e.hours_saved }} hrs</strong> of consultant time.
+        </p>
+        <p class="text-sm text-gray-700 mt-1">
+            {{ e.hours_saved }} hrs &times; ${{ e.hourly_rate_usd }}/hr (GTM/marketing strategist market rate, $150&ndash;300/hr range) = <strong>${{ e.cost_avoided_usd }}</strong> of consultant cost avoided.
+        </p>
+        {% if e.roi_multiple %}
+        <p class="text-sm text-gray-700 mt-1">
+            ${{ e.cost_avoided_usd }} avoided &divide; ${{ m.ai_cost_usd }} actually spent on AI (measured token usage) = <strong>{{ e.roi_multiple|intcomma }}&times;</strong> return.
+        </p>
+        {% endif %}
+        <p class="text-xs text-gray-400 mt-3">Estimate only &mdash; actual value will vary by document complexity and consultant rate.</p>
+    </div>
+</div>
+
+<div class="bg-white rounded-xl p-5 md:p-6 border border-gray-100 flex flex-col mb-6">
+    <h3 class="text-lg font-bold text-gray-800 mb-1">Agent Activity</h3>
+    <p class="text-sm text-gray-500 mb-3">Everything the team has actually done in this workspace &mdash; not just documents.</p>
+    <div class="relative mt-2" style="height: 220px;">
+        <canvas id="impactActivityChart"></canvas>
+    </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-8">
+    <div class="bg-white rounded-xl p-5 md:p-6 border border-gray-100 flex flex-col">
+        <h3 class="text-lg font-bold text-gray-800 mb-1">Documents Created per Week</h3>
+        <div class="relative h-64 w-full mt-3">
+            <canvas id="impactDocumentsChart"></canvas>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl p-5 md:p-6 border border-gray-100 flex flex-col">
+        <h3 class="text-lg font-bold text-gray-800 mb-1">Documents by Agent</h3>
+        <div class="relative flex-1 flex items-center justify-center min-h-[250px]">
+            <canvas id="impactAgentDonutChart"></canvas>
+        </div>
+    </div>
+</div>
+{% endwith %}
+
+{{ agent_value_context.trend_weeks_labels|json_script:"js-impact-weeks-labels" }}
+{{ agent_value_context.trend_documents_per_week|json_script:"js-impact-documents-per-week" }}
+{{ agent_value_context.measured.documents_by_agent_labels|json_script:"js-impact-agent-labels" }}
+{{ agent_value_context.measured.documents_by_agent_counts|json_script:"js-impact-agent-counts" }}
+{{ agent_value_context.measured.activity_labels|json_script:"js-impact-activity-labels" }}
+{{ agent_value_context.measured.activity_counts|json_script:"js-impact-activity-counts" }}
+<script>
+(function() {
+    function initImpactCharts() {
+        const getJsonData = (id, defaultVal) => {
+            const el = document.getElementById(id);
+            if (!el) return defaultVal;
+            try { return JSON.parse(el.textContent); } catch(e) { return defaultVal; }
+        };
+
+        // Documents Created per Week (bar)
+        const ctx = document.getElementById('impactDocumentsChart');
+        if (ctx && typeof Chart !== 'undefined') {
+            Chart.getChart(ctx)?.destroy();
+            const labels = getJsonData('js-impact-weeks-labels', []);
+            const data = getJsonData('js-impact-documents-per-week', []);
+            const hasData = data && data.some(v => v > 0);
+            const barData = hasData ? data : [0, 0, 0, 0, 0, 0, 0, 1];
+
+            new Chart(ctx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Documents Created',
+                        data: barData,
+                        backgroundColor: hasData ? '#B8530F' : '#e2e8f0',
+                        borderRadius: 4,
+                        barThickness: 24,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { precision: 0 }, border: { display: false } },
+                        x: { grid: { display: false }, border: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Agent Activity (horizontal bar, spans conversations/task-actions/completions/documents)
+        const ctxActivity = document.getElementById('impactActivityChart');
+        if (ctxActivity && typeof Chart !== 'undefined') {
+            Chart.getChart(ctxActivity)?.destroy();
+            const activityLabels = getJsonData('js-impact-activity-labels', []);
+            const activityCounts = getJsonData('js-impact-activity-counts', []);
+            const hasData = activityCounts && activityCounts.some(v => v > 0);
+
+            new Chart(ctxActivity.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: activityLabels,
+                    datasets: [{
+                        data: hasData ? activityCounts : [0, 0, 0, 0],
+                        backgroundColor: hasData ? '#B8530F' : '#e2e8f0',
+                        borderRadius: 4,
+                        barThickness: 20,
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { beginAtZero: true, ticks: { precision: 0 }, border: { display: false } },
+                        y: { grid: { display: false }, border: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // Documents by Agent (donut)
+        const ctxAgent = document.getElementById('impactAgentDonutChart');
+        if (ctxAgent && typeof Chart !== 'undefined') {
+            Chart.getChart(ctxAgent)?.destroy();
+            const agentLabels = getJsonData('js-impact-agent-labels', []);
+            const agentCounts = getJsonData('js-impact-agent-counts', []);
+            const hasData = agentCounts && agentCounts.some(v => v > 0);
+
+            new Chart(ctxAgent.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: hasData ? agentLabels : ['No documents yet'],
+                    datasets: [{
+                        data: hasData ? agentCounts : [1],
+                        backgroundColor: hasData ? ['#B8530F', '#2563eb', '#16a34a', '#eab308'] : ['#e2e8f0'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    cutout: '65%',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { usePointStyle: true, padding: 20 }
+                        }
+                    }
+                }
+            });
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', initImpactCharts);
+    if (document.readyState !== 'loading') {
+        setTimeout(initImpactCharts, 100);
+    }
+})();
+</script>
+{% endif %}
+</div>

@@ -15,6 +15,7 @@ explaining why -- not a false "done."
 """
 
 import logging
+import time
 from typing import Any, Dict, List, Optional
 
 from django.utils import timezone
@@ -152,6 +153,7 @@ def complete_action_item(action_item: ActionItem, user=None) -> Dict[str, Any]:
         automatic_function_calling=types.AutomaticFunctionCallingConfig(maximum_remote_calls=MAX_TOOL_ROUNDS),
     )
 
+    start_time = time.monotonic()
     try:
         chat = client.chats.create(model="gemini-2.5-flash", config=config, history=[])
         response = chat.send_message(f"Complete this task: {action_item.note}")
@@ -168,6 +170,11 @@ def complete_action_item(action_item: ActionItem, user=None) -> Dict[str, Any]:
             extra={"action_item_id": action_item.id},
         )
         return {"success": False, "error": "Ran into a technical error completing this task. Please try again."}
+
+    duration_ms = round((time.monotonic() - start_time) * 1000)
+    usage = getattr(response, "usage_metadata", None)
+    prompt_token_count = getattr(usage, "prompt_token_count", None) if usage else None
+    candidates_token_count = getattr(usage, "candidates_token_count", None) if usage else None
 
     deliverable = None
     if created_doc_ids:
@@ -193,7 +200,14 @@ def complete_action_item(action_item: ActionItem, user=None) -> Dict[str, Any]:
         action_item.save(update_fields=["status", "updated_at"])
         result_status = "doing"
 
-    ActionItemComment.objects.create(action_item=action_item, user=user, text=comment_text)
+    ActionItemComment.objects.create(
+        action_item=action_item,
+        user=user,
+        text=comment_text,
+        duration_ms=duration_ms,
+        prompt_token_count=prompt_token_count,
+        candidates_token_count=candidates_token_count,
+    )
 
     return {
         "success": True,

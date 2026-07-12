@@ -922,21 +922,27 @@ async function refreshDocumentsPanel() {
 async function openDocumentEditor(docId) {
     const modalContent = document.getElementById('modal-content');
     const listContainer = document.getElementById('documents-list');
-    if (!modalContent || typeof window.openModal !== 'function' || !listContainer) return;
+    if (!modalContent || typeof window.openModal !== 'function' || !listContainer || typeof toastui === 'undefined') return;
     const scopeQs = listContainer.dataset.scopeQs || '';
 
     const response = await fetch(`/dashboard/documents/${docId}/${scopeQs}`);
     const data = await response.json();
     if (!data.success) return;
 
+    // The shared #modal wrapper caps width at sm:max-w-lg -- too narrow for
+    // a WYSIWYG toolbar. Widen it for this modal only; closeModal() (in
+    // base.html) always resets it back, however this modal gets dismissed.
+    modalContent.parentElement.classList.remove('sm:max-w-lg');
+    modalContent.parentElement.classList.add('sm:max-w-3xl');
+
     modalContent.innerHTML = `
-        <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden w-full max-w-2xl">
+        <div class="bg-white rounded-2xl overflow-hidden w-full">
             <div class="px-6 py-5 border-b border-gray-100">
                 <h3 class="text-lg font-semibold text-gray-900">${escapeHtml(data.title)}</h3>
                 <p class="mt-1 text-xs text-gray-500">Version ${data.version}</p>
             </div>
             <div class="px-6 py-4">
-                <textarea id="document-edit-textarea" rows="14" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-indigo-500 focus:ring-indigo-500">${escapeHtml(data.content)}</textarea>
+                <div id="document-editor-mount"></div>
             </div>
             <div class="px-6 py-4 flex justify-end gap-3 border-t border-gray-100">
                 <button type="button" id="document-edit-cancel" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
@@ -945,13 +951,23 @@ async function openDocumentEditor(docId) {
         </div>
     `;
 
+    const editor = new toastui.Editor({
+        el: document.getElementById('document-editor-mount'),
+        height: '420px',
+        initialEditType: 'wysiwyg',
+        hideModeSwitch: true,
+        initialValue: data.content || ' ',
+    });
+
     document.getElementById('document-edit-cancel').addEventListener('click', function() {
+        editor.destroy();
         window.closeModal();
     }, { once: true });
 
     document.getElementById('document-edit-save').addEventListener('click', async function() {
         const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
-        const content = document.getElementById('document-edit-textarea').value;
+        const content = editor.getMarkdown();
+        editor.destroy();
         const saveResponse = await fetch(`/dashboard/documents/${docId}/${scopeQs}`, {
             method: 'POST',
             headers: {
