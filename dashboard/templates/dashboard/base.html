@@ -5,7 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}ForgeGTM Dashboard{% endblock %}</title>
-    
+    <link rel="icon" type="image/png" href="{% static 'images/icon.png' %}">
+
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <script src="{% static 'js/tailwind-config.js' %}"></script>
     <script src="{% static 'js/chart.js' %}"></script>
@@ -47,6 +48,7 @@
         .sidebar-collapsed { width: 80px !important; }
         .sidebar-collapsed .sidebar-text { display: none; }
         .sidebar-collapsed .sidebar-logo-text { display: none; }
+        .sidebar-collapsed .sidebar-icon-mark { display: block; }
         .sidebar-collapsed nav a { 
             justify-content: center; 
             padding: 1rem 0.5rem;
@@ -195,6 +197,7 @@
         <div class="sidebar-header h-16 hidden md:flex items-center px-6 border-b border-gray-100 justify-between relative">
             <div class="flex items-center gap-2 text-indigo-600">
                 <img src="{% static 'images/forge_logo.png' %}" alt="ForgeGTM" class="sidebar-logo-text h-8 w-auto object-contain" />
+                <img src="{% static 'images/icon.png' %}" alt="ForgeGTM" class="sidebar-icon-mark hidden h-8 w-8 object-contain" />
             </div>
             <button onclick="toggleDesktopSidebar()" class="collapse-btn text-gray-400 hover:text-gray-600 transition-colors" title="Toggle sidebar">
                 <svg id="collapseIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

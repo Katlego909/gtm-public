@@ -622,13 +622,50 @@ async function clearWorkspaceAgentMessages() {
     const clearButton = document.getElementById('workspace-agent-clear');
     if (!panel || !container || !clearButton) return;
 
-    const shouldClear = window.confirm('Clear chat history for this agent?');
-    if (!shouldClear) return;
+    const agentType = panel.dataset.agentType;
 
+    const modalContent = document.getElementById('modal-content');
+    if (!modalContent || typeof window.openModal !== 'function' || typeof window.closeModal !== 'function') {
+        const shouldClear = window.confirm('Clear chat history for this agent?');
+        if (!shouldClear) return;
+        await executeWorkspaceAgentClear(agentType, clearButton, container);
+        return;
+    }
+
+    modalContent.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-semibold text-gray-900">Clear Chat History</h3>
+                <p class="mt-2 text-sm text-gray-600">This will remove all messages for this agent.</p>
+            </div>
+            <div class="px-6 py-4 flex justify-end gap-3">
+                <button type="button" id="workspace-agent-clear-cancel" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
+                <button type="button" id="workspace-agent-clear-confirm" class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition">Clear Chat</button>
+            </div>
+        </div>
+    `;
+
+    const cancelBtn = document.getElementById('workspace-agent-clear-cancel');
+    const confirmBtn = document.getElementById('workspace-agent-clear-confirm');
+    if (!cancelBtn || !confirmBtn) return;
+
+    cancelBtn.addEventListener('click', function() {
+        window.closeModal();
+    }, { once: true });
+
+    confirmBtn.addEventListener('click', async function() {
+        window.closeModal();
+        await executeWorkspaceAgentClear(agentType, clearButton, container);
+    }, { once: true });
+
+    window.openModal();
+}
+
+async function executeWorkspaceAgentClear(agentType, clearButton, container) {
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
     clearButton.disabled = true;
     try {
-        const response = await fetch(`/dashboard/agent/${panel.dataset.agentType}/clear/${window.location.search || ''}`, {
+        const response = await fetch(`/dashboard/agent/${agentType}/clear/${window.location.search || ''}`, {
             method: 'POST',
             headers: { 'X-CSRFToken': csrfToken },
         });
