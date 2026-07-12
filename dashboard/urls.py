@@ -13,7 +13,7 @@ urlpatterns = [
     path('kpi/total_sessions/', views.kpi_total_sessions, name='kpi_total_sessions'),
     path('kpi/completed_items/', views.kpi_completed_items, name='kpi_completed_items'),
     path('kpi/pending_items/', views.kpi_pending_items, name='kpi_pending_items'),
-    path('insight/<int:pk>/export/', views.insight_export, name='insight_export'),
+    path('insight/<int:pk>/export/<str:fmt>/', views.insight_export, name='insight_export'),
     path('insight/<int:pk>/feedback/', views.insight_feedback, name='insight_feedback'),
 
     # Gap Analysis Metric CRUD URLs

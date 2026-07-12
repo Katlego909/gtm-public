@@ -91,18 +91,23 @@ from .helpers import (
 )
 
 @csrf_exempt
-def insight_export(request, pk):
-    """Export AI insight/playbook as a text file."""
+def insight_export(request, pk, fmt):
+    """Export an AI insight/playbook as a PDF or Word document."""
     # Only allow access to insights in user's workspace
     workspace_id = request.session.get('current_workspace_id')
     if workspace_id:
         insight = get_object_or_404(ResultSnapshot, pk=pk, session__workspace_id=workspace_id)
     else:
         insight = get_object_or_404(ResultSnapshot, pk=pk, session__user=request.user)
-    content = insight.ai_playbook or ''
-    response = HttpResponse(content, content_type='text/plain')
-    response['Content-Disposition'] = f'attachment; filename=insight_{pk}.txt'
-    return response
+
+    if fmt == 'pdf':
+        from gtm.utils_pdf import render_insight_pdf_response
+        return render_insight_pdf_response(company_name=insight.company_name, ai_playbook_md=insight.ai_playbook or '')
+    elif fmt == 'docx':
+        from gtm.utils_docx import render_insight_docx_response
+        return render_insight_docx_response(company_name=insight.company_name, ai_playbook_md=insight.ai_playbook or '')
+    else:
+        raise Http404("Unsupported export format.")
 
 
 @csrf_exempt

@@ -193,23 +193,8 @@ def _md_to_flowables(text: str, styles, avail_width: float) -> list:
     return flow
 
 
-def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
-    """
-    Build a professional, multi-page PDF (with the AI Playbook + 30-Day plan)
-    using built-in Helvetica fonts for maximum compatibility.
-    Returns an HttpResponse ready to send.
-    """
-    buffer = BytesIO()
-
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        leftMargin=2 * cm,
-        rightMargin=2 * cm,
-        topMargin=2 * cm,
-        bottomMargin=2 * cm,
-    )
-
+def _build_report_styles():
+    """Shared ParagraphStyle set for all reportlab-based PDF exports (full report + single insight)."""
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(
         name="H1",
@@ -249,7 +234,7 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
         textColor=colors.HexColor("#6B7280"),
         backColor=colors.HexColor("#F9FAFB"),
     ))
-    
+
     styles.add(ParagraphStyle(
         name="List",
         parent=styles["Body"],
@@ -257,7 +242,7 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
         spaceBefore=2,
         spaceAfter=6,
     ))
-    
+
     styles.add(ParagraphStyle(
         name="Highlight",
         fontName="Helvetica-Bold",
@@ -266,6 +251,27 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
         spaceAfter=6,
         textColor=colors.HexColor("#DC2626"),
     ))
+    return styles
+
+
+def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
+    """
+    Build a professional, multi-page PDF (with the AI Playbook + 30-Day plan)
+    using built-in Helvetica fonts for maximum compatibility.
+    Returns an HttpResponse ready to send.
+    """
+    buffer = BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=2 * cm,
+        rightMargin=2 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm,
+    )
+
+    styles = _build_report_styles()
 
     content = []
 
@@ -538,5 +544,47 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
     _company_slug = re.sub(r'[^\w\s-]', '', session.company_name or "company").strip()
     _company_slug = re.sub(r'[\s]+', '_', _company_slug)
     resp["Content-Disposition"] = f'attachment; filename=\"{_company_slug}_AI_playbook_report_ForgeGTM.pdf\"'
+    resp.write(pdf)
+    return resp
+
+
+def render_insight_pdf_response(*, company_name, ai_playbook_md):
+    """
+    Build a short, single-insight PDF (one AI-generated playbook, not the full
+    multi-section assessment report). Reuses the same styles/header/footer and
+    markdown pipeline as render_gtm_report_pdf_response for visual parity.
+    """
+    buffer = BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=2 * cm,
+        rightMargin=2 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm,
+    )
+
+    styles = _build_report_styles()
+
+    content = [
+        Spacer(1, 0.5 * cm),
+        Paragraph("Funti3r GTM Validator", styles["H1"]),
+        Paragraph(f"{company_name or 'Company'} — AI Insight", styles["H2"]),
+        Spacer(1, 0.4 * cm),
+    ]
+
+    normalized = _normalize_ai_markdown(ai_playbook_md or "")
+    content.extend(_md_to_flowables(normalized, styles, doc.width))
+
+    doc.build(content, onFirstPage=_header_footer, onLaterPages=_header_footer)
+
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    resp = HttpResponse(content_type="application/pdf")
+    _company_slug = re.sub(r'[^\w\s-]', '', company_name or "company").strip()
+    _company_slug = re.sub(r'[\s]+', '_', _company_slug)
+    resp["Content-Disposition"] = f'attachment; filename="{_company_slug}_insight_ForgeGTM.pdf"'
     resp.write(pdf)
     return resp
