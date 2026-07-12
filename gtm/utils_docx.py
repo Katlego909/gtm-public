@@ -5,14 +5,17 @@ from django.http import HttpResponse
 from docx import Document
 from docx.shared import Pt, RGBColor
 
-from .utils_pdf import _normalize_ai_markdown, _parse_playbook_priorities
+from .utils_pdf import _normalize_ai_markdown, _parse_playbook_priorities, _slugify_filename_part
 
 
-def render_insight_docx_response(*, company_name, ai_playbook_md):
+def render_insight_docx_response(*, company_name, ai_playbook_md, doc_title=None, doc_type_label=None, doc_date=None):
     """
     Build a Word (.docx) export of a single AI insight, structurally matching
     the PDF export: a title, then each parsed "Priority N: Title (Category)"
     section as a heading with its bullet points.
+
+    doc_title/doc_type_label/doc_date: see render_insight_pdf_response's
+    docstring in gtm/utils_pdf.py -- same optional-identity filename scheme.
     """
     normalized = _normalize_ai_markdown(ai_playbook_md or "")
     priorities = _parse_playbook_priorities(normalized)
@@ -52,8 +55,15 @@ def render_insight_docx_response(*, company_name, ai_playbook_md):
     resp = HttpResponse(
         content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
-    company_slug = re.sub(r'[^\w\s-]', '', company_name or "company").strip()
-    company_slug = re.sub(r'[\s]+', '_', company_slug)
-    resp["Content-Disposition"] = f'attachment; filename="{company_slug}_insight_ForgeGTM.docx"'
+    company_slug = _slugify_filename_part(company_name, fallback="company")
+    _parts = [company_slug]
+    if doc_title:
+        _parts.append(_slugify_filename_part(doc_title, fallback="document", max_len=50))
+    _parts.append(_slugify_filename_part(doc_type_label, fallback="insight") if doc_type_label else "insight")
+    if doc_date:
+        _parts.append(doc_date.strftime("%Y%m%d"))
+    _parts.append("ForgeGTM")
+    _filename = "_".join(_parts) + ".docx"
+    resp["Content-Disposition"] = f'attachment; filename="{_filename}"'
     resp.write(docx_bytes)
     return resp

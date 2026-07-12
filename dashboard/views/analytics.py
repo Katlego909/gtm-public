@@ -102,10 +102,10 @@ def insight_export(request, pk, fmt):
 
     if fmt == 'pdf':
         from gtm.utils_pdf import render_insight_pdf_response
-        return render_insight_pdf_response(company_name=insight.company_name, ai_playbook_md=insight.ai_playbook or '')
+        return render_insight_pdf_response(company_name=insight.company_name, ai_playbook_md=insight.ai_playbook or '', doc_date=insight.created_at)
     elif fmt == 'docx':
         from gtm.utils_docx import render_insight_docx_response
-        return render_insight_docx_response(company_name=insight.company_name, ai_playbook_md=insight.ai_playbook or '')
+        return render_insight_docx_response(company_name=insight.company_name, ai_playbook_md=insight.ai_playbook or '', doc_date=insight.created_at)
     else:
         raise Http404("Unsupported export format.")
 

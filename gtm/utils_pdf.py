@@ -27,6 +27,16 @@ def _trunc(text: str, max_len: int = 160) -> str:
     return text[:max_len].rsplit(' ', 1)[0] + '…'
 
 
+def _slugify_filename_part(text: str, fallback: str = "untitled", max_len: int = None) -> str:
+    """Filesystem-safe filename fragment: strip non-word/space/hyphen chars,
+    collapse whitespace to underscores, optionally truncate."""
+    slug = re.sub(r'[^\w\s-]', '', text or fallback).strip()
+    slug = re.sub(r'[\s]+', '_', slug).strip('_') or fallback
+    if max_len and len(slug) > max_len:
+        slug = slug[:max_len].rstrip('_')
+    return slug
+
+
 def _parse_playbook_priorities(ai_md: str) -> list:
     """Extract Priority sections from AI playbook markdown."""
     priorities = []
@@ -541,18 +551,23 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
     buffer.close()
 
     resp = HttpResponse(content_type="application/pdf")
-    _company_slug = re.sub(r'[^\w\s-]', '', session.company_name or "company").strip()
-    _company_slug = re.sub(r'[\s]+', '_', _company_slug)
+    _company_slug = _slugify_filename_part(session.company_name, fallback="company")
     resp["Content-Disposition"] = f'attachment; filename=\"{_company_slug}_AI_playbook_report_ForgeGTM.pdf\"'
     resp.write(pdf)
     return resp
 
 
-def render_insight_pdf_response(*, company_name, ai_playbook_md):
+def render_insight_pdf_response(*, company_name, ai_playbook_md, doc_title=None, doc_type_label=None, doc_date=None):
     """
     Build a short, single-insight PDF (one AI-generated playbook, not the full
     multi-section assessment report). Reuses the same styles/header/footer and
     markdown pipeline as render_gtm_report_pdf_response for visual parity.
+
+    doc_title/doc_type_label/doc_date are optional -- when supplied (by the
+    AgentDocument export flow) they make the filename distinct per document
+    instead of colliding on company_name alone; when omitted (the original
+    ResultSnapshot insight-export caller) the filename falls back to its
+    original "_insight_" shape, just with a date appended.
     """
     buffer = BytesIO()
 
@@ -583,8 +598,15 @@ def render_insight_pdf_response(*, company_name, ai_playbook_md):
     buffer.close()
 
     resp = HttpResponse(content_type="application/pdf")
-    _company_slug = re.sub(r'[^\w\s-]', '', company_name or "company").strip()
-    _company_slug = re.sub(r'[\s]+', '_', _company_slug)
-    resp["Content-Disposition"] = f'attachment; filename="{_company_slug}_insight_ForgeGTM.pdf"'
+    _company_slug = _slugify_filename_part(company_name, fallback="company")
+    _parts = [_company_slug]
+    if doc_title:
+        _parts.append(_slugify_filename_part(doc_title, fallback="document", max_len=50))
+    _parts.append(_slugify_filename_part(doc_type_label, fallback="insight") if doc_type_label else "insight")
+    if doc_date:
+        _parts.append(doc_date.strftime("%Y%m%d"))
+    _parts.append("ForgeGTM")
+    _filename = "_".join(_parts) + ".pdf"
+    resp["Content-Disposition"] = f'attachment; filename="{_filename}"'
     resp.write(pdf)
     return resp

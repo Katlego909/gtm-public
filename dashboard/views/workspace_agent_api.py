@@ -481,7 +481,7 @@ def document_export(request, pk, fmt):
     from django.http import HttpResponse
 
     from gtm.utils_docx import render_insight_docx_response
-    from gtm.utils_pdf import render_insight_pdf_response
+    from gtm.utils_pdf import render_insight_pdf_response, _slugify_filename_part
 
     workspace, session = _resolve_document_scope(request)
     if not workspace and not session:
@@ -494,16 +494,34 @@ def document_export(request, pk, fmt):
     company_name = workspace.name if workspace else (session.company_name or "Company")
 
     if fmt == 'pdf':
-        return render_insight_pdf_response(company_name=company_name, ai_playbook_md=document.content)
+        return render_insight_pdf_response(
+            company_name=company_name,
+            ai_playbook_md=document.content,
+            doc_title=document.title,
+            doc_type_label=document.get_doc_type_display(),
+            doc_date=document.created_at,
+        )
     elif fmt == 'docx':
-        return render_insight_docx_response(company_name=company_name, ai_playbook_md=document.content)
+        return render_insight_docx_response(
+            company_name=company_name,
+            ai_playbook_md=document.content,
+            doc_title=document.title,
+            doc_type_label=document.get_doc_type_display(),
+            doc_date=document.created_at,
+        )
     elif fmt in ('md', 'markdown'):
+        title_slug = _slugify_filename_part(document.title, fallback="document", max_len=50)
+        type_slug = _slugify_filename_part(document.get_doc_type_display())
+        date_str = document.created_at.strftime("%Y%m%d")
         resp = HttpResponse(document.content, content_type="text/markdown")
-        resp["Content-Disposition"] = f'attachment; filename="{document.title}.md"'
+        resp["Content-Disposition"] = f'attachment; filename="{title_slug}_{type_slug}_{date_str}.md"'
         return resp
     elif fmt == 'txt':
+        title_slug = _slugify_filename_part(document.title, fallback="document", max_len=50)
+        type_slug = _slugify_filename_part(document.get_doc_type_display())
+        date_str = document.created_at.strftime("%Y%m%d")
         resp = HttpResponse(document.content, content_type="text/plain")
-        resp["Content-Disposition"] = f'attachment; filename="{document.title}.txt"'
+        resp["Content-Disposition"] = f'attachment; filename="{title_slug}_{type_slug}_{date_str}.txt"'
         return resp
     else:
         raise Http404("Unsupported export format.")
