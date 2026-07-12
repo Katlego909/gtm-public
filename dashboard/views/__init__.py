@@ -48,6 +48,13 @@ from .agent_api import (
     dashboard_agent_clear_api,
     dashboard_agent_context_api,
 )
+from .workspace_agent_api import (
+    dashboard_agent_insights_refresh,
+    dashboard_agent_insights_status,
+    dashboard_workspace_agent_api,
+    dashboard_workspace_agent_clear_api,
+    dashboard_workspace_agent_context_api,
+)
 from .actions import (
     add_action_item_comment,
     add_edit_action_item,

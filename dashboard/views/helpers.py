@@ -106,6 +106,39 @@ from ..parsers import (
 )
 
 
+def _parse_agent_request_payload(request, require_session=True):
+    """Parse an agent chat POST body (JSON or multipart) shared by the
+    session-scoped and workspace-scoped agent chat endpoints.
+
+    Returns (session_id, message, file_type, uploaded_files, error_response).
+    error_response is a JsonResponse if validation failed; callers should
+    return it directly when it is not None.
+    """
+    content_type = (request.content_type or '').lower()
+    uploaded_files = []
+    if 'multipart/form-data' in content_type:
+        session_id = str(request.POST.get('session_id', '')).strip()
+        message = (request.POST.get('message') or '').strip()
+        file_type = (request.POST.get('file_type') or 'other').strip()
+        uploaded_files = request.FILES.getlist('attachments')
+    else:
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return None, None, None, None, JsonResponse({"success": False, "error": "Invalid JSON"}, status=400)
+
+        session_id = str(data.get('session_id', '')).strip()
+        message = (data.get('message') or '').strip()
+        file_type = (data.get('file_type') or 'other').strip()
+
+    if require_session and not session_id:
+        return None, None, None, None, JsonResponse({"success": False, "error": "Select an assessment first."}, status=400)
+    if not message:
+        return None, None, None, None, JsonResponse({"success": False, "error": "Message cannot be empty."}, status=400)
+
+    return session_id, message, file_type, uploaded_files, None
+
+
 
 def _resolve_dashboard_workspace(request):
     """Resolve the active workspace from request/query/session for dashboard-scoped UI."""

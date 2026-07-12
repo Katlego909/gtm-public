@@ -45,9 +45,11 @@ from gtm.models import (
     ResultSnapshot,
     ChatMessage,
     GTMFile,
+    WorkspaceChatMessage,
 )
 from gtm.models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation, WorkspaceActivityEvent
 from gtm.ai_chat import get_suggested_prompts, process_chat_message
+from gtm.workspace_agent_chat import AGENT_TYPES, get_suggested_prompts_for_agent
 from gtm.decorators import workspace_permission_required, workspace_admin_required, workspace_member_required
 from dashboard.models import Channel, ChannelAnalytics, GapAnalysisMetric, GapAnalysisSuggestion, Resource, Notification, UserSettings
 from dashboard.forms import GapAnalysisMetricForm, ActionItemForm, UserProfileForm, UserSettingsForm
@@ -220,9 +222,14 @@ def tasks_board(request):
 @vary_on_headers('HX-Request')
 @login_required
 def agent_hub(request):
-    """Dedicated GTM agent page with persistent, session-scoped conversation context."""
+    """Dedicated GTM agent page. Supports the original session-scoped GTM
+    Agent ('session', default) plus three workspace-scoped agents (portfolio,
+    resource, insights) selected via ?agent_type=."""
     workspace_id = request.GET.get('workspace') or request.session.get('current_workspace_id')
     agent_session_id = request.GET.get('agent_session')
+    active_agent_type = request.GET.get('agent_type', 'session')
+    if active_agent_type != 'session' and active_agent_type not in AGENT_TYPES:
+        active_agent_type = 'session'
     current_workspace = None
     user_workspaces = []
 
@@ -247,46 +254,70 @@ def agent_hub(request):
         assessments_qs = AssessmentSession.objects.filter(user=request.user)
         pending_items = ActionItem.objects.filter(session__user=request.user).exclude(status='done').count()
 
-    completed_sessions = assessments_qs.filter(is_completed=True).order_by('-created_at')[:10]
-    agent_session_options = [
-        {
-            'uuid': str(session.uuid),
-            'label': f"{session.company_name or 'Unnamed'} • {session.created_at.strftime('%b %d, %Y')}",
-        }
-        for session in completed_sessions
-    ]
-    if not agent_session_options:
+    agent_session_options = []
+    dashboard_agent_session = None
+    dashboard_agent_prompts = []
+    dashboard_agent_history = []
+    workspace_agent_prompts = []
+    workspace_agent_history = []
+
+    if active_agent_type == 'session':
+        completed_sessions = assessments_qs.filter(is_completed=True).order_by('-created_at')[:10]
         agent_session_options = [
             {
                 'uuid': str(session.uuid),
                 'label': f"{session.company_name or 'Unnamed'} • {session.created_at.strftime('%b %d, %Y')}",
             }
-            for session in assessments_qs.order_by('-created_at')[:10]
+            for session in completed_sessions
         ]
+        if not agent_session_options:
+            agent_session_options = [
+                {
+                    'uuid': str(session.uuid),
+                    'label': f"{session.company_name or 'Unnamed'} • {session.created_at.strftime('%b %d, %Y')}",
+                }
+                for session in assessments_qs.order_by('-created_at')[:10]
+            ]
 
-    dashboard_agent_session = None
-    if agent_session_options:
-        if agent_session_id and any(option['uuid'] == agent_session_id for option in agent_session_options):
-            dashboard_agent_session = assessments_qs.filter(uuid=agent_session_id).first()
-        if not dashboard_agent_session:
-            dashboard_agent_session = assessments_qs.filter(uuid=agent_session_options[0]['uuid']).first()
+        if agent_session_options:
+            if agent_session_id and any(option['uuid'] == agent_session_id for option in agent_session_options):
+                dashboard_agent_session = assessments_qs.filter(uuid=agent_session_id).first()
+            if not dashboard_agent_session:
+                dashboard_agent_session = assessments_qs.filter(uuid=agent_session_options[0]['uuid']).first()
 
-    dashboard_agent_prompts = get_suggested_prompts(dashboard_agent_session) if dashboard_agent_session else []
-    dashboard_agent_history = []
-    if dashboard_agent_session:
-        history_qs = ChatMessage.objects.filter(session=dashboard_agent_session).order_by('-created_at')[:50]
+        dashboard_agent_prompts = get_suggested_prompts(dashboard_agent_session) if dashboard_agent_session else []
+        if dashboard_agent_session:
+            history_qs = ChatMessage.objects.filter(session=dashboard_agent_session).order_by('-created_at')[:50]
+            chats = list(reversed(history_qs))
+            for chat in chats:
+                chat.response_html = _md(chat.response or '')
+            dashboard_agent_history = chats
+    elif current_workspace:
+        workspace_agent_prompts = get_suggested_prompts_for_agent(active_agent_type, current_workspace)
+        history_qs = WorkspaceChatMessage.objects.filter(
+            workspace=current_workspace, agent_type=active_agent_type
+        ).order_by('-created_at')[:50]
         chats = list(reversed(history_qs))
         for chat in chats:
             chat.response_html = _md(chat.response or '')
-        dashboard_agent_history = chats
+        workspace_agent_history = chats
 
     context = {
         'current_workspace': current_workspace,
         'user_workspaces': user_workspaces,
+        'active_agent_type': active_agent_type,
+        'agent_tabs': [
+            ('session', 'GTM Agent'),
+            ('portfolio', 'Portfolio'),
+            ('resource', 'Resources'),
+            ('insights', 'Insights'),
+        ],
         'agent_session_options': agent_session_options,
         'dashboard_agent_session': dashboard_agent_session,
         'dashboard_agent_prompts': dashboard_agent_prompts,
         'dashboard_agent_history': dashboard_agent_history,
+        'workspace_agent_prompts': workspace_agent_prompts,
+        'workspace_agent_history': workspace_agent_history,
         'pending_items': pending_items,
         'page_title': 'Agent',
     }

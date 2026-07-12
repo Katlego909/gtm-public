@@ -286,9 +286,55 @@ class ChatMessage(models.Model):
     
     class Meta:
         ordering = ['created_at']
-    
+
     def __str__(self):
         return f"Chat {self.session.uuid} at {self.created_at}"
+
+
+class WorkspaceChatMessage(models.Model):
+    """Chat history for the workspace-scoped agents (portfolio, resource,
+    insights). Kept separate from ChatMessage, which is hard-tied to a
+    single AssessmentSession."""
+
+    AGENT_TYPE_CHOICES = [
+        ("portfolio", "Portfolio Agent"),
+        ("resource", "Resource Agent"),
+        ("insights", "Insights Agent"),
+    ]
+
+    workspace = models.ForeignKey(
+        Workspace,
+        on_delete=models.CASCADE,
+        related_name="agent_chat_messages",
+    )
+    session = models.ForeignKey(
+        AssessmentSession,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="workspace_agent_chat_messages",
+    )
+    agent_type = models.CharField(max_length=20, choices=AGENT_TYPE_CHOICES, db_index=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    message = models.TextField()
+    response = models.TextField()
+    attachments = models.JSONField(default=list, blank=True)
+    intent = models.CharField(max_length=50, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['workspace', 'agent_type', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.get_agent_type_display()} chat in workspace {self.workspace_id} at {self.created_at}"
 
 
 class GTMFile(models.Model):

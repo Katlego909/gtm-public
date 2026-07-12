@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django.contrib import messages
 from .utils_email import send_snapshot_report_email
-from .models import AssessmentSession, ResultSnapshot, RecommendationBand, Category, Question, Response, ActionItem, ToolRecommendation, ChatMessage
+from .models import AssessmentSession, ResultSnapshot, RecommendationBand, Category, Question, Response, ActionItem, ToolRecommendation, ChatMessage, WorkspaceChatMessage
 from .models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation
 from dashboard.models import GapAnalysisMetric
 
@@ -186,6 +186,19 @@ class ChatMessageAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at",)
     ordering = ("-created_at",)
     
+    def message_preview(self, obj):
+        return obj.message[:60] + "..." if len(obj.message) > 60 else obj.message
+    message_preview.short_description = "Message"
+
+
+@admin.register(WorkspaceChatMessage)
+class WorkspaceChatMessageAdmin(admin.ModelAdmin):
+    list_display = ("workspace", "agent_type", "message_preview", "intent", "created_at")
+    list_filter = ("agent_type", "intent", "created_at")
+    search_fields = ("message", "response", "workspace__name")
+    readonly_fields = ("created_at",)
+    ordering = ("-created_at",)
+
     def message_preview(self, obj):
         return obj.message[:60] + "..." if len(obj.message) > 60 else obj.message
     message_preview.short_description = "Message"

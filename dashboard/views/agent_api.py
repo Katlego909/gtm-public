@@ -86,7 +86,9 @@ from .helpers import (
     _get_gap_scope,
     _load_pending_gap_suggestions,
     _md,
+    _parse_agent_request_payload,
     _resolve_dashboard_workspace,
+    _run_dashboard_action_command,
     _upsert_gap_metric_in_scope,
 )
 
@@ -94,27 +96,11 @@ from .helpers import (
 @login_required
 def dashboard_agent_api(request):
     """Run the GTM agent inline from the dashboard without navigating to chat."""
-    content_type = (request.content_type or '').lower()
-    uploaded_files = []
-    if 'multipart/form-data' in content_type:
-        session_id = str(request.POST.get('session_id', '')).strip()
-        message = (request.POST.get('message') or '').strip()
-        file_type = (request.POST.get('file_type') or 'other').strip()
-        uploaded_files = request.FILES.getlist('attachments')
-    else:
-        try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({"success": False, "error": "Invalid JSON"}, status=400)
-
-        session_id = str(data.get('session_id', '')).strip()
-        message = (data.get('message') or '').strip()
-        file_type = (data.get('file_type') or 'other').strip()
-
-    if not session_id:
-        return JsonResponse({"success": False, "error": "Select an assessment first."}, status=400)
-    if not message:
-        return JsonResponse({"success": False, "error": "Message cannot be empty."}, status=400)
+    session_id, message, file_type, uploaded_files, error_response = _parse_agent_request_payload(
+        request, require_session=True
+    )
+    if error_response:
+        return error_response
 
     try:
         session = AssessmentSession.objects.get(pk=session_id)
