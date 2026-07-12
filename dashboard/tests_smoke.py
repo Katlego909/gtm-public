@@ -13,6 +13,7 @@ from django.test import TestCase
 from django.test.utils import override_settings
 from django.urls import reverse
 
+from gtm.models import AssessmentSession
 from gtm.models_workspace import Workspace, WorkspaceMembership
 
 User = get_user_model()
@@ -83,3 +84,27 @@ class ViewPackageSmokeTests(TestCase):
         for name in self.DASHBOARD_PAGES:
             with self.subTest(url=name):
                 self._assert_renders(name)
+
+    def test_agent_hub_team_tab_renders(self):
+        """?agent_type=team is the 5th agent_hub tab (gtm/team_chat.py) --
+        must render both unbound (workspace only) and with an assessment
+        bound, since binding one changes which transfer tools exist."""
+        response = self.client.get(reverse("agent_hub"), {"agent_type": "team"})
+        self.assertEqual(response.status_code, 200)
+
+        session = AssessmentSession.objects.create(
+            owner_client_id="smoke-client",
+            user=self.user,
+            workspace=self.workspace,
+            company_name="Smoke Co",
+        )
+        response = self.client.get(
+            reverse("agent_hub"), {"agent_type": "team", "agent_session": str(session.uuid)}
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_team_agent_chat_url_resolves(self):
+        """The Team Chat POST endpoint (gtm/team_chat.py's entry point) must
+        be wired up; the POST itself needs a live Gemini call so isn't
+        exercised here, matching the other 4 chat endpoints."""
+        self.assertTrue(reverse("dashboard_team_agent_api"))

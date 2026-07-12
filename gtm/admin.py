@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django.contrib import messages
 from .utils_email import send_snapshot_report_email
-from .models import AssessmentSession, ResultSnapshot, RecommendationBand, Category, Question, Response, ActionItem, ToolRecommendation, ChatMessage, WorkspaceChatMessage
+from .models import AssessmentSession, ResultSnapshot, RecommendationBand, Category, Question, Response, ActionItem, ToolRecommendation, ChatMessage, WorkspaceChatMessage, AgentDocument
 from .models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation
 from dashboard.models import GapAnalysisMetric
 
@@ -202,6 +202,16 @@ class WorkspaceChatMessageAdmin(admin.ModelAdmin):
     def message_preview(self, obj):
         return obj.message[:60] + "..." if len(obj.message) > 60 else obj.message
     message_preview.short_description = "Message"
+
+
+@admin.register(AgentDocument)
+class AgentDocumentAdmin(admin.ModelAdmin):
+    list_display = ("title", "agent_type", "doc_type", "version", "workspace", "updated_at")
+    list_filter = ("agent_type", "doc_type", "created_at")
+    search_fields = ("title", "content", "workspace__name")
+    readonly_fields = ("created_at", "updated_at")
+    ordering = ("-updated_at",)
+
 
 @admin.register(GapAnalysisMetric)
 class GapAnalysisMetricAdmin(admin.ModelAdmin):

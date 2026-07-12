@@ -20,6 +20,7 @@
 .agent-bubble *:first-child { margin-top: 0; }
 .agent-bubble *:last-child  { margin-bottom: 0; }
 </style>
+{{ agent_display_labels|json_script:"agent-display-labels" }}
 <div class="p-6 md:p-8 h-full overflow-y-auto">
     <div class="max-w-7xl mx-auto">
         <div class="mb-6">
@@ -44,6 +45,7 @@
         {% if agent_session_options %}
         <div class="grid grid-cols-1 xl:grid-cols-[320px,1fr] gap-6">
             <aside class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 h-fit sticky top-4">
+                {% if active_agent_display %}<p class="text-xs font-semibold text-indigo-600 mb-3">{{ active_agent_display }}</p>{% endif %}
                 <div>
                     <label for="dashboard-agent-session" class="block text-sm font-semibold text-gray-700 mb-2">Assessment Context</label>
                     <select id="dashboard-agent-session" onchange="onDashboardAgentSessionChange(this.value)" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500">
@@ -71,19 +73,27 @@
                     <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Quick Prompts</p>
                     <div class="flex flex-wrap gap-2">
                         {% for prompt in dashboard_agent_prompts %}
-                        <button type="button" onclick="sendDashboardAgentPrompt('{{ prompt|escapejs }}')" class="px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 hover:bg-indigo-50 hover:border-indigo-200 text-gray-700 transition">
+                        <button type="button" onclick="sendDashboardAgentPrompt('{{ prompt|escapejs }}')" class="px-3 py-2 text-sm text-left rounded-lg border border-gray-200 bg-gray-50 hover:bg-indigo-50 hover:border-indigo-200 text-gray-700 transition">
                             {{ prompt }}
                         </button>
                         {% endfor %}
-                        <button type="button" onclick="sendDashboardAgentPrompt('Build my action plan')" class="px-3 py-2 text-sm rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition">
+                        <button type="button" onclick="sendDashboardAgentPrompt('Build my action plan')" class="px-3 py-2 text-sm text-left rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition">
                             Build my action plan
                         </button>
-                        <button type="button" onclick="sendDashboardAgentPrompt('Review my action items')" class="px-3 py-2 text-sm rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition">
+                        <button type="button" onclick="sendDashboardAgentPrompt('Review my action items')" class="px-3 py-2 text-sm text-left rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition">
                             Review my action items
                         </button>
                     </div>
                 </div>
                 {% endif %}
+
+                <div class="mt-6 pt-4 border-t border-gray-100">
+                    <div class="flex items-center justify-between mb-3">
+                        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Documents</p>
+                        <button type="button" onclick="refreshDocumentsPanel()" class="text-xs text-indigo-600 hover:underline">Refresh</button>
+                    </div>
+                    <div id="documents-list" data-scope-qs="?session_id={{ dashboard_agent_session.uuid }}{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}" class="space-y-2 text-sm text-gray-500">Loading...</div>
+                </div>
             </aside>
 
             <section id="dashboard-agent-chat-panel" class="border border-gray-200 rounded-2xl overflow-hidden bg-slate-50 min-h-[640px] flex flex-col transition-colors">
@@ -98,9 +108,10 @@
                     {% endfor %}
 
                     {% if not dashboard_agent_history %}
-                    <div class="flex items-start gap-3">
+                    <div class="flex flex-col items-start gap-1">
+                        <span class="text-xs font-semibold text-indigo-600 ml-1">{{ active_agent_display }}</span>
                         <div class="bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl">
-                            Ask about this assessment, build an action plan, or review the current execution backlog.
+                            Hi, I'm {{ active_agent_name }}, your GTM Strategist. Ask me about this assessment, build an action plan, or review your execution backlog.
                         </div>
                     </div>
                     {% endif %}
@@ -108,20 +119,13 @@
                 <form id="dashboard-agent-form" class="border-t border-gray-200 bg-white p-4 flex gap-3">
                     {% csrf_token %}
                     <input id="dashboard-agent-files" type="file" class="hidden" multiple accept=".txt,.md,.csv,.json,.log,.xml,.yaml,.yml,.pdf,image/*">
-                    <select id="dashboard-agent-file-type" title="Asset Type" class="px-2 py-3 rounded-xl border border-gray-300 bg-white text-xs font-semibold text-gray-700 hover:border-indigo-300 focus:ring-indigo-500 transition cursor-pointer">
-                        <option value="other">General Asset</option>
-                        <option value="landing_page">Landing Page</option>
-                        <option value="ad_creative">Ad Creative</option>
-                        <option value="sales_deck">Sales Deck</option>
-                        <option value="marketing_copy">Marketing Copy</option>
-                    </select>
                     <button id="dashboard-agent-attach" type="button" class="px-3 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition flex items-center justify-center" aria-label="Attach file">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l7.071-7.071a4 4 0 00-5.657-5.657l-7.071 7.07a6 6 0 108.485 8.486L19 13" />
                         </svg>
                         <span class="sr-only">Attach</span>
                     </button>
-                    <input id="dashboard-agent-input" type="text" placeholder="Ask the GTM agent anything about this assessment..." class="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <input id="dashboard-agent-input" type="text" placeholder="Ask {{ active_agent_name|default:'the GTM agent' }} anything about this assessment..." class="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-indigo-500 focus:ring-indigo-500">
                     <button id="dashboard-agent-send" type="submit" class="px-5 py-3 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center" aria-label="Send message">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M22 2L11 13" />
@@ -145,6 +149,85 @@
             <p class="text-sm text-gray-500 mt-2">Run your first GTM assessment to unlock Agent Workspace.</p>
         </div>
         {% endif %}
+        {% elif active_agent_type == 'team' %}
+        {% if current_workspace or agent_session_options %}
+        <div class="grid grid-cols-1 xl:grid-cols-[320px,1fr] gap-6">
+            <aside class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 h-fit sticky top-4">
+                <p class="text-sm font-semibold text-gray-700 mb-2">Team Chat</p>
+                <p class="text-xs text-gray-500">
+                    Talk to whichever agent fits -- control transfers to the right specialist automatically, and it answers in its own voice.
+                </p>
+
+                {% if agent_session_options %}
+                <div class="mt-4">
+                    <label for="team-agent-session" class="block text-sm font-semibold text-gray-700 mb-2">Assessment Context (optional)</label>
+                    <select id="team-agent-session" onchange="onTeamAgentSessionChange(this.value)" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option value="">None -- workspace only</option>
+                        {% for session_option in agent_session_options %}
+                        <option value="{{ session_option.uuid }}" {% if team_selected_session and team_selected_session.uuid|stringformat:'s' == session_option.uuid %}selected{% endif %}>{{ session_option.label }}</option>
+                        {% endfor %}
+                    </select>
+                    <p class="mt-2 text-xs text-gray-400">Binding an assessment lets the team transfer to the GTM Strategist too.</p>
+                </div>
+                {% endif %}
+
+                <div class="mt-6 pt-4 border-t border-gray-100">
+                    <div class="flex items-center justify-between mb-3">
+                        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Documents</p>
+                        <button type="button" onclick="refreshDocumentsPanel()" class="text-xs text-indigo-600 hover:underline">Refresh</button>
+                    </div>
+                    <div id="documents-list" data-scope-qs="?{% if current_workspace %}workspace={{ current_workspace.id }}{% if team_selected_session %}&session_id={{ team_selected_session.uuid }}{% endif %}{% elif team_selected_session %}session_id={{ team_selected_session.uuid }}{% endif %}" class="space-y-2 text-sm text-gray-500">Loading...</div>
+                </div>
+            </aside>
+
+            <section id="team-agent-chat-panel" class="border border-gray-200 rounded-2xl overflow-hidden bg-slate-50 min-h-[640px] flex flex-col transition-colors">
+                <div id="team-agent-messages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 scroll-smooth">
+                    {% for chat in team_agent_history %}
+                    <div class="flex items-start gap-3 justify-end">
+                        <div class="bg-gray-900 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm max-w-3xl whitespace-pre-wrap">{{ chat.message }}</div>
+                    </div>
+                    <div class="flex flex-col items-start gap-1">
+                        <span class="text-xs font-semibold text-indigo-600 ml-1">{{ chat.agent_label }}</span>
+                        <div class="agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl">{{ chat.response_html|safe }}</div>
+                    </div>
+                    {% endfor %}
+
+                    {% if not team_agent_history %}
+                    <div class="flex flex-col items-start gap-1">
+                        <span class="text-xs font-semibold text-indigo-600 ml-1">Team</span>
+                        <div class="bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl">
+                            Hi, we're {{ team_agent_names_display }}. Ask anything, and whichever of us owns the answer will take over and reply directly.
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+                <form id="team-agent-form" class="border-t border-gray-200 bg-white p-4 flex gap-3">
+                    {% csrf_token %}
+                    <input id="team-agent-files" type="file" class="hidden" multiple accept=".txt,.md,.csv,.json,.log,.xml,.yaml,.yml,.pdf,image/*">
+                    <button id="team-agent-attach" type="button" class="px-3 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition flex items-center justify-center" aria-label="Attach file">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l7.071-7.071a4 4 0 00-5.657-5.657l-7.071 7.07a6 6 0 108.485 8.486L19 13" />
+                        </svg>
+                        <span class="sr-only">Attach</span>
+                    </button>
+                    <input id="team-agent-input" type="text" placeholder="Ask the team anything..." class="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <button id="team-agent-send" type="submit" class="px-5 py-3 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center" aria-label="Send message">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M22 2L11 13" />
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M22 2L15 22L11 13L2 9L22 2Z" />
+                        </svg>
+                        <span class="sr-only">Send</span>
+                    </button>
+                </form>
+                <p id="team-agent-files-hint" class="px-4 pb-3 text-xs text-gray-500 hidden"></p>
+            </section>
+        </div>
+        {% else %}
+        <div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center">
+            <p class="text-gray-700 font-medium">Select a workspace or run an assessment to use Team Chat.</p>
+            <p class="text-sm text-gray-500 mt-2">Team Chat needs at least a workspace or an assessment to talk about.</p>
+        </div>
+        {% endif %}
         {% elif not current_workspace %}
         <div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center">
             <p class="text-gray-700 font-medium">Select a workspace to use this agent.</p>
@@ -153,6 +236,7 @@
         {% else %}
         <div class="grid grid-cols-1 xl:grid-cols-[320px,1fr] gap-6">
             <aside class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 h-fit sticky top-4">
+                {% if active_agent_display %}<p class="text-xs font-semibold text-indigo-600 mb-1">{{ active_agent_display }}</p>{% endif %}
                 <p class="text-sm font-semibold text-gray-700 mb-2">{{ current_workspace.name }}</p>
                 <p class="text-xs text-gray-500">
                     {% if active_agent_type == 'portfolio' %}Trends across every assessment in this workspace.
@@ -170,31 +254,31 @@
                 </div>
                 {% endif %}
 
-                {% if active_agent_type == 'portfolio' or active_agent_type == 'insights' %}
-                <div class="mt-4 pt-4 border-t border-gray-100">
-                    <button type="button" id="client-summary-button" onclick="refreshClientSummary()" class="inline-flex items-center justify-center w-full px-4 py-2 rounded-lg border border-emerald-200 text-sm font-medium text-emerald-700 hover:bg-emerald-50 transition">
-                        Generate Client Summary
-                    </button>
-                    <p id="client-summary-status" class="mt-2 text-xs text-gray-500"></p>
-                    <div id="client-summary-exports" class="mt-2 hidden flex flex-col gap-1 text-xs">
-                        <a id="client-summary-export-pdf" href="#" target="_blank" class="text-indigo-600 hover:underline">Download PDF</a>
-                        <a id="client-summary-export-docx" href="#" target="_blank" class="text-indigo-600 hover:underline">Download Word</a>
-                    </div>
-                </div>
-                {% endif %}
-
-                {% if workspace_agent_prompts %}
+                {% if workspace_agent_prompts or active_agent_type == 'portfolio' or active_agent_type == 'insights' %}
                 <div class="mt-6">
                     <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Quick Prompts</p>
                     <div class="flex flex-wrap gap-2">
                         {% for prompt in workspace_agent_prompts %}
-                        <button type="button" onclick="sendWorkspaceAgentPrompt('{{ prompt|escapejs }}')" class="px-3 py-2 text-sm rounded-lg border border-gray-200 bg-gray-50 hover:bg-indigo-50 hover:border-indigo-200 text-gray-700 transition">
+                        <button type="button" onclick="sendWorkspaceAgentPrompt('{{ prompt|escapejs }}')" class="px-3 py-2 text-sm text-left rounded-lg border border-gray-200 bg-gray-50 hover:bg-indigo-50 hover:border-indigo-200 text-gray-700 transition">
                             {{ prompt }}
                         </button>
                         {% endfor %}
+                        {% if active_agent_type == 'portfolio' or active_agent_type == 'insights' %}
+                        <button type="button" onclick="sendWorkspaceAgentPrompt('Draft a client summary I can send to the client')" class="px-3 py-2 text-sm text-left rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition">
+                            Draft a client summary
+                        </button>
+                        {% endif %}
                     </div>
                 </div>
                 {% endif %}
+
+                <div class="mt-6 pt-4 border-t border-gray-100">
+                    <div class="flex items-center justify-between mb-3">
+                        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Documents</p>
+                        <button type="button" onclick="refreshDocumentsPanel()" class="text-xs text-indigo-600 hover:underline">Refresh</button>
+                    </div>
+                    <div id="documents-list" data-scope-qs="?workspace={{ current_workspace.id }}" class="space-y-2 text-sm text-gray-500">Loading...</div>
+                </div>
             </aside>
 
             <section id="workspace-agent-chat-panel" data-agent-type="{{ active_agent_type }}" class="border border-gray-200 rounded-2xl overflow-hidden bg-slate-50 min-h-[640px] flex flex-col transition-colors">
@@ -209,11 +293,12 @@
                     {% endfor %}
 
                     {% if not workspace_agent_history %}
-                    <div class="flex items-start gap-3">
+                    <div class="flex flex-col items-start gap-1">
+                        <span class="text-xs font-semibold text-indigo-600 ml-1">{{ active_agent_display }}</span>
                         <div class="bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl">
-                            {% if active_agent_type == 'portfolio' %}Ask about trends across this workspace's assessments.
-                            {% elif active_agent_type == 'resource' %}Ask about the resource library or coverage gaps.
-                            {% elif active_agent_type == 'insights' %}Ask what changed recently, or click Refresh Insights for a digest.
+                            {% if active_agent_type == 'portfolio' %}Hi, I'm {{ active_agent_name }}, your Portfolio Agent. Ask me about trends across this workspace's assessments.
+                            {% elif active_agent_type == 'resource' %}Hi, I'm {{ active_agent_name }}, your Resource Agent. Ask me about the resource library or coverage gaps.
+                            {% elif active_agent_type == 'insights' %}Hi, I'm {{ active_agent_name }}, your Insights Agent. Ask me what changed recently, or click Refresh Insights for a digest.
                             {% endif %}
                         </div>
                     </div>
@@ -221,7 +306,14 @@
                 </div>
                 <form id="workspace-agent-form" class="border-t border-gray-200 bg-white p-4 flex gap-3">
                     {% csrf_token %}
-                    <input id="workspace-agent-input" type="text" placeholder="Ask the agent anything about this workspace..." class="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <input id="workspace-agent-files" type="file" class="hidden" multiple accept=".txt,.md,.csv,.json,.log,.xml,.yaml,.yml,.pdf,image/*">
+                    <button id="workspace-agent-attach" type="button" class="px-3 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition flex items-center justify-center" aria-label="Attach file">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l7.071-7.071a4 4 0 00-5.657-5.657l-7.071 7.07a6 6 0 108.485 8.486L19 13" />
+                        </svg>
+                        <span class="sr-only">Attach</span>
+                    </button>
+                    <input id="workspace-agent-input" type="text" placeholder="Ask {{ active_agent_name|default:'the agent' }} anything about this workspace..." class="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-indigo-500 focus:ring-indigo-500">
                     <button id="workspace-agent-send" type="submit" class="px-5 py-3 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center" aria-label="Send message">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M22 2L11 13" />
@@ -236,6 +328,7 @@
                         <span class="sr-only">Clear</span>
                     </button>
                 </form>
+                <p id="workspace-agent-files-hint" class="px-4 pb-3 text-xs text-gray-500 hidden"></p>
             </section>
         </div>
         {% endif %}
@@ -280,12 +373,10 @@ async function sendDashboardAgentMessage(message) {
     const button = document.getElementById('dashboard-agent-send');
     const attachButton = document.getElementById('dashboard-agent-attach');
     const fileInput = document.getElementById('dashboard-agent-files');
-    const fileType = document.getElementById('dashboard-agent-file-type');
     const sessionSelect = document.getElementById('dashboard-agent-session');
-    if (!input || !button || !sessionSelect || !fileInput || !attachButton || !fileType) return;
+    if (!input || !button || !sessionSelect || !fileInput || !attachButton) return;
 
     const sessionId = sessionSelect.value;
-    const selectedFileType = fileType.value || 'other';
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
     const files = Array.from(fileInput.files || []);
     if (!sessionId) {
@@ -323,7 +414,6 @@ async function sendDashboardAgentMessage(message) {
             const formData = new FormData();
             formData.append('session_id', sessionId);
             formData.append('message', message);
-            formData.append('file_type', selectedFileType);
             files.forEach(file => formData.append('attachments', file));
             response = await fetch(agentApiUrl, {
                 method: 'POST',
@@ -342,7 +432,6 @@ async function sendDashboardAgentMessage(message) {
                 body: JSON.stringify({
                     session_id: sessionId,
                     message: message,
-                    file_type: selectedFileType,
                 }),
             });
         }
@@ -446,7 +535,7 @@ async function executeDashboardAgentClear(sessionId, clearButton, container) {
         }
 
         container.innerHTML = '';
-        appendDashboardAgentMessage('Ask about this assessment, build an action plan, or review the current execution backlog.', false);
+        appendDashboardAgentMessage("Hi, I'm {{ active_agent_name }}, your GTM Strategist. Ask me about this assessment, build an action plan, or review your execution backlog.", false);
     } catch (error) {
         appendDashboardAgentMessage('Error: Could not clear chat history.', false);
     } finally {
@@ -454,8 +543,8 @@ async function executeDashboardAgentClear(sessionId, clearButton, container) {
     }
 }
 
-function updateDashboardAgentFileHint(fileInput) {
-    const hint = document.getElementById('dashboard-agent-files-hint');
+function updateDashboardAgentFileHint(fileInput, hintId) {
+    const hint = document.getElementById(hintId || 'dashboard-agent-files-hint');
     if (!hint || !fileInput) return;
     const names = Array.from(fileInput.files || []).map(file => file.name).filter(Boolean);
     if (!names.length) {
@@ -496,6 +585,7 @@ function initDashboardAgent() {
     if (!agentForm || !agentInput || agentForm.dataset.initialized === 'true') return;
 
     agentForm.dataset.initialized = 'true';
+    refreshDocumentsPanel();
 
     // Check for auto-prompt parameter in URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -568,14 +658,18 @@ function initDashboardAgent() {
 async function sendWorkspaceAgentMessage(agentType, message) {
     const input = document.getElementById('workspace-agent-input');
     const button = document.getElementById('workspace-agent-send');
+    const attachButton = document.getElementById('workspace-agent-attach');
+    const fileInput = document.getElementById('workspace-agent-files');
     if (!input || !button) return;
 
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
+    const files = Array.from(fileInput?.files || []);
 
     appendDashboardAgentMessage(message, true, null, 'workspace-agent-messages');
     input.value = '';
     input.disabled = true;
     button.disabled = true;
+    if (attachButton) attachButton.disabled = true;
 
     const thinkingId = 'ws-thinking-' + Date.now();
     const msgsContainer = document.getElementById('workspace-agent-messages');
@@ -595,14 +689,26 @@ async function sendWorkspaceAgentMessage(agentType, message) {
 
     try {
         const agentApiUrl = `/dashboard/agent/${agentType}/chat/${window.location.search || ''}`;
-        const response = await fetch(agentApiUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRFToken': csrfToken,
-            },
-            body: JSON.stringify({ message: message }),
-        });
+        let response;
+        if (files.length) {
+            const formData = new FormData();
+            formData.append('message', message);
+            files.forEach(file => formData.append('attachments', file));
+            response = await fetch(agentApiUrl, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken },
+                body: formData,
+            });
+        } else {
+            response = await fetch(agentApiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken,
+                },
+                body: JSON.stringify({ message: message }),
+            });
+        }
         const data = await response.json();
         appendDashboardAgentMessage(
             data.success ? data.response : `Error: ${data.error || 'Unknown error'}`,
@@ -617,6 +723,9 @@ async function sendWorkspaceAgentMessage(agentType, message) {
         if (thinkingEl) thinkingEl.remove();
         input.disabled = false;
         button.disabled = false;
+        if (attachButton) attachButton.disabled = false;
+        if (fileInput) fileInput.value = '';
+        updateDashboardAgentFileHint(fileInput, 'workspace-agent-files-hint');
         input.focus();
     }
 }
@@ -763,83 +872,102 @@ function pollWorkspaceInsightsStatus(button, statusEl, attempt) {
         });
 }
 
-async function refreshClientSummary() {
-    const button = document.getElementById('client-summary-button');
-    const statusEl = document.getElementById('client-summary-status');
-    if (!button || !statusEl) return;
+function escapeHtml(str) {
+    return String(str || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
+}
 
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
-    button.disabled = true;
-    statusEl.textContent = 'Drafting...';
+function renderDocumentsList(docs) {
+    const container = document.getElementById('documents-list');
+    if (!container) return;
+    const scopeQs = container.dataset.scopeQs || '';
+
+    if (!docs.length) {
+        container.innerHTML = '<p class="text-xs text-gray-400">No documents saved yet. Ask the agent to create one, e.g. "save this as a document."</p>';
+        return;
+    }
+
+    container.innerHTML = docs.map(d => `
+        <div class="border border-gray-200 rounded-lg p-3">
+            <p class="text-sm font-medium text-gray-800">${escapeHtml(d.title)}</p>
+            <p class="text-xs text-gray-400">${escapeHtml(d.doc_type_display)} &middot; v${d.version} &middot; ${new Date(d.updated_at).toLocaleDateString()}</p>
+            <div class="mt-2 flex flex-wrap gap-2 text-xs">
+                <button type="button" onclick="openDocumentEditor('${d.id}')" class="text-indigo-600 hover:underline">Edit</button>
+                <a href="/dashboard/documents/${d.id}/export/pdf/${scopeQs}" target="_blank" class="text-indigo-600 hover:underline">PDF</a>
+                <a href="/dashboard/documents/${d.id}/export/docx/${scopeQs}" target="_blank" class="text-indigo-600 hover:underline">Word</a>
+                <a href="/dashboard/documents/${d.id}/export/md/${scopeQs}" target="_blank" class="text-indigo-600 hover:underline">Markdown</a>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function refreshDocumentsPanel() {
+    const container = document.getElementById('documents-list');
+    if (!container) return;
+    const scopeQs = container.dataset.scopeQs || '';
+    if (!scopeQs) return;
 
     try {
-        const response = await fetch(`/dashboard/agent/client-summary/refresh/${window.location.search || ''}`, {
-            method: 'POST',
-            headers: { 'X-CSRFToken': csrfToken },
-        });
+        const response = await fetch(`/dashboard/documents/${scopeQs}`);
         const data = await response.json();
-        if (!data.success) {
-            statusEl.textContent = data.error || 'Could not generate a client summary.';
-            button.disabled = false;
-            return;
-        }
-        pollClientSummaryStatus(button, statusEl);
+        renderDocumentsList(data.documents || []);
     } catch (error) {
-        statusEl.textContent = 'Could not generate a client summary.';
-        button.disabled = false;
+        container.innerHTML = '<p class="text-xs text-red-500">Could not load documents.</p>';
     }
 }
 
-function pollClientSummaryStatus(button, statusEl, attempt) {
-    attempt = attempt || 0;
-    if (attempt > 30) {
-        statusEl.textContent = 'Still working — check back shortly.';
-        button.disabled = false;
-        return;
-    }
-    fetch(`/dashboard/agent/client-summary/status/${window.location.search || ''}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'generating') {
-                statusEl.textContent = 'Drafting...';
-                setTimeout(() => pollClientSummaryStatus(button, statusEl, attempt + 1), 2000);
-                return;
-            }
-            button.disabled = false;
-            if (data.status === 'failed') {
-                statusEl.textContent = 'Draft failed — please try again.';
-                return;
-            }
-            statusEl.textContent = data.generated_at ? `Drafted ${new Date(data.generated_at).toLocaleString()}` : '';
+async function openDocumentEditor(docId) {
+    const modalContent = document.getElementById('modal-content');
+    const listContainer = document.getElementById('documents-list');
+    if (!modalContent || typeof window.openModal !== 'function' || !listContainer) return;
+    const scopeQs = listContainer.dataset.scopeQs || '';
 
-            if (data.latest_summary_id) {
-                const exportsEl = document.getElementById('client-summary-exports');
-                const pdfLink = document.getElementById('client-summary-export-pdf');
-                const docxLink = document.getElementById('client-summary-export-docx');
-                const qs = window.location.search || '';
-                if (pdfLink) pdfLink.href = `/dashboard/client-summary/${data.latest_summary_id}/export/pdf/${qs}`;
-                if (docxLink) docxLink.href = `/dashboard/client-summary/${data.latest_summary_id}/export/docx/${qs}`;
-                if (exportsEl) exportsEl.classList.remove('hidden');
-            }
+    const response = await fetch(`/dashboard/documents/${docId}/${scopeQs}`);
+    const data = await response.json();
+    if (!data.success) return;
 
-            if (data.latest_summary_html) {
-                const container = document.getElementById('workspace-agent-messages');
-                if (container) {
-                    const wrapper = document.createElement('div');
-                    wrapper.className = 'flex items-start gap-3';
-                    const bubble = document.createElement('div');
-                    bubble.className = 'agent-bubble bg-emerald-50 border border-emerald-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl';
-                    bubble.innerHTML = data.latest_summary_html;
-                    wrapper.appendChild(bubble);
-                    container.appendChild(wrapper);
-                    container.scrollTop = container.scrollHeight;
-                }
-            }
-        })
-        .catch(() => {
-            statusEl.textContent = 'Could not check draft status.';
-            button.disabled = false;
+    modalContent.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden w-full max-w-2xl">
+            <div class="px-6 py-5 border-b border-gray-100">
+                <h3 class="text-lg font-semibold text-gray-900">${escapeHtml(data.title)}</h3>
+                <p class="mt-1 text-xs text-gray-500">Version ${data.version}</p>
+            </div>
+            <div class="px-6 py-4">
+                <textarea id="document-edit-textarea" rows="14" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-mono focus:border-indigo-500 focus:ring-indigo-500">${escapeHtml(data.content)}</textarea>
+            </div>
+            <div class="px-6 py-4 flex justify-end gap-3 border-t border-gray-100">
+                <button type="button" id="document-edit-cancel" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
+                <button type="button" id="document-edit-save" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition">Save</button>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('document-edit-cancel').addEventListener('click', function() {
+        window.closeModal();
+    }, { once: true });
+
+    document.getElementById('document-edit-save').addEventListener('click', async function() {
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
+        const content = document.getElementById('document-edit-textarea').value;
+        const saveResponse = await fetch(`/dashboard/documents/${docId}/${scopeQs}`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': csrfToken,
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `content=${encodeURIComponent(content)}`,
         });
+        const saveData = await saveResponse.json();
+        window.closeModal();
+        if (saveData.success) {
+            refreshDocumentsPanel();
+        }
+    }, { once: true });
+
+    window.openModal();
 }
 
 function initWorkspaceAgent() {
@@ -848,9 +976,12 @@ function initWorkspaceAgent() {
     const clearButton = document.getElementById('workspace-agent-clear');
     const container = document.getElementById('workspace-agent-messages');
     const panel = document.getElementById('workspace-agent-chat-panel');
+    const fileInput = document.getElementById('workspace-agent-files');
+    const attachButton = document.getElementById('workspace-agent-attach');
     if (!agentForm || !agentInput || !panel || agentForm.dataset.initialized === 'true') return;
 
     agentForm.dataset.initialized = 'true';
+    refreshDocumentsPanel();
 
     agentForm.addEventListener('submit', function(event) {
         event.preventDefault();
@@ -866,12 +997,228 @@ function initWorkspaceAgent() {
     if (container) {
         container.scrollTop = container.scrollHeight;
     }
+
+    if (attachButton && fileInput) {
+        attachButton.addEventListener('click', function() {
+            fileInput.click();
+        });
+        fileInput.addEventListener('change', function() {
+            updateDashboardAgentFileHint(fileInput, 'workspace-agent-files-hint');
+        });
+    }
+
+    if (panel && fileInput) {
+        panel.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            panel.classList.add('ring-2', 'ring-indigo-200');
+        });
+        panel.addEventListener('dragleave', function() {
+            panel.classList.remove('ring-2', 'ring-indigo-200');
+        });
+        panel.addEventListener('drop', function(e) {
+            e.preventDefault();
+            panel.classList.remove('ring-2', 'ring-indigo-200');
+            const dropped = Array.from(e.dataTransfer.files || []);
+            if (!dropped.length) return;
+
+            const dt = new DataTransfer();
+            Array.from(fileInput.files || []).forEach(f => dt.items.add(f));
+            dropped.forEach(f => dt.items.add(f));
+            fileInput.files = dt.files;
+            updateDashboardAgentFileHint(fileInput, 'workspace-agent-files-hint');
+        });
+    }
+}
+
+const TEAM_AGENT_LABELS = JSON.parse(document.getElementById('agent-display-labels').textContent);
+
+function appendTeamAgentMessage(message, isUser, responseHtml, agentType) {
+    const container = document.getElementById('team-agent-messages');
+    if (!container) return;
+
+    const safeMessage = String(message || '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;');
+
+    const wrapper = document.createElement('div');
+
+    if (isUser) {
+        wrapper.className = 'flex items-start gap-3 justify-end';
+        wrapper.innerHTML = `
+            <div class="bg-gray-900 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm max-w-3xl whitespace-pre-wrap">${safeMessage}</div>
+        `;
+    } else {
+        wrapper.className = 'flex flex-col items-start gap-1';
+        const label = TEAM_AGENT_LABELS[agentType] || 'Agent';
+        const labelEl = document.createElement('span');
+        labelEl.className = 'text-xs font-semibold text-indigo-600 ml-1';
+        labelEl.textContent = label;
+        const bubble = document.createElement('div');
+        bubble.className = 'agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl';
+        if (responseHtml) {
+            bubble.innerHTML = responseHtml;
+        } else {
+            bubble.textContent = message || '';
+        }
+        wrapper.appendChild(labelEl);
+        wrapper.appendChild(bubble);
+    }
+
+    container.appendChild(wrapper);
+    container.scrollTop = container.scrollHeight;
+}
+
+async function sendTeamAgentMessage(message) {
+    const input = document.getElementById('team-agent-input');
+    const button = document.getElementById('team-agent-send');
+    const sessionSelect = document.getElementById('team-agent-session');
+    const attachButton = document.getElementById('team-agent-attach');
+    const fileInput = document.getElementById('team-agent-files');
+    if (!input || !button) return;
+
+    const sessionId = sessionSelect ? sessionSelect.value : '';
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
+    const files = Array.from(fileInput?.files || []);
+
+    appendTeamAgentMessage(message, true);
+    input.value = '';
+    input.disabled = true;
+    button.disabled = true;
+    if (attachButton) attachButton.disabled = true;
+
+    const thinkingId = 'team-thinking-' + Date.now();
+    const msgsContainer = document.getElementById('team-agent-messages');
+    if (msgsContainer) {
+        const thinkingWrapper = document.createElement('div');
+        thinkingWrapper.id = thinkingId;
+        thinkingWrapper.className = 'flex items-start gap-3';
+        thinkingWrapper.innerHTML = `
+            <div class="agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl flex items-center gap-2">
+                <svg class="animate-spin h-4 w-4 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                Processing...
+            </div>
+        `;
+        msgsContainer.appendChild(thinkingWrapper);
+        msgsContainer.scrollTop = msgsContainer.scrollHeight;
+    }
+
+    try {
+        const agentApiUrl = `/dashboard/agent/team/chat/${window.location.search || ''}`;
+        let response;
+        if (files.length) {
+            const formData = new FormData();
+            formData.append('session_id', sessionId);
+            formData.append('message', message);
+            files.forEach(file => formData.append('attachments', file));
+            response = await fetch(agentApiUrl, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken },
+                body: formData,
+            });
+        } else {
+            response = await fetch(agentApiUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken,
+                },
+                body: JSON.stringify({ session_id: sessionId, message: message }),
+            });
+        }
+        const data = await response.json();
+        appendTeamAgentMessage(
+            data.success ? data.response : `Error: ${data.error || 'Unknown error'}`,
+            false,
+            data.response_html || '',
+            data.agent_type
+        );
+    } catch (error) {
+        appendTeamAgentMessage('Error: Could not reach the team agent.', false, null, null);
+    } finally {
+        const thinkingEl = document.getElementById(thinkingId);
+        if (thinkingEl) thinkingEl.remove();
+        input.disabled = false;
+        button.disabled = false;
+        if (attachButton) attachButton.disabled = false;
+        if (fileInput) fileInput.value = '';
+        updateDashboardAgentFileHint(fileInput, 'team-agent-files-hint');
+        input.focus();
+    }
+}
+
+function onTeamAgentSessionChange(sessionId) {
+    const currentUrl = new URL(window.location.href);
+    if (sessionId) {
+        currentUrl.searchParams.set('agent_session', sessionId);
+    } else {
+        currentUrl.searchParams.delete('agent_session');
+    }
+    window.location.href = currentUrl.toString();
+}
+
+function initTeamAgent() {
+    const agentForm = document.getElementById('team-agent-form');
+    const agentInput = document.getElementById('team-agent-input');
+    const container = document.getElementById('team-agent-messages');
+    const panel = document.getElementById('team-agent-chat-panel');
+    const fileInput = document.getElementById('team-agent-files');
+    const attachButton = document.getElementById('team-agent-attach');
+    if (!agentForm || !agentInput || agentForm.dataset.initialized === 'true') return;
+
+    agentForm.dataset.initialized = 'true';
+    refreshDocumentsPanel();
+
+    agentForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        const message = agentInput.value.trim();
+        if (!message) return;
+        sendTeamAgentMessage(message);
+    });
+
+    if (container) {
+        container.scrollTop = container.scrollHeight;
+    }
+
+    if (attachButton && fileInput) {
+        attachButton.addEventListener('click', function() {
+            fileInput.click();
+        });
+        fileInput.addEventListener('change', function() {
+            updateDashboardAgentFileHint(fileInput, 'team-agent-files-hint');
+        });
+    }
+
+    if (panel && fileInput) {
+        panel.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            panel.classList.add('ring-2', 'ring-indigo-200');
+        });
+        panel.addEventListener('dragleave', function() {
+            panel.classList.remove('ring-2', 'ring-indigo-200');
+        });
+        panel.addEventListener('drop', function(e) {
+            e.preventDefault();
+            panel.classList.remove('ring-2', 'ring-indigo-200');
+            const dropped = Array.from(e.dataTransfer.files || []);
+            if (!dropped.length) return;
+
+            const dt = new DataTransfer();
+            Array.from(fileInput.files || []).forEach(f => dt.items.add(f));
+            dropped.forEach(f => dt.items.add(f));
+            fileInput.files = dt.files;
+            updateDashboardAgentFileHint(fileInput, 'team-agent-files-hint');
+        });
+    }
 }
 
 document.addEventListener('DOMContentLoaded', initDashboardAgent);
 document.addEventListener('htmx:afterSwap', initDashboardAgent);
 document.addEventListener('DOMContentLoaded', initWorkspaceAgent);
 document.addEventListener('htmx:afterSwap', initWorkspaceAgent);
+document.addEventListener('DOMContentLoaded', initTeamAgent);
+document.addEventListener('htmx:afterSwap', initTeamAgent);
 initDashboardAgent();
 initWorkspaceAgent();
+initTeamAgent();
 </script>

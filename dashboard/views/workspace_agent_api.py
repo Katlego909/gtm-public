@@ -10,7 +10,6 @@ import logging
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.http import Http404, JsonResponse
-from django.shortcuts import get_object_or_404
 from django.views.decorators.http import require_http_methods
 
 from dashboard.utils_notifications import send_notification
@@ -21,15 +20,13 @@ from gtm.utils_async import run_in_background
 from gtm.utils_logging import log_ai_error
 from gtm.workspace_agent_chat import (
     AGENT_TYPES,
-    CLIENT_SUMMARY_AGENT_TYPE,
     build_insights_context,
-    draft_client_summary_text,
     format_insights_digest_text,
     get_suggested_prompts_for_agent,
     process_workspace_chat_message,
 )
 
-from ..parsers import log_workspace_activity
+from ..document_processors import _process_agent_attachments
 from .helpers import _md, _parse_agent_request_payload, _resolve_dashboard_workspace
 
 logger = logging.getLogger(__name__)
@@ -53,6 +50,19 @@ def _resolve_session_in_workspace(session_id, workspace):
     return None
 
 
+def _resolve_team_session(request, session_id, current_workspace):
+    """Team Chat's session check: trust session_id either when it belongs
+    to the resolved workspace, or -- for a personal, no-workspace session --
+    when the requester owns it directly."""
+    if not session_id:
+        return None
+    if current_workspace and AssessmentSession.objects.filter(uuid=session_id, workspace=current_workspace).exists():
+        return session_id
+    if AssessmentSession.objects.filter(uuid=session_id, user=request.user, workspace__isnull=True).exists():
+        return session_id
+    return None
+
+
 @require_http_methods(["POST"])
 @login_required
 def dashboard_workspace_agent_api(request, agent_type):
@@ -72,6 +82,7 @@ def dashboard_workspace_agent_api(request, agent_type):
         return error_response
 
     resolved_session_id = _resolve_session_in_workspace(session_id, current_workspace)
+    attachments, attachment_context, attachment_warnings = _process_agent_attachments(uploaded_files)
 
     result = process_workspace_chat_message(
         agent_type=agent_type,
@@ -79,6 +90,7 @@ def dashboard_workspace_agent_api(request, agent_type):
         message=message,
         user=request.user,
         session_id=resolved_session_id,
+        supplemental_context=attachment_context,
     )
 
     if result.get("success"):
@@ -89,9 +101,13 @@ def dashboard_workspace_agent_api(request, agent_type):
             user=request.user,
             message=message,
             response=result.get("response", ""),
+            attachments=attachments,
             intent=result.get("intent", ""),
         )
         result["response_html"] = _md(result.get("response", ""))
+        result["uploaded_attachments"] = attachments
+        if attachment_warnings:
+            result["attachment_warnings"] = attachment_warnings
 
     return JsonResponse(result, status=200 if result.get("success") else 500)
 
@@ -151,6 +167,53 @@ def dashboard_workspace_agent_context_api(request, agent_type):
         "prompts": prompts,
         "history": history,
     })
+
+
+# ================================================================
+# TEAM CHAT -- one window, real transfer_to_agent between all 4 agents
+# (gtm/team_chat.py). Persistence happens inside process_team_chat_message
+# itself (into whichever agent's own table actually responded), so this
+# view is a thin wrapper unlike the other chat endpoints above.
+# ================================================================
+
+@require_http_methods(["POST"])
+@login_required
+def dashboard_team_agent_api(request):
+    """Run a Team Chat turn: resolves who's active, follows any transfer
+    chain, and returns whichever agent ultimately answered."""
+    from gtm.team_chat import process_team_chat_message
+
+    current_workspace, _ = _resolve_dashboard_workspace(request)
+
+    session_id, message, file_type, uploaded_files, error_response = _parse_agent_request_payload(
+        request, require_session=False
+    )
+    if error_response:
+        return error_response
+
+    resolved_session_id = _resolve_team_session(request, session_id, current_workspace)
+
+    if not current_workspace and not resolved_session_id:
+        return JsonResponse({"success": False, "error": "Select a workspace or assessment first."}, status=400)
+
+    attachments, attachment_context, attachment_warnings = _process_agent_attachments(uploaded_files)
+
+    result = process_team_chat_message(
+        workspace_id=current_workspace.id if current_workspace else None,
+        message=message,
+        user=request.user,
+        session_id=resolved_session_id,
+        supplemental_context=attachment_context,
+        attachments=attachments,
+    )
+
+    if result.get("success"):
+        result["response_html"] = _md(result.get("response", ""))
+        result["uploaded_attachments"] = attachments
+        if attachment_warnings:
+            result["attachment_warnings"] = attachment_warnings
+
+    return JsonResponse(result, status=200 if result.get("success") else 500)
 
 
 # ================================================================
@@ -266,150 +329,142 @@ def dashboard_agent_insights_status(request):
 
 
 # ================================================================
-# CLIENT SUMMARY (client-facing deliverable) -- same on-demand refresh +
-# poll pattern as the insights digest above, plus an export endpoint.
-# Always persisted with agent_type="insights" regardless of which agent's
-# tool triggered it, so exports don't need to know which agent generated it.
-# CLIENT_SUMMARY_AGENT_TYPE is imported from gtm.workspace_agent_chat, the
-# single source of truth both this module and the conversational tool use.
+# AGENT DOCUMENTS -- generic list/edit/export for documents any of the 4
+# agents can author (gtm/agent_documents.py). Creation and (chat-driven)
+# editing happen via the create_document/edit_document tools; these views
+# cover the Documents panel: listing, manual editing, and multi-format
+# export. Scoped to either a workspace (the 3 workspace agent tabs) or a
+# specific, ownership-checked session (the GTM Strategist tab).
 # ================================================================
 
+def _resolve_document_scope(request):
+    """Resolve (workspace, session) for document endpoints. Prefers an
+    explicit, ownership-checked session_id (GTM Strategist tab); falls back
+    to the current workspace (the 3 workspace agent tabs)."""
+    session_id = request.GET.get('session_id') or request.POST.get('session_id')
+    if session_id:
+        session = AssessmentSession.objects.filter(uuid=session_id).first()
+        if session and (
+            session.user_id == request.user.id
+            or (session.workspace_id and WorkspaceMembership.objects.filter(
+                workspace_id=session.workspace_id, user=request.user, is_active=True
+            ).exists())
+        ):
+            return None, session
 
-def _client_summary_status_cache_key(workspace_id) -> str:
-    return f"gtm:agent:client_summary:{workspace_id}:status"
-
-
-def _client_summary_lock_key(workspace_id) -> str:
-    return f"gtm:ai:client_summary:{workspace_id}:lock"
-
-
-def _generate_client_summary_background(workspace_id, user_id):
-    """Background job: draft a client summary, persist it, log activity, and notify."""
-    from django.contrib.auth import get_user_model
-
-    from gtm.models_workspace import Workspace
-
-    status_key = _client_summary_status_cache_key(workspace_id)
-    lock_key = _client_summary_lock_key(workspace_id)
-    try:
-        workspace = Workspace.objects.get(id=workspace_id)
-        summary_text = draft_client_summary_text(workspace)
-
-        chat_message = WorkspaceChatMessage.objects.create(
-            workspace=workspace,
-            agent_type=CLIENT_SUMMARY_AGENT_TYPE,
-            user_id=user_id,
-            message="[System] Generate client summary",
-            response=summary_text,
-            intent="client_summary",
-        )
-
-        User = get_user_model()
-        actor = User.objects.filter(id=user_id).first() if user_id else None
-        log_workspace_activity(
-            workspace, actor, "client_summary_generated",
-            f"Generated a client-facing summary ({len(summary_text)} chars)",
-            object_type="workspace_chat_message", object_id=str(chat_message.pk),
-        )
-
-        recipients = WorkspaceMembership.objects.filter(
-            workspace=workspace, role__in=INSIGHTS_NOTIFY_ROLES, is_active=True
-        ).select_related("user")
-        for membership in recipients:
-            send_notification(
-                recipient=membership.user,
-                title=f"Client summary ready for {workspace.name}",
-                message="A new client-ready summary has been drafted and is ready to review and export.",
-                notification_type="ai_report",
-                level="info",
-                workspace=workspace,
-            )
-
-        cache.set(status_key, "done", timeout=3600)
-    except Exception as e:
-        log_ai_error(
-            "Client summary generation failed",
-            e,
-            service="google-genai",
-            extra={"workspace_id": str(workspace_id)},
-        )
-        cache.set(status_key, "failed", timeout=600)
-    finally:
-        _release_lock(lock_key)
-
-
-@require_http_methods(["POST"])
-@login_required
-def dashboard_client_summary_refresh(request):
-    """Kick off a client summary draft in the background (explicit trigger only)."""
     current_workspace, _ = _resolve_dashboard_workspace(request)
-    if not current_workspace:
-        return JsonResponse({"success": False, "error": "Select a workspace first."}, status=400)
+    return current_workspace, None
 
-    lock_key = _client_summary_lock_key(current_workspace.id)
-    if not _acquire_lock(lock_key, ttl_seconds=180):
-        return JsonResponse({"success": True, "status": "generating", "message": "A client summary is already being drafted."})
 
-    status_key = _client_summary_status_cache_key(current_workspace.id)
-    cache.set(status_key, "generating", timeout=600)
+def _get_scoped_document(pk, workspace, session):
+    from gtm.models import AgentDocument
 
-    run_in_background(
-        _generate_client_summary_background,
-        current_workspace.id,
-        request.user.id,
-        name=f"workspace_client_summary:{current_workspace.id}",
-    )
-
-    return JsonResponse({"success": True, "status": "generating"})
+    qs = AgentDocument.objects.filter(pk=pk)
+    if session is not None:
+        qs = qs.filter(session=session)
+    elif workspace is not None:
+        qs = qs.filter(workspace=workspace)
+    else:
+        return None
+    return qs.first()
 
 
 @require_http_methods(["GET"])
 @login_required
-def dashboard_client_summary_status(request):
-    """HTMX/JSON polling endpoint for the client summary draft."""
-    current_workspace, _ = _resolve_dashboard_workspace(request)
-    if not current_workspace:
-        return JsonResponse({"success": False, "error": "Select a workspace first."}, status=400)
+def document_list_api(request):
+    """List documents in scope, for the sidebar Documents panel."""
+    from gtm.agent_documents import list_agent_documents
 
-    status_key = _client_summary_status_cache_key(current_workspace.id)
-    status = cache.get(status_key)
+    workspace, session = _resolve_document_scope(request)
+    if not workspace and not session:
+        return JsonResponse({"success": False, "error": "Select a workspace or assessment first."}, status=400)
 
-    latest = WorkspaceChatMessage.objects.filter(
-        workspace=current_workspace, agent_type=CLIENT_SUMMARY_AGENT_TYPE, intent="client_summary"
-    ).order_by('-created_at').first()
-
-    if status is None:
-        status = "done" if latest else "idle"
-
+    docs = list_agent_documents(workspace=workspace, session=session)[:50]
     return JsonResponse({
         "success": True,
-        "status": status,
-        "latest_summary": latest.response if latest else None,
-        "latest_summary_html": _md(latest.response) if latest else None,
-        "latest_summary_id": latest.pk if latest else None,
-        "generated_at": latest.created_at.isoformat() if latest else None,
+        "documents": [
+            {
+                "id": str(d.pk),
+                "title": d.title,
+                "doc_type": d.doc_type,
+                "doc_type_display": d.get_doc_type_display(),
+                "agent_type": d.agent_type,
+                "version": d.version,
+                "updated_at": d.updated_at.isoformat(),
+            }
+            for d in docs
+        ],
     })
 
 
+@require_http_methods(["GET", "POST"])
+@login_required
+def document_edit_api(request, pk):
+    """Fetch (GET) or manually edit (POST) a document's content -- mirrors
+    the existing add_edit_resource pattern for a manual fallback alongside
+    the chat-driven edit_document tool."""
+    from gtm.agent_documents import edit_agent_document
+
+    workspace, session = _resolve_document_scope(request)
+    if not workspace and not session:
+        return JsonResponse({"success": False, "error": "Select a workspace or assessment first."}, status=400)
+
+    document = _get_scoped_document(pk, workspace, session)
+    if not document:
+        return JsonResponse({"success": False, "error": "Document not found."}, status=404)
+
+    if request.method == "GET":
+        return JsonResponse({
+            "success": True,
+            "id": str(document.pk),
+            "title": document.title,
+            "content": document.content,
+            "doc_type": document.doc_type,
+            "version": document.version,
+        })
+
+    new_content = (request.POST.get("content") or "").strip()
+    if not new_content:
+        return JsonResponse({"success": False, "error": "Content cannot be empty."}, status=400)
+
+    updated = edit_agent_document(pk, new_content, workspace=workspace, session=session)
+    if not updated:
+        return JsonResponse({"success": False, "error": "Document not found."}, status=404)
+
+    return JsonResponse({"success": True, "version": updated.version})
+
+
 @require_http_methods(["GET"])
 @login_required
-def client_summary_export(request, pk, fmt):
-    """Export a drafted client summary as PDF or Word, scoped to the
-    requester's current workspace."""
+def document_export(request, pk, fmt):
+    """Export a document as PDF, Word, or Markdown, scoped to the
+    requester's current workspace or a specific owned session."""
+    from django.http import HttpResponse
+
     from gtm.utils_docx import render_insight_docx_response
     from gtm.utils_pdf import render_insight_pdf_response
 
-    current_workspace, _ = _resolve_dashboard_workspace(request)
-    if not current_workspace:
-        return JsonResponse({"success": False, "error": "Select a workspace first."}, status=400)
+    workspace, session = _resolve_document_scope(request)
+    if not workspace and not session:
+        return JsonResponse({"success": False, "error": "Select a workspace or assessment first."}, status=400)
 
-    message = get_object_or_404(
-        WorkspaceChatMessage, pk=pk, intent="client_summary", workspace=current_workspace
-    )
+    document = _get_scoped_document(pk, workspace, session)
+    if not document:
+        raise Http404("Document not found.")
+
+    company_name = workspace.name if workspace else (session.company_name or "Company")
 
     if fmt == 'pdf':
-        return render_insight_pdf_response(company_name=message.workspace.name, ai_playbook_md=message.response)
+        return render_insight_pdf_response(company_name=company_name, ai_playbook_md=document.content)
     elif fmt == 'docx':
-        return render_insight_docx_response(company_name=message.workspace.name, ai_playbook_md=message.response)
+        return render_insight_docx_response(company_name=company_name, ai_playbook_md=document.content)
+    elif fmt in ('md', 'markdown'):
+        resp = HttpResponse(document.content, content_type="text/markdown")
+        resp["Content-Disposition"] = f'attachment; filename="{document.title}.md"'
+        return resp
+    elif fmt == 'txt':
+        resp = HttpResponse(document.content, content_type="text/plain")
+        resp["Content-Disposition"] = f'attachment; filename="{document.title}.txt"'
+        return resp
     else:
         raise Http404("Unsupported export format.")

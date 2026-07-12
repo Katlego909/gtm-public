@@ -49,14 +49,15 @@ from .agent_api import (
     dashboard_agent_context_api,
 )
 from .workspace_agent_api import (
-    client_summary_export,
     dashboard_agent_insights_refresh,
     dashboard_agent_insights_status,
-    dashboard_client_summary_refresh,
-    dashboard_client_summary_status,
+    dashboard_team_agent_api,
     dashboard_workspace_agent_api,
     dashboard_workspace_agent_clear_api,
     dashboard_workspace_agent_context_api,
+    document_edit_api,
+    document_export,
+    document_list_api,
 )
 from .actions import (
     add_action_item_comment,

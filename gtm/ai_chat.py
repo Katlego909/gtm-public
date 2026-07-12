@@ -38,8 +38,124 @@ except ImportError:
 # parameter, so the model can call these but can never supply *which*
 # session to act on.
 
-def _build_session_tools(session: AssessmentSession, user=None) -> List[Any]:
-    """Build the GTM Agent's tool set, scoped to the current session."""
+def _build_document_tools_for_session(session: AssessmentSession, user=None) -> List[Any]:
+    """Generic create/edit/list document tools, scoped to this session. New
+    documents are tagged with both `session` and `session.workspace` (when
+    present) so they're visible from the workspace-wide Documents panel
+    too; edit/list here stay narrowly scoped to this session's own docs."""
+    from .agent_documents import create_agent_document, edit_agent_document, list_agent_documents
+
+    def create_document(title: str, content: str, doc_type: str = "other") -> str:
+        """Create and save a new document (e.g. an action plan, roadmap, or
+        summary) that the user can review and export as PDF, Word, or
+        Markdown. `doc_type` should be one of: client_summary, action_plan,
+        roadmap, resource_brief, other.
+        """
+        doc = create_agent_document(
+            agent_type="gtm_strategist", title=title, content=content, doc_type=doc_type,
+            workspace=session.workspace, session=session, user=user,
+        )
+        return f'Saved "{doc.title}" (ID {doc.pk}) -- you can review and export it from the Documents panel.'
+
+    def edit_document(document_id: str, new_content: str) -> str:
+        """Edit an existing document's content by its ID (use list_documents
+        first if you don't already know the ID). Replaces the document's
+        full content and saves a new version.
+        """
+        doc = edit_agent_document(document_id, new_content, session=session)
+        if not doc:
+            return "I couldn't find a document with that ID for this assessment."
+        return f'Updated "{doc.title}" to version {doc.version}.'
+
+    def list_documents(doc_type: str = "") -> str:
+        """List documents already saved for this assessment. Use this to
+        find a document's ID before editing it, or to check what's already
+        been created.
+        """
+        docs = list(list_agent_documents(session=session, doc_type=doc_type or None)[:10])
+        if not docs:
+            return "No documents have been saved for this assessment yet."
+        lines = ["Documents for this assessment:"]
+        for d in docs:
+            lines.append(f"- [{d.pk}] {d.title} ({d.get_doc_type_display()}, v{d.version}, updated {d.updated_at.strftime('%b %d, %Y')})")
+        return "\n".join(lines)
+
+    return [create_document, edit_document, list_documents]
+
+
+def _make_session_consult_tool(target_agent_type: str, session: AssessmentSession, user=None, _handoff_depth: int = 0):
+    """Build one consult_<target>_agent tool that hands a question off to
+    one of the three workspace-scoped agents, via this session's workspace.
+    Persists the exchange into the target agent's own conversation log so
+    it genuinely remembers being consulted -- real "full sub-conversation
+    handoff", not a stateless lookup."""
+    from .agent_runtime import AGENT_DIRECTORY
+
+    info = AGENT_DIRECTORY.get(target_agent_type, {})
+    name = info.get("name", target_agent_type)
+    label = info.get("label", target_agent_type)
+    domain = info.get("domain", "")
+
+    def consult_tool(question: str) -> str:
+        if not session.workspace:
+            return "This assessment isn't linked to a workspace, so I can't loop in that specialist."
+
+        from .models import WorkspaceChatMessage
+        from .workspace_agent_chat import handle_general_chat_workspace
+
+        try:
+            answer = handle_general_chat_workspace(
+                target_agent_type, session.workspace, question, user=user, _handoff_depth=_handoff_depth + 1
+            )
+            WorkspaceChatMessage.objects.create(
+                workspace=session.workspace,
+                agent_type=target_agent_type,
+                user=user if user and getattr(user, "is_authenticated", False) else None,
+                message=question,
+                response=answer,
+                intent="handoff_query",
+            )
+            return answer
+        except Exception as e:
+            logger.error(f"Handoff to {target_agent_type} failed: {e}")
+            return f"I couldn't reach {name} right now."
+
+    consult_tool.__name__ = f"consult_{target_agent_type}_agent"
+    consult_tool.__doc__ = (
+        f"Consult {name} ({label}), who specializes in: {domain} Use this when the user's question "
+        "is really about that domain rather than yours. Pass the specific question to ask."
+    )
+    return consult_tool
+
+
+def _build_consult_tools_for_session(session: AssessmentSession, user=None, _handoff_depth: int = 0) -> List[Any]:
+    """Build consult tools to the 3 workspace agents, depth-gated so a
+    handoff chain is guaranteed to terminate (see
+    agent_runtime.MAX_HANDOFF_DEPTH)."""
+    from .agent_runtime import MAX_HANDOFF_DEPTH
+
+    if _handoff_depth >= MAX_HANDOFF_DEPTH:
+        return []
+    return [
+        _make_session_consult_tool(agent_type, session, user, _handoff_depth)
+        for agent_type in ("portfolio", "resource", "insights")
+    ]
+
+
+def _build_session_tools(
+    session: AssessmentSession,
+    user=None,
+    _handoff_depth: int = 0,
+    include_consult: bool = True,
+) -> List[Any]:
+    """Build the GTM Agent's tool set, scoped to the current session.
+
+    `include_consult=False` omits the consult_* tools -- used by Team mode
+    (gtm/team_chat.py), which gives an agent transfer_to_* tools instead.
+    The two mechanisms are deliberately mutually exclusive per agent turn:
+    offering both invites the model to pick inconsistently between "get an
+    answer and keep talking" and "hand off entirely" for similar requests.
+    """
 
     def get_gtm_assessment_data() -> str:
         """Retrieves the complete GTM assessment results for the company.
@@ -314,6 +430,8 @@ def _build_session_tools(session: AssessmentSession, user=None) -> List[Any]:
         resource_allocation_guidance,
         customer_segment_analysis,
         audit_strategic_evidence,
+        *_build_document_tools_for_session(session, user=user),
+        *(_build_consult_tools_for_session(session, user=user, _handoff_depth=_handoff_depth) if include_consult else []),
     ]
 
 # ================================================================
@@ -370,9 +488,10 @@ def _get_chat_client():
             return None
 
 
-def _get_chat_config(tools: Optional[List[Any]] = None):
-    """Builds the configuration for the chat agent, including its tool set."""
-    system_instruction = """You're a GTM strategist helping companies improve their Go-To-Market execution.
+# Base personality/instruction text for the GTM Strategist, factored out as
+# a module constant (rather than inlined in _get_chat_config) so gtm/team_chat.py
+# can reuse the exact same voice for this agent without duplicating the text.
+GTM_STRATEGIST_SYSTEM_INSTRUCTION = """You're Charlie, a GTM strategist helping companies improve their Go-To-Market execution.
 
 Be conversational, direct, and practical. Ground every claim in the company's actual assessment data --
 call the appropriate tool to fetch real scores, action items, resources, or other context rather than
@@ -380,8 +499,33 @@ guessing or making up numbers. If a tool exists that answers the user's question
 Only call a tool that modifies data (like building an action plan) when the user explicitly asks for that
 action, not to preview or describe what it would do.
 
+You can also create, edit, and save documents (action plans, roadmaps, summaries, briefs) that the user
+can export as PDF, Word, or Markdown -- use create_document/edit_document/list_documents for this.
+
+Some turns in your history were said by other specialist agents on this team, not the user -- the system
+automatically marks whose turn is whose when it loads your history, so you never need to and must never
+add that marking yourself; write your own replies as plain prose with no name or bracket in front of them.
+Treat a teammate's marked turn as background you're aware of, not as an answer to reuse: if the user's
+current question needs specific data -- a name, a number, anything not identical to what a teammate
+already looked up -- call the right tool yourself and get a fresh answer rather than repeating or lightly
+rewording something a teammate said about a different question.
+
 Focus on: their strongest areas, critical gaps, and specific next steps they can take immediately.
 Keep responses conversational and avoid lengthy lists. End with a specific next step."""
+
+
+def _get_chat_config(tools: Optional[List[Any]] = None):
+    """Builds the configuration for the chat agent, including its tool set."""
+    system_instruction = GTM_STRATEGIST_SYSTEM_INSTRUCTION
+
+    # Only mention handoff capability when a consult_ tool is actually in
+    # this turn's tool list -- a depth-capped sub-agent has none, and a
+    # prompt claiming collaboration it can't act on would be misleading.
+    has_handoff_tools = any(getattr(t, "__name__", "").startswith("consult_") for t in (tools or []))
+    if has_handoff_tools:
+        from .agent_runtime import build_agent_directory_prompt
+        system_instruction += build_agent_directory_prompt("gtm_strategist")
+
     return types.GenerateContentConfig(
         system_instruction=system_instruction,
         temperature=0.8,
@@ -801,13 +945,41 @@ def audit_strategic_evidence(session_uuid: str, file_id: str = None) -> str:
 # ================================================================
 # AI-POWERED GTM AGENT (CONVERSATIONAL & AUTONOMOUS)
 # ================================================================
-def _build_chat_history(session: AssessmentSession, max_turns: int = 12) -> List[Any]:
-    """Reconstruct this session's recent conversation as types.Content history
-    for real multi-turn memory via client.chats.create(history=...)."""
-    from .agent_runtime import build_content_history
+def _build_chat_history(session: AssessmentSession, max_turns: int = 16) -> List[Any]:
+    """Reconstruct this session's shared conversation as types.Content
+    history for real multi-turn memory. Merges the session's own
+    ChatMessage turns (unlabeled -- "me") with, when session.workspace
+    exists, that workspace's WorkspaceChatMessage turns (speaker-tagged via
+    AGENT_DIRECTORY) -- so the GTM Strategist sees what the 3 workspace
+    agents have been doing in this workspace, not just its own history.
 
-    rows = list(reversed(ChatMessage.objects.filter(session=session).order_by('-created_at')[:max_turns]))
-    return build_content_history(rows, max_turns=max_turns)
+    One-directional by design: the 3 workspace agents do NOT pull in any
+    session's ChatMessage rows in the other direction -- a workspace has
+    many sessions, so "which session's Strategist conversation" would be
+    ambiguous (same reasoning as why there's no consult_gtm_strategist
+    tool).
+    """
+    from .agent_runtime import AGENT_DIRECTORY, build_tagged_content_history
+    from .models import WorkspaceChatMessage
+
+    own_rows = list(ChatMessage.objects.filter(session=session).order_by('-created_at')[:max_turns])
+    entries = [(None, row.created_at, row.message, row.response) for row in own_rows]
+
+    if session.workspace:
+        workspace_rows = list(
+            WorkspaceChatMessage.objects.filter(workspace=session.workspace)
+            .exclude(intent__in=["insights_digest", "client_summary"])
+            .order_by('-created_at')[:max_turns]
+        )
+        entries += [
+            (AGENT_DIRECTORY.get(row.agent_type, {}).get("name"), row.created_at, row.message, row.response)
+            for row in workspace_rows
+        ]
+
+    entries.sort(key=lambda entry: entry[1])
+    trimmed = entries[-max_turns:]
+    tagged = [(label, message, response) for label, _created_at, message, response in trimmed]
+    return build_tagged_content_history(tagged, max_turns=max_turns)
 
 
 def handle_general_chat(
@@ -816,10 +988,20 @@ def handle_general_chat(
     message: str,
     user=None,
     supplemental_context: str = "",
+    _handoff_depth: int = 0,
 ) -> str:
     """
     The GTM Agent: real multi-turn memory + real Gemini tool-calling (the
     tools built by _build_session_tools), instead of a single-shot call.
+
+    `_handoff_depth` is not model-facing -- it bounds how many further
+    handoff hops this call's own tools can make (see
+    agent_runtime.MAX_HANDOFF_DEPTH). Always 0 for a real user turn; there
+    is currently no reverse handoff *into* the GTM Strategist (a workspace
+    has many sessions, so "the" session to consult is ambiguous), so this
+    stays 0 in practice today -- kept as a parameter for symmetry with
+    handle_general_chat_workspace and to make that scope boundary explicit
+    rather than silently assumed.
     """
     # 1. Quota Safety Gate
     from .ai_services import _quota_cooldown_active, _request_budget_available, _is_quota_error, _set_quota_cooldown, _extract_retry_delay_seconds
@@ -856,7 +1038,7 @@ def handle_general_chat(
 
         # 4. Real multi-turn memory + real tool-calling
         history = _build_chat_history(session)
-        tools = _build_session_tools(session, user=user)
+        tools = _build_session_tools(session, user=user, _handoff_depth=_handoff_depth)
         config = _get_chat_config(tools=tools)
 
         text = run_agent_turn(

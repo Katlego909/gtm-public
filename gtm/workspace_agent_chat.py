@@ -222,35 +222,38 @@ def format_insights_digest_text(context: Dict[str, Any]) -> str:
 # *which* workspace to act on. Each closure wraps one of the response
 # formatters above, computed against a single fresh context per request.
 
-def _make_draft_client_summary_tool(workspace: Workspace, user=None):
+def _make_draft_client_summary_tool(agent_type: str, workspace: Workspace, user=None):
     """Shared closure factory for the draft_client_summary tool, made
     available on both the portfolio and insights agents (not resource --
-    its job is finding docs/tools, not writing client prose)."""
+    its job is finding docs/tools, not writing client prose). Uses the
+    dedicated, carefully-tuned draft_client_summary_text generator below,
+    then saves the result as an AgentDocument like any other document."""
 
     def draft_client_summary(focus: str = "") -> str:
         """Draft a polished, client-facing progress summary document for
-        this workspace that the consultant can review and export (PDF or
-        Word) to send directly to the client. ONLY call this when the user
+        this workspace and save it, so the consultant can review and
+        export it as PDF, Word, or Markdown. ONLY call this when the user
         explicitly asks for a client summary, report, or something to
         send/share with the client -- do not call this just to describe
         what a summary would contain. `focus` is an optional area to
         emphasize, e.g. 'focus on Delivery'.
         """
-        from .models import WorkspaceChatMessage
+        from .agent_documents import create_agent_document
 
         try:
             summary_text = draft_client_summary_text(workspace, focus)
-            chat_message = WorkspaceChatMessage.objects.create(
+            title = f"Client Summary - {workspace.name}" + (f" ({focus})" if focus else "")
+            doc = create_agent_document(
+                agent_type=agent_type,
+                title=title,
+                content=summary_text,
+                doc_type="client_summary",
                 workspace=workspace,
-                agent_type=CLIENT_SUMMARY_AGENT_TYPE,
-                user=user if user and getattr(user, "is_authenticated", False) else None,
-                message="[System] Generate client summary" + (f" ({focus})" if focus else ""),
-                response=summary_text,
-                intent="client_summary",
+                user=user,
             )
             return (
-                f"I've drafted a client summary (ID {chat_message.pk}) -- you can review and export it "
-                "as PDF or Word from the Generate Client Summary panel."
+                f"I've drafted a client summary (ID {doc.pk}) -- you can review and export it "
+                "as PDF, Word, or Markdown from the Documents panel."
             )
         except Exception as e:
             logger.error(f"Client summary tool failure: {e}")
@@ -259,9 +262,120 @@ def _make_draft_client_summary_tool(workspace: Workspace, user=None):
     return draft_client_summary
 
 
-def _build_workspace_tools(agent_type: str, workspace: Workspace, user=None) -> List[Any]:
-    """Build the tool set for one workspace agent, scoped to `workspace`."""
+def _build_document_tools(agent_type: str, workspace: Workspace, user=None) -> List[Any]:
+    """Generic create/edit/list document tools, available to every workspace
+    agent (not just the ones with a specialized draft_client_summary)."""
+    from .agent_documents import create_agent_document, edit_agent_document, list_agent_documents
+
+    def create_document(title: str, content: str, doc_type: str = "other") -> str:
+        """Create and save a new document (e.g. an action plan, roadmap, or
+        resource brief) that the user can review and export as PDF, Word,
+        or Markdown. `doc_type` should be one of: client_summary,
+        action_plan, roadmap, resource_brief, other.
+        """
+        doc = create_agent_document(
+            agent_type=agent_type, title=title, content=content, doc_type=doc_type,
+            workspace=workspace, user=user,
+        )
+        return f'Saved "{doc.title}" (ID {doc.pk}) -- you can review and export it from the Documents panel.'
+
+    def edit_document(document_id: str, new_content: str) -> str:
+        """Edit an existing document's content by its ID (use list_documents
+        first if you don't already know the ID). Replaces the document's
+        full content and saves a new version.
+        """
+        doc = edit_agent_document(document_id, new_content, workspace=workspace)
+        if not doc:
+            return "I couldn't find a document with that ID in this workspace."
+        return f'Updated "{doc.title}" to version {doc.version}.'
+
+    def list_documents(doc_type: str = "") -> str:
+        """List documents already saved for this workspace, optionally
+        filtered by doc_type. Use this to find a document's ID before
+        editing it, or to check what's already been created.
+        """
+        docs = list(list_agent_documents(workspace=workspace, doc_type=doc_type or None)[:10])
+        if not docs:
+            return "No documents have been saved for this workspace yet."
+        lines = ["Documents in this workspace:"]
+        for d in docs:
+            lines.append(f"- [{d.pk}] {d.title} ({d.get_doc_type_display()}, v{d.version}, updated {d.updated_at.strftime('%b %d, %Y')})")
+        return "\n".join(lines)
+
+    return [create_document, edit_document, list_documents]
+
+
+def _make_consult_tool(target_agent_type: str, workspace: Workspace, user=None, _handoff_depth: int = 0):
+    """Build one consult_<target>_agent tool that hands the question off to
+    another workspace agent's full entry point (real memory + real tools),
+    and persists the exchange into the target agent's own conversation log
+    so it genuinely remembers being consulted."""
+    from .agent_runtime import AGENT_DIRECTORY
+
+    info = AGENT_DIRECTORY.get(target_agent_type, {})
+    name = info.get("name", target_agent_type)
+    label = info.get("label", target_agent_type)
+    domain = info.get("domain", "")
+
+    def consult_tool(question: str) -> str:
+        from .models import WorkspaceChatMessage
+
+        try:
+            answer = handle_general_chat_workspace(
+                target_agent_type, workspace, question, user=user, _handoff_depth=_handoff_depth + 1
+            )
+            WorkspaceChatMessage.objects.create(
+                workspace=workspace,
+                agent_type=target_agent_type,
+                user=user if user and getattr(user, "is_authenticated", False) else None,
+                message=question,
+                response=answer,
+                intent="handoff_query",
+            )
+            return answer
+        except Exception as e:
+            logger.error(f"Handoff to {target_agent_type} failed: {e}")
+            return f"I couldn't reach {name} right now."
+
+    consult_tool.__name__ = f"consult_{target_agent_type}_agent"
+    consult_tool.__doc__ = (
+        f"Consult {name} ({label}), who specializes in: {domain} Use this when the user's question "
+        "is really about that domain rather than yours. Pass the specific question to ask."
+    )
+    return consult_tool
+
+
+def _build_consult_tools(agent_type: str, workspace: Workspace, user=None, _handoff_depth: int = 0) -> List[Any]:
+    """Build consult tools to this agent's peers, depth-gated so a handoff
+    chain is guaranteed to terminate (see agent_runtime.MAX_HANDOFF_DEPTH)."""
+    from .agent_runtime import MAX_HANDOFF_DEPTH
+
+    if _handoff_depth >= MAX_HANDOFF_DEPTH:
+        return []
+
+    peers = [t for t in AGENT_TYPES if t != agent_type]
+    return [_make_consult_tool(peer, workspace, user, _handoff_depth) for peer in peers]
+
+
+def _build_workspace_tools(
+    agent_type: str,
+    workspace: Workspace,
+    user=None,
+    _handoff_depth: int = 0,
+    include_consult: bool = True,
+) -> List[Any]:
+    """Build the tool set for one workspace agent, scoped to `workspace`.
+
+    `include_consult=False` omits the consult_* tools -- used by Team mode
+    (gtm/team_chat.py), which gives an agent transfer_to_* tools instead.
+    The two mechanisms are deliberately mutually exclusive per agent turn.
+    """
     context = build_workspace_agent_context(agent_type, workspace)
+    document_tools = _build_document_tools(agent_type, workspace, user=user)
+    consult_tools = (
+        _build_consult_tools(agent_type, workspace, user=user, _handoff_depth=_handoff_depth)
+        if include_consult else []
+    )
 
     if agent_type == "portfolio":
         def get_trend_overview() -> str:
@@ -298,7 +412,9 @@ def _build_workspace_tools(agent_type: str, workspace: Workspace, user=None) -> 
             get_category_trend,
             compare_sessions,
             get_assessment_history,
-            _make_draft_client_summary_tool(workspace, user),
+            _make_draft_client_summary_tool("portfolio", workspace, user),
+            *document_tools,
+            *consult_tools,
         ]
 
     if agent_type == "resource":
@@ -327,7 +443,14 @@ def _build_workspace_tools(agent_type: str, workspace: Workspace, user=None) -> 
             """
             return handle_coverage_gap(context, "")
 
-        return [find_resource, recommend_resource_for_gap, list_resources, get_coverage_gaps]
+        return [
+            find_resource,
+            recommend_resource_for_gap,
+            list_resources,
+            get_coverage_gaps,
+            *document_tools,
+            *consult_tools,
+        ]
 
     if agent_type == "insights":
         def get_score_change() -> str:
@@ -359,7 +482,9 @@ def _build_workspace_tools(agent_type: str, workspace: Workspace, user=None) -> 
             get_activity_summary,
             get_pending_reviews,
             get_overdue_tasks,
-            _make_draft_client_summary_tool(workspace, user),
+            _make_draft_client_summary_tool("insights", workspace, user),
+            *document_tools,
+            *consult_tools,
         ]
 
     return []
@@ -372,28 +497,48 @@ def _build_workspace_tools(agent_type: str, workspace: Workspace, user=None) -> 
 
 SYSTEM_INSTRUCTIONS = {
     "portfolio": (
-        "You are a GTM portfolio analyst reviewing one client's full assessment history over time. "
+        "You are Nora, a GTM portfolio analyst reviewing one client's full assessment history over time. "
         "Focus on trajectory, not a single snapshot. Be conversational, direct, and concise."
     ),
     "resource": (
-        "You are a resource curator surfacing the workspace's own playbooks/tools/docs against its weakest "
+        "You are Theo, a resource curator surfacing the workspace's own playbooks/tools/docs against its weakest "
         "GTM categories. Recommend from the provided resource list; do not invent tools that aren't in the library."
     ),
     "insights": (
-        "You are a proactive account-health monitor. Summarize what changed for this client since the last "
+        "You are Milo, a proactive account-health monitor. Summarize what changed for this client since the last "
         "check-in, flag risks, and be concise — this is a digest, not a conversation."
     ),
 }
 
 
 def _get_workspace_chat_config(agent_type: str, tools: Optional[List[Any]] = None):
+    from .agent_runtime import build_agent_directory_prompt
+
     base_instruction = SYSTEM_INSTRUCTIONS.get(agent_type, "You are a helpful GTM strategy assistant.")
     tool_guidance = (
         "\n\nGround every claim in real workspace data -- call the appropriate tool to fetch it rather than "
-        "guessing or making up numbers. If a tool exists that answers the user's question, call it before answering."
+        "guessing or making up numbers. If a tool exists that answers the user's question, call it before "
+        "answering. You can also create, edit, and save documents (action plans, roadmaps, summaries, briefs) "
+        "that the user can export as PDF, Word, or Markdown -- use create_document/edit_document/list_documents.\n\n"
+        "Some turns in your history were said by other specialist agents on this team, not the user -- the "
+        "system automatically marks whose turn is whose when it loads your history, so you never need to and "
+        "must never add that marking yourself; write your own replies as plain prose with no name or bracket "
+        "in front of them. Treat a teammate's marked turn as background you're aware of, not as an answer to "
+        "reuse: if the user's current question needs specific data -- a name, a number, anything not identical "
+        "to what a teammate already looked up -- call the right tool yourself and get a fresh answer rather "
+        "than repeating or lightly rewording something a teammate said about a different question."
     )
+    system_instruction = base_instruction + tool_guidance
+
+    # Only mention handoff capability when a consult_ tool is actually in
+    # this turn's tool list -- a depth-capped sub-agent has none, and a
+    # prompt claiming collaboration it can't act on would be misleading.
+    has_handoff_tools = any(getattr(t, "__name__", "").startswith("consult_") for t in (tools or []))
+    if has_handoff_tools:
+        system_instruction += build_agent_directory_prompt(agent_type)
+
     return types.GenerateContentConfig(
-        system_instruction=base_instruction + tool_guidance,
+        system_instruction=system_instruction,
         temperature=0.7,
         max_output_tokens=1536,
         thinking_config=types.ThinkingConfig(thinking_budget=0),
@@ -402,19 +547,38 @@ def _get_workspace_chat_config(agent_type: str, tools: Optional[List[Any]] = Non
     )
 
 
-def _build_workspace_chat_history(workspace: Workspace, agent_type: str, max_turns: int = 12) -> List[Any]:
-    """Reconstruct this agent's recent conversation as types.Content history.
-    Excludes synthetic system rows (insights_digest/client_summary) so the
-    model never sees a turn the user didn't actually say."""
-    from .agent_runtime import build_content_history
+def _build_workspace_chat_history(workspace: Workspace, agent_type: str, max_turns: int = 16) -> List[Any]:
+    """Reconstruct this workspace's shared, cross-agent conversation as
+    types.Content history -- every agent's turns are visible to every other
+    agent (speaker-tagged via AGENT_DIRECTORY), not just this agent's own.
+    This is what closes the "Portfolio hands off to Resource but doesn't
+    remember doing so" gap: the exchange was always persisted into
+    Resource's log, it just wasn't being read back into Portfolio's own
+    context until now.
+
+    Excludes synthetic system rows (insights_digest, and legacy
+    client_summary rows from before documents had their own model) so the
+    model never sees a turn nobody actually said. Handoff exchanges
+    (intent="handoff_query") are real conversational content and are NOT
+    excluded.
+    """
+    from .agent_runtime import AGENT_DIRECTORY, build_tagged_content_history
     from .models import WorkspaceChatMessage
 
     rows = list(reversed(
-        WorkspaceChatMessage.objects.filter(workspace=workspace, agent_type=agent_type)
+        WorkspaceChatMessage.objects.filter(workspace=workspace)
         .exclude(intent__in=["insights_digest", "client_summary"])
         .order_by('-created_at')[:max_turns]
     ))
-    return build_content_history(rows, max_turns=max_turns)
+    entries = [
+        (
+            None if row.agent_type == agent_type else AGENT_DIRECTORY.get(row.agent_type, {}).get("name"),
+            row.message,
+            row.response,
+        )
+        for row in rows
+    ]
+    return build_tagged_content_history(entries, max_turns=max_turns)
 
 
 def handle_general_chat_workspace(
@@ -422,9 +586,22 @@ def handle_general_chat_workspace(
     workspace: Workspace,
     message: str,
     user=None,
+    _handoff_depth: int = 0,
+    supplemental_context: str = "",
 ) -> str:
     """The workspace agent's conversational path: real multi-turn memory +
-    real Gemini tool-calling via the tools built by _build_workspace_tools."""
+    real Gemini tool-calling via the tools built by _build_workspace_tools.
+
+    `_handoff_depth` is not model-facing -- it's incremented by consult
+    tools when this function is called recursively as a handoff target, and
+    caps how many further hops that sub-agent can itself hand off to (see
+    agent_runtime.MAX_HANDOFF_DEPTH).
+
+    `supplemental_context` is extracted text from this turn's uploaded
+    attachments (see dashboard/document_processors.py's
+    _process_agent_attachments) -- folded into the message sent to the
+    model but not into `message` itself, so the persisted/displayed chat
+    bubble stays the clean text the user actually typed."""
     from .ai_services import (
         _extract_retry_delay_seconds,
         _is_quota_error,
@@ -442,8 +619,12 @@ def handle_general_chat_workspace(
         return "I'm having trouble connecting to my AI brain right now. Please try again in a moment."
 
     try:
+        full_message = message
+        if supplemental_context:
+            full_message = f"{message}\n\n[Relevant attachment context]\n{supplemental_context}"
+
         history = _build_workspace_chat_history(workspace, agent_type)
-        tools = _build_workspace_tools(agent_type, workspace, user=user)
+        tools = _build_workspace_tools(agent_type, workspace, user=user, _handoff_depth=_handoff_depth)
         config = _get_workspace_chat_config(agent_type, tools=tools)
 
         text = run_agent_turn(
@@ -451,7 +632,7 @@ def handle_general_chat_workspace(
             model="gemini-2.5-flash",
             config=config,
             history=history,
-            message=message,
+            message=full_message,
             usage_label=f"workspace_agent_{agent_type}",
         )
         return text or "I've processed your request but don't have anything further to add right now."
@@ -470,16 +651,12 @@ def handle_general_chat_workspace(
 
 
 # ================================================================
-# CLIENT SUMMARY (client-facing deliverable) -- one dedicated one-shot
-# generation call, not routed through the conversational chat/tools loop.
-# Pure generation, no persistence -- callers decide where to store the
-# result (WorkspaceChatMessage with intent="client_summary").
+# CLIENT SUMMARY GENERATOR -- one dedicated one-shot generation call with
+# its own carefully-tuned prompt, not routed through the conversational
+# chat/tools loop. Pure generation, no persistence -- the
+# draft_client_summary tool (in _make_draft_client_summary_tool above)
+# saves the result as an AgentDocument.
 # ================================================================
-
-# Persisted with this agent_type regardless of which agent's tool (or the
-# button-triggered background job) generated it, so exports don't need to
-# know which agent produced the summary.
-CLIENT_SUMMARY_AGENT_TYPE = "insights"
 
 _CLIENT_SUMMARY_SYSTEM_INSTRUCTION = """You are drafting a client-facing GTM progress summary for a
 consultant to send directly to their client. Write for the client, not for internal use:
@@ -565,6 +742,7 @@ def process_workspace_chat_message(
     message: str,
     user=None,
     session_id: Optional[str] = None,
+    supplemental_context: str = "",
 ) -> Dict[str, Any]:
     """Primary entry point for a workspace-scoped agent chat message."""
     if agent_type not in AGENT_TYPES:
@@ -572,7 +750,9 @@ def process_workspace_chat_message(
 
     try:
         workspace = Workspace.objects.get(id=workspace_id)
-        response_text = handle_general_chat_workspace(agent_type, workspace, message, user=user)
+        response_text = handle_general_chat_workspace(
+            agent_type, workspace, message, user=user, supplemental_context=supplemental_context
+        )
         return {"success": True, "response": response_text, "intent": "general_chat"}
     except Workspace.DoesNotExist:
         return {"success": False, "response": "Workspace not found.", "intent": "error"}

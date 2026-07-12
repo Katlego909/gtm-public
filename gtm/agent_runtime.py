@@ -23,25 +23,110 @@ except ImportError:
     MONITORING_AVAILABLE = False
 
 
-def build_content_history(rows: Sequence[Any], max_turns: int = 12) -> List["types.Content"]:
-    """Convert chronologically-ordered chat rows into a types.Content history
-    list for client.chats.create(history=...).
+# ================================================================
+# CROSS-AGENT HANDOFF
+# ================================================================
+# Shared, dependency-free home for handoff constants -- both ai_chat.py and
+# workspace_agent_chat.py already import from this module, and
+# workspace_agent_chat.py imports from ai_chat.py at top level, so routing
+# shared state here (rather than through either agent module) avoids a
+# circular import.
 
-    `rows` must already be in chronological order (oldest first) and already
-    filtered to exclude synthetic system rows (e.g. intent="insights_digest"
-    or "client_summary") -- this function only knows about `.message`/
-    `.response` fields, not intent semantics, so that filtering stays the
-    caller's responsibility.
+AGENT_DIRECTORY = {
+    "gtm_strategist": {
+        "name": "Charlie",
+        "label": "GTM Strategist",
+        "domain": "This specific assessment's scores, gaps, action items, roadmap, and evidence audits.",
+    },
+    "portfolio": {
+        "name": "Nora",
+        "label": "Portfolio Agent",
+        "domain": "Score trends and comparisons across all of this workspace's assessments over time.",
+    },
+    "resource": {
+        "name": "Theo",
+        "label": "Resource Agent",
+        "domain": "The workspace's resource library -- finding and recommending existing docs/tools/decks.",
+    },
+    "insights": {
+        "name": "Milo",
+        "label": "Insights Agent",
+        "domain": "Recent workspace activity, score changes, pending reviews, overdue tasks, and documents.",
+    },
+}
+
+
+def agent_display_label(agent_type: str) -> str:
+    """"Name · Role" display string for UI (e.g. "Nora · Portfolio Agent") --
+    the single source of truth so templates/JS don't hardcode names
+    separately from AGENT_DIRECTORY."""
+    info = AGENT_DIRECTORY.get(agent_type, {})
+    name = info.get("name", agent_type)
+    label = info.get("label", agent_type)
+    return f"{name} · {label}" if name != label else label
+
+# Hard cap on handoff chain length: origin agent + up to this many hops.
+# Not model-facing -- a plain Python counter threaded through the tool
+# builders. Without this, "full sub-conversation handoff" (each hop gets
+# its own real tools, including further handoff tools) has no structural
+# reason to terminate -- an LLM deciding call-by-call whether to hand off
+# again has no built-in stopping condition.
+MAX_HANDOFF_DEPTH = 2
+
+
+def build_agent_directory_prompt(current_agent_type: str) -> str:
+    """Render the other agents' labels/domains as a prompt paragraph telling
+    `current_agent_type` who it can hand off to. Used to append onto every
+    agent's system_instruction."""
+    others = [
+        f"- {info['name']} ({info['label']}): {info['domain']}"
+        for agent_type, info in AGENT_DIRECTORY.items()
+        if agent_type != current_agent_type
+    ]
+    return (
+        "\n\nYou are one of several specialized GTM agents working together as a team:\n"
+        + "\n".join(others)
+        + "\n\nIf a question is better answered by one of these other agents, call the matching "
+        "consult_ tool and weave its answer into your own response. Never say you can't "
+        "collaborate with other agents -- you can, via these tools."
+    )
+
+
+def build_tagged_content_history(
+    entries: Sequence[Any],
+    max_turns: int = 16,
+) -> List["types.Content"]:
+    """Convert a chronologically-ordered, cross-agent timeline into a
+    types.Content history list for client.chats.create(history=...).
+
+    `entries` is a list of (speaker_label_or_None, message, response)
+    tuples, already in chronological order (oldest first) and already
+    filtered to exclude synthetic system rows (e.g. intent="insights_digest")
+    -- this function only knows about the tuple shape, not model/intent
+    semantics, so that filtering stays the caller's responsibility.
+
+    `speaker_label` is prefixed onto the model turn when given (e.g.
+    "[Resource Agent]:") -- Gemini's Content.role only distinguishes
+    user/model, not which of several agents produced a given model turn, so
+    without tagging, a shared multi-agent timeline is unattributable. Pass
+    None for a row that belongs to the agent whose own history this is (no
+    point prefixing an agent with its own name).
+
+    Real conversational content, including handed-off exchanges
+    (intent="handoff_query"), should NOT be excluded -- that's what gives a
+    consulted agent (or, in Team mode, any agent) genuine memory of what
+    already happened.
     """
-    trimmed = list(rows)[-max_turns:]
+    trimmed = list(entries)[-max_turns:]
     history: List[types.Content] = []
-    for row in trimmed:
-        message = (row.message or "").strip()
-        response = (row.response or "").strip()
+    for label, message, response in trimmed:
+        message = (message or "").strip()
+        response = (response or "").strip()
         if message:
             history.append(types.Content(role="user", parts=[types.Part.from_text(text=message)]))
         if response:
-            history.append(types.Content(role="model", parts=[types.Part.from_text(text=response)]))
+            text = f"[{label}]: {response}" if label else response
+            history.append(types.Content(role="model", parts=[types.Part.from_text(text=text)]))
     return history
 
 

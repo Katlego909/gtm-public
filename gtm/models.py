@@ -170,6 +170,14 @@ class ActionItem(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    deliverable_document = models.ForeignKey(
+        'AgentDocument',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="completed_action_items",
+        help_text="The concrete artifact an AI agent produced to complete this task, if any.",
+    )
+
     def __str__(self):
         return self.note[:50]
 
@@ -335,6 +343,63 @@ class WorkspaceChatMessage(models.Model):
 
     def __str__(self):
         return f"{self.get_agent_type_display()} chat in workspace {self.workspace_id} at {self.created_at}"
+
+
+class AgentDocument(models.Model):
+    """A document created and editable by any of the 4 GTM agents. Content
+    is stored as markdown text (never a FileField -- this app's default
+    storage is local filesystem, which doesn't persist across Cloud Run
+    instances/restarts) and rendered to PDF/Word/Markdown on export."""
+
+    DOC_TYPE_CHOICES = [
+        ("client_summary", "Client Summary"),
+        ("action_plan", "Action Plan"),
+        ("roadmap", "Roadmap"),
+        ("resource_brief", "Resource Brief"),
+        ("action_item_deliverable", "Action Item Deliverable"),
+        ("other", "Other"),
+    ]
+    AGENT_TYPE_CHOICES = [
+        ("gtm_strategist", "GTM Strategist"),
+        ("portfolio", "Portfolio Agent"),
+        ("resource", "Resource Agent"),
+        ("insights", "Insights Agent"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey(
+        Workspace,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="agent_documents",
+    )
+    session = models.ForeignKey(
+        AssessmentSession,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="agent_documents",
+    )
+    agent_type = models.CharField(max_length=20, choices=AGENT_TYPE_CHOICES)
+    doc_type = models.CharField(max_length=30, choices=DOC_TYPE_CHOICES, default="other")
+    title = models.CharField(max_length=200)
+    content = models.TextField()
+    version = models.PositiveIntegerField(default=1)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def __str__(self):
+        return f"{self.title} (v{self.version})"
 
 
 class GTMFile(models.Model):
