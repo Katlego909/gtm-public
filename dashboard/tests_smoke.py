@@ -375,3 +375,86 @@ class UnifiedLibraryTests(TestCase):
         titles = [d["title"] for d in response.json()["documents"]]
         self.assertNotIn("Should Be Hidden From Sidebar", titles)
         self.assertIn("Should Still Show In Sidebar", titles)
+
+
+@override_settings(SECURE_SSL_REDIRECT=False)
+class GapMetricActionItemGenerationTests(TestCase):
+    """dashboard/views/gap_analysis.py::generate_action_items_for_gap --
+    turns a GapAnalysisMetric's standing recommendation into real
+    ActionItems. The actual Gemini call needs a live call (matching every
+    other AI endpoint in this repo), so _ai_action_items_for_gap_metric is
+    mocked as a black box; these tests cover the ActionItem creation,
+    workspace scoping, and activity logging around it."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_user(
+            username="gap-remediate", password="pass1234", email="gap-remediate@test.com"
+        )
+        cls.workspace = Workspace.objects.create(name="Gap Remediate Co")
+        WorkspaceMembership.objects.create(
+            workspace=cls.workspace, user=cls.user, role="admin", is_active=True
+        )
+        cls.session = AssessmentSession.objects.create(
+            owner_client_id="gap-remediate-client",
+            user=cls.user,
+            workspace=cls.workspace,
+            company_name="Gap Remediate Co",
+        )
+
+    def setUp(self):
+        self.client.force_login(self.user)
+        session = self.client.session
+        session["current_workspace_id"] = str(self.workspace.id)
+        session.save()
+
+    def _make_metric(self, **kwargs):
+        from dashboard.models import GapAnalysisMetric
+
+        defaults = dict(
+            workspace=self.workspace,
+            session=self.session,
+            user=self.user,
+            category="Marketing ROI",
+            metric="CAC Payback Period",
+            current=11.7,
+            target=9.7,
+            priority="High",
+            recommendation="Reduce low-performing spend and align campaign budgets to top channels.",
+            source="AI",
+        )
+        defaults.update(kwargs)
+        return GapAnalysisMetric.objects.create(**defaults)
+
+    @mock.patch("dashboard.views.gap_analysis._ai_action_items_for_gap_metric")
+    def test_generates_action_items_from_metric(self, mock_generate):
+        mock_generate.return_value = (
+            ["Audit top 3 underperforming ad channels", "Tighten lead qualification criteria"],
+            {"generator": "gemini"},
+        )
+        metric = self._make_metric()
+
+        response = self.client.post(reverse("generate_action_items_for_gap", args=[metric.id]))
+        self.assertEqual(response.status_code, 204)
+        mock_generate.assert_called_once()
+
+        created = ActionItem.objects.filter(workspace=self.workspace).order_by("id")
+        self.assertEqual(created.count(), 2)
+        self.assertEqual(created[0].note, "Audit top 3 underperforming ad channels")
+        self.assertEqual(created[0].session, self.session)
+        self.assertEqual(created[0].status, "todo")
+
+        self.assertTrue(
+            WorkspaceActivityEvent.objects.filter(
+                workspace=self.workspace, event_type="task_created", metadata__source="gap_remediation"
+            ).exists()
+        )
+
+    @mock.patch("dashboard.views.gap_analysis._ai_action_items_for_gap_metric")
+    def test_metric_from_another_workspace_is_not_found(self, mock_generate):
+        other_workspace = Workspace.objects.create(name="Other Co")
+        metric = self._make_metric(workspace=other_workspace)
+
+        response = self.client.post(reverse("generate_action_items_for_gap", args=[metric.id]))
+        self.assertEqual(response.status_code, 404)
+        mock_generate.assert_not_called()

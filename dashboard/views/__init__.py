@@ -15,6 +15,7 @@ from .gap_analysis import (
     delete_gap_metric,
     gap_analysis_table,
     gap_report,
+    generate_action_items_for_gap,
     generate_gap_suggestions,
     get_gap_metric_row,
     refresh_gap_analysis_table,

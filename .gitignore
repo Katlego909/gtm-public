@@ -27,6 +27,7 @@ node_modules/
 # Documentation & product files
 ForgeGTM_*.docx
 ForgeGTM_*.pdf
+*.pptx
 FORGEGTM_*.md
 MENTOR_GUIDE.md
 ONBOARDING_ROADMAP.md

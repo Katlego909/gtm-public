@@ -342,6 +342,8 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
         'top_tools': top_tools,
         'insights': insights,
         'weekly_activity': weekly_activity,
+        'items_created_per_day': [d['items_created'] for d in weekly_activity],
+        'items_completed_per_day': [d['items_completed'] for d in weekly_activity],
         'validator_results': validator_results,
         'channel_data': channel_data,
         'gap_analysis': gap_analysis,

@@ -32,6 +32,7 @@ urlpatterns = [
     path('gap-metric/<int:pk>/edit/', views.add_edit_gap_metric, name='edit_gap_metric'),
     path('gap-metric/<int:pk>/delete/', views.delete_gap_metric, name='delete_gap_metric'),
     path('gap-metric/<int:pk>/', views.get_gap_metric_row, name='get_gap_metric_row'),
+    path('gap-metric/<int:pk>/generate-action-items/', views.generate_action_items_for_gap, name='generate_action_items_for_gap'),
     path('gap-suggestions/refresh/', views.refresh_gap_suggestions, name='refresh_gap_suggestions'),
     path('gap-suggestions/generate/', views.generate_gap_suggestions, name='generate_gap_suggestions'),
     path('gap-suggestions/<int:suggestion_id>/accept/', views.accept_gap_suggestion, name='accept_gap_suggestion'),

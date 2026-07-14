@@ -164,7 +164,7 @@
                     <p class="text-sm text-gray-600">{{ metric.category }}</p>
                 </div>
                 <div class="text-right">
-                    <p class="text-2xl font-bold text-red-600">{{ metric.gap_percent|floatformat:1 }}%</p>
+                    <p class="text-2xl font-bold text-red-600">{{ metric.gap_percent }}</p>
                     <p class="text-xs text-gray-500">Behind target</p>
                 </div>
             </div>
@@ -176,6 +176,12 @@
     <div class="h-12"></div>
 </div>
 
+{{ completed_items|default:0|json_script:"js-completed-items" }}
+{{ pending_items|default:0|json_script:"js-pending-items" }}
+{{ days_labels|default_if_none:'[]'|json_script:"js-days-labels" }}
+{{ score_trend_data|default_if_none:'{}'|json_script:"js-score-trend-data" }}
+{{ items_created_per_day|default_if_none:'[]'|json_script:"js-items-created-per-day" }}
+{{ items_completed_per_day|default_if_none:'[]'|json_script:"js-items-completed-per-day" }}
 <script>
 function initAnalyticsCharts() {
     const getJsonData = (id, defaultVal) => {
@@ -185,7 +191,8 @@ function initAnalyticsCharts() {
     };
 
     const chartData = {
-        sessions_per_day: getJsonData('js-sessions-per-day', [0,0,0,0,0,0,0]),
+        items_created_per_day: getJsonData('js-items-created-per-day', [0,0,0,0,0,0,0]),
+        items_completed_per_day: getJsonData('js-items-completed-per-day', [0,0,0,0,0,0,0]),
         days_labels: getJsonData('js-days-labels', ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"]),
         score_trend_data: getJsonData('js-score-trend-data', {scores: [], labels: []})
     };
@@ -198,27 +205,38 @@ function initAnalyticsCharts() {
     // Weekly Activity Chart
     const ctxWeekly = document.getElementById('weeklyActivityAnalyticsChart');
     if (ctxWeekly) {
-        const hasData = chartData.sessions_per_day && chartData.sessions_per_day.some(v => v > 0);
-        const barData = hasData ? chartData.sessions_per_day : [0, 0, 1, 0, 0, 0, 0];
+        const hasData = (chartData.items_created_per_day && chartData.items_created_per_day.some(v => v > 0))
+            || (chartData.items_completed_per_day && chartData.items_completed_per_day.some(v => v > 0));
+        const createdData = hasData ? chartData.items_created_per_day : [0, 0, 1, 0, 0, 0, 0];
+        const completedData = hasData ? chartData.items_completed_per_day : [0, 0, 0, 0, 0, 0, 0];
 
         new Chart(ctxWeekly.getContext('2d'), {
             type: 'bar',
             data: {
                 labels: chartData.days_labels,
-                datasets: [{
-                    label: 'Sessions',
-                    data: barData,
-                    backgroundColor: hasData ? '#B8530F' : '#e2e8f0',
-                    borderRadius: 4,
-                    barThickness: 24,
-                }]
+                datasets: [
+                    {
+                        label: 'Created',
+                        data: createdData,
+                        backgroundColor: hasData ? '#B8530F' : '#e2e8f0',
+                        borderRadius: 4,
+                        barThickness: 16,
+                    },
+                    {
+                        label: 'Completed',
+                        data: completedData,
+                        backgroundColor: hasData ? '#16a34a' : '#e2e8f0',
+                        borderRadius: 4,
+                        barThickness: 16,
+                    }
+                ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
+                plugins: { legend: { display: hasData, position: 'bottom', labels: { usePointStyle: true } } },
                 scales: {
-                    y: { beginAtZero: true, border: { display: false } },
+                    y: { beginAtZero: true, ticks: { precision: 0 }, border: { display: false } },
                     x: { grid: { display: false }, border: { display: false } }
                 }
             }

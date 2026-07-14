@@ -433,6 +433,57 @@ Assessment context:
     }
 
 
+MAX_ACTION_ITEMS_PER_GAP = 3
+
+
+def _ai_action_items_for_gap_metric(metric):
+    """Break a GapAnalysisMetric's standing recommendation into concrete,
+    executable action items via one real Gemini call -- turning a static
+    'here's what you should do' row into real Tasks-board items the AI
+    completion pipeline can then act on. Falls back to a single
+    deterministic item (the recommendation text itself) if AI is
+    unavailable, so this never silently produces nothing."""
+    fallback = [metric.recommendation[:240]] if metric.recommendation else [f"Address the {metric.metric} gap ({metric.category})"]
+
+    client = None
+    try:
+        from gtm.ai_services import _get_client
+        client = _get_client()
+    except Exception as exc:
+        logger.warning('Vertex AI client unavailable: %s', exc)
+
+    if not client:
+        return fallback, {'generator': 'fallback'}
+
+    prompt = f"""
+You are a GTM operator turning one growth gap into concrete next steps.
+
+Gap: {metric.category} — {metric.metric}
+Current: {metric.current}   Target: {metric.target}   Priority: {metric.priority}
+Standing recommendation: "{metric.recommendation}"
+
+Break this into at most {MAX_ACTION_ITEMS_PER_GAP} concrete, specific action items a
+team could actually start this week -- not vague restatements of the
+recommendation. Each item is a single actionable task title, under 140 characters.
+
+Output STRICT JSON only: {{"action_items": ["...", "..."]}}
+""".strip()
+
+    try:
+        ai_response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+        payload = json.loads(_clean_json_payload(getattr(ai_response, 'text', '')))
+        items = payload.get('action_items', []) if isinstance(payload, dict) else []
+    except Exception as exc:
+        logger.warning('AI gap action-item generation failed; using fallback: %s', exc)
+        return fallback, {'generator': 'fallback_after_ai_error'}
+
+    cleaned = [item.strip()[:240] for item in items if isinstance(item, str) and item.strip()]
+    if not cleaned:
+        return fallback, {'generator': 'fallback_after_validation'}
+
+    return cleaned[:MAX_ACTION_ITEMS_PER_GAP], {'generator': 'gemini'}
+
+
 def _load_pending_gap_suggestions(request, current_workspace):
     if current_workspace:
         qs = GapAnalysisSuggestion.objects.filter(

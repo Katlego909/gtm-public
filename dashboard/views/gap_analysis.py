@@ -55,6 +55,7 @@ from dashboard.utils_notifications import send_notification
 from ..forms import GapAnalysisMetricForm, ActionItemForm, UserProfileForm, ResourceForm
 from gtm.views import _compute_scores, _band_for_score
 from ..utils import calculate_gap_metric_display_properties
+from ..parsers import log_workspace_activity
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,7 @@ from ..document_processors import (
 # ================================================================
 
 from .helpers import (
+    _ai_action_items_for_gap_metric,
     _ai_gap_suggestions_from_assessment,
     _build_sidebar_notifications_context,
     _clean_json_payload,
@@ -208,6 +210,57 @@ def accept_gap_suggestion(request, suggestion_id):
         'gapAnalysisUpdated': True,
         'resourceToast': {
             'message': f"Accepted AI suggestion for '{suggestion.metric}'.",
+            'level': 'success',
+        }
+    })
+    return response
+
+
+@require_http_methods(["POST"])
+@login_required
+def generate_action_items_for_gap(request, pk):
+    """Turn one accepted GapAnalysisMetric's standing recommendation into
+    real ActionItems via one AI call, so it can flow through the existing
+    Tasks board / Complete-with-AI pipeline instead of sitting as a static
+    row with no path to action."""
+    current_workspace, latest_completed_session = _get_gap_scope(request)
+    metric_qs = GapAnalysisMetric.objects.filter(workspace=current_workspace) if current_workspace \
+        else GapAnalysisMetric.objects.filter(user=request.user, workspace__isnull=True)
+    metric = get_object_or_404(metric_qs, pk=pk)
+
+    action_texts, _metadata = _ai_action_items_for_gap_metric(metric)
+    session = metric.session or latest_completed_session
+
+    created = ActionItem.objects.bulk_create([
+        ActionItem(
+            session=session,
+            workspace=current_workspace,
+            note=text,
+            status='todo',
+            created_by=request.user,
+            owner=request.user.get_full_name() or request.user.username,
+        )
+        for text in action_texts
+    ])
+
+    for item in created:
+        log_workspace_activity(
+            current_workspace,
+            request.user,
+            'task_created',
+            f"AI created task '{item.note[:80]}' to close the {metric.metric} gap.",
+            object_type='action_item',
+            object_id=item.id,
+            metadata={'source': 'gap_remediation', 'gap_metric_id': metric.id},
+            session=item.session,
+        )
+
+    response = HttpResponse(status=204)
+    response['HX-Trigger'] = json.dumps({
+        'refreshAgentActions': True,
+        'refreshNotifications': True,
+        'resourceToast': {
+            'message': f"Created {len(created)} action item(s) to close the {metric.metric} gap. Find them on the Tasks board.",
             'level': 'success',
         }
     })

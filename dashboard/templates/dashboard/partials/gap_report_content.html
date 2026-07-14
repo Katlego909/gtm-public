@@ -59,7 +59,7 @@
                         <div>
                             <p class="text-sm font-semibold text-gray-900">{{ metric.metric }}</p>
                             <p class="text-xs text-gray-600 mt-0.5">{{ metric.category }} • Priority {{ metric.priority }}</p>
-                            <p class="text-xs text-gray-700 mt-1">Current {{ metric.current }} -> Target {{ metric.target }}</p>
+                            <p class="text-xs text-gray-700 mt-1">Current {{ metric.current }} -> Target {{ metric.target }} <span class="text-gray-400">(est.)</span></p>
                         </div>
                         <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">{{ metric.gap_numeric|floatformat:1 }}%</span>
                     </div>
@@ -122,7 +122,8 @@
         </div>
 
         <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-            <h2 class="text-lg font-bold text-gray-900 mb-4">Detailed Metrics</h2>
+            <h2 class="text-lg font-bold text-gray-900 mb-1">Detailed Metrics</h2>
+            <p class="text-xs text-gray-500 mb-4">Current/Target figures are AI estimates inferred from your assessment scores, not measured business metrics.</p>
             {% if metrics %}
             <div class="overflow-x-auto">
                 <table class="min-w-full text-sm">
@@ -130,8 +131,8 @@
                         <tr>
                             <th class="px-4 py-3 text-left">Category</th>
                             <th class="px-4 py-3 text-left">Metric</th>
-                            <th class="px-4 py-3 text-left">Current</th>
-                            <th class="px-4 py-3 text-left">Target</th>
+                            <th class="px-4 py-3 text-left">Current (Est.)</th>
+                            <th class="px-4 py-3 text-left">Target (Est.)</th>
                             <th class="px-4 py-3 text-left">Gap</th>
                             <th class="px-4 py-3 text-left">Priority</th>
                             <th class="px-4 py-3 text-left">Source</th>

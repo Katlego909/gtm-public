@@ -1,4 +1,3 @@
-{% load humanize %}
 <header class="hidden md:flex h-16 bg-white border-b border-gray-200 justify-between items-center px-8 flex-shrink-0">
     <h1 class="text-xl font-bold text-gray-800">Impact</h1>
 </header>
@@ -87,7 +86,7 @@
         <span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide bg-indigo-100 text-indigo-700">Estimate</span>
     </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
         <div class="bg-white rounded-lg p-4">
             <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Time Saved</p>
             <p class="text-3xl font-bold text-indigo-900">{{ e.hours_saved }} <span class="text-base font-medium text-gray-400">hrs</span></p>
@@ -95,12 +94,6 @@
         <div class="bg-white rounded-lg p-4">
             <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Cost Avoided</p>
             <p class="text-3xl font-bold text-indigo-900">${{ e.cost_avoided_usd }}</p>
-        </div>
-        <div class="bg-white rounded-lg p-4">
-            <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Return on AI Spend</p>
-            <p class="text-3xl font-bold text-green-600">
-                {% if e.roi_multiple %}{{ e.roi_multiple|intcomma }}<span class="text-base font-medium text-gray-400">&times;</span>{% else %}&mdash;{% endif %}
-            </p>
         </div>
     </div>
 
@@ -112,12 +105,7 @@
         <p class="text-sm text-gray-700 mt-1">
             {{ e.hours_saved }} hrs &times; ${{ e.hourly_rate_usd }}/hr (GTM/marketing strategist market rate, $150&ndash;300/hr range) = <strong>${{ e.cost_avoided_usd }}</strong> of consultant cost avoided.
         </p>
-        {% if e.roi_multiple %}
-        <p class="text-sm text-gray-700 mt-1">
-            ${{ e.cost_avoided_usd }} avoided &divide; ${{ m.ai_cost_usd }} actually spent on AI (measured token usage) = <strong>{{ e.roi_multiple|intcomma }}&times;</strong> return.
-        </p>
-        {% endif %}
-        <p class="text-xs text-gray-400 mt-3">Estimate only &mdash; actual value will vary by document complexity and consultant rate.</p>
+        <p class="text-xs text-gray-400 mt-3">Estimate only &mdash; actual value will vary by document complexity and consultant rate. Compare against the measured "Actual AI Cost" above to see what running the team actually cost.</p>
     </div>
 </div>
 

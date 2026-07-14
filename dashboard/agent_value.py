@@ -77,7 +77,6 @@ def _empty_context():
             "cost_avoided_usd": 0.0,
             "hours_per_document": ASSUMED_HOURS_PER_DOCUMENT,
             "hourly_rate_usd": ASSUMED_HOURLY_RATE_USD,
-            "roi_multiple": None,
         },
         "trend_weeks_labels": [],
         "trend_documents_per_week": [],
@@ -134,7 +133,13 @@ def get_agent_value_context(current_workspace):
 
     hours_saved = documents_total * ASSUMED_HOURS_PER_DOCUMENT
     cost_avoided_usd = hours_saved * ASSUMED_HOURLY_RATE_USD
-    roi_multiple = round(cost_avoided_usd / ai_cost_usd) if ai_cost_usd > 0 else None
+    # Deliberately NOT showing cost_avoided/ai_cost as a "return multiple" --
+    # with AI cost in fractions of a cent, that ratio is always an absurd,
+    # multi-million-times figure regardless of how accurate the inputs are
+    # (a near-zero denominator makes it swing wildly and read as fake). Two
+    # honest, real-magnitude numbers (time saved, cost avoided) tell this
+    # story better than a derived ratio that's technically correct but
+    # impossible to believe at a glance.
 
     # Conversations: every chat turn across Charlie (session-scoped) and
     # Nora/Theo/Milo/Team (workspace-scoped) -- real usage volume, distinct
@@ -191,7 +196,6 @@ def get_agent_value_context(current_workspace):
             "cost_avoided_usd": round(cost_avoided_usd, 2),
             "hours_per_document": ASSUMED_HOURS_PER_DOCUMENT,
             "hourly_rate_usd": ASSUMED_HOURLY_RATE_USD,
-            "roi_multiple": roi_multiple,
         },
         "trend_weeks_labels": trend_weeks_labels,
         "trend_documents_per_week": trend_documents_per_week,
