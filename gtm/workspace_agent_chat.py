@@ -197,7 +197,7 @@ def handle_overdue_tasks(context: Dict[str, Any], message: str) -> str:
     response = f"**{context['overdue_action_count']} overdue task(s) — {context['workspace_name']}**\n"
     for action in context["overdue_actions"][:10]:
         assignee = (action.assigned_to.get_full_name() or action.assigned_to.username) if action.assigned_to else "Unassigned"
-        response += f"\n• {action.note} (due {action.due_date}, {assignee})"
+        response += f"\n• [ID: {action.id}] {action.note} (due {action.due_date}, {assignee})"
     return response
 
 
@@ -477,8 +477,11 @@ def _build_workspace_tools(
             return handle_pending_review(context, "")
 
         def get_overdue_tasks() -> str:
-            """List overdue action items in this workspace. Use this when
-            asked about overdue or stale tasks.
+            """List overdue action items in this workspace, each prefixed
+            with its real ID in brackets. Use this when asked about overdue
+            or stale tasks -- and to get a real ID before calling
+            assign_task, assign_task_to_agent, or comment_on_task. Never
+            guess or invent an ID.
             """
             return handle_overdue_tasks(context, "")
 

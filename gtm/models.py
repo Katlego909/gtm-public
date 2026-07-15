@@ -133,7 +133,13 @@ class RecommendationBand(models.Model):
 
 class ActionItem(models.Model):
     STATUS_CHOICES = [("todo","To do"),("doing","In progress"),("done","Done")]
-    
+    AGENT_TYPE_CHOICES = [
+        ("gtm_strategist", "Charlie · GTM Strategist"),
+        ("portfolio", "Nora · Portfolio Agent"),
+        ("resource", "Theo · Resource Agent"),
+        ("insights", "Milo · Insights Agent"),
+    ]
+
     id = models.AutoField(primary_key=True)
     session = models.ForeignKey(AssessmentSession, on_delete=models.CASCADE, related_name="actions", null=True, blank=True)
     question = models.ForeignKey(Question, on_delete=models.CASCADE, null=True, blank=True)
@@ -163,7 +169,12 @@ class ActionItem(models.Model):
         null=True, blank=True,
         related_name="assigned_action_items"
     )
-    
+
+    assigned_agent_type = models.CharField(
+        max_length=20, choices=AGENT_TYPE_CHOICES, null=True, blank=True,
+        help_text="Which AI agent (if any) this task has been routed to for autonomous completion.",
+    )
+
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="todo")
     due_date = models.DateField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)

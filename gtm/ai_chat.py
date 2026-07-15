@@ -247,8 +247,11 @@ def _build_session_tools(
     def review_current_action_items() -> str:
         """Retrieves the status of all current tasks and action items in the
         workspace. Includes: total count, status (To Do, In Progress, Done),
-        and a list of open priorities. Use this when the user asks 'what are
-        my tasks', 'review my items', 'how is my progress', or 'what is pending'.
+        and a list of open priorities, each prefixed with its real ID in
+        brackets. Use this when the user asks 'what are my tasks', 'review my
+        items', 'how is my progress', or 'what is pending' -- and ALWAYS use
+        this first to get real IDs before calling assign_task,
+        assign_task_to_agent, or comment_on_task. Never guess or invent an ID.
         """
         try:
             summary = review_action_items(session)
@@ -263,7 +266,7 @@ def _build_session_tools(
             for action in summary["open_actions"]:
                 status = action.get_status_display()
                 due = action.due_date.isoformat() if action.due_date else "No due date"
-                res.append(f" - [{status}] {action.note} (Due: {due})")
+                res.append(f" - [ID: {action.id}] [{status}] {action.note} (Due: {due})")
             return "\n".join(res)
         except Exception as e:
             return f"Error reviewing action items: {str(e)}"

@@ -7,6 +7,8 @@ Gemini call, matching the existing convention for agent-adjacent logic (see
 dashboard/tests_smoke.py's ActionItemAICompletionTests).
 """
 
+from unittest import mock
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
@@ -99,6 +101,112 @@ class AgentActionToolsTests(TestCase):
         self.assertIn("Assigned", result)
         self.task.refresh_from_db()
         self.assertEqual(self.task.assigned_to, self.teammate)
+
+    def test_notify_teammate_redirects_for_fellow_agent_name(self):
+        """"Milo" isn't a human teammate -- it's the Insights Agent. The tool
+        should redirect to consult_insights_agent instead of a generic
+        not-found error, since the notify lookup can never succeed for it."""
+        tools = self._tools()
+        result = tools["notify_teammate"]("Milo", "Heads up", "msg")
+        self.assertIn("fellow AI agent", result)
+        self.assertIn("consult_insights_agent", result)
+        self.assertFalse(Notification.objects.filter(notification_type='ai_report', title="Heads up").exists())
+
+    def test_assign_task_redirects_for_fellow_agent_name(self):
+        """assign_task's redirect points at assign_task_to_agent (the real
+        mechanism), not consult_* -- consulting is for questions, this is
+        for handing off task ownership."""
+        tools = self._tools()
+        result = tools["assign_task"](str(self.task.id), "Nora")
+        self.assertIn("fellow AI agent", result)
+        self.assertIn("assign_task_to_agent", result)
+        self.task.refresh_from_db()
+        self.assertIsNone(self.task.assigned_to)
+
+    def test_notify_teammate_prefers_real_human_over_agent_name_collision(self):
+        """If a real teammate happens to be named after an agent, the
+        genuine WorkspaceMembership lookup must win -- the hint is a
+        fallback for lookup failures only, never a hard block."""
+        human_milo = User.objects.create_user(
+            username="milo", password="pass1234", email="milo@test.com", first_name="Milo"
+        )
+        WorkspaceMembership.objects.create(workspace=self.workspace, user=human_milo, is_active=True, role="contributor")
+        tools = self._tools()
+        result = tools["notify_teammate"]("Milo", "Heads up", "msg")
+        self.assertIn("Notified", result)
+        self.assertTrue(Notification.objects.filter(recipient=human_milo, title="Heads up").exists())
+
+    @mock.patch("gtm.utils_async.run_in_background", side_effect=lambda target, *args, **kwargs: target(*args))
+    @mock.patch("gtm.action_item_completion.complete_action_item")
+    def test_assign_task_to_agent_routes_and_triggers_completion(self, mock_complete, mock_run_bg):
+        """run_in_background is patched to run synchronously so the effect
+        is observable immediately. complete_action_item is mocked as a black
+        box (same convention as dashboard.tests_smoke's
+        ActionItemAICompletionTests) -- it owns the actual status/comment
+        write-back, so what's observable here is _complete_action_item_background's
+        own side effects: the cached completion state and the activity log,
+        confirmed via the polling cache key it writes to."""
+        from django.core.cache import cache
+        from dashboard.views.actions import _action_item_complete_status_cache_key
+
+        mock_complete.return_value = {
+            "success": True, "status": "done",
+            "summary": "Drafted the ICP one-pager.", "document_id": None,
+        }
+        self.task.session = self.session
+        self.task.save()
+        tools = self._tools()
+        result = tools["assign_task_to_agent"](str(self.task.id), "insights")
+        self.assertIn("Routed", result)
+        self.assertIn("Milo", result)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assigned_agent_type, "insights")
+        mock_complete.assert_called_once()
+        cached_status = cache.get(_action_item_complete_status_cache_key(self.task.id))
+        self.assertEqual(cached_status["state"], "done")
+        self.assertEqual(cached_status["status"], "done")
+
+    def test_assign_task_to_agent_rejects_invalid_agent_type(self):
+        tools = self._tools()
+        result = tools["assign_task_to_agent"](str(self.task.id), "not_a_real_agent")
+        self.assertIn("isn't a recognized agent type", result)
+        self.task.refresh_from_db()
+        self.assertIsNone(self.task.assigned_agent_type)
+
+    def test_assign_task_to_agent_respects_can_assign_tasks_permission(self):
+        tools = self._tools(user=self.teammate)  # contributor -- can_assign_tasks is False
+        result = tools["assign_task_to_agent"](str(self.task.id), "insights")
+        self.assertIn("don't have permission", result)
+        self.task.refresh_from_db()
+        self.assertIsNone(self.task.assigned_agent_type)
+
+    def test_assign_task_to_agent_labels_only_without_linked_session(self):
+        """A task with no linked assessment can still be routed/labeled, but
+        honestly can't be attempted -- no background job should fire."""
+        unlinked_task = ActionItem.objects.create(
+            workspace=self.workspace, note="No session here", status="todo", session=None
+        )
+        tools = self._tools()
+        with mock.patch("gtm.utils_async.run_in_background") as mock_run_bg:
+            result = tools["assign_task_to_agent"](str(unlinked_task.id), "insights")
+        self.assertIn("Routed", result)
+        self.assertIn("no linked assessment", result)
+        unlinked_task.refresh_from_db()
+        self.assertEqual(unlinked_task.assigned_agent_type, "insights")
+        mock_run_bg.assert_not_called()
+
+    def test_assign_task_to_agent_labels_only_when_not_todo(self):
+        self.task.session = self.session
+        self.task.status = "done"
+        self.task.save()
+        tools = self._tools()
+        with mock.patch("gtm.utils_async.run_in_background") as mock_run_bg:
+            result = tools["assign_task_to_agent"](str(self.task.id), "insights")
+        self.assertIn("Routed", result)
+        self.assertIn("already", result)
+        mock_run_bg.assert_not_called()
+        self.task.status = "todo"
+        self.task.save()
 
     def test_escalate_gap_creates_pending_metric_without_action_items(self):
         tools = self._tools()
