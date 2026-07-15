@@ -439,6 +439,8 @@ def _build_session_tools(
             logger.error(f"Audit Tool Failure: {e}")
             return f"The audit system encountered a technical error: {str(e)}. Please try re-uploading the asset."
 
+    from .agent_actions import build_agent_action_tools
+
     return [
         get_gtm_assessment_data,
         build_prioritized_action_plan,
@@ -451,6 +453,7 @@ def _build_session_tools(
         customer_segment_analysis,
         audit_strategic_evidence,
         *_build_document_tools_for_session(session, user=user),
+        *(build_agent_action_tools(session.workspace, user) if session.workspace and user else []),
         *(_build_consult_tools_for_session(session, user=user, _handoff_depth=_handoff_depth) if include_consult else []),
     ]
 

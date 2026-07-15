@@ -7,7 +7,7 @@ from django.utils import timezone
 from django.urls import reverse
 from .models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation
 from .forms import WorkspaceInvitationForm
-from .middleware_workspace import workspace_required, role_required
+from .middleware_workspace import workspace_required, admin_or_manager_required
 
 
 @login_required
@@ -53,7 +53,7 @@ def workspace_detail(request, workspace_id):
 
 
 @workspace_required
-@role_required(['admin', 'manager'])
+@admin_or_manager_required
 def workspace_invite(request, workspace_id):
     """Invite users to workspace"""
     workspace = request.workspace

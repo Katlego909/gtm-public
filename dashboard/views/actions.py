@@ -50,7 +50,7 @@ from gtm.models import (
 from gtm.models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation, WorkspaceActivityEvent
 from gtm.ai_chat import get_suggested_prompts, process_chat_message
 from gtm.ai_services import _acquire_lock, _release_lock
-from gtm.decorators import workspace_permission_required, workspace_admin_required, workspace_member_required
+from gtm.decorators import workspace_permission_required, workspace_member_required
 from gtm.utils_async import run_in_background
 from gtm.utils_logging import log_ai_error
 from dashboard.models import Channel, ChannelAnalytics, GapAnalysisMetric, GapAnalysisSuggestion, Resource, Notification, UserSettings

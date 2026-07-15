@@ -113,14 +113,9 @@ class WorkspaceMembership(models.Model):
         return f"{self.user.username} - {self.workspace.name} ({self.role})"
     
     @property
-    def is_funti3r_team(self):
-        """Check if user is Funti3r team member"""
-        return self.role == 'funti3r_consultant'
-    
-    @property 
     def can_invite_users(self):
         """Check if user can invite others to workspace"""
-        return self.role in ['admin', 'funti3r_consultant']
+        return self.role in ['admin', 'manager', 'funti3r_consultant']
     
     @property
     def can_assign_tasks(self):

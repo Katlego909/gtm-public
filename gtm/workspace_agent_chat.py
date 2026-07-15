@@ -370,8 +370,11 @@ def _build_workspace_tools(
     (gtm/team_chat.py), which gives an agent transfer_to_* tools instead.
     The two mechanisms are deliberately mutually exclusive per agent turn.
     """
+    from .agent_actions import build_agent_action_tools
+
     context = build_workspace_agent_context(agent_type, workspace)
     document_tools = _build_document_tools(agent_type, workspace, user=user)
+    action_tools = build_agent_action_tools(workspace, user) if user else []
     consult_tools = (
         _build_consult_tools(agent_type, workspace, user=user, _handoff_depth=_handoff_depth)
         if include_consult else []
@@ -414,6 +417,7 @@ def _build_workspace_tools(
             get_assessment_history,
             _make_draft_client_summary_tool("portfolio", workspace, user),
             *document_tools,
+            *action_tools,
             *consult_tools,
         ]
 
@@ -449,6 +453,7 @@ def _build_workspace_tools(
             list_resources,
             get_coverage_gaps,
             *document_tools,
+            *action_tools,
             *consult_tools,
         ]
 
@@ -484,6 +489,7 @@ def _build_workspace_tools(
             get_overdue_tasks,
             _make_draft_client_summary_tool("insights", workspace, user),
             *document_tools,
+            *action_tools,
             *consult_tools,
         ]
 

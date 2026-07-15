@@ -48,7 +48,7 @@ from gtm.models import (
 )
 from gtm.models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation, WorkspaceActivityEvent
 from gtm.ai_chat import get_suggested_prompts, process_chat_message
-from gtm.decorators import workspace_permission_required, workspace_admin_required, workspace_member_required
+from gtm.decorators import workspace_permission_required, workspace_member_required
 from dashboard.models import Channel, ChannelAnalytics, GapAnalysisMetric, GapAnalysisSuggestion, Resource, Notification, UserSettings
 from dashboard.forms import GapAnalysisMetricForm, ActionItemForm, UserProfileForm, UserSettingsForm
 from dashboard.utils_notifications import send_notification
