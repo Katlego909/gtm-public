@@ -26,7 +26,9 @@
     </div>
     
     <div class="flex items-center gap-4">
-        <button hx-get="{% url 'add_action_item' %}" 
+        {% include 'dashboard/partials/global_search.html' with instance_id="header" %}
+        {% include 'dashboard/partials/notification_bell.html' with instance_id="header" %}
+        <button hx-get="{% url 'add_action_item' %}"
                 hx-target="#modal-content"
                 onclick="openModal()"
                 class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2">

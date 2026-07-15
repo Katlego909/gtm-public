@@ -136,3 +136,37 @@ def send_workspace_invitation_email(invitation, request=None):
     )
     msg.attach_alternative(html_body, "text/html")
     msg.send(fail_silently=False)
+
+
+def send_notification_email(recipient, title, message, link=""):
+    """
+    Sends a generic notification email for any Notification (task update,
+    invite, AI report, etc). Kept intentionally simple/type-agnostic so
+    callers don't need a bespoke template per notification_type.
+    """
+    base_url = getattr(settings, "SITE_BASE_URL", "http://127.0.0.1:8000")
+    absolute_link = (base_url + link) if link and not link.startswith("http") else link
+
+    context = {
+        'recipient': recipient,
+        'title': title,
+        'message': message,
+        'link': absolute_link,
+        'brand_name': "Funti3r GTM Validator",
+    }
+
+    subject = title
+    html_body = render_to_string("emails/notification.html", context)
+    text_body = render_to_string("emails/notification.txt", context)
+
+    if not text_body.strip():
+        text_body = strip_tags(html_body)
+
+    msg = EmailMultiAlternatives(
+        subject=subject,
+        body=text_body,
+        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+        to=[recipient.email],
+    )
+    msg.attach_alternative(html_body, "text/html")
+    msg.send(fail_silently=False)

@@ -87,6 +87,24 @@ def workspace_invite(request, workspace_id):
             except Exception as e:
                 messages.error(request, f'Failed to send invitation email: {e}')
                 invitation.delete()
+                return redirect(dashboard_url)
+
+            # If the invitee already has an account, also surface an in-app
+            # notification (they may not see the email right away).
+            from django.contrib.auth import get_user_model
+            from dashboard.utils_notifications import send_notification
+            existing_user = get_user_model().objects.filter(email__iexact=email).first()
+            if existing_user:
+                send_notification(
+                    recipient=existing_user,
+                    sender=request.user,
+                    workspace=workspace,
+                    notification_type='invite',
+                    level='info',
+                    title="Workspace Invitation",
+                    message=f"{request.user.get_full_name() or request.user.username} invited you to join {workspace.name}.",
+                    link=reverse('gtm:workspace:join', args=[invitation.token])
+                )
 
         else:
             for field, errors in form.errors.items():

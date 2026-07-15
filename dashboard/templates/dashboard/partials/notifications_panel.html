@@ -1,25 +1,36 @@
-<div class="space-y-5">
-    <div class="flex items-start gap-3 pl-3 border-l-2 border-yellow-400">
-        <div>
-            <h4 class="text-sm font-bold text-gray-900">Pending Reviews</h4>
-            <p class="text-xs text-gray-500 mt-0.5">You have <span id="sidebar-pending-count">{{ pending_items }}</span> items waiting.</p>
-        </div>
+<div class="space-y-6">
+    {% if pending_items %}
+    <div class="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+        <span class="h-2 w-2 rounded-full bg-amber-500 flex-shrink-0"></span>
+        <p class="text-xs text-gray-700">
+            <span class="font-bold text-gray-900">{{ pending_items }}</span>
+            pending review{{ pending_items|pluralize }}
+        </p>
     </div>
+    {% endif %}
 
     <div>
-        <div class="flex items-center justify-between pb-2 mb-1 border-b border-gray-200">
-            <h4 class="text-sm font-bold text-gray-900">Recent Activity</h4>
+        <div class="flex items-center justify-between pb-2 mb-2 border-b border-gray-200">
+            <h4 class="text-xs font-bold text-gray-900 uppercase tracking-wide">Recent Activity</h4>
             {% if sidebar_workspace %}
-                <span class="text-[11px] font-medium text-gray-400">{{ sidebar_workspace.name }}</span>
+                <span class="text-[11px] font-medium text-gray-400 truncate max-w-[9rem]">{{ sidebar_workspace.name }}</span>
             {% endif %}
         </div>
 
         {% if sidebar_recent_activity %}
-            <div class="divide-y divide-gray-100 max-h-[440px] overflow-y-auto pr-1">
+            <div class="divide-y divide-gray-100 max-h-[440px] overflow-y-auto -mx-1">
                 {% for event in sidebar_recent_activity %}
-                <div class="py-2.5">
-                    <p class="text-xs text-gray-700 truncate" title="{{ event.summary }}">{{ event.summary }}</p>
-                    <p class="text-[11px] text-gray-400 mt-0.5">{{ event.created_at|timesince }} ago</p>
+                <div class="flex items-start gap-2.5 px-1 py-3 hover:bg-gray-50 rounded-md transition-colors">
+                    <span class="mt-1.5 h-1.5 w-1.5 rounded-full flex-shrink-0
+                        {% if 'deleted' in event.event_type %}bg-red-500
+                        {% elif 'created' in event.event_type %}bg-green-500
+                        {% elif 'moved' in event.event_type %}bg-indigo-500
+                        {% elif 'comment' in event.event_type %}bg-blue-500
+                        {% else %}bg-gray-400{% endif %}"></span>
+                    <div class="min-w-0">
+                        <p class="text-xs text-gray-700 leading-snug break-words">{{ event.summary }}</p>
+                        <p class="text-[11px] text-gray-400 mt-1">{{ event.created_at|timesince }} ago</p>
+                    </div>
                 </div>
                 {% endfor %}
             </div>

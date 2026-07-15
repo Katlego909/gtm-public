@@ -1,0 +1,62 @@
+{% with instance_id=instance_id|default:"default" %}
+<div class="relative js-dropdown-trigger" id="notification-bell-{{ instance_id }}"
+     data-panel="notification-dropdown-panel-{{ instance_id }}">
+    <button type="button" id="notification-bell-button-{{ instance_id }}"
+            onclick="toggleDropdownPanel('notification-dropdown-panel-{{ instance_id }}')"
+            class="relative p-2 text-gray-500 hover:text-indigo-600 transition rounded-full hover:bg-gray-100">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+        </svg>
+        <span id="notification-badge-{{ instance_id }}"
+              hx-get="{% url 'notification_unread_count' %}"
+              hx-trigger="load, every 30s, refreshNotifications from:body"
+              hx-swap="innerHTML"></span>
+    </button>
+    <div id="notification-dropdown-panel-{{ instance_id }}"
+         class="hidden absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg z-50">
+        <div id="notification-dropdown-content-{{ instance_id }}"
+             hx-get="{% url 'notification_dropdown' %}"
+             hx-trigger="click from:#notification-bell-button-{{ instance_id }}, refreshNotifications from:body"
+             hx-swap="innerHTML">
+            <div class="px-4 py-6 text-xs text-gray-500">Loading notifications...</div>
+        </div>
+    </div>
+</div>
+{% endwith %}
+<script>
+    function toggleDropdownPanel(panelId) {
+        const panel = document.getElementById(panelId);
+        if (panel) panel.classList.toggle('hidden');
+    }
+
+    function showDropdownPanel(panelId) {
+        const panel = document.getElementById(panelId);
+        if (panel) panel.classList.remove('hidden');
+    }
+
+    if (!window.__dropdownOutsideClickBound) {
+        window.__dropdownOutsideClickBound = true;
+        document.addEventListener('click', function (evt) {
+            document.querySelectorAll('.js-dropdown-trigger').forEach(function (trigger) {
+                const panel = document.getElementById(trigger.dataset.panel);
+                if (panel && !trigger.contains(evt.target)) {
+                    panel.classList.add('hidden');
+                }
+            });
+        });
+    }
+
+    function markNotificationRead(id) {
+        const csrfToken = document.cookie.split('; ')
+            .find(row => row.startsWith('csrftoken='))
+            ?.split('=')[1];
+        fetch(`/dashboard/notifications/${id}/read/`, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: csrfToken ? { 'X-CSRFToken': csrfToken } : {},
+        }).then(function () {
+            if (window.htmx) { htmx.trigger(document.body, 'refreshNotifications'); }
+        });
+    }
+</script>

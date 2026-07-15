@@ -195,7 +195,7 @@
             <div class="flex items-center gap-2">
                 <img src="{% static 'images/forge_logo.png' %}" alt="ForgeGTM" class="h-9 w-auto object-contain" />
             </div>
-            <div class="w-10"></div> <!-- Spacer for centering -->
+            {% include 'dashboard/partials/notification_bell.html' with instance_id="mobile" %}
         </div>
     </nav>
 
@@ -407,7 +407,7 @@
 
     <aside class="w-80 bg-white border-l border-gray-200 flex-shrink-0 hidden xl:flex flex-col">
         <div class="p-6 border-b border-gray-100">
-            <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider">Notifications</h3>
+            <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider">Activity</h3>
         </div>
         <div id="sidebar-notifications-panel"
              class="p-4 overflow-y-auto"

@@ -27,6 +27,8 @@
         </div>
 
         <div class="flex items-center gap-4">
+            {% include 'dashboard/partials/global_search.html' with instance_id="header" %}
+            {% include 'dashboard/partials/notification_bell.html' with instance_id="header" %}
             {% if current_workspace %}
                 <button id="hub-invite-btn"
                     data-invite-url="{% url 'invite_to_workspace' current_workspace.id %}"

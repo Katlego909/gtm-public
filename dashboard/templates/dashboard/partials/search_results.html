@@ -1,0 +1,80 @@
+{% if too_short %}
+<p class="px-4 py-6 text-xs text-gray-500 text-center">Keep typing to search…</p>
+{% elif not assessments and not tasks and not resources and not documents %}
+<p class="px-4 py-6 text-xs text-gray-500 text-center">No results for "{{ query }}".</p>
+{% else %}
+<div class="max-h-96 overflow-y-auto divide-y divide-gray-100">
+    {% if assessments %}
+    <div class="py-2">
+        <p class="px-4 pb-1 text-[11px] font-bold text-gray-400 uppercase tracking-wide">Assessments</p>
+        {% for item in assessments %}
+        <a href="{% url 'gtm:results' item.uuid %}" class="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition">
+            <span class="h-7 w-7 rounded-full bg-sky-50 flex items-center justify-center flex-shrink-0">
+                <svg class="w-3.5 h-3.5 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+            </span>
+            <span class="text-sm text-gray-800 truncate">{{ item.company_name|default:"Untitled company" }}</span>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if tasks %}
+    <div class="py-2">
+        <p class="px-4 pb-1 text-[11px] font-bold text-gray-400 uppercase tracking-wide">Tasks</p>
+        {% for item in tasks %}
+        <a href="{% url 'tasks_board' %}{% if current_workspace %}?workspace={{ current_workspace.id }}{% endif %}"
+           hx-get="{% url 'tasks_board' %}{% if current_workspace %}?workspace={{ current_workspace.id }}{% endif %}"
+           hx-target="#main-content" hx-push-url="true"
+           class="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition">
+            <span class="h-7 w-7 rounded-full bg-indigo-50 flex items-center justify-center flex-shrink-0">
+                <svg class="w-3.5 h-3.5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+            </span>
+            <span class="text-sm text-gray-800 truncate">{{ item.note }}</span>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if resources %}
+    <div class="py-2">
+        <p class="px-4 pb-1 text-[11px] font-bold text-gray-400 uppercase tracking-wide">Resources</p>
+        {% for item in resources %}
+        <a href="{% url 'asset_library' %}?tab=resources{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
+           hx-get="{% url 'asset_library' %}?tab=resources{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
+           hx-target="#main-content" hx-push-url="true"
+           class="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition">
+            <span class="h-7 w-7 rounded-full bg-green-50 flex items-center justify-center flex-shrink-0">
+                <svg class="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+            </span>
+            <span class="text-sm text-gray-800 truncate">{{ item.name }}</span>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if documents %}
+    <div class="py-2">
+        <p class="px-4 pb-1 text-[11px] font-bold text-gray-400 uppercase tracking-wide">Documents</p>
+        {% for item in documents %}
+        <a href="{% url 'asset_library' %}?tab=documents{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
+           hx-get="{% url 'asset_library' %}?tab=documents{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
+           hx-target="#main-content" hx-push-url="true"
+           class="flex items-center gap-3 px-4 py-2 hover:bg-gray-50 transition">
+            <span class="h-7 w-7 rounded-full bg-amber-50 flex items-center justify-center flex-shrink-0">
+                <svg class="w-3.5 h-3.5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+            </span>
+            <span class="text-sm text-gray-800 truncate">{{ item.title }}</span>
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endif %}

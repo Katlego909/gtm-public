@@ -1,0 +1,5 @@
+{% if unread_count > 0 %}
+<span class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-600 text-white text-[10px] font-bold leading-none border border-white">
+    {% if unread_count > 99 %}99+{% else %}{{ unread_count }}{% endif %}
+</span>
+{% endif %}

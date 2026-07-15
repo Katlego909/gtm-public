@@ -39,6 +39,8 @@ def auto_join_invited_workspaces(sender, instance, created, raw=False, update_fi
         accepted_at__isnull=True,
         expires_at__gt=timezone.now(),
     )
+    from dashboard.utils_notifications import send_notification
+
     for invite in invitations:
         if not WorkspaceMembership.objects.filter(workspace=invite.workspace, user=instance).exists():
             WorkspaceMembership.objects.create(
@@ -51,6 +53,16 @@ def auto_join_invited_workspaces(sender, instance, created, raw=False, update_fi
             invite.accepted_at = timezone.now()
             invite.is_accepted = True
             invite.save(update_fields=['accepted_at', 'is_accepted'])
+            send_notification(
+                recipient=instance,
+                sender=invite.invited_by,
+                workspace=invite.workspace,
+                notification_type='system',
+                level='success',
+                title="Welcome to the team",
+                message=f"You've automatically joined {invite.workspace.name} from a pending invitation.",
+                link=f"/dashboard/?workspace={invite.workspace.id}"
+            )
 
 
 @receiver(post_save, sender=ResultSnapshot)

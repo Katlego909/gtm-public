@@ -4,6 +4,11 @@ from . import views
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
     path('notifications/panel/', views.notifications_panel, name='notifications_panel'),
+    path('notifications/dropdown/', views.notification_dropdown, name='notification_dropdown'),
+    path('notifications/unread-count/', views.notification_unread_count, name='notification_unread_count'),
+    path('notifications/<uuid:pk>/read/', views.notification_mark_read, name='notification_mark_read'),
+    path('notifications/read-all/', views.notifications_mark_all_read, name='notifications_mark_all_read'),
+    path('search/', views.global_search, name='global_search'),
     path('agent/', views.agent_hub, name='agent_hub'),
     path('impact/', views.agent_impact_hub, name='agent_impact_hub'),
     path('agent/chat/', views.dashboard_agent_api, name='dashboard_agent_api'),

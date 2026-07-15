@@ -95,6 +95,23 @@ from .helpers import (
 )
 from ..parsers import log_workspace_activity
 
+
+def _notify_task_completed(item, actor, workspace):
+    """Notify the creator that their task was completed by someone else."""
+    if not item.created_by or item.created_by == actor:
+        return
+    send_notification(
+        recipient=item.created_by,
+        sender=actor,
+        workspace=workspace,
+        notification_type='task_status',
+        level='success',
+        title="Task Completed",
+        message=f"{actor.get_full_name() or actor.username} completed your task: {item.note[:50]}",
+        link=f"/dashboard/tasks/?workspace={workspace.id if workspace else ''}"
+    )
+
+
 def refresh_action_items(request):
     """Returns the updated action items board - workspace-aware."""
     
@@ -178,6 +195,7 @@ def add_edit_action_item(request, pk=None):
         title = "Add Action Item"
 
     if request.method == 'POST':
+        previous_status = instance.status if instance and instance.pk else None
         form = ActionItemForm(request.POST, instance=instance, workspace=current_workspace)
         if form.is_valid():
             instance = form.save(commit=False)
@@ -187,6 +205,9 @@ def add_edit_action_item(request, pk=None):
                 instance.workspace = current_workspace
                 instance.created_by = request.user
             instance.save()
+
+            if not is_new_item and previous_status != 'done' and instance.status == 'done':
+                _notify_task_completed(instance, request.user, current_workspace)
 
             if is_new_item:
                 log_workspace_activity(
@@ -352,7 +373,8 @@ def move_action_item(request, pk, new_status):
             item = get_object_or_404(ActionItem, pk=pk, session__user=request.user, workspace__isnull=True)
         
         if new_status in ['todo', 'doing', 'done']:
-            if new_status == 'done' and item.status != 'done':
+            just_completed = new_status == 'done' and item.status != 'done'
+            if just_completed:
                 from django.utils import timezone
                 item.completed_at = timezone.now()
             elif new_status != 'done':
@@ -369,6 +391,8 @@ def move_action_item(request, pk, new_status):
                 metadata={'status': new_status},
                 session=item.session,
             )
+            if just_completed:
+                _notify_task_completed(item, request.user, current_workspace)
 
             return refresh_action_items(request)
     return HttpResponse(status=400)
@@ -441,6 +465,20 @@ def _complete_action_item_background(action_item_id, user_id, workspace_id):
                 metadata={'status': result["status"], 'ai_completed': True},
                 session=action_item.session,
             )
+            if result["status"] == "done":
+                workspace = Workspace.objects.filter(id=workspace_id).first() if workspace_id else None
+                recipients = {r for r in (action_item.created_by, action_item.assigned_to) if r and r != user}
+                for recipient in recipients:
+                    send_notification(
+                        recipient=recipient,
+                        sender=user,
+                        workspace=workspace,
+                        notification_type='task_status',
+                        level='success',
+                        title="Task Completed by AI",
+                        message=f"AI completed your task: {action_item.note[:50]}",
+                        link=f"/dashboard/tasks/?workspace={workspace.id if workspace else ''}"
+                    )
         else:
             cache.set(status_key, {"state": "failed", "error": result.get("error", "Unknown error.")}, timeout=600)
     except Exception as e:

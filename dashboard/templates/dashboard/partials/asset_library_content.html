@@ -25,6 +25,8 @@
   </div>
 
   <div class="flex items-center gap-3">
+    {% include 'dashboard/partials/global_search.html' with instance_id="header" %}
+    {% include 'dashboard/partials/notification_bell.html' with instance_id="header" %}
     {% if active_tab == 'resources' %}
     <button type="button"
             hx-get="{% url 'add_resource' %}"

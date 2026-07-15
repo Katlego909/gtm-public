@@ -81,3 +81,10 @@ from .pages import (
     profile,
     settings_view,
 )
+from .notifications import (
+    notification_dropdown,
+    notification_mark_read,
+    notification_unread_count,
+    notifications_mark_all_read,
+)
+from .search import global_search

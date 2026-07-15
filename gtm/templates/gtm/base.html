@@ -66,6 +66,8 @@
         {% endif %}
         
         {% if user.is_authenticated %}
+          {% include 'dashboard/partials/notification_bell.html' %}
+
           <!-- Authenticated User Menu -->
           <div class="relative group">
             <button class="flex items-center gap-2 text-gray-700 hover:text-indigo-600 transition font-medium">
