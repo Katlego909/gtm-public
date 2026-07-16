@@ -55,6 +55,7 @@ from .actions import (
     action_toggle,
     action_update,
     cancel_assessment,
+    delete_assessment,
 )
 from .profile import history, logout_view, profile
 from .legal import contact, privacy_policy, terms_of_service

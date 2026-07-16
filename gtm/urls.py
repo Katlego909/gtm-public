@@ -22,6 +22,7 @@ urlpatterns = [
     path("download/<uuid:session_id>/", views.download_report_pdf, name="download"),
     path("history/", views.history, name="history"),
     path("cancel/<uuid:session_id>/", views.cancel_assessment, name="cancel_assessment"),
+    path("delete/<uuid:session_id>/", views.delete_assessment, name="delete_assessment"),
     
     path("actions/add/<uuid:session_id>/", views.action_add, name="action_add"),
     path("actions/toggle/<int:action_id>/", views.action_toggle, name="action_toggle"),

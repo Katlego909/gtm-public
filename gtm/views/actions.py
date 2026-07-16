@@ -67,6 +67,20 @@ def cancel_assessment(request, session, session_id):
 
 @require_POST
 @require_session_ownership
+def delete_assessment(request, session, session_id):
+    """Permanently delete a completed assessment and its results."""
+    if not session.is_completed:
+        messages.warning(request, "Use Cancel to remove an in-progress assessment.")
+        return redirect("gtm:history")
+
+    company_label = session.company_name or "this assessment"
+    session.delete()
+    messages.success(request, f"Deleted {company_label}.")
+    return redirect("gtm:history")
+
+
+@require_POST
+@require_session_ownership
 def action_add(request, session, session_id):
     """Add a new action item to the session."""
     note = request.POST.get("note","").strip()
