@@ -242,6 +242,8 @@ def assessment_step(request, session_id, step: int):
             label="Please provide more info on this"
         )
 
+    question_count = len(questions)
+
     # Pre-fill if answers exist
     initial = {}
     existing = {r.question_id: r for r in Response.objects.filter(session=session, question__in=questions)}
@@ -288,6 +290,17 @@ def assessment_step(request, session_id, step: int):
             return redirect("gtm:assessment_step", session_id=session.uuid, step=next_step)
     else:
         form = StepForm(initial=initial)
+
+    question_rows = [
+        {
+            "index": i + 1,
+            "question": q,
+            "rating_field": form[q.id_code],
+            "note_field": form[f"{q.id_code}_context_note"],
+            "guidance": question_guidance.get(q.id_code),
+        }
+        for i, q in enumerate(questions)
+    ]
 
     progress_pct = int((step - 1) / total_steps * 100)
     legend_html = "<br>".join([f"<b>{k}</b>: {v}" for k, v in LEGEND.items()])
@@ -339,6 +352,8 @@ def assessment_step(request, session_id, step: int):
         "is_htmx": _is_htmx(request),
         "context_fields": context_fields,
         "question_guidance": question_guidance,
+        "question_rows": question_rows,
+        "question_count": question_count,
         "is_delivery_step": is_delivery_step,
         "is_ai_step": True,
         "ai_upload_url": ai_upload_url,

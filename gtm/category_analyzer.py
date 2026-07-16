@@ -26,8 +26,8 @@ DEMAND_QUESTIONS = [
         "id_code": "DEM-ICP-01",
         "dimension": "ICP Clarity",
         "text": (
-            "We have a simple written profile of our ideal customer, including who is a "
-            "strong fit and who is not, and we review it every quarter so all teams stay aligned."
+            "Do you have a simple written profile of your ideal customer — including who is a "
+            "strong fit and who isn't — that all teams review and stay aligned on every quarter?"
         ),
         "evidence_hint": (
             "Look for: ICP documentation, buyer persona profiles, ideal customer criteria, "
@@ -38,8 +38,8 @@ DEMAND_QUESTIONS = [
         "id_code": "DEM-FIT-02",
         "dimension": "Lead Quality",
         "text": (
-            "At least 6 out of 10 new inbound leads match our ideal customer profile, "
-            "and we can verify this with clear qualification fields in our CRM."
+            "Do at least 6 out of 10 new inbound leads match your ideal customer profile, "
+            "verified with clear qualification fields in your CRM?"
         ),
         "evidence_hint": (
             "Look for: lead qualification rates, CRM field completeness reports, "
@@ -50,8 +50,8 @@ DEMAND_QUESTIONS = [
         "id_code": "DEM-MSG-03",
         "dimension": "Positioning",
         "text": (
-            "Our core value message is easy to understand, tested with each target segment, "
-            "and used consistently across our website, outbound messages, and sales materials."
+            "Is your core value message easy to understand, tested with each target segment, "
+            "and used consistently across your website, outbound messages, and sales materials?"
         ),
         "evidence_hint": (
             "Look for: messaging frameworks, positioning documents, A/B test results on messaging, "
@@ -62,8 +62,8 @@ DEMAND_QUESTIONS = [
         "id_code": "DEM-CHN-04",
         "dimension": "Channel Strategy",
         "text": (
-            "We have a clear channel plan that shows expected customer acquisition cost and "
-            "pipeline contribution for each channel, and we review performance every month."
+            "Do you have a clear channel plan that shows expected customer acquisition cost and "
+            "pipeline contribution for each channel, reviewed every month?"
         ),
         "evidence_hint": (
             "Look for: channel performance reports, CAC by channel, pipeline contribution by source, "
@@ -74,8 +74,8 @@ DEMAND_QUESTIONS = [
         "id_code": "DEM-ATT-05",
         "dimension": "Attribution",
         "text": (
-            "We can reliably identify which marketing channels generate qualified leads and "
-            "pipeline, using reporting data we trust."
+            "Can you reliably identify which marketing channels generate qualified leads and "
+            "pipeline, using reporting data you trust?"
         ),
         "evidence_hint": (
             "Look for: multi-touch attribution reports, UTM tracking data, campaign-to-pipeline "
@@ -86,8 +86,8 @@ DEMAND_QUESTIONS = [
         "id_code": "DEM-CNT-06",
         "dimension": "Execution Cadence",
         "text": (
-            "We run content or outbound work on a regular schedule, not randomly, "
-            "and each activity is tied to target accounts and clear pipeline goals."
+            "Do you run content or outbound work on a regular, planned schedule — with each "
+            "activity tied to target accounts and clear pipeline goals?"
         ),
         "evidence_hint": (
             "Look for: content calendars, campaign schedules, outbound sequence cadence docs, "

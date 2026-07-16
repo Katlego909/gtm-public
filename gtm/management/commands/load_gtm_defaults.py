@@ -13,7 +13,7 @@ Goals
 What this adds or updates
 -------------------------
 1) Categories   — Three areas we measure: Demand, Conversion, Delivery.
-2) Questions    — Short statements people rate from 1 to 5.
+2) Questions    — Short questions people rate from 1 to 5.
 3) Score Bands  — Ranges that map the final score to a stage and a helpful write-up.
 4) Tool Hints   — Light suggestions of tools people can look into.
 
@@ -58,7 +58,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
     "Demand": [
         {
             "id_code": "DEM-ICP-01",
-            "text": "We have a simple written profile of our ideal customer, including who is a strong fit and who is not, and we review it every quarter so all teams stay aligned.",
+            "text": "Do you have a simple written profile of your ideal customer — including who is a strong fit and who isn't — that all teams review and stay aligned on every quarter?",
             "weight": 0.22,
             "diagnostic_note": "If this is unclear, teams chase more leads instead of the right leads.",
             "ai_metadata": {
@@ -74,7 +74,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEM-FIT-02",
-            "text": "At least 6 out of 10 new inbound leads match our ideal customer profile, and we can verify this with clear qualification fields in our CRM.",
+            "text": "Do at least 6 out of 10 new inbound leads match your ideal customer profile, verified with clear qualification fields in your CRM?",
             "weight": 0.16,
             "diagnostic_note": "If lead fit is low, spend goes up and conversion goes down.",
             "ai_metadata": {
@@ -90,7 +90,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEM-MSG-03",
-            "text": "Our core value message is easy to understand, tested with each target segment, and used consistently across our website, outbound messages, and sales materials.",
+            "text": "Is your core value message easy to understand, tested with each target segment, and used consistently across your website, outbound messages, and sales materials?",
             "weight": 0.18,
             "diagnostic_note": "If the message is inconsistent, fewer buyers move forward.",
             "ai_metadata": {
@@ -106,7 +106,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEM-CHN-04",
-            "text": "We have a clear channel plan that shows expected customer acquisition cost and pipeline contribution for each channel, and we review performance every month.",
+            "text": "Do you have a clear channel plan that shows expected customer acquisition cost and pipeline contribution for each channel, reviewed every month?",
             "weight": 0.2,
             "diagnostic_note": "Without this, channel spend becomes guesswork.",
             "ai_metadata": {
@@ -122,7 +122,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEM-ATT-05",
-            "text": "We can reliably identify which marketing channels generate qualified leads and pipeline, using reporting data we trust.",
+            "text": "Can you reliably identify which marketing channels generate qualified leads and pipeline, using reporting data you trust?",
             "weight": 0.14,
             "diagnostic_note": "Without clear attribution, it is hard to know where to invest.",
             "ai_metadata": {
@@ -138,7 +138,7 @@ QUESTIONS: Dict[str, List[Dict]] = {
         },
         {
             "id_code": "DEM-CNT-06",
-            "text": "We run content or outbound work on a regular schedule, not randomly, and each activity is tied to target accounts and clear pipeline goals.",
+            "text": "Do you run content or outbound work on a regular, planned schedule — with each activity tied to target accounts and clear pipeline goals?",
             "weight": 0.1,
             "diagnostic_note": "If execution is irregular, pipeline becomes harder to predict.",
             "ai_metadata": {
