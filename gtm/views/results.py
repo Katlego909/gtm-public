@@ -1,6 +1,7 @@
 # Split verbatim from the former monolithic gtm/views.py. Shared imports live
 # in each module's header; shared helpers in gtm/views/helpers.py.
 from ..utils_logging import log_error
+from collections import defaultdict
 from io import BytesIO
 from django.shortcuts import render, redirect, get_object_or_404
 from django.db.models import Count
@@ -118,7 +119,16 @@ def results(request, session_id):
                 # Include the AI insight from the Response object
                 "ai_insight": r.ai_insight or "",
             })
-    weakest_questions = sorted(all_rows, key=lambda x: x["weighted"])[:3]
+    # One weakest question per category, not a pure global bottom-3: without
+    # this, Question.objects.all() (no order_by, so PK order) makes sorted()'s
+    # stable tie-break always favor whichever category was seeded with the
+    # lowest PKs (Demand) on every weighted-score tie -- silently starving
+    # other pillars out of this panel even when their scores are just as weak.
+    rows_by_category = defaultdict(list)
+    for row in all_rows:
+        rows_by_category[row["question"].category_id].append(row)
+    weakest_per_category = [min(rows, key=lambda x: x["weighted"]) for rows in rows_by_category.values()]
+    weakest_questions = sorted(weakest_per_category, key=lambda x: x["weighted"])[:3]
 
     labels = [c["category"].name for c in cat_scores]
     values = [round(c["avg"], 2) for c in cat_scores]

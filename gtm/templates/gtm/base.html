@@ -69,8 +69,8 @@
           {% include 'dashboard/partials/notification_bell.html' %}
 
           <!-- Authenticated User Menu -->
-          <div class="relative group">
-            <button class="flex items-center gap-2 text-gray-700 hover:text-indigo-600 transition font-medium">
+          <div class="relative js-dropdown-trigger" id="user-menu" data-panel="user-menu-panel">
+            <button type="button" onclick="toggleDropdownPanel('user-menu-panel')" class="flex items-center gap-2 text-gray-700 hover:text-indigo-600 transition font-medium">
               <div class="h-8 w-8 bg-indigo-600 rounded-full flex items-center justify-center">
                 <span class="text-white text-sm font-semibold">{{ user.username|slice:":1"|upper }}</span>
               </div>
@@ -80,7 +80,7 @@
               </svg>
             </button>
             <!-- Dropdown Menu -->
-            <div class="absolute right-0 mt-2 w-48 bg-white rounded-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-200">
+            <div id="user-menu-panel" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg border border-gray-200 z-50">
               <a href="{% url 'gtm:profile' %}" 
                  hx-get="{% url 'gtm:profile' %}" 
                  hx-target="#main-content" 
