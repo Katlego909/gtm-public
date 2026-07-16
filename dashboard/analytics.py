@@ -10,6 +10,34 @@ from gtm.ai_chat import get_suggested_prompts
 def _md(text):
     return markdown.markdown(text)
 
+
+def _build_assessment_history_export_rows(sessions_qs):
+    """Build full (unbounded) assessment-history rows for CSV export.
+
+    Prefers the cached ResultSnapshot over recomputing scores -- mirrors the
+    approach gtm/views/profile.py's `history` view already uses -- and only
+    falls back to _compute_scores for completed sessions that were never
+    viewed on the results page yet (so no snapshot exists).
+    """
+    rows = []
+    for session in sessions_qs:
+        snap = getattr(session, 'snapshot', None)
+        if snap:
+            overall = snap.overall
+            band_stage = snap.band_stage or 'Unknown'
+        else:
+            _, overall = _compute_scores(session)
+            band = _band_for_score(overall)
+            band_stage = band.stage if band else 'Unknown'
+        rows.append({
+            'company_name': session.company_name or 'Unnamed',
+            'industry': session.industry or 'N/A',
+            'overall_score': round(overall, 1),
+            'band_stage': band_stage,
+            'created_at': session.created_at,
+        })
+    return rows
+
 def get_dashboard_context(request, current_workspace, user_workspaces, agent_session_id):
     from dashboard.views import _load_pending_gap_suggestions
     from dashboard.utils import calculate_gap_metric_display_properties
@@ -348,8 +376,10 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
 
     if current_workspace:
         gap_report_url = f"{reverse('gap_report')}?workspace={current_workspace.id}"
+        assessment_history_export_url = f"{reverse('assessment_history_export', args=['csv'])}?workspace={current_workspace.id}"
     else:
         gap_report_url = reverse('gap_report')
+        assessment_history_export_url = reverse('assessment_history_export', args=['csv'])
 
     context = {
         'total_sessions': total_sessions,
@@ -382,6 +412,7 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
         'latest_score_risk': latest_score_risk,
         'ai_resource_recommendations': ai_resource_recommendations,
         'gap_report_url': gap_report_url,
+        'assessment_history_export_url': assessment_history_export_url,
         'assessment_history': assessment_history,
         'assessment_stats': assessment_stats,
         'score_trend_data': score_trend_data,

@@ -68,6 +68,7 @@ urlpatterns = [
 
     # Analytics and Settings
     path('analytics/', views.analytics, name='analytics'),
+    path('assessment-history/export/<str:fmt>/', views.assessment_history_export, name='assessment_history_export'),
     path('settings/', views.settings_view, name='settings'),
     
     # Workspace management from dashboard

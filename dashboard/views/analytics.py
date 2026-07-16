@@ -1,11 +1,12 @@
 # Split verbatim from the former monolithic dashboard/views.py. Shared imports
 # live in each module's header; shared helpers in dashboard/views/helpers.py.
-from ..analytics import get_dashboard_context
+from ..analytics import get_dashboard_context, _build_assessment_history_export_rows
 # dashboard/views.py
 """
 Dashboard views for GTM Validator
 """
 
+import csv
 import datetime
 import json
 import mimetypes
@@ -21,7 +22,7 @@ from typing import Any, Dict, List, Tuple
 from django.shortcuts import get_object_or_404, render, redirect
 from django.db import models
 from django.db import transaction
-from django.http import HttpResponse, JsonResponse, Http404
+from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse, Http404
 from django.utils import timezone
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
@@ -108,6 +109,42 @@ def insight_export(request, pk, fmt):
         return render_insight_docx_response(company_name=insight.company_name, ai_playbook_md=insight.ai_playbook or '', doc_date=insight.created_at)
     else:
         raise Http404("Unsupported export format.")
+
+
+@login_required
+def assessment_history_export(request, fmt):
+    """Export the full (unbounded) assessment history for the current workspace
+    or, if none is active, the user's own standalone assessments."""
+    if fmt != 'csv':
+        return HttpResponseBadRequest("Unsupported export format.")
+
+    current_workspace, _ = _resolve_dashboard_workspace(request)
+    if current_workspace:
+        assessments_qs = AssessmentSession.objects.filter(workspace=current_workspace, is_completed=True)
+        scope_slug = current_workspace.slug
+    else:
+        assessments_qs = AssessmentSession.objects.filter(user=request.user, workspace__isnull=True, is_completed=True)
+        scope_slug = request.user.username or 'personal'
+    assessments_qs = assessments_qs.select_related('snapshot__band').order_by('-created_at')
+
+    rows = _build_assessment_history_export_rows(assessments_qs)
+
+    filename = f"assessment_history_{scope_slug}_{timezone.now().date().isoformat()}.csv"
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+    writer = csv.writer(response)
+    writer.writerow(['Company', 'Industry', 'Overall Score', 'Stage', 'Assessed On'])
+    for row in rows:
+        writer.writerow([
+            row['company_name'],
+            row['industry'],
+            row['overall_score'],
+            row['band_stage'],
+            row['created_at'].date().isoformat(),
+        ])
+
+    return response
 
 
 @csrf_exempt

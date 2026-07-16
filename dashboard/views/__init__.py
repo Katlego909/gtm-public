@@ -32,6 +32,7 @@ from .resources import (
 )
 from .analytics import (
     analytics,
+    assessment_history_export,
     insight_export,
     insight_feedback,
     kpi_completed_items,

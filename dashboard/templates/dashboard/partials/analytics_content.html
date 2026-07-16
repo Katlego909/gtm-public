@@ -68,8 +68,12 @@
     <!-- Assessment History Table -->
     {% if assessment_history %}
     <div class="bg-white rounded-xl shadow-sm border border-gray-100 mb-8">
-        <div class="px-6 py-4 border-b border-gray-200">
+        <div class="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
             <h3 class="text-lg font-bold text-gray-800">Assessment History</h3>
+            <a href="{{ assessment_history_export_url }}"
+               class="px-4 py-2 bg-white border border-indigo-200 text-indigo-700 text-sm font-medium rounded-lg hover:bg-indigo-50 transition-colors">
+                Export CSV
+            </a>
         </div>
         <table class="w-full">
             <thead class="bg-gray-50 border-b border-gray-200">
