@@ -91,6 +91,10 @@ def results(request, session_id):
     strengths_categories = sorted(scoreable_cats, key=lambda x: x["avg"], reverse=True)[:3]
     focus_categories = sorted(scoreable_cats, key=lambda x: x["avg"])[:3]
 
+    focus_category_ids = {c["category"].id for c in focus_categories}
+    for c in cat_scores:
+        c["is_focus"] = c["category"].id in focus_category_ids
+
     for it in strengths_categories:
         it["step"] = step_map.get(it["category"].id)
     for it in focus_categories:

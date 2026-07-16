@@ -1,4 +1,4 @@
-﻿{% extends "gtm/base.html" %}
+{% extends "gtm/base.html" %}
 {% block content %}
 
 <!-- Page Header -->
@@ -11,7 +11,7 @@
 
 <div class="grid lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8 px-2 sm:px-0">
 
-    <div class="lg:col-span-2 bg-white rounded-lg border border-gray-200 p-4 sm:p-6 lg:p-8 reveal">
+    <div class="lg:col-span-2 app-card p-4 sm:p-6 lg:p-8 reveal">
 
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b pb-4 sm:pb-6 mb-4 sm:mb-6 gap-4">
             <div class="flex-1 min-w-0">
@@ -22,7 +22,7 @@
                 {% endif %}
                 <h2 class="text-base sm:text-lg lg:text-xl font-medium text-gray-500 mt-2">Overall GTM Score</h2>
             </div>
-            
+
             <div class="relative w-24 h-24 sm:w-28 sm:h-28 shrink-0 mx-auto sm:mx-0">
                 <svg class="w-full h-full -rotate-90" viewBox="0 0 36 36">
                     <path class="text-gray-200" stroke="currentColor" stroke-width="3" fill="none"
@@ -48,11 +48,11 @@
         </div>
     </div>
 
-    <div class="bg-white rounded-lg border border-gray-200 p-4 sm:p-6 lg:p-8 reveal reveal-delay-2">
+    <div class="app-card p-4 sm:p-6 lg:p-8 reveal reveal-delay-2">
         <!-- Header with icon -->
-        <div class="flex items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6 pb-4 sm:pb-5 border-b border-gray-200">
-            <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-indigo-50 flex-shrink-0">
-                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="app-section-header items-start sm:items-center mb-4 sm:mb-6 pb-4 sm:pb-5 border-b border-gray-200">
+            <div class="app-icon-badge app-icon-badge--solid flex-shrink-0">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
             </div>
@@ -110,8 +110,8 @@
             </p>
         </div>
 
-          <a href="{% url 'dashboard' %}?agent_session={{ session.uuid }}?prompt=action-plan"
-             hx-get="{% url 'dashboard' %}?agent_session={{ session.uuid }}?prompt=action-plan"
+          <a href="{% url 'dashboard' %}?agent_session={{ session.uuid }}&prompt=action-plan"
+             hx-get="{% url 'dashboard' %}?agent_session={{ session.uuid }}&prompt=action-plan"
              hx-target="#main-content"
              hx-select="#main-content"
              hx-swap="innerHTML swap:200ms"
@@ -119,7 +119,7 @@
              class="inline-flex items-center justify-center px-4 sm:px-6 py-3 rounded-lg bg-white text-indigo-700 text-sm sm:text-base font-bold hover:bg-indigo-50 transition w-full sm:w-fit">
             Run Execution Agent
           </a>
-        
+
         <div id="playbook-header-action">
             {% if snap and snap.ai_playbook %}
                 {% include "gtm/partials/playbook_ready_button.html" %}
@@ -133,11 +133,11 @@
 {% endif %}
 
 {% if band %}
-    <div class="bg-white rounded-lg p-8 mt-6 border border-gray-200 reveal">
+    <div class="app-card p-4 sm:p-6 lg:p-8 mt-6 sm:mt-8 reveal">
         <!-- Header with icon -->
-        <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
-            <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-indigo-50 flex-shrink-0">
-                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div class="app-section-header mb-4 sm:mb-6 pb-4 sm:pb-5 border-b border-gray-200">
+            <div class="app-icon-badge app-icon-badge--solid flex-shrink-0">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                 </svg>
             </div>
@@ -159,249 +159,20 @@
 
 {% if scoring_context %}
 {# ── Priority Opportunities + Detected Patterns ───────────────────────────── #}
-<div class="grid lg:grid-cols-2 gap-6 mt-8">
-
-  {# Left: Top 3 Opportunities #}
-  <div class="bg-white rounded-lg p-8 border border-gray-200 reveal">
-    <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
-      <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-indigo-50 flex-shrink-0">
-        <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
-        </svg>
-      </div>
-      <div>
-        <h3 class="text-2xl font-bold text-gray-900 mb-1">Priority Opportunities</h3>
-        <p class="text-sm text-gray-600">
-          Ranked by score-point impact — fix these first.
-          {% if scoring_context.total_opportunity_pts %}
-            <span class="font-semibold text-indigo-600">+{{ scoring_context.total_opportunity_pts|floatformat:1 }} pts still available overall.</span>
-          {% endif %}
-        </p>
-      </div>
-    </div>
-
-    <ol class="space-y-4">
-      {% for pri in scoring_context.top_priorities %}
-      <li class="flex gap-4 p-4 rounded-lg border border-gray-200 bg-gray-50 hover:border-indigo-200 transition">
-        <div class="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-600 text-white text-sm font-bold flex items-center justify-center">
-          {{ forloop.counter }}
-        </div>
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center justify-between gap-2 flex-wrap">
-            <span class="font-semibold text-gray-900">{{ pri.dimension }}</span>
-            <span class="text-xs font-medium px-2 py-0.5 rounded-full
-              {% if pri.pillar == 'Demand' %}bg-blue-100 text-blue-700
-              {% elif pri.pillar == 'Conversion' %}bg-amber-100 text-amber-700
-              {% else %}bg-green-100 text-green-700{% endif %}">
-              {{ pri.pillar }}
-            </span>
-          </div>
-          <div class="flex items-center gap-3 mt-2 flex-wrap">
-            <span class="text-sm text-gray-600">Score: <strong class="{% if pri.current_score <= 2 %}text-red-600{% elif pri.current_score >= 4 %}text-green-600{% else %}text-amber-600{% endif %}">{{ pri.current_score }}/5</strong></span>
-            <span class="text-sm font-semibold text-indigo-600">+{{ pri.opportunity_pts|floatformat:1 }} pts if fixed</span>
-          </div>
-        </div>
-      </li>
-      {% empty %}
-      <li class="text-gray-500 text-sm p-4">No opportunity data yet.</li>
-      {% endfor %}
-    </ol>
-  </div>
-
-  {# Right: Detected Patterns #}
-  <div class="bg-white rounded-lg p-8 border border-gray-200 reveal reveal-delay-2">
-    <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
-      <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-red-50 flex-shrink-0">
-        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
-        </svg>
-      </div>
-      <div>
-        <h3 class="text-2xl font-bold text-gray-900 mb-1">Detected GTM Patterns</h3>
-        <p class="text-sm text-gray-600">Structural failure modes identified from your individual scores.</p>
-      </div>
-    </div>
-
-    {% if scoring_context.patterns %}
-    <ul class="space-y-4">
-      {% for pat in scoring_context.patterns %}
-      <li class="p-4 rounded-lg border
-        {% if pat.severity == 'Critical' %}border-red-200 bg-red-50
-        {% elif pat.severity == 'High' %}border-amber-200 bg-amber-50
-        {% elif pat.severity == 'Medium' %}border-yellow-100 bg-yellow-50
-        {% else %}border-green-200 bg-green-50{% endif %}">
-        <div class="flex items-center gap-2 mb-1 flex-wrap">
-          <span class="text-xs font-bold px-2 py-0.5 rounded-full
-            {% if pat.severity == 'Critical' %}bg-red-600 text-white
-            {% elif pat.severity == 'High' %}bg-amber-500 text-white
-            {% elif pat.severity == 'Medium' %}bg-yellow-400 text-gray-900
-            {% else %}bg-green-500 text-white{% endif %}">
-            {{ pat.severity }}
-          </span>
-          <span class="font-semibold text-gray-900 text-sm">{{ pat.headline }}</span>
-        </div>
-        <p class="text-xs text-gray-600 mt-1">{{ pat.root_cause }}</p>
-        <p class="text-xs font-medium text-indigo-700 mt-2">
-          Quick win: {{ pat.quick_win }}
-        </p>
-      </li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    <div class="flex items-center gap-3 p-4 rounded-lg bg-green-50 border border-green-200">
-      <svg class="w-6 h-6 text-green-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-      </svg>
-      <p class="text-sm text-green-800 font-medium">No critical GTM patterns detected. Your scores are above the risk thresholds across all dimensions.</p>
-    </div>
-    {% endif %}
-  </div>
-
+<div class="grid lg:grid-cols-2 gap-4 sm:gap-6 mt-6 sm:mt-8 px-2 sm:px-0">
+  {% include "gtm/partials/results/priority_opportunities.html" %}
+  {% include "gtm/partials/results/detected_patterns.html" %}
 </div>
 {% endif %}
 
 
-<div class="grid lg:grid-cols-2 gap-6 mt-8">
-
-    <div class="bg-white rounded-lg p-8 border border-gray-200 reveal">
-        <!-- Header with icon -->
-        <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
-            <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-indigo-50 flex-shrink-0">
-                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                </svg>
-            </div>
-            <div>
-                <h4 class="text-2xl font-bold text-gray-900 mb-1">Recommended Tools</h4>
-                <p class="text-sm text-gray-600">Tools to address gaps in your weakest GTM areas</p>
-            </div>
-        </div>
-
-        <div class="space-y-4">
-            {% if recommendations %}
-              {% for r in recommendations %}
-                <div class="p-3 border rounded-lg hover:border-indigo-300 transition">
-                  <h5 class="font-semibold text-gray-900 mb-1 break-words">{{ r.keyword|capfirst }}</h5>
-                  <p class="text-sm text-gray-600 mb-2 break-words">{{ r.description|truncatechars:80 }}</p>
-                  <div class="flex justify-between items-center text-xs">
-                      <span class="text-gray-500 break-words">{{ r.tool_list|join:", " }}</span>
-                      {% if r.url %}
-                        <a href="{{ r.url }}" target="_blank" class="text-indigo-600 hover:text-indigo-800 font-medium transition shrink-0">Explore</a>
-                      {% endif %}
-                  </div>
-                </div>
-              {% endfor %}
-            {% else %}
-              <div class="p-4 bg-gray-50 rounded-lg text-center text-gray-600">
-                <p>Complete your assessment to receive personalized tool recommendations.</p>
-              </div>
-            {% endif %}
-        </div>
-    </div>
-
-    <div class="bg-white rounded-lg p-8 border border-gray-200 reveal reveal-delay-2">
-        <!-- Header with icon -->
-        <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
-            <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-indigo-50 flex-shrink-0">
-                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-            </div>
-            <div>
-                <h4 class="text-2xl font-bold text-gray-900 mb-1">Top Strengths</h4>
-                <p class="text-sm text-gray-600">Your highest-performing categories</p>
-            </div>
-        </div>
-        <ul class="space-y-4">
-            {% for c in strengths_categories %}
-                <li class="p-3 bg-gray-50 rounded-lg">
-                    <div class="flex items-center justify-between">
-                        <div class="font-medium text-indigo-700 break-words">{{ c.category.name }}</div>
-                        <div class="text-sm text-gray-700 font-medium shrink-0">{{ c.avg|floatformat:2 }}/5</div>
-                    </div>
-                    <p class="text-xs text-gray-500 mt-1">Performing well &mdash; maintain the rigor in this area.</p>
-                </li>
-            {% empty %}
-                <li class="text-gray-500 text-sm">No clear strengths yet.</li>
-            {% endfor %}
-        </ul>
-    </div>
-
-    
+<div class="grid lg:grid-cols-2 gap-4 sm:gap-6 mt-6 sm:mt-8 px-2 sm:px-0">
+  {% include "gtm/partials/results/recommended_tools.html" %}
+  {% include "gtm/partials/results/top_strengths.html" %}
 </div>
 
 
-<div class="bg-white rounded-lg border border-gray-200 p-8 mt-6 reveal">
-  <!-- Header with icon -->
-  <div class="flex items-center gap-4 mb-6 pb-5 border-b border-gray-200">
-      <div class="flex items-center justify-center w-12 h-12 rounded-lg bg-indigo-50 flex-shrink-0">
-          <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-      </div>
-      <div>
-          <h4 class="text-2xl font-bold text-gray-900 mb-1">
-            {% if overall >= 90 %}Key Insights & Core Strengths{% else %}Weakest Questions & Insights{% endif %}
-          </h4>
-          <p class="text-sm text-gray-600">
-            {% if overall >= 90 %}Analysis of your top GTM pillars with personalized AI insights{% else %}Areas where you scored lowest with personalized AI insights{% endif %}
-          </p>
-      </div>
-  </div>
-  
-  <ul class="space-y-4">
-    {% for q in weakest_questions %}
-      <li class="border border-gray-200 rounded-lg p-4">
-        <div class="flex items-center justify-between mb-2">
-            <div class="font-medium text-lg text-indigo-700 break-words">{{ q.question.category.name }}</div>
-            <div class="text-xl font-semibold 
-              {% if q.score <= 2 %}text-red-600
-              {% elif q.score >= 4 %}text-green-600
-              {% else %}text-yellow-600{% endif %} shrink-0">{{ q.score }}/5</div>
-        </div>
-        <p class="text-sm mt-1 mb-3 break-words">{{ q.question.text }}</p>
-
-        {% if q.note %}
-            <p class="text-xs text-gray-500 mt-1 break-words">Diagnostic: {{ q.note }}</p>
-        {% endif %}
-
-        <div id="insight-{{ q.question.id_code }}">
-          {% if q.ai_insight %}
-            <div class="mt-3 p-3 rounded text-sm overflow-hidden border-l-4
-              {% if q.score >= 4 %}bg-green-50 border-green-500
-              {% elif q.score == 3 %}bg-yellow-50 border-yellow-400
-              {% else %}bg-red-50 border-red-500{% endif %}">
-              <div class="flex items-center mb-1">
-                  <span class="font-semibold {% if q.score >= 4 %}text-green-700{% elif q.score == 3 %}text-yellow-700{% else %}text-red-700{% endif %}">
-                    AI Insight:
-                  </span>
-              </div>
-              <p class="text-gray-800 mt-1 leading-snug break-words">{{ q.ai_insight }}</p>
-            </div>
-          {% elif q.ai_insight_loading and q.response_id %}
-            <div class="mt-3 p-3 bg-gray-50 border-l-4 border-indigo-400 rounded text-sm flex items-center gap-3 animate-pulse"
-                 hx-get="{% url 'gtm:insight_status' session.uuid q.response_id %}"
-                 hx-trigger="load, every 3s"
-                 hx-target="#insight-{{ q.question.id_code }}"
-                 hx-swap="outerHTML">
-              <div class="animate-spin h-4 w-4 border-2 border-indigo-500 border-t-transparent rounded-full"></div>
-              <span class="text-gray-600 italic">AI is analyzing this area...</span>
-            </div>
-          {% endif %}
-        </div>
-        
-        <div class="mt-4 flex flex-wrap items-center gap-2 border-t pt-3">
-          <a href="{% url 'gtm:assessment_step' session.uuid q.step %}" class="px-3 py-1.5 rounded border border-indigo-600 text-indigo-600 text-sm hover:bg-indigo-50 shrink-0">Fix this item</a>
-          <button type="button" data-check="{{ q.question.text }}" class="copy-action px-3 py-1.5 rounded border text-gray-700 text-sm hover:bg-gray-50 shrink-0">Copy to checklist</button>
-        </div>
-      </li>
-    {% empty %}
-      <li class="text-gray-500 text-sm">No answered questions yet.</li>
-    {% endfor %}
-  </ul>
-</div>
+{% include "gtm/partials/results/weakest_questions.html" %}
 
 <div class="mt-6 flex flex-col sm:flex-row gap-2 sm:gap-3 px-2 sm:px-0">
     <a href="{% url 'gtm:assessment_step' session.uuid total_steps %}"
@@ -416,10 +187,10 @@
     </a>
 
     <a href="{% url 'dashboard' %}?agent_session={{ session.uuid }}"
-       hx-get="{% url 'dashboard' %}?agent_session={{ session.uuid }}" 
-       hx-target="#main-content" 
+       hx-get="{% url 'dashboard' %}?agent_session={{ session.uuid }}"
+       hx-target="#main-content"
        hx-select="#main-content"
-       hx-swap="innerHTML swap:200ms" 
+       hx-swap="innerHTML swap:200ms"
        hx-push-url="true"
        class="flex-1 sm:flex-none inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg bg-indigo-600 text-white text-sm sm:text-base font-semibold hover:bg-indigo-700 transition gap-2">
       <svg class="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -428,8 +199,8 @@
       <span>Ask AI Assistant</span>
     </a>
 
-    <a href="{% url 'dashboard' %}?agent_session={{ session.uuid }}?prompt=action-plan"
-       hx-get="{% url 'dashboard' %}?agent_session={{ session.uuid }}?prompt=action-plan"
+    <a href="{% url 'dashboard' %}?agent_session={{ session.uuid }}&prompt=action-plan"
+       hx-get="{% url 'dashboard' %}?agent_session={{ session.uuid }}&prompt=action-plan"
        hx-target="#main-content"
        hx-select="#main-content"
        hx-swap="innerHTML swap:200ms"
@@ -437,7 +208,7 @@
        class="flex-1 sm:flex-none inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg bg-white border border-indigo-200 text-indigo-700 text-sm sm:text-base font-semibold hover:bg-indigo-50 transition">
       Run Execution Agent
     </a>
-    
+
     <div id="playbook-footer-action" class="flex-1 sm:flex-none">
         {% include "gtm/partials/playbook_footer_status.html" with session=session ready=snap.ai_playbook %}
     </div>
