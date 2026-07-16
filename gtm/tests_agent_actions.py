@@ -237,3 +237,78 @@ class AgentActionToolsTests(TestCase):
         result = tools["recommend_resource"]("Nonexistent Deck", str(self.session.uuid), "x")
         self.assertIn("couldn't find a resource", result)
         self.assertFalse(AIResourceRecommendation.objects.filter(session=self.session).exists())
+
+    def test_lookup_crm_company_without_connection_returns_setup_hint(self):
+        tools = self._tools()
+        with mock.patch("gtm.integrations.hubspot_client.get_client_for_workspace", return_value=None):
+            result = tools["lookup_crm_company"]("acme.com")
+        self.assertIn("doesn't have HubSpot connected", result)
+
+    def test_lookup_crm_company_formats_found_company(self):
+        tools = self._tools()
+        fake_client = mock.Mock()
+        fake_client.find_company.return_value = {
+            "id": "123",
+            "properties": {"name": "Acme Inc", "domain": "acme.com", "industry": "Software"},
+        }
+        with mock.patch("gtm.integrations.hubspot_client.get_client_for_workspace", return_value=fake_client):
+            result = tools["lookup_crm_company"]("acme.com")
+        self.assertIn("Acme Inc", result)
+        self.assertIn("Software", result)
+        fake_client.find_company.assert_called_once_with("acme.com")
+
+    def test_lookup_crm_company_ambiguous_match_asks_for_specificity(self):
+        tools = self._tools()
+        fake_client = mock.Mock()
+        fake_client.find_company.return_value = None
+        with mock.patch("gtm.integrations.hubspot_client.get_client_for_workspace", return_value=fake_client):
+            result = tools["lookup_crm_company"]("Acme")
+        self.assertIn("couldn't find a single HubSpot company", result)
+
+    def test_log_insight_to_crm_creates_note_on_matched_company(self):
+        tools = self._tools()
+        fake_client = mock.Mock()
+        fake_client.find_company.return_value = {"id": "123", "properties": {"name": "Acme Inc"}}
+        with mock.patch("gtm.integrations.hubspot_client.get_client_for_workspace", return_value=fake_client):
+            result = tools["log_insight_to_crm"]("acme.com", "Weak ICP definition detected.")
+        self.assertIn("Logged a note", result)
+        self.assertIn("Acme Inc", result)
+        fake_client.create_note.assert_called_once_with("123", "[GTM Validator AI] Weak ICP definition detected.")
+
+    def test_log_insight_to_crm_without_connection_returns_setup_hint(self):
+        tools = self._tools()
+        with mock.patch("gtm.integrations.hubspot_client.get_client_for_workspace", return_value=None):
+            result = tools["log_insight_to_crm"]("acme.com", "Some finding.")
+        self.assertIn("doesn't have HubSpot connected", result)
+
+    def test_create_crm_follow_up_task_respects_can_assign_tasks_permission(self):
+        tools = self._tools(user=self.teammate)  # contributor -- can_assign_tasks is False
+        with mock.patch("gtm.integrations.hubspot_client.get_client_for_workspace") as mock_get_client:
+            result = tools["create_crm_follow_up_task"](str(self.task.id), "acme.com")
+        self.assertIn("don't have permission", result)
+        mock_get_client.assert_not_called()
+
+    def test_create_crm_follow_up_task_creates_then_updates_idempotently(self):
+        tools = self._tools()  # actor is admin
+        fake_client = mock.Mock()
+        fake_client.find_company.return_value = {"id": "123", "properties": {"name": "Acme Inc"}}
+        fake_client.create_task.return_value = "task-999"
+
+        with mock.patch("gtm.integrations.hubspot_client.get_client_for_workspace", return_value=fake_client):
+            first = tools["create_crm_follow_up_task"](str(self.task.id), "acme.com")
+
+        self.assertIn("Pushed", first)
+        self.assertIn("Acme Inc", first)
+        fake_client.create_task.assert_called_once()
+        fake_client.update_task.assert_not_called()
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.external_crm_task_id, "task-999")
+        self.assertEqual(self.task.crm_sync_status, "synced")
+        self.assertIsNotNone(self.task.crm_synced_at)
+
+        with mock.patch("gtm.integrations.hubspot_client.get_client_for_workspace", return_value=fake_client):
+            second = tools["create_crm_follow_up_task"](str(self.task.id), "acme.com")
+
+        self.assertIn("Updated", second)
+        fake_client.update_task.assert_called_once_with("task-999", mock.ANY, mock.ANY, None)
+        fake_client.create_task.assert_called_once()  # still only called once total

@@ -22,6 +22,7 @@ import csv
 import json
 import logging
 import re
+import threading
 import zipfile
 import xml.etree.ElementTree as ET
 
@@ -33,8 +34,12 @@ _TEXT_LIMIT_PER_DOC = 30_000
 _COMBINED_TEXT_LIMIT = 50_000
 
 # Lazy-loaded ML model caches — initialised on first analysis call, then reused.
+# Locks guard against two threads in the same worker racing to load the same
+# model concurrently (mirrors gtm/ai_services.py's _get_client() pattern).
 _ST_MODEL = None    # sentence-transformers SentenceTransformer
-_SPACY_NLP = None   # spaCy en_core_web_sm pipeline
+_ST_LOCK = threading.Lock()
+_SPACY_NLP = None   # spaCy en_core_web_sm pipeline (tok2vec + ner only, see _get_spacy_nlp)
+_SPACY_LOCK = threading.Lock()
 
 
 DELIVERY_QUESTIONS = [
@@ -436,7 +441,11 @@ def _tfidf_rank(chunks: list, queries: list, top_k: int = 3) -> dict:
 def _get_sentence_transformer():
     """Lazy-load and cache the sentence-transformer model (all-MiniLM-L6-v2)."""
     global _ST_MODEL
-    if _ST_MODEL is None:
+    if _ST_MODEL is not None:
+        return _ST_MODEL
+    with _ST_LOCK:
+        if _ST_MODEL is not None:
+            return _ST_MODEL
         from sentence_transformers import SentenceTransformer
         logger.info(
             "Loading sentence-transformer model 'all-MiniLM-L6-v2' "
@@ -489,12 +498,26 @@ def _semantic_rank(sentences: list, queries: list, top_k: int = 3) -> dict:
 # ---------------------------------------------------------------------------
 
 def _get_spacy_nlp():
-    """Lazy-load and cache the spaCy en_core_web_sm pipeline."""
+    """Lazy-load and cache the spaCy en_core_web_sm pipeline.
+
+    _extract_metrics_spacy (the only consumer of this cached pipeline) reads
+    only doc.ents, never POS tags, the dependency parse, lemmas, or noun
+    chunks -- so the tagger/parser/attribute_ruler/lemmatizer components are
+    disabled, keeping just tok2vec + ner. This noticeably speeds up nlp()
+    calls over the up-to-50k-char documents this pipeline processes.
+    """
     global _SPACY_NLP
-    if _SPACY_NLP is None:
+    if _SPACY_NLP is not None:
+        return _SPACY_NLP
+    with _SPACY_LOCK:
+        if _SPACY_NLP is not None:
+            return _SPACY_NLP
         try:
             import spacy
-            _SPACY_NLP = spacy.load("en_core_web_sm")
+            _SPACY_NLP = spacy.load(
+                "en_core_web_sm",
+                disable=["tagger", "parser", "attribute_ruler", "lemmatizer"],
+            )
         except ImportError:
             logger.warning("spaCy not installed — NER stage skipped.")
             return None

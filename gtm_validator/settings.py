@@ -201,6 +201,21 @@ if not GCP_PROJECT_ID or GCP_PROJECT_ID == "your-gcp-project-id":
         except Exception:
             pass
 
+# Encryption key for workspace-integration credentials (e.g. HubSpot tokens) at rest.
+# A dedicated key (not derived from SECRET_KEY unconditionally) so that rotating
+# SECRET_KEY for a security incident doesn't also corrupt every stored integration
+# token as a side effect -- SECRET_KEY also signs sessions/CSRF (signed_cookies).
+# Falls back to a key derived from SECRET_KEY for local dev convenience, matching
+# this project's existing "insecure default for dev" pattern; set an explicit,
+# independently-rotatable INTEGRATION_ENCRYPTION_KEY in production.
+INTEGRATION_ENCRYPTION_KEY = os.getenv("INTEGRATION_ENCRYPTION_KEY", "")
+if not INTEGRATION_ENCRYPTION_KEY:
+    import base64 as _base64
+    import hashlib as _hashlib
+    INTEGRATION_ENCRYPTION_KEY = _base64.urlsafe_b64encode(
+        _hashlib.sha256(SECRET_KEY.encode("utf-8")).digest()
+    ).decode("utf-8")
+
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
     'allauth.account.auth_backends.AuthenticationBackend',

@@ -10,6 +10,8 @@ tool schema via automatic function calling.
 
 from typing import Any, List, Optional
 
+from django.utils import timezone
+
 from .models import ActionItem, ActionItemComment, AssessmentSession
 from .models_workspace import WorkspaceMembership
 
@@ -208,4 +210,113 @@ def build_agent_action_tools(workspace, user) -> List[Any]:
         )
         return f'Recommended "{resource.name}" for this assessment.'
 
-    return [notify_teammate, comment_on_task, assign_task, assign_task_to_agent, escalate_gap, recommend_resource]
+    def _hubspot_or_message(workspace):
+        """(client, None) if HubSpot is connected for this workspace, else
+        (None, an explanatory message) safe to return directly from a tool."""
+        from .integrations.hubspot_client import get_client_for_workspace
+
+        client = get_client_for_workspace(workspace)
+        if not client:
+            return None, (
+                "This workspace doesn't have HubSpot connected yet. Ask a workspace "
+                "admin to add a HubSpot Private App token under Workspace Settings > Integrations."
+            )
+        return client, None
+
+    def lookup_crm_company(company_identifier: str) -> str:
+        """Look up a company in the workspace's connected HubSpot CRM by
+        domain or name, to pull real context (industry, size, lifecycle
+        stage) into a GTM insight, playbook, or chat answer. Read-only.
+        Requires HubSpot to be connected under Workspace Settings > Integrations.
+        """
+        from .integrations.hubspot_client import HubSpotAPIError
+
+        client, error = _hubspot_or_message(workspace)
+        if error:
+            return error
+        try:
+            company = client.find_company(company_identifier)
+        except HubSpotAPIError as exc:
+            return f"HubSpot lookup failed: {exc}"
+        if company is None:
+            return f"I couldn't find a single HubSpot company matching '{company_identifier}' -- try a more specific name or domain."
+        props = company.get('properties', {})
+        parts = [f"Name: {props.get('name', 'Unknown')}"]
+        for label, key in [("Domain", "domain"), ("Industry", "industry"),
+                            ("Employees", "numberofemployees"), ("Lifecycle stage", "lifecyclestage")]:
+            if props.get(key):
+                parts.append(f"{label}: {props[key]}")
+        return " | ".join(parts)
+
+    def log_insight_to_crm(company_identifier: str, summary: str) -> str:
+        """Write a GTM finding as a Note on the matching HubSpot company
+        record (domain or name), so the workspace's HubSpot users see it
+        without leaving their CRM. Requires HubSpot to be connected.
+        """
+        from .integrations.hubspot_client import HubSpotAPIError
+
+        client, error = _hubspot_or_message(workspace)
+        if error:
+            return error
+        try:
+            company = client.find_company(company_identifier)
+            if company is None:
+                return f"I couldn't find a single HubSpot company matching '{company_identifier}' -- try a more specific name or domain."
+            client.create_note(company['id'], f"[GTM Validator AI] {summary}")
+        except HubSpotAPIError as exc:
+            return f"HubSpot write failed: {exc}"
+        company_name = company.get('properties', {}).get('name', company_identifier)
+        return f'Logged a note to HubSpot on "{company_name}".'
+
+    def create_crm_follow_up_task(action_item_id: str, company_identifier: str, due_date: str = "") -> str:
+        """Push a workspace task (ActionItem) into HubSpot as a Task on the
+        matching company (domain or name), so the client's team sees the
+        GTM follow-up inside HubSpot itself. `due_date` is optional, format
+        YYYY-MM-DD. Re-running this on an already-synced task updates the
+        existing HubSpot task rather than duplicating it. Requires HubSpot
+        to be connected and the requesting user to have task-assignment
+        permission in this workspace (same requirement as assign_task).
+        """
+        from .integrations.hubspot_client import HubSpotAPIError
+
+        membership = WorkspaceMembership.objects.filter(
+            workspace=workspace, user=user, is_active=True
+        ).first()
+        if not membership or not membership.can_assign_tasks:
+            return "You don't have permission to push tasks to the CRM in this workspace."
+        try:
+            item = ActionItem.objects.get(pk=int(action_item_id), workspace=workspace)
+        except (ActionItem.DoesNotExist, ValueError, TypeError):
+            return f"I couldn't find task {action_item_id} in this workspace."
+
+        client, error = _hubspot_or_message(workspace)
+        if error:
+            return error
+
+        subject = item.note[:100]
+        body = f"GTM follow-up from Funti3r GTM Validator: {item.note}"
+        try:
+            company = client.find_company(company_identifier)
+            if company is None:
+                return f"I couldn't find a single HubSpot company matching '{company_identifier}' -- try a more specific name or domain."
+            if item.external_crm_task_id:
+                client.update_task(item.external_crm_task_id, subject, body, due_date or None)
+                action_verb = "Updated"
+            else:
+                item.external_crm_task_id = client.create_task(company['id'], subject, body, due_date or None)
+                action_verb = "Pushed"
+        except HubSpotAPIError as exc:
+            item.crm_sync_status = 'error'
+            item.save(update_fields=['crm_sync_status'])
+            return f"HubSpot task sync failed: {exc}"
+
+        item.crm_sync_status = 'synced'
+        item.crm_synced_at = timezone.now()
+        item.save(update_fields=['external_crm_task_id', 'crm_sync_status', 'crm_synced_at'])
+        company_name = company.get('properties', {}).get('name', company_identifier)
+        return f'{action_verb} "{subject}" to HubSpot as a task on {company_name}.'
+
+    return [
+        notify_teammate, comment_on_task, assign_task, assign_task_to_agent, escalate_gap, recommend_resource,
+        lookup_crm_company, log_insight_to_crm, create_crm_follow_up_task,
+    ]

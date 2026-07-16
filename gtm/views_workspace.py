@@ -6,8 +6,12 @@ from django.conf import settings
 from django.utils import timezone
 from django.urls import reverse
 from .models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation
+from .models_integrations import WorkspaceIntegration
+from .integrations.crypto import CredentialDecryptionError
+from .integrations.hubspot_client import HubSpotClient
 from .forms import WorkspaceInvitationForm
 from .middleware_workspace import workspace_required, admin_or_manager_required
+from .decorators import workspace_permission_required
 
 
 @login_required
@@ -112,6 +116,96 @@ def workspace_invite(request, workspace_id):
                     messages.error(request, f"{field.capitalize()}: {error}")
             
     return redirect(dashboard_url)
+
+
+@workspace_permission_required('can_manage_integrations', workspace_param='workspace_id')
+def workspace_integrations(request, workspace_id):
+    """View and configure workspace integrations (HubSpot CRM, etc.)."""
+    workspace = request.workspace
+    integration = WorkspaceIntegration.objects.filter(workspace=workspace, provider='hubspot').first()
+
+    if request.method == 'POST':
+        token = request.POST.get('token', '').strip()
+        if not token:
+            messages.error(request, 'Please paste a HubSpot Private App token.')
+            return redirect('workspace:integrations', workspace_id=workspace_id)
+
+        if integration is None:
+            integration = WorkspaceIntegration(workspace=workspace, provider='hubspot')
+        integration.auth_method = 'api_key'
+        integration.set_credential(token)
+        integration.configured_by = request.user
+        integration.save()
+
+        ok, result_message = HubSpotClient(token).test_connection()
+        integration.status = 'connected' if ok else 'error'
+        integration.last_verified_at = timezone.now()
+        integration.last_error = '' if ok else result_message
+        integration.save()
+
+        if ok:
+            messages.success(request, 'HubSpot connected successfully.')
+        else:
+            messages.error(request, f'Token saved, but the connection test failed: {result_message}')
+
+        return redirect('workspace:integrations', workspace_id=workspace_id)
+
+    return render(request, 'gtm/workspace/integrations.html', {
+        'workspace': workspace,
+        'integration': integration,
+        'user_membership': request.membership,
+    })
+
+
+@workspace_permission_required('can_manage_integrations', workspace_param='workspace_id')
+def workspace_integration_test_hubspot(request, workspace_id):
+    """Re-verify the stored HubSpot token's connection status."""
+    if request.method != 'POST':
+        return redirect('workspace:integrations', workspace_id=workspace_id)
+
+    workspace = request.workspace
+    integration = get_object_or_404(WorkspaceIntegration, workspace=workspace, provider='hubspot')
+
+    try:
+        token = integration.get_credential()
+    except CredentialDecryptionError:
+        integration.status = 'error'
+        integration.last_error = 'Stored credential could not be decrypted. Please reconnect.'
+        integration.last_verified_at = timezone.now()
+        integration.save()
+        messages.error(request, integration.last_error)
+        return redirect('workspace:integrations', workspace_id=workspace_id)
+
+    ok, result_message = HubSpotClient(token).test_connection()
+    integration.status = 'connected' if ok else 'error'
+    integration.last_verified_at = timezone.now()
+    integration.last_error = '' if ok else result_message
+    integration.save()
+
+    if ok:
+        messages.success(request, 'Connection is healthy.')
+    else:
+        messages.error(request, result_message)
+
+    return redirect('workspace:integrations', workspace_id=workspace_id)
+
+
+@workspace_permission_required('can_manage_integrations', workspace_param='workspace_id')
+def workspace_integration_disconnect_hubspot(request, workspace_id):
+    """Disconnect the workspace's HubSpot integration (clears the stored credential)."""
+    if request.method != 'POST':
+        return redirect('workspace:integrations', workspace_id=workspace_id)
+
+    workspace = request.workspace
+    integration = get_object_or_404(WorkspaceIntegration, workspace=workspace, provider='hubspot')
+    integration.clear_credential()
+    integration.status = 'not_connected'
+    integration.last_error = ''
+    integration.last_verified_at = None
+    integration.save()
+
+    messages.success(request, 'HubSpot has been disconnected.')
+    return redirect('workspace:integrations', workspace_id=workspace_id)
 
 
 @login_required

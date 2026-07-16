@@ -48,6 +48,8 @@ from gtm.models import (
     WorkspaceChatMessage,
 )
 from gtm.models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation, WorkspaceActivityEvent
+from gtm.models_integrations import WorkspaceIntegration
+from gtm.integrations.hubspot_client import HubSpotClient
 from gtm.agent_runtime import AGENT_DIRECTORY, agent_display_label
 from gtm.ai_chat import get_suggested_prompts, process_chat_message
 from gtm.workspace_agent_chat import AGENT_TYPES, get_suggested_prompts_for_agent
@@ -93,6 +95,61 @@ from .helpers import (
     _upsert_gap_metric_in_scope,
 )
 
+def _handle_hubspot_integration_action(request, workspace):
+    """Save/test/disconnect the workspace's HubSpot connection. Caller has
+    already verified the requesting user has can_manage_integrations."""
+    action = request.POST.get('integration_action')
+    integration, _ = WorkspaceIntegration.objects.get_or_create(workspace=workspace, provider='hubspot')
+
+    if action == 'save_hubspot':
+        token = request.POST.get('token', '').strip()
+        if not token:
+            messages.error(request, 'Please paste a HubSpot Private App token.')
+            return
+        integration.auth_method = 'api_key'
+        integration.set_credential(token)
+        integration.configured_by = request.user
+        integration.save()
+        ok, result_message = HubSpotClient(token).test_connection()
+        integration.status = 'connected' if ok else 'error'
+        integration.last_verified_at = timezone.now()
+        integration.last_error = '' if ok else result_message
+        integration.save()
+        if ok:
+            messages.success(request, 'HubSpot connected successfully.')
+        else:
+            messages.error(request, f'Token saved, but the connection test failed: {result_message}')
+
+    elif action == 'test_hubspot':
+        from gtm.integrations.crypto import CredentialDecryptionError
+        try:
+            token = integration.get_credential()
+        except CredentialDecryptionError:
+            integration.status = 'error'
+            integration.last_error = 'Stored credential could not be decrypted. Please reconnect.'
+            integration.last_verified_at = timezone.now()
+            integration.save()
+            messages.error(request, integration.last_error)
+            return
+        ok, result_message = HubSpotClient(token).test_connection()
+        integration.status = 'connected' if ok else 'error'
+        integration.last_verified_at = timezone.now()
+        integration.last_error = '' if ok else result_message
+        integration.save()
+        if ok:
+            messages.success(request, 'Connection is healthy.')
+        else:
+            messages.error(request, result_message)
+
+    elif action == 'disconnect_hubspot':
+        integration.clear_credential()
+        integration.status = 'not_connected'
+        integration.last_error = ''
+        integration.last_verified_at = None
+        integration.save()
+        messages.success(request, 'HubSpot has been disconnected.')
+
+
 @vary_on_headers('HX-Request')
 @login_required
 def workspace_hub(request):
@@ -114,6 +171,24 @@ def workspace_hub(request):
 
         if current_workspace:
             request.session['current_workspace_id'] = str(current_workspace.id)
+
+    user_membership = None
+    if current_workspace:
+        user_membership = WorkspaceMembership.objects.filter(
+            workspace=current_workspace, user=request.user, is_active=True
+        ).first()
+
+    if request.method == 'POST' and current_workspace and 'integration_action' in request.POST:
+        if not user_membership or not user_membership.can_manage_integrations:
+            messages.error(request, "You don't have permission to manage integrations in this workspace.")
+        else:
+            _handle_hubspot_integration_action(request, current_workspace)
+
+    hubspot_integration = None
+    if current_workspace:
+        hubspot_integration = WorkspaceIntegration.objects.filter(
+            workspace=current_workspace, provider='hubspot'
+        ).first()
 
     team_members = []
     workspace_memberships = []
@@ -151,6 +226,8 @@ def workspace_hub(request):
         'workspace_memberships': workspace_memberships,
         'pending_invites': pending_invites,
         'accepted_awaiting': accepted_awaiting,
+        'hubspot_integration': hubspot_integration,
+        'user_can_manage_integrations': bool(user_membership and user_membership.can_manage_integrations),
         'page_title': 'Workspace Hub'
     }
 

@@ -170,9 +170,7 @@ def upload_delivery_document(request, session_id):
 @login_required
 @require_POST
 def analyze_delivery_documents(request, session_id):
-    """Run Gemini analysis on all uploaded delivery documents and return per-question scores."""
-    from ..delivery_analyzer import analyze_delivery_documents as _run_analysis
-
+    """Kick off Gemini analysis on all uploaded delivery documents in the background."""
     session, is_authorized = safe_get_session_or_403(request, session_id)
     if not is_authorized:
         return JsonResponse({"success": False, "error": "Access denied."}, status=403)
@@ -188,17 +186,28 @@ def analyze_delivery_documents(request, session_id):
             status=400,
         )
 
-    result = _run_analysis(session)
-    if not result or "_error" in result:
-        error_detail = result.get("_error", "") if result else ""
-        return JsonResponse(
-            {"success": False, "error": f"Analysis failed: {error_detail}" if error_detail else "Could not analyse documents. Please try again."},
-            status=500,
-        )
+    doc_ids = list(docs_with_text.values_list('id', flat=True))
+    docs_with_text.update(analysis_status='analyzing')
 
-    docs_with_text.update(analysis_status='complete', analysis_result=result)
+    def _analyze_in_background(session_id, doc_ids):
+        from ..delivery_analyzer import analyze_delivery_documents as _run_analysis
+        session = AssessmentSession.objects.get(uuid=session_id)
+        target_docs = DeliveryDocument.objects.filter(id__in=doc_ids)
+        result = _run_analysis(session)
+        if not result or "_error" in result:
+            error_detail = result.get("_error", "") if result else ""
+            log_error(
+                "Delivery document analysis",
+                Exception(error_detail or "Analysis returned no result"),
+                extra={"session": str(session_id)},
+            )
+            target_docs.update(analysis_status='failed')
+            return
+        target_docs.update(analysis_status='complete', analysis_result=result)
 
-    return JsonResponse({"success": True, "scores": result})
+    run_in_background(_analyze_in_background, str(session.uuid), doc_ids, name="delivery_doc_analyze")
+
+    return JsonResponse({"success": True, "status": "analyzing"})
 
 
 @login_required
@@ -339,17 +348,28 @@ def analyze_category_documents(request, session_id, category):
             status=400,
         )
 
-    from ..category_analyzer import analyze_category_documents as _run_analysis
-    result = _run_analysis(session, category)
-    if not result or "_error" in result:
-        error_detail = result.get("_error", "") if result else ""
-        return JsonResponse(
-            {"success": False, "error": f"Analysis failed: {error_detail}" if error_detail else "Could not analyse documents. Please try again."},
-            status=500,
-        )
+    doc_ids = list(docs_with_text.values_list('id', flat=True))
+    docs_with_text.update(analysis_status='analyzing')
 
-    docs_with_text.update(analysis_status='complete', analysis_result=result)
-    return JsonResponse({"success": True, "scores": result})
+    def _analyze_in_background(session_id, category, doc_ids):
+        from ..category_analyzer import analyze_category_documents as _run_analysis
+        session = AssessmentSession.objects.get(uuid=session_id)
+        target_docs = CategoryDocument.objects.filter(id__in=doc_ids)
+        result = _run_analysis(session, category)
+        if not result or "_error" in result:
+            error_detail = result.get("_error", "") if result else ""
+            log_error(
+                "Category document analysis",
+                Exception(error_detail or "Analysis returned no result"),
+                extra={"session": str(session_id), "category": category},
+            )
+            target_docs.update(analysis_status='failed')
+            return
+        target_docs.update(analysis_status='complete', analysis_result=result)
+
+    run_in_background(_analyze_in_background, str(session.uuid), category, doc_ids, name="category_doc_analyze")
+
+    return JsonResponse({"success": True, "status": "analyzing"})
 
 
 @login_required

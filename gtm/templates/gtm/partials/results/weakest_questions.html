@@ -48,7 +48,7 @@
           {% elif q.ai_insight_loading and q.response_id %}
             <div class="mt-3 p-3 bg-gray-50 border-l-4 border-indigo-400 rounded text-sm flex items-center gap-3 animate-pulse"
                  hx-get="{% url 'gtm:insight_status' session.uuid q.response_id %}"
-                 hx-trigger="load, every 3s"
+                 hx-trigger="every 3s"
                  hx-target="#insight-{{ q.question.id_code }}"
                  hx-swap="outerHTML">
               <div class="animate-spin h-4 w-4 border-2 border-indigo-500 border-t-transparent rounded-full"></div>

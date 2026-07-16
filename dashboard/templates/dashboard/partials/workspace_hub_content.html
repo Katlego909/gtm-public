@@ -105,6 +105,69 @@
                 </div>
             </div>
 
+            <!-- Integrations -->
+            {% if user_can_manage_integrations %}
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                        <span class="inline-block bg-orange-100 text-orange-600 rounded-full p-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        </span>
+                        Integrations
+                    </h3>
+                    <span class="text-xs px-3 py-1 rounded-full border
+                        {% if hubspot_integration.status == 'connected' %}bg-green-50 border-green-200 text-green-700
+                        {% elif hubspot_integration.status == 'error' %}bg-red-50 border-red-200 text-red-700
+                        {% else %}bg-gray-50 border-gray-200 text-gray-700{% endif %}">
+                        {% if hubspot_integration.status == 'connected' %}Connected
+                        {% elif hubspot_integration.status == 'error' %}Error
+                        {% else %}Not Connected{% endif %}
+                    </span>
+                </div>
+                <p class="text-sm text-gray-500 mb-4">HubSpot CRM &mdash; lets AI agents look up company context and log GTM findings directly in HubSpot.</p>
+
+                {% if hubspot_integration.token_preview %}
+                    <div class="text-sm text-gray-600 space-y-1 mb-4">
+                        <p>Token ending in <span class="font-mono">&bull;&bull;&bull;{{ hubspot_integration.token_preview }}</span></p>
+                        {% if hubspot_integration.last_verified_at %}
+                            <p>Last verified {{ hubspot_integration.last_verified_at|timesince }} ago</p>
+                        {% endif %}
+                        {% if hubspot_integration.status == 'error' and hubspot_integration.last_error %}
+                            <p class="text-red-600">{{ hubspot_integration.last_error }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="flex gap-3 mb-4">
+                        <form hx-post="{% url 'workspace_hub' %}?workspace={{ current_workspace.id }}" hx-target="#main-content" hx-swap="innerHTML">
+                            {% csrf_token %}
+                            <input type="hidden" name="integration_action" value="test_hubspot">
+                            <button type="submit" class="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-800 rounded-lg border border-gray-300 hover:bg-gray-200">
+                                Test Connection
+                            </button>
+                        </form>
+                        <form hx-post="{% url 'workspace_hub' %}?workspace={{ current_workspace.id }}" hx-target="#main-content" hx-swap="innerHTML"
+                              onsubmit="return confirm('Disconnect HubSpot for this workspace? Agents will lose CRM access until reconnected.');">
+                            {% csrf_token %}
+                            <input type="hidden" name="integration_action" value="disconnect_hubspot">
+                            <button type="submit" class="px-4 py-2 text-sm font-medium bg-white text-red-600 rounded-lg border border-red-300 hover:bg-red-50">
+                                Disconnect
+                            </button>
+                        </form>
+                    </div>
+                {% endif %}
+
+                <form hx-post="{% url 'workspace_hub' %}?workspace={{ current_workspace.id }}" hx-target="#main-content" hx-swap="innerHTML"
+                      onsubmit="return confirm('Save this HubSpot token for the workspace?');" class="flex gap-3">
+                    {% csrf_token %}
+                    <input type="hidden" name="integration_action" value="save_hubspot">
+                    <input type="password" name="token" required placeholder="pat-na1-..."
+                           class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm transition-colors flex-shrink-0">
+                        {% if hubspot_integration.token_preview %}Replace Token{% else %}Save{% endif %}
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+
             <!-- Library link (Resources + Documents now live on one unified page) -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">

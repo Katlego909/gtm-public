@@ -501,12 +501,17 @@
         if (!list) return;
         list.innerHTML = '';
         let anyComplete = false;
+        let anyFailed = false;
+        const STATUS_HTML = {
+          uploaded:  '<i class="fas fa-clock text-gray-400"></i> Uploaded',
+          analyzing: '<i class="fas fa-spinner fa-spin text-indigo-400"></i> Analyzing…',
+          complete:  '<i class="fas fa-check-circle text-green-500"></i> Ready',
+          failed:    '<i class="fas fa-exclamation-circle text-red-500"></i> Analysis failed',
+        };
         docs.forEach(doc => {
-          const ready = doc.analysis_status === 'complete';
-          if (ready) anyComplete = true;
-          const statusHtml = ready
-            ? '<i class="fas fa-check-circle text-green-500"></i> Ready'
-            : '<i class="fas fa-spinner fa-spin text-indigo-400"></i> Processing…';
+          if (doc.analysis_status === 'complete') anyComplete = true;
+          if (doc.analysis_status === 'failed') anyFailed = true;
+          const statusHtml = STATUS_HTML[doc.analysis_status] || STATUS_HTML.uploaded;
           const div = document.createElement('div');
           div.className = 'flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-4 py-2.5 text-sm';
           div.innerHTML = `
@@ -527,7 +532,9 @@
           d => d.analysis_status === 'complete' && d.analysis_result && Object.keys(d.analysis_result || {}).length > 0
         );
 
-        if (!hasValidAnalysis) {
+        const status = document.getElementById('analyzeStatus');
+
+        if (!hasValidAnalysis && !anyFailed) {
           // No valid analysis (new file added, file deleted, or never analysed yet).
           // Clear any panels that may be visible from a previous run or server render.
           document.querySelectorAll('.ai-result-panel').forEach(el => el.classList.add('hidden'));
@@ -535,17 +542,31 @@
           document.getElementById('analysisDoneBadge')?.classList.add('hidden');
           analysisComplete = false;
           if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = ''; submitBtn.style.pointerEvents = ''; }
-        } else if (anyComplete && !analysisComplete && !analysisInProgress) {
-          // Valid analysis found on first load — restore panels from stored results.
+        } else if (anyComplete && !analysisComplete) {
+          // Analysis just completed (either detected live via polling, or on first
+          // load) — restore panels from stored results and release the button/status
+          // that runDeliveryAnalysis put into a "working" state.
           analysisComplete = true;
+          analysisInProgress = false;
+          if (analyzeBtn) analyzeBtn.disabled = false;
+          if (status) status.classList.add('hidden');
           if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = ''; submitBtn.style.pointerEvents = ''; }
           const savedDoc = docs.find(d => d.analysis_result && Object.keys(d.analysis_result || {}).length > 0);
           if (savedDoc) {
             applyDeliveryScores(savedDoc.analysis_result);
             document.getElementById('analysisDoneBadge')?.classList.remove('hidden');
           }
+        } else if (anyFailed && !anyComplete && analysisInProgress) {
+          // Analysis failed in the background -- surface it and let the user retry.
+          analysisInProgress = false;
+          if (analyzeBtn) analyzeBtn.disabled = false;
+          if (status) {
+            status.textContent = 'Analysis failed. Please try again.';
+            status.className = 'text-sm text-red-600';
+            status.classList.remove('hidden');
+          }
         }
-        if (docs.some(d => d.analysis_status === 'uploaded')) {
+        if (docs.some(d => d.analysis_status === 'uploaded' || d.analysis_status === 'analyzing')) {
           setTimeout(() => { if (_aiPollGen === myGen) loadDeliveryDocs(); }, 3500);
         }
       }
@@ -586,14 +607,11 @@
             btn.disabled = false;
             return;
           }
-          applyDeliveryScores(data.scores);
-          analysisComplete   = true;
-          analysisInProgress = false;
-          btn.disabled = false;
-          status.classList.add('hidden');
-          document.getElementById('analysisDoneBadge')?.classList.remove('hidden');
-          const submitBtn = document.getElementById('submitBtn');
-          if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = ''; submitBtn.style.pointerEvents = ''; }
+          // Analysis now runs in the background — the request only acknowledges
+          // that it started. renderDeliveryFileList's polling loop picks up the
+          // 'analyzing' -> 'complete'/'failed' transition and applies the scores
+          // (or surfaces the failure) once it actually finishes.
+          loadDeliveryDocs();
         } catch (err) {
           status.textContent = 'Connection error — please try again.';
           status.className = 'text-sm text-red-600';

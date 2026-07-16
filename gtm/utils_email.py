@@ -1,6 +1,7 @@
 # gtm/utils_email.py
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
+from django.template.defaultfilters import floatformat
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
@@ -15,7 +16,7 @@ def send_snapshot_report_email(snapshot):
     import markdown
     
     session = snapshot.session
-    subject = f"Your GTM Assessment Results — {snapshot.company_name or 'Untitled'} ({int(round(snapshot.overall))}/100)"
+    subject = f"Your GTM Assessment Results — {snapshot.company_name or 'Untitled'} ({floatformat(snapshot.overall, 0)}/100)"
 
     # Recipients
     to_recipients = []
@@ -30,10 +31,13 @@ def send_snapshot_report_email(snapshot):
     else:
         bcc_recipients = list(getattr(settings, "GTM_REPORT_INTERNAL_TO", []))
 
-    # Sort categories to identify strengths and weaknesses
+    # Sort categories to identify strengths and weaknesses. Threshold-gated
+    # (matching gtm/utils_pdf.py's PDF report) rather than a pure top-N/bottom-N
+    # rank slice -- with only 3 pillars total, slicing bottom-2 and top-2
+    # unconditionally guarantees the middle-ranked category lands in both lists.
     categories_sorted = sorted(snapshot.category_breakdown, key=lambda x: x.get('avg', 0))
-    weakest_areas = categories_sorted[:2]  # Bottom 2
-    strongest_areas = categories_sorted[-2:]  # Top 2
+    weakest_areas = [c for c in categories_sorted if c.get('avg', 0) < 3.0][:2]
+    strongest_areas = [c for c in reversed(categories_sorted) if c.get('avg', 0) >= 4.0 and c not in weakest_areas][:2]
     
     # Get action items count
     action_items_count = ActionItem.objects.filter(session=session).count()
@@ -70,7 +74,7 @@ def send_snapshot_report_email(snapshot):
         "brand_name": "Funti3r GTM Validator",
         "brand_url": "https://funti3r.xyz",
         "logo_url": "https://funti3r.xyz/static/brand/funti3r-logo.png",
-        "preheader": f"Your GTM score: {int(round(snapshot.overall))}/100 • {snapshot.band.stage if snapshot.band else 'Assessment Complete'} • Download your playbook now!",
+        "preheader": f"Your GTM score: {floatformat(snapshot.overall, 0)}/100 • {snapshot.band.stage if snapshot.band else 'Assessment Complete'} • Download your playbook now!",
     }
 
     html_body = render_to_string("emails/assessment_report.html", context)

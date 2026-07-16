@@ -154,6 +154,19 @@
                 </div>
             </div>
 
+            <!-- Integrations -->
+            {% if user_membership.can_manage_integrations %}
+                <div class="bg-white rounded-xl border border-indigo-100 p-6 mb-6">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-lg font-semibold text-indigo-900">Integrations</h3>
+                        <a href="{% url 'gtm:workspace:integrations' workspace.id %}" class="text-indigo-600 hover:text-indigo-800 text-sm">
+                            Manage →
+                        </a>
+                    </div>
+                    <p class="text-sm text-gray-600 mt-1">Connect HubSpot so agents can act on your CRM data.</p>
+                </div>
+            {% endif %}
+
             <!-- Pending Invites -->
             {% if pending_invites %}
                 <div class="bg-white rounded-xl border border-indigo-100 p-6">

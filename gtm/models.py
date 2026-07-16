@@ -5,6 +5,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 
 # Import workspace models so Django can find them
 from .models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation
+from .models_integrations import WorkspaceIntegration
 
 # AI generation status choices
 AI_STATUS_CHOICES = [
@@ -188,6 +189,18 @@ class ActionItem(models.Model):
         related_name="completed_action_items",
         help_text="The concrete artifact an AI agent produced to complete this task, if any.",
     )
+
+    CRM_SYNC_STATUS_CHOICES = [
+        ("not_synced", "Not Synced"),
+        ("synced", "Synced"),
+        ("error", "Error"),
+    ]
+    crm_sync_status = models.CharField(max_length=20, choices=CRM_SYNC_STATUS_CHOICES, default="not_synced")
+    external_crm_task_id = models.CharField(
+        max_length=64, blank=True, default="",
+        help_text="ID of the corresponding task in the connected CRM (e.g. HubSpot), if pushed there.",
+    )
+    crm_synced_at = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return self.note[:50]

@@ -193,8 +193,8 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
         # regardless of value would surface a category as "recommended" even
         # when everything is already scoring well.
         categories_sorted = sorted(latest_snapshot.category_breakdown, key=lambda c: c.get('avg', 0))
-        weak_entries = [c for c in categories_sorted if c.get('avg', 0) < 75][:3]
-        weak_names = [c.get('name') for c in weak_entries if c.get('name')]
+        weak_entries = [c for c in categories_sorted if (c.get('avg', 0) / 5 * 100) < 75][:3]
+        weak_names = [c.get('category') for c in weak_entries if c.get('category')]
 
         tools_by_category_name = {}
         for tool in ToolRecommendation.objects.filter(category__name__in=weak_names).select_related('category'):
@@ -202,14 +202,15 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
             tools_by_category_name.setdefault(tool.category.name, []).append(tool)
 
         for entry in weak_entries:
-            name = entry.get('name')
+            name = entry.get('category')
             tools = tools_by_category_name.get(name)
             if not tools:
                 continue
             avg = entry.get('avg', 0)
-            if avg < 50:
+            avg_pct = avg / 5 * 100
+            if avg_pct < 50:
                 severity_class, severity_label = 'bg-red-100 text-red-500', 'Needs Attention'
-            elif avg < 75:
+            elif avg_pct < 75:
                 severity_class, severity_label = 'bg-yellow-100 text-yellow-700', 'Improving'
             else:
                 severity_class, severity_label = 'bg-green-100 text-green-700', 'Strong'

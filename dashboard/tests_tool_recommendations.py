@@ -47,8 +47,8 @@ class TopToolRecommendationsTests(TestCase):
             session=cls.session,
             overall=55.0,
             category_breakdown=[
-                {"name": "Demand", "avg": 35.0},
-                {"name": "Delivery", "avg": 92.0},
+                {"category": "Demand", "avg": 1.75},   # 35% -- weak, below the 50% threshold
+                {"category": "Delivery", "avg": 4.6},  # 92% -- strong, above the 75% threshold
             ],
         )
 
