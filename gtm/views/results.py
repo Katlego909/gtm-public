@@ -17,9 +17,6 @@ import markdown as md
 import math
 import re
 from django.http import HttpResponse, JsonResponse
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.lib.units import cm
 from django.utils.html import strip_tags
 from django.views.decorators.http import require_POST
 from django.shortcuts import redirect

@@ -1,11 +1,21 @@
 # gtm/utils_docx.py
 import re
 from io import BytesIO
+from django.contrib.staticfiles import finders
 from django.http import HttpResponse
 from docx import Document
-from docx.shared import Pt, RGBColor
+from docx.shared import Pt, RGBColor, Cm
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 
 from .utils_pdf import _normalize_ai_markdown, _parse_playbook_priorities, _slugify_filename_part
+
+# Same burnt-copper brand accent as the PDF export (theme/static/css/app.css's
+# --accent-600 / --accent-900) -- kept as RGBColor tuples since python-docx
+# doesn't take hex strings directly.
+_ACCENT_RGB = RGBColor(0xB8, 0x53, 0x0F)
+_ACCENT_DARK_RGB = RGBColor(0x5C, 0x2B, 0x10)
+
+_LOGO_PATH = finders.find("images/forge_logo.png")
 
 
 def render_insight_docx_response(*, company_name, ai_playbook_md, doc_title=None, doc_type_label=None, doc_date=None):
@@ -16,19 +26,34 @@ def render_insight_docx_response(*, company_name, ai_playbook_md, doc_title=None
 
     doc_title/doc_type_label/doc_date: see render_insight_pdf_response's
     docstring in gtm/utils_pdf.py -- same optional-identity filename scheme.
+
+    Note: unlike the PDF (which embeds its heading font directly, so it
+    always renders correctly), a .docx only stores a font *name* -- Word
+    would render a custom typeface only if the recipient's machine has it
+    installed, which can't be guaranteed. Headings stay on Word's default
+    font; only brand color and the logo are reliably portable here.
     """
     normalized = _normalize_ai_markdown(ai_playbook_md or "")
     priorities = _parse_playbook_priorities(normalized)
 
     doc = Document()
 
+    if _LOGO_PATH:
+        logo_paragraph = doc.add_paragraph()
+        logo_paragraph.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        logo_run = logo_paragraph.add_run()
+        try:
+            logo_run.add_picture(_LOGO_PATH, width=Cm(4.5))
+        except Exception:
+            pass
+
     title = doc.add_heading("Funti3r GTM Validator", level=0)
     for run in title.runs:
-        run.font.color.rgb = RGBColor(0x1E, 0x40, 0xAF)
+        run.font.color.rgb = _ACCENT_DARK_RGB
 
     subtitle = doc.add_heading(f"{company_name or 'Company'} — AI Insight", level=1)
     for run in subtitle.runs:
-        run.font.color.rgb = RGBColor(0x1E, 0x3A, 0x8A)
+        run.font.color.rgb = _ACCENT_RGB
 
     if priorities:
         for priority in priorities:

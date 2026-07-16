@@ -150,18 +150,48 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
     top_doing = action_items_qs.filter(status='doing').order_by('due_date')
     top_done = action_items_qs.filter(status='done').order_by('-created_at')
 
-    # Tool recommendations: only show if there are assessments in workspace
-    if assessments_qs.exists():
-        top_tools_qs = ToolRecommendation.objects.all()[:5]
-        top_tools = []
-        for tool in top_tools_qs:
-            if tool.tools:
-                tool.tools_list = [t.strip().lower().title() for t in tool.tools.split(',')]
+    # Tool recommendations: matched to this workspace's weakest-scoring
+    # categories from its latest completed assessment, mirroring the
+    # weak-category matching already used on the Results page
+    # (gtm/views/results.py) rather than showing arbitrary rows.
+    top_tool_groups = []
+    latest_snapshot = ResultSnapshot.objects.filter(
+        session__in=assessments_qs, session__is_completed=True
+    ).order_by('-created_at').first()
+
+    if latest_snapshot and latest_snapshot.category_breakdown:
+        # Only genuinely weak categories (avg < 75, the same "Improving"
+        # threshold used for the severity badge below) -- ranking bottom-N
+        # regardless of value would surface a category as "recommended" even
+        # when everything is already scoring well.
+        categories_sorted = sorted(latest_snapshot.category_breakdown, key=lambda c: c.get('avg', 0))
+        weak_entries = [c for c in categories_sorted if c.get('avg', 0) < 75][:3]
+        weak_names = [c.get('name') for c in weak_entries if c.get('name')]
+
+        tools_by_category_name = {}
+        for tool in ToolRecommendation.objects.filter(category__name__in=weak_names).select_related('category'):
+            tool.tools_list = [t.strip().lower().title() for t in tool.tools.split(',')] if tool.tools else []
+            tools_by_category_name.setdefault(tool.category.name, []).append(tool)
+
+        for entry in weak_entries:
+            name = entry.get('name')
+            tools = tools_by_category_name.get(name)
+            if not tools:
+                continue
+            avg = entry.get('avg', 0)
+            if avg < 50:
+                severity_class, severity_label = 'bg-red-100 text-red-500', 'Needs Attention'
+            elif avg < 75:
+                severity_class, severity_label = 'bg-yellow-100 text-yellow-700', 'Improving'
             else:
-                tool.tools_list = []
-            top_tools.append(tool)
-    else:
-        top_tools = []
+                severity_class, severity_label = 'bg-green-100 text-green-700', 'Strong'
+            top_tool_groups.append({
+                'category_name': name,
+                'score': round(avg, 1),
+                'severity_class': severity_class,
+                'severity_label': severity_label,
+                'tools': tools,
+            })
 
     # Insights (from ResultSnapshot.ai_playbook) - WORKSPACE-SCOPED
     if current_workspace:
@@ -339,7 +369,7 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
         'sessions_per_day': sessions_per_day,
         'days_labels': days_labels,
         'status_breakdown': status_breakdown,
-        'top_tools': top_tools,
+        'top_tool_groups': top_tool_groups,
         'insights': insights,
         'weekly_activity': weekly_activity,
         'items_created_per_day': [d['items_created'] for d in weekly_activity],

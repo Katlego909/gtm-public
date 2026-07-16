@@ -237,11 +237,16 @@ class ActionItemAICompletionTests(TestCase):
         """Simulates an already-in-flight job by pre-acquiring the same
         lock key the view uses, then confirms a second POST doesn't start
         a duplicate run."""
-        from gtm.ai_services import _acquire_lock
+        from gtm.ai_services import _acquire_lock, _release_lock
         from dashboard.views.actions import _action_item_complete_lock_key
 
         item = self._make_item()
-        self.assertTrue(_acquire_lock(_action_item_complete_lock_key(item.id), ttl_seconds=60))
+        lock_key = _action_item_complete_lock_key(item.id)
+        self.assertTrue(_acquire_lock(lock_key, ttl_seconds=60))
+        # The cache backend is process-global, not part of the DB transaction
+        # this TestCase rolls back -- release explicitly so a held lock can't
+        # leak into another test whose ActionItem happens to reuse this id.
+        self.addCleanup(_release_lock, lock_key)
 
         with mock.patch("gtm.action_item_completion.complete_action_item") as mock_complete:
             response = self.client.post(reverse("complete_action_item_ai", args=[item.id]))
