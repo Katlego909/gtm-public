@@ -403,9 +403,15 @@
     }
 
     function animateProgressRing() {
+      // finalValue/w are read from immutable data-* attributes (set once at
+      // server-render time), not the element's current style/attribute --
+      // this function is re-invoked on every htmx:afterSwap page-wide
+      // (including unrelated polling widgets on this same page), so reading
+      // "current" state would race: a second invocation landing mid-animation
+      // would capture the temporary 0% and permanently lock it in.
       const progressRing = document.getElementById('progressRing');
       if (progressRing) {
-        const finalValue = progressRing.getAttribute('stroke-dasharray').split(',')[0];
+        const finalValue = progressRing.dataset.final;
         progressRing.setAttribute('stroke-dasharray', '0, 100');
         progressRing.style.transition = 'none';
         setTimeout(() => {
@@ -415,7 +421,7 @@
       }
 
       document.querySelectorAll('.h-3.rounded-full.transition-all').forEach((bar, index) => {
-        const w = bar.style.width;
+        const w = (bar.dataset.pct || '0') + '%';
         bar.style.width = '0%';
         setTimeout(() => {
           bar.style.transition = 'width 1.2s ease-out';

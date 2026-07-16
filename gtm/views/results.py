@@ -52,6 +52,32 @@ from .helpers import (
     require_session_ownership,
 )
 
+# Performance Breakdown bar/badge colors, keyed by absolute pillar-score
+# severity (not relative ranking -- see _pillar_severity). Validated with the
+# dataviz skill's palette checker (CVD separation + normal-vision floor both
+# pass; the "warning" tier's lower surface contrast is an accepted tradeoff
+# from the skill's own reference palette, mitigated by always pairing it with
+# a text badge rather than color alone).
+_SEVERITY_BAR_COLOR = {"critical": "#d03b3b", "warning": "#fab219", "good": "#0ca30c"}
+_SEVERITY_BADGE_CLASS = {
+    "critical": "bg-red-50 text-red-700",
+    "warning": "bg-amber-50 text-amber-700",
+    "good": "bg-green-50 text-green-700",
+}
+_SEVERITY_LABEL = {"critical": "Needs Attention", "warning": "On Track", "good": "Strong"}
+
+
+def _pillar_severity(avg):
+    """Weak/mid/strong bands for a 0-5 pillar score, matching the 2.5/3.5
+    cutoffs scoring_engine.py's EARLY_STAGE_ALL_LOW/SCALING_READY patterns
+    already use to describe pillar health."""
+    if avg < 2.5:
+        return "critical"
+    if avg < 3.5:
+        return "warning"
+    return "good"
+
+
 def results(request, session_id):
     # Access control: ensure user owns or is in session's workspace
     session, is_authorized = safe_get_session_or_403(request, session_id)
@@ -73,6 +99,11 @@ def results(request, session_id):
     applicable_names = set(_applicable_categories(session).values_list("name", flat=True))
     for c in cat_scores:
         c["is_applicable"] = c["category"].name in applicable_names
+        if c["is_applicable"]:
+            severity = _pillar_severity(c["avg"])
+            c["bar_color"] = _SEVERITY_BAR_COLOR[severity]
+            c["badge_class"] = _SEVERITY_BADGE_CLASS[severity]
+            c["badge_label"] = _SEVERITY_LABEL[severity]
     exempted_names = [c["category"].name for c in cat_scores if not c["is_applicable"]]
     stage_exemption_note = ""
     if exempted_names:

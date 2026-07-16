@@ -9,9 +9,9 @@
   <p class="text-lg sm:text-xl text-gray-600 break-words">{{ session.company_name|default:"Your Company" }}</p>
 </div>
 
-<div class="grid lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8 px-2 sm:px-0">
+<div class="grid lg:grid-cols-5 gap-4 sm:gap-6 mb-6 sm:mb-8 px-2 sm:px-0">
 
-    <div class="lg:col-span-2 app-card p-4 sm:p-6 lg:p-8 reveal">
+    <div class="lg:col-span-3 app-card p-4 sm:p-6 lg:p-8 reveal">
 
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between border-b pb-4 sm:pb-6 mb-4 sm:mb-6 gap-4">
             <div class="flex-1 min-w-0">
@@ -29,6 +29,7 @@
                           d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                     <path id="progressRing" stroke="#B8530F" stroke-width="4" stroke-linecap="round" fill="none"
                           stroke-dasharray="{{ overall|floatformat:0 }}, 100"
+                          data-final="{{ overall|floatformat:0 }}"
                           d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
                 </svg>
                 <div class="absolute inset-0 flex flex-col items-center justify-center">
@@ -48,7 +49,7 @@
         </div>
     </div>
 
-    <div class="app-card p-4 sm:p-6 lg:p-8 reveal reveal-delay-2">
+    <div class="lg:col-span-2 app-card p-4 sm:p-6 lg:p-8 reveal reveal-delay-2">
         <!-- Header with icon -->
         <div class="app-section-header items-start sm:items-center mb-4 sm:mb-6 pb-4 sm:pb-5 border-b border-gray-200">
             <div class="app-icon-badge app-icon-badge--solid flex-shrink-0">
@@ -64,20 +65,20 @@
         <div class="space-y-6">
             {% for c in cat_scores %}
                 {% if c.is_applicable %}
-                    {# Assuming c.is_focus (boolean) is passed from the view logic (e.g., c.avg < 3.0) #}
-                    {% with is_focus=c.is_focus %}
                     <div>
-                        <div class="flex justify-between text-base font-medium mb-2">
-                            <span class="{% if is_focus %}text-red-600{% endif %} break-words">{{ c.category.name }}</span>
-                            <span class="{% if is_focus %}text-red-600 font-bold{% else %}text-indigo-600 font-semibold{% endif %}">{{ c.avg|floatformat:2 }}/5</span>
+                        <div class="flex justify-between items-center text-base font-medium mb-2">
+                            <span class="break-words">{{ c.category.name }}</span>
+                            <span class="flex items-center gap-2">
+                                <span class="{{ c.badge_class }} text-xs font-semibold px-2 py-0.5 rounded-full">{{ c.badge_label }}</span>
+                                <span class="text-gray-900 font-semibold">{{ c.avg|floatformat:2 }}/5</span>
+                            </span>
                         </div>
                         <div class="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                            <div class="h-3 rounded-full transition-all duration-500 bg-indigo-600"
-                                style="width: {{ c.pct }}%;">
+                            <div class="h-3 rounded-full transition-all duration-500"
+                                style="width: {{ c.pct }}%; background-color: {{ c.bar_color }};" data-pct="{{ c.pct }}">
                             </div>
                         </div>
                     </div>
-                    {% endwith %}
                 {% else %}
                     <div>
                         <div class="flex justify-between text-base font-medium mb-2">
