@@ -231,8 +231,9 @@ def generate_action_items_for_gap(request, pk):
     action_texts, _metadata = _ai_action_items_for_gap_metric(metric)
     session = metric.session or latest_completed_session
 
-    created = ActionItem.objects.bulk_create([
-        ActionItem(
+    created = []
+    for text in action_texts:
+        item, was_created = ActionItem.objects.create_deduped(
             session=session,
             workspace=current_workspace,
             note=text,
@@ -240,8 +241,8 @@ def generate_action_items_for_gap(request, pk):
             created_by=request.user,
             owner=request.user.get_full_name() or request.user.username,
         )
-        for text in action_texts
-    ])
+        if was_created:
+            created.append(item)
 
     for item in created:
         log_workspace_activity(
@@ -255,12 +256,17 @@ def generate_action_items_for_gap(request, pk):
             session=item.session,
         )
 
+    if created:
+        toast_message = f"Created {len(created)} action item(s) to close the {metric.metric} gap. Find them on the Tasks board."
+    else:
+        toast_message = f"Those action items already exist for the {metric.metric} gap."
+
     response = HttpResponse(status=204)
     response['HX-Trigger'] = json.dumps({
         'refreshAgentActions': True,
         'refreshNotifications': True,
         'resourceToast': {
-            'message': f"Created {len(created)} action item(s) to close the {metric.metric} gap. Find them on the Tasks board.",
+            'message': toast_message,
             'level': 'success',
         }
     })

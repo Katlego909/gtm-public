@@ -84,15 +84,17 @@ def delete_assessment(request, session, session_id):
 def action_add(request, session, session_id):
     """Add a new action item to the session."""
     note = request.POST.get("note","").strip()
-    
+
     question_id = request.POST.get("question_id")
     if note:
-        ActionItem.objects.create(
+        _item, _created = ActionItem.objects.create_deduped(
             session=session,
             question=Question.objects.filter(id=question_id).first() if question_id else None,
             note=note,
             created_by=request.user
         )
+        if not _created:
+            messages.info(request, "That task already exists.")
     return redirect("gtm:playbook", session_id=session.uuid)
 
 @require_POST

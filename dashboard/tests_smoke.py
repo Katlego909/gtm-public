@@ -463,3 +463,23 @@ class GapMetricActionItemGenerationTests(TestCase):
         response = self.client.post(reverse("generate_action_items_for_gap", args=[metric.id]))
         self.assertEqual(response.status_code, 404)
         mock_generate.assert_not_called()
+
+    @mock.patch("dashboard.views.gap_analysis._ai_action_items_for_gap_metric")
+    def test_duplicate_note_is_not_created_twice(self, mock_generate):
+        """A note the AI suggests that's already an ActionItem for this
+        session must not create a second row -- covers both a pre-existing
+        duplicate and a double click/retry producing the same note twice
+        in one AI response."""
+        ActionItem.objects.create(session=self.session, workspace=self.workspace, note="Audit top 3 underperforming ad channels")
+        mock_generate.return_value = (
+            ["Audit top 3 underperforming ad channels", "Tighten lead qualification criteria", "tighten LEAD qualification criteria "],
+            {"generator": "gemini"},
+        )
+        metric = self._make_metric()
+
+        response = self.client.post(reverse("generate_action_items_for_gap", args=[metric.id]))
+        self.assertEqual(response.status_code, 204)
+
+        notes = list(ActionItem.objects.filter(workspace=self.workspace).values_list("note_key", flat=True))
+        self.assertEqual(len(notes), len(set(notes)), f"duplicate note_key found in {notes}")
+        self.assertEqual(ActionItem.objects.filter(workspace=self.workspace).count(), 2)

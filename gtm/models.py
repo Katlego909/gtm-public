@@ -134,6 +134,29 @@ class RecommendationBand(models.Model):
 
     def __str__(self): return f"{self.stage} ({self.min_score}-{self.max_score})"
 
+class ActionItemManager(models.Manager):
+    def create_deduped(self, *, note, session=None, workspace=None, **extra):
+        """Create an ActionItem unless one with the same normalized note already
+        exists in the same scope (session, else workspace, else creator).
+        Race-safe: relies on get_or_create's own atomic-insert + IntegrityError
+        retry against the DB constraints in ActionItem.Meta, not an in-memory
+        check. Returns (item, created); never raises on a duplicate."""
+        note = (note or "").strip()
+        if not note:
+            return None, False
+        note_key = note.lower()
+        if session is not None:
+            lookup = {"session": session, "note_key": note_key}
+        elif workspace is not None:
+            lookup = {"session": None, "workspace": workspace, "note_key": note_key}
+        else:
+            lookup = {"session": None, "workspace": None, "created_by": extra.get("created_by"), "note_key": note_key}
+        defaults = {"note": note, "workspace": workspace, **extra}
+        for key in lookup:
+            defaults.pop(key, None)
+        return self.get_or_create(defaults=defaults, **lookup)
+
+
 class ActionItem(models.Model):
     STATUS_CHOICES = [("todo","To do"),("doing","In progress"),("done","Done")]
     AGENT_TYPE_CHOICES = [
@@ -142,6 +165,8 @@ class ActionItem(models.Model):
         ("resource", "Theo · Resource Agent"),
         ("insights", "Milo · Insights Agent"),
     ]
+
+    objects = ActionItemManager()
 
     id = models.AutoField(primary_key=True)
     session = models.ForeignKey(AssessmentSession, on_delete=models.CASCADE, related_name="actions", null=True, blank=True)
@@ -203,6 +228,34 @@ class ActionItem(models.Model):
         help_text="ID of the corresponding task in the connected CRM (e.g. HubSpot), if pushed there.",
     )
     crm_synced_at = models.DateTimeField(null=True, blank=True)
+
+    note_key = models.CharField(
+        max_length=240, editable=False, blank=True, default="",
+        help_text="Normalized (trimmed, lowercased) note text, used to enforce no-duplicate-tasks constraints.",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["session", "note_key"],
+                condition=models.Q(session__isnull=False),
+                name="unique_actionitem_note_per_session",
+            ),
+            models.UniqueConstraint(
+                fields=["workspace", "note_key"],
+                condition=models.Q(session__isnull=True, workspace__isnull=False),
+                name="unique_actionitem_note_per_workspace",
+            ),
+            models.UniqueConstraint(
+                fields=["created_by", "note_key"],
+                condition=models.Q(session__isnull=True, workspace__isnull=True),
+                name="unique_actionitem_note_per_creator_unscoped",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.note_key = (self.note or "").strip().lower()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.note[:50]

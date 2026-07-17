@@ -246,7 +246,7 @@ def _run_dashboard_action_command(request, session, current_workspace, message):
 
     if cmd['action'] == 'create_task':
         assigned_user = _resolve_assignee(current_workspace, cmd['assignee'])
-        item = ActionItem.objects.create(
+        item, was_created = ActionItem.objects.create_deduped(
             session=session,
             workspace=current_workspace,
             note=cmd['title'],
@@ -257,7 +257,7 @@ def _run_dashboard_action_command(request, session, current_workspace, message):
         )
 
         assignee_text = assigned_user.get_full_name() or assigned_user.username if assigned_user else None
-        if current_workspace:
+        if was_created and current_workspace:
             summary = (
                 f"{actor_name} created task '{item.note}'"
                 + (f" and assigned it to {assignee_text}." if assignee_text else ".")
@@ -273,7 +273,9 @@ def _run_dashboard_action_command(request, session, current_workspace, message):
                 session=item.session,
             )
 
-        if cmd['assignee'] and not assigned_user and current_workspace:
+        if not was_created:
+            response_text = f"That task already exists: **{item.note}**."
+        elif cmd['assignee'] and not assigned_user and current_workspace:
             response_text = (
                 f"Task created: **{item.note}** (To do).\n"
                 f"I could not find **{cmd['assignee']}** in this workspace, so it is currently unassigned."

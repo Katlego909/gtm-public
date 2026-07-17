@@ -38,6 +38,8 @@ from ..ai_services import (
     _normalize_ai_playbook_markdown,
     rewrite_context_note_with_ai,
     ENRICHMENT_UNAVAILABLE,
+    _acquire_lock,
+    _release_lock,
 )
 from ..forms import StartAssessmentForm # Added import
 from ..services import (_expand_gtm_jargon, _build_question_guidance, _kickoff_playbook_generation, _log_access_denied, safe_get_session_or_403, _format_band_actions_markdown, _paginated_questions, _category_step_map, _first_incomplete_step, _compute_scores, _band_for_score, _is_session_complete, _save_snapshot)
@@ -276,50 +278,55 @@ def playbook(request, session_id):
         for _tr in _tool_recs if _tr.tools
     ]
 
-    # Auto-populate task list on first visit (no tasks yet)
-    # 90% from AI playbook via Gemini extraction, 10% from scoring engine quick_win
+    # Auto-populate task list on first visit (no tasks yet).
+    # 90% from AI playbook via Gemini extraction, 10% from scoring engine quick_win.
+    # ActionItem.objects.create_deduped + the DB constraints in ActionItem.Meta are
+    # what actually guarantee no duplicate rows; the lock below is just a cost-saving
+    # fast path so two racing requests don't both pay for a Gemini extraction call.
     if scoring_context and not session.actions.exists():
-        from ..ai_services import extract_tasks_from_playbook
-        _snap_for_tasks = getattr(session, "snapshot", None) or ResultSnapshot.objects.filter(session=session).first()
-        _playbook_text = (_snap_for_tasks.ai_playbook or "").strip() if _snap_for_tasks else ""
-        _company = session.company_name or "your company"
-        _patterns = scoring_context.get("patterns", [])
-        _severity_days = {"Critical": 14, "High": 28, "Medium": 42}
-        _tasks_to_create = []
+        _autopop_lock_key = f"gtm:actionitem:autopopulate:{session.id}:lock"
+        if _acquire_lock(_autopop_lock_key, ttl_seconds=60):
+            try:
+                from ..ai_services import extract_tasks_from_playbook
+                _snap_for_tasks = getattr(session, "snapshot", None) or ResultSnapshot.objects.filter(session=session).first()
+                _playbook_text = (_snap_for_tasks.ai_playbook or "").strip() if _snap_for_tasks else ""
+                _company = session.company_name or "your company"
+                _patterns = scoring_context.get("patterns", [])
+                _severity_days = {"Critical": 14, "High": 28, "Medium": 42}
 
-        # Try 90%: extract ~4 tasks from AI playbook
-        from ..ai_credits import resolve_account_for_session
-        _ai_tasks = extract_tasks_from_playbook(
-            _playbook_text, _company, n=4, account=resolve_account_for_session(session)
-        ) if _playbook_text else []
+                # Try 90%: extract ~4 tasks from AI playbook
+                from ..ai_credits import resolve_account_for_session
+                _ai_tasks = extract_tasks_from_playbook(
+                    _playbook_text, _company, n=4, account=resolve_account_for_session(session)
+                ) if _playbook_text else []
 
-        if _ai_tasks:
-            _default_due = timezone.now().date() + timedelta(days=21)
-            for _t in _ai_tasks:
-                _tasks_to_create.append(ActionItem(session=session, note=_t, status="todo", due_date=_default_due))
-            # 10%: first quick_win sentence from highest-severity pattern
-            if _patterns:
-                _top_pat = _patterns[0]
-                _qw = (_top_pat.get("quick_win") or "").strip()
-                _first = _re.split(r'(?<=[.!?])\s+', _qw)[0].strip() if _qw else ""
-                _due = timezone.now().date() + timedelta(days=_severity_days.get(_top_pat["severity"], 28))
-                _first_words = set(_first.lower().split()) if _first else set()
-                _too_similar = any(
-                    len(_first_words & set(_t.lower().split())) / max(len(_first_words), 1) > 0.6
-                    for _t in _ai_tasks
-                )
-                if _first and len(_first) <= 240 and not _too_similar:
-                    _tasks_to_create.append(ActionItem(session=session, note=_first, status="todo", due_date=_due))
-        else:
-            # Fallback: all scoring engine quick_win sentences
-            for _pat in _patterns:
-                _due = timezone.now().date() + timedelta(days=_severity_days.get(_pat["severity"], 28))
-                _qw = (_pat.get("quick_win") or "").strip()
-                for _s in [s.strip() for s in _re.split(r'(?<=[.!?])\s+', _qw) if s.strip()]:
-                    if len(_s) <= 240:
-                        _tasks_to_create.append(ActionItem(session=session, note=_s, status="todo", due_date=_due))
-
-        ActionItem.objects.bulk_create(_tasks_to_create)
+                if _ai_tasks:
+                    _default_due = timezone.now().date() + timedelta(days=21)
+                    for _t in _ai_tasks:
+                        ActionItem.objects.create_deduped(session=session, note=_t, status="todo", due_date=_default_due)
+                    # 10%: first quick_win sentence from highest-severity pattern
+                    if _patterns:
+                        _top_pat = _patterns[0]
+                        _qw = (_top_pat.get("quick_win") or "").strip()
+                        _first = _re.split(r'(?<=[.!?])\s+', _qw)[0].strip() if _qw else ""
+                        _due = timezone.now().date() + timedelta(days=_severity_days.get(_top_pat["severity"], 28))
+                        _first_words = set(_first.lower().split()) if _first else set()
+                        _too_similar = any(
+                            len(_first_words & set(_t.lower().split())) / max(len(_first_words), 1) > 0.6
+                            for _t in _ai_tasks
+                        )
+                        if _first and len(_first) <= 240 and not _too_similar:
+                            ActionItem.objects.create_deduped(session=session, note=_first, status="todo", due_date=_due)
+                else:
+                    # Fallback: all scoring engine quick_win sentences
+                    for _pat in _patterns:
+                        _due = timezone.now().date() + timedelta(days=_severity_days.get(_pat["severity"], 28))
+                        _qw = (_pat.get("quick_win") or "").strip()
+                        for _s in [s.strip() for s in _re.split(r'(?<=[.!?])\s+', _qw) if s.strip()]:
+                            if len(_s) <= 240:
+                                ActionItem.objects.create_deduped(session=session, note=_s, status="todo", due_date=_due)
+            finally:
+                _release_lock(_autopop_lock_key)
 
     # -----------------------------
     # AI Playbook Rendering (+ optional lazy-generate)
@@ -365,9 +372,6 @@ def playbook(request, session_id):
         ai_competitor_html = ""
         playbook_ready = False
         playbook_loading = False
-
-    # Note: Action items are now created explicitly via the "build my action plan" agent command.
-    # This prevents duplicate auto-creation and gives users explicit control over task generation.
 
     # Render Template
     # ----

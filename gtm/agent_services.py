@@ -127,16 +127,18 @@ def build_execution_plan(
 
     if persist:
         for item in suggested_items:
-            created_items.append(
-                ActionItem.objects.create(
-                    session=session,
-                    workspace=session.workspace,
-                    question=item["question"],
-                    note=item["note"],
-                    created_by=actor if getattr(actor, "is_authenticated", False) else session.user,
-                    due_date=item["due_date"],
-                )
+            created_item, was_created = ActionItem.objects.create_deduped(
+                session=session,
+                workspace=session.workspace,
+                question=item["question"],
+                note=item["note"],
+                created_by=actor if getattr(actor, "is_authenticated", False) else session.user,
+                due_date=item["due_date"],
             )
+            if was_created:
+                created_items.append(created_item)
+            else:
+                skipped_items.append(item["note"])
 
     top_categories = sorted(cat_scores, key=lambda row: row["avg"])[:3]
 

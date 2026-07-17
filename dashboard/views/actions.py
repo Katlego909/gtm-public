@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Tuple
 from django.shortcuts import get_object_or_404, render, redirect
 from django.db import models
 from django.db import transaction
+from django.db import IntegrityError
 from django.http import HttpResponse, JsonResponse, Http404
 from django.utils import timezone
 from django.conf import settings
@@ -204,7 +205,17 @@ def add_edit_action_item(request, pk=None):
             if not instance.pk:
                 instance.workspace = current_workspace
                 instance.created_by = request.user
-            instance.save()
+            try:
+                with transaction.atomic():
+                    instance.save()
+            except IntegrityError:
+                form.add_error('note', "A task with this exact wording already exists.")
+                context = {
+                    'form': form,
+                    'title': title,
+                    'instance': instance if instance.pk else None
+                }
+                return render(request, 'dashboard/partials/action_item_form.html', context)
 
             if not is_new_item and previous_status != 'done' and instance.status == 'done':
                 _notify_task_completed(instance, request.user, current_workspace)
