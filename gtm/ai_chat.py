@@ -39,11 +39,15 @@ except ImportError:
 # session to act on.
 
 def _build_document_tools_for_session(session: AssessmentSession, user=None) -> List[Any]:
-    """Generic create/edit/list document tools, scoped to this session. New
-    documents are tagged with both `session` and `session.workspace` (when
-    present) so they're visible from the workspace-wide Documents panel
-    too; edit/list here stay narrowly scoped to this session's own docs."""
-    from .agent_documents import create_agent_document, edit_agent_document, list_agent_documents
+    """Generic create/edit/list/read/search document tools, scoped to this
+    session. New documents are tagged with both `session` and
+    `session.workspace` (when present) so they're visible from the
+    workspace-wide Documents panel too; edit/list/read/search here stay
+    narrowly scoped to this session's own docs."""
+    from .agent_documents import (
+        create_agent_document, edit_agent_document, get_agent_document, list_agent_documents,
+        search_agent_documents, _snippet_around,
+    )
 
     def create_document(title: str, content: str, doc_type: str = "other") -> str:
         """Create and save a new document (e.g. an action plan, roadmap, or
@@ -80,7 +84,56 @@ def _build_document_tools_for_session(session: AssessmentSession, user=None) -> 
             lines.append(f"- [{d.pk}] {d.title} ({d.get_doc_type_display()}, v{d.version}, updated {d.updated_at.strftime('%b %d, %Y')})")
         return "\n".join(lines)
 
-    return [create_document, edit_document, list_documents]
+    def read_document(document_id: str) -> str:
+        """Read an existing document's full content by its ID (use
+        list_documents or search_documents first if you don't already know
+        the ID). Use this before referencing, quoting, or building on a
+        document you or a teammate created earlier.
+        """
+        doc = get_agent_document(document_id, session=session)
+        if not doc:
+            return "I couldn't find a document with that ID for this assessment."
+        return f'"{doc.title}" ({doc.get_doc_type_display()}, v{doc.version}):\n\n{doc.content}'
+
+    def search_documents(query: str) -> str:
+        """Search saved documents (client summaries, roadmaps, action
+        plans, briefs) for this assessment by title or content. Use this
+        to find a relevant document before creating a new one, or to
+        answer a question using something already written.
+        """
+        docs = list(search_agent_documents(query, session=session)[:10])
+        if not docs:
+            return f"No documents matching '{query}' found for this assessment."
+        lines = [f"Documents matching '{query}':"]
+        for d in docs:
+            lines.append(f"- [{d.pk}] {d.title} ({d.get_doc_type_display()}, v{d.version})")
+        return "\n".join(lines)
+
+    def search_evidence(query: str) -> str:
+        """Search the text extracted from evidence documents uploaded to
+        auto-score this assessment (CSVs, PDFs, spreadsheets, contracts,
+        etc.) for a keyword or phrase. Use this to find and quote real
+        evidence, e.g. 'what did the uploaded SLA say about response
+        times'.
+        """
+        delivery_matches = list(
+            session.delivery_docs.exclude(extracted_text="").filter(extracted_text__icontains=query)[:5]
+        )
+        category_matches = list(
+            session.category_docs.exclude(extracted_text="").filter(extracted_text__icontains=query)[:5]
+        )
+        if not delivery_matches and not category_matches:
+            return f"No uploaded evidence matching '{query}' found for this assessment."
+        lines = [f"Evidence matching '{query}':"]
+        for d in delivery_matches:
+            snippet = _snippet_around(d.extracted_text, query)
+            lines.append(f'- {d.original_filename} (Delivery): "{snippet}"')
+        for d in category_matches:
+            snippet = _snippet_around(d.extracted_text, query)
+            lines.append(f'- {d.original_filename} ({d.get_category_display()}): "{snippet}"')
+        return "\n".join(lines)
+
+    return [create_document, edit_document, list_documents, read_document, search_documents, search_evidence]
 
 
 def _make_session_consult_tool(
@@ -464,6 +517,7 @@ def _build_session_tools(
             return f"The audit system encountered a technical error: {str(e)}. Please try re-uploading the asset."
 
     from .agent_actions import build_agent_action_tools
+    from .web_tools import build_web_tools
 
     return [
         get_gtm_assessment_data,
@@ -477,6 +531,7 @@ def _build_session_tools(
         customer_segment_analysis,
         audit_strategic_evidence,
         *_build_document_tools_for_session(session, user=user),
+        *build_web_tools(session=session, user=user),
         *(
             build_agent_action_tools(session.workspace, user, task_refs_sink=task_refs_sink)
             if session.workspace and user else []

@@ -20,7 +20,14 @@ from typing import Any, Dict, List, Optional
 
 from django.utils import timezone
 
-from .agent_documents import create_agent_document, edit_agent_document, list_agent_documents
+from .agent_documents import (
+    create_agent_document,
+    edit_agent_document,
+    get_agent_document,
+    list_agent_documents,
+    search_agent_documents,
+    _snippet_around,
+)
 from .ai_chat import (
     _get_chat_client,
     _make_get_gtm_assessment_data_tool,
@@ -98,7 +105,58 @@ def _build_completion_tools(action_item: ActionItem, user, created_doc_ids: List
             lines.append(f"- [{d.pk}] {d.title} ({d.get_doc_type_display()}, v{d.version})")
         return "\n".join(lines)
 
-    return [get_gtm_assessment_data, search_internal_resources, create_document, edit_document, list_documents]
+    def read_document(document_id: str) -> str:
+        """Read an existing document's full content by its ID (use
+        list_documents or search_documents first if you don't already know
+        the ID). Use this before referencing, quoting, or building on a
+        document that already covers this task.
+        """
+        doc = get_agent_document(document_id, session=session)
+        if not doc:
+            return "I couldn't find a document with that ID for this assessment."
+        return f'"{doc.title}" ({doc.get_doc_type_display()}, v{doc.version}):\n\n{doc.content}'
+
+    def search_documents(query: str) -> str:
+        """Search saved documents for this assessment by title or content.
+        Use this to check whether a deliverable for this task already
+        exists before drafting a new one.
+        """
+        docs = list(search_agent_documents(query, session=session)[:10])
+        if not docs:
+            return f"No documents matching '{query}' found for this assessment."
+        lines = [f"Documents matching '{query}':"]
+        for d in docs:
+            lines.append(f"- [{d.pk}] {d.title} ({d.get_doc_type_display()}, v{d.version})")
+        return "\n".join(lines)
+
+    def search_evidence(query: str) -> str:
+        """Search the text extracted from evidence documents uploaded to
+        auto-score this assessment (CSVs, PDFs, spreadsheets, contracts,
+        etc.) for a keyword or phrase. Use this to ground the deliverable
+        in real uploaded evidence, e.g. 'what did the uploaded contract
+        say about SLAs'.
+        """
+        delivery_matches = list(
+            session.delivery_docs.exclude(extracted_text="").filter(extracted_text__icontains=query)[:5]
+        )
+        category_matches = list(
+            session.category_docs.exclude(extracted_text="").filter(extracted_text__icontains=query)[:5]
+        )
+        if not delivery_matches and not category_matches:
+            return f"No uploaded evidence matching '{query}' found for this assessment."
+        lines = [f"Evidence matching '{query}':"]
+        for d in delivery_matches:
+            snippet = _snippet_around(d.extracted_text, query)
+            lines.append(f'- {d.original_filename} (Delivery): "{snippet}"')
+        for d in category_matches:
+            snippet = _snippet_around(d.extracted_text, query)
+            lines.append(f'- {d.original_filename} ({d.get_category_display()}): "{snippet}"')
+        return "\n".join(lines)
+
+    return [
+        get_gtm_assessment_data, search_internal_resources, create_document, edit_document, list_documents,
+        read_document, search_documents, search_evidence,
+    ]
 
 
 def _build_completion_system_instruction(action_item: ActionItem) -> str:

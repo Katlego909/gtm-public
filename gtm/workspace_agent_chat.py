@@ -272,9 +272,13 @@ def _make_draft_client_summary_tool(agent_type: str, workspace: Workspace, user=
 
 
 def _build_document_tools(agent_type: str, workspace: Workspace, user=None) -> List[Any]:
-    """Generic create/edit/list document tools, available to every workspace
-    agent (not just the ones with a specialized draft_client_summary)."""
-    from .agent_documents import create_agent_document, edit_agent_document, list_agent_documents
+    """Generic create/edit/list/read/search document tools, available to
+    every workspace agent (not just the ones with a specialized
+    draft_client_summary)."""
+    from .agent_documents import (
+        create_agent_document, edit_agent_document, get_agent_document, list_agent_documents,
+        search_agent_documents, _snippet_around,
+    )
 
     def create_document(title: str, content: str, doc_type: str = "other") -> str:
         """Create and save a new document (e.g. an action plan, roadmap, or
@@ -311,7 +315,64 @@ def _build_document_tools(agent_type: str, workspace: Workspace, user=None) -> L
             lines.append(f"- [{d.pk}] {d.title} ({d.get_doc_type_display()}, v{d.version}, updated {d.updated_at.strftime('%b %d, %Y')})")
         return "\n".join(lines)
 
-    return [create_document, edit_document, list_documents]
+    def read_document(document_id: str) -> str:
+        """Read an existing document's full content by its ID (use
+        list_documents or search_documents first if you don't already know
+        the ID). Use this before referencing, quoting, or building on a
+        document you or a teammate created earlier.
+        """
+        doc = get_agent_document(document_id, workspace=workspace)
+        if not doc:
+            return "I couldn't find a document with that ID in this workspace."
+        return f'"{doc.title}" ({doc.get_doc_type_display()}, v{doc.version}):\n\n{doc.content}'
+
+    def search_documents(query: str) -> str:
+        """Search saved documents (client summaries, roadmaps, action
+        plans, briefs) in this workspace by title or content. Use this to
+        find a relevant document before creating a new one, or to answer a
+        question using something already written.
+        """
+        docs = list(search_agent_documents(query, workspace=workspace)[:10])
+        if not docs:
+            return f"No documents matching '{query}' found in this workspace."
+        lines = [f"Documents matching '{query}':"]
+        for d in docs:
+            lines.append(f"- [{d.pk}] {d.title} ({d.get_doc_type_display()}, v{d.version})")
+        return "\n".join(lines)
+
+    def search_evidence(query: str) -> str:
+        """Search the text extracted from evidence documents uploaded to
+        auto-score this workspace's assessments (CSVs, PDFs, spreadsheets,
+        contracts, etc.) for a keyword or phrase. Use this to find and
+        quote real evidence, e.g. 'what did the uploaded SLA say about
+        response times'.
+        """
+        from .models import CategoryDocument, DeliveryDocument
+
+        delivery_matches = list(
+            DeliveryDocument.objects.filter(session__workspace=workspace)
+            .exclude(extracted_text="").filter(extracted_text__icontains=query)
+            .select_related("session")[:5]
+        )
+        category_matches = list(
+            CategoryDocument.objects.filter(session__workspace=workspace)
+            .exclude(extracted_text="").filter(extracted_text__icontains=query)
+            .select_related("session")[:5]
+        )
+        if not delivery_matches and not category_matches:
+            return f"No uploaded evidence matching '{query}' found in this workspace."
+        lines = [f"Evidence matching '{query}':"]
+        for d in delivery_matches:
+            snippet = _snippet_around(d.extracted_text, query)
+            company = d.session.company_name or "Unnamed assessment"
+            lines.append(f'- {d.original_filename} (Delivery, {company}): "{snippet}"')
+        for d in category_matches:
+            snippet = _snippet_around(d.extracted_text, query)
+            company = d.session.company_name or "Unnamed assessment"
+            lines.append(f'- {d.original_filename} ({d.get_category_display()}, {company}): "{snippet}"')
+        return "\n".join(lines)
+
+    return [create_document, edit_document, list_documents, read_document, search_documents, search_evidence]
 
 
 def _make_consult_tool(
@@ -400,12 +461,14 @@ def _build_workspace_tools(
     agent_runtime.record_task_ref and gtm/agent_actions.py.
     """
     from .agent_actions import build_agent_action_tools
+    from .web_tools import build_web_tools
 
     if task_refs_sink is None:
         task_refs_sink = []
 
     context = build_workspace_agent_context(agent_type, workspace)
     document_tools = _build_document_tools(agent_type, workspace, user=user)
+    web_tools = build_web_tools(workspace=workspace, user=user)
     action_tools = build_agent_action_tools(workspace, user, task_refs_sink=task_refs_sink) if user else []
     consult_tools = (
         _build_consult_tools(
@@ -451,6 +514,7 @@ def _build_workspace_tools(
             get_assessment_history,
             _make_draft_client_summary_tool("portfolio", workspace, user),
             *document_tools,
+            *web_tools,
             *action_tools,
             *consult_tools,
         ]
@@ -487,6 +551,7 @@ def _build_workspace_tools(
             list_resources,
             get_coverage_gaps,
             *document_tools,
+            *web_tools,
             *action_tools,
             *consult_tools,
         ]
@@ -527,6 +592,7 @@ def _build_workspace_tools(
             get_overdue_tasks,
             _make_draft_client_summary_tool("insights", workspace, user),
             *document_tools,
+            *web_tools,
             *action_tools,
             *consult_tools,
         ]
