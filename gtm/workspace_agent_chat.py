@@ -7,7 +7,7 @@ of a single AssessmentSession. Uses real multi-turn memory
 
 import logging
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from .ai_chat import GENAI_AVAILABLE, _get_chat_client
 from .models_workspace import Workspace
@@ -24,6 +24,12 @@ try:
     from google.genai import types
 except ImportError:
     types = None
+
+try:
+    from .utils_ai_monitoring import AIUsageTracker
+    MONITORING_AVAILABLE = True
+except ImportError:
+    MONITORING_AVAILABLE = False
 
 AGENT_TYPES = ("portfolio", "resource", "insights")
 
@@ -191,12 +197,15 @@ def handle_pending_review(context: Dict[str, Any], message: str) -> str:
     return response
 
 
-def handle_overdue_tasks(context: Dict[str, Any], message: str) -> str:
+def handle_overdue_tasks(context: Dict[str, Any], message: str, task_refs_sink: Optional[List[Any]] = None) -> str:
+    from .agent_runtime import record_task_ref
+
     if not context["overdue_actions"]:
         return f"No overdue tasks for **{context['workspace_name']}** — {context['open_action_count']} open task(s) total, all on track."
     response = f"**{context['overdue_action_count']} overdue task(s) — {context['workspace_name']}**\n"
     for action in context["overdue_actions"][:10]:
         assignee = (action.assigned_to.get_full_name() or action.assigned_to.username) if action.assigned_to else "Unassigned"
+        record_task_ref(task_refs_sink, action.id, action.note)
         response += f"\n• [ID: {action.id}] {action.note} (due {action.due_date}, {assignee})"
     return response
 
@@ -305,12 +314,15 @@ def _build_document_tools(agent_type: str, workspace: Workspace, user=None) -> L
     return [create_document, edit_document, list_documents]
 
 
-def _make_consult_tool(target_agent_type: str, workspace: Workspace, user=None, _handoff_depth: int = 0):
+def _make_consult_tool(
+    target_agent_type: str, workspace: Workspace, user=None, _handoff_depth: int = 0,
+    task_refs_sink: Optional[List[Any]] = None,
+):
     """Build one consult_<target>_agent tool that hands the question off to
     another workspace agent's full entry point (real memory + real tools),
     and persists the exchange into the target agent's own conversation log
     so it genuinely remembers being consulted."""
-    from .agent_runtime import AGENT_DIRECTORY
+    from .agent_runtime import AGENT_DIRECTORY, record_task_ref
 
     info = AGENT_DIRECTORY.get(target_agent_type, {})
     name = info.get("name", target_agent_type)
@@ -321,7 +333,7 @@ def _make_consult_tool(target_agent_type: str, workspace: Workspace, user=None, 
         from .models import WorkspaceChatMessage
 
         try:
-            answer = handle_general_chat_workspace(
+            answer, nested_task_refs = handle_general_chat_workspace(
                 target_agent_type, workspace, question, user=user, _handoff_depth=_handoff_depth + 1
             )
             WorkspaceChatMessage.objects.create(
@@ -330,8 +342,14 @@ def _make_consult_tool(target_agent_type: str, workspace: Workspace, user=None, 
                 user=user if user and getattr(user, "is_authenticated", False) else None,
                 message=question,
                 response=answer,
+                task_refs=nested_task_refs,
                 intent="handoff_query",
             )
+            # The consulted peer's own tool calls surfaced these -- fold
+            # them into the outer agent's sink too, so a fact Nora only
+            # learned by asking Theo is still actable this same turn.
+            for ref in nested_task_refs:
+                record_task_ref(task_refs_sink, ref["id"], ref["note"])
             return answer
         except Exception as e:
             logger.error(f"Handoff to {target_agent_type} failed: {e}")
@@ -345,7 +363,10 @@ def _make_consult_tool(target_agent_type: str, workspace: Workspace, user=None, 
     return consult_tool
 
 
-def _build_consult_tools(agent_type: str, workspace: Workspace, user=None, _handoff_depth: int = 0) -> List[Any]:
+def _build_consult_tools(
+    agent_type: str, workspace: Workspace, user=None, _handoff_depth: int = 0,
+    task_refs_sink: Optional[List[Any]] = None,
+) -> List[Any]:
     """Build consult tools to this agent's peers, depth-gated so a handoff
     chain is guaranteed to terminate (see agent_runtime.MAX_HANDOFF_DEPTH)."""
     from .agent_runtime import MAX_HANDOFF_DEPTH
@@ -354,7 +375,10 @@ def _build_consult_tools(agent_type: str, workspace: Workspace, user=None, _hand
         return []
 
     peers = [t for t in AGENT_TYPES if t != agent_type]
-    return [_make_consult_tool(peer, workspace, user, _handoff_depth) for peer in peers]
+    return [
+        _make_consult_tool(peer, workspace, user, _handoff_depth, task_refs_sink=task_refs_sink)
+        for peer in peers
+    ]
 
 
 def _build_workspace_tools(
@@ -363,20 +387,30 @@ def _build_workspace_tools(
     user=None,
     _handoff_depth: int = 0,
     include_consult: bool = True,
+    task_refs_sink: Optional[List[Any]] = None,
 ) -> List[Any]:
     """Build the tool set for one workspace agent, scoped to `workspace`.
 
     `include_consult=False` omits the consult_* tools -- used by Team mode
     (gtm/team_chat.py), which gives an agent transfer_to_* tools instead.
     The two mechanisms are deliberately mutually exclusive per agent turn.
+
+    `task_refs_sink`, when given, is the mutable list real task IDs get
+    recorded into as tools resolve them this turn -- see
+    agent_runtime.record_task_ref and gtm/agent_actions.py.
     """
     from .agent_actions import build_agent_action_tools
 
+    if task_refs_sink is None:
+        task_refs_sink = []
+
     context = build_workspace_agent_context(agent_type, workspace)
     document_tools = _build_document_tools(agent_type, workspace, user=user)
-    action_tools = build_agent_action_tools(workspace, user) if user else []
+    action_tools = build_agent_action_tools(workspace, user, task_refs_sink=task_refs_sink) if user else []
     consult_tools = (
-        _build_consult_tools(agent_type, workspace, user=user, _handoff_depth=_handoff_depth)
+        _build_consult_tools(
+            agent_type, workspace, user=user, _handoff_depth=_handoff_depth, task_refs_sink=task_refs_sink,
+        )
         if include_consult else []
     )
 
@@ -481,9 +515,10 @@ def _build_workspace_tools(
             with its real ID in brackets. Use this when asked about overdue
             or stale tasks -- and to get a real ID before calling
             assign_task, assign_task_to_agent, or comment_on_task. Never
-            guess or invent an ID.
+            guess or invent an ID. For tasks that aren't overdue, use
+            find_tasks instead.
             """
-            return handle_overdue_tasks(context, "")
+            return handle_overdue_tasks(context, "", task_refs_sink=task_refs_sink)
 
         return [
             get_score_change,
@@ -520,8 +555,10 @@ SYSTEM_INSTRUCTIONS = {
 }
 
 
-def _get_workspace_chat_config(agent_type: str, tools: Optional[List[Any]] = None):
-    from .agent_runtime import build_agent_directory_prompt
+def _get_workspace_chat_config(
+    agent_type: str, tools: Optional[List[Any]] = None, task_refs: Optional[List[Any]] = None,
+):
+    from .agent_runtime import build_agent_directory_prompt, build_task_context_prompt
 
     base_instruction = SYSTEM_INSTRUCTIONS.get(agent_type, "You are a helpful GTM strategy assistant.")
     tool_guidance = (
@@ -537,7 +574,7 @@ def _get_workspace_chat_config(agent_type: str, tools: Optional[List[Any]] = Non
         "to what a teammate already looked up -- call the right tool yourself and get a fresh answer rather "
         "than repeating or lightly rewording something a teammate said about a different question."
     )
-    system_instruction = base_instruction + tool_guidance
+    system_instruction = base_instruction + tool_guidance + build_task_context_prompt(task_refs)
 
     # Only mention handoff capability when a consult_ tool is actually in
     # this turn's tool list -- a depth-capped sub-agent has none, and a
@@ -556,7 +593,9 @@ def _get_workspace_chat_config(agent_type: str, tools: Optional[List[Any]] = Non
     )
 
 
-def _build_workspace_chat_history(workspace: Workspace, agent_type: str, max_turns: int = 16) -> List[Any]:
+def _build_workspace_chat_history(
+    workspace: Workspace, agent_type: str, max_turns: int = 16,
+) -> Tuple[List[Any], List[Dict[str, Any]]]:
     """Reconstruct this workspace's shared, cross-agent conversation as
     types.Content history -- every agent's turns are visible to every other
     agent (speaker-tagged via AGENT_DIRECTORY), not just this agent's own.
@@ -570,8 +609,14 @@ def _build_workspace_chat_history(workspace: Workspace, agent_type: str, max_tur
     model never sees a turn nobody actually said. Handoff exchanges
     (intent="handoff_query") are real conversational content and are NOT
     excluded.
+
+    Also returns the real task IDs surfaced across these rows (each row's
+    stored `task_refs`), aggregated and capped -- NOT folded into the
+    `Content` history text itself (that's the self-tagging leak risk
+    described on build_task_context_prompt), but returned separately so the
+    caller can feed it into this turn's system_instruction instead.
     """
-    from .agent_runtime import AGENT_DIRECTORY, build_tagged_content_history
+    from .agent_runtime import AGENT_DIRECTORY, build_tagged_content_history, record_task_ref
     from .models import WorkspaceChatMessage
 
     rows = list(reversed(
@@ -587,7 +632,11 @@ def _build_workspace_chat_history(workspace: Workspace, agent_type: str, max_tur
         )
         for row in rows
     ]
-    return build_tagged_content_history(entries, max_turns=max_turns)
+    history_task_refs: List[Dict[str, Any]] = []
+    for row in rows:
+        for ref in (row.task_refs or []):
+            record_task_ref(history_task_refs, ref["id"], ref["note"], cap=12)
+    return build_tagged_content_history(entries, max_turns=max_turns), history_task_refs
 
 
 def handle_general_chat_workspace(
@@ -597,7 +646,7 @@ def handle_general_chat_workspace(
     user=None,
     _handoff_depth: int = 0,
     supplemental_context: str = "",
-) -> str:
+) -> Tuple[str, List[Dict[str, Any]]]:
     """The workspace agent's conversational path: real multi-turn memory +
     real Gemini tool-calling via the tools built by _build_workspace_tools.
 
@@ -610,7 +659,13 @@ def handle_general_chat_workspace(
     attachments (see dashboard/document_processors.py's
     _process_agent_attachments) -- folded into the message sent to the
     model but not into `message` itself, so the persisted/displayed chat
-    bubble stays the clean text the user actually typed."""
+    bubble stays the clean text the user actually typed.
+
+    Returns `(response_text, turn_task_refs)` -- the second element is the
+    real ActionItem ids/notes any tool call surfaced this turn (see
+    agent_runtime.record_task_ref), for the caller to persist alongside the
+    response so a later turn can still act on them without either party
+    having shown the raw ID."""
     from .ai_services import (
         _extract_retry_delay_seconds,
         _is_quota_error,
@@ -619,22 +674,33 @@ def handle_general_chat_workspace(
         _set_quota_cooldown,
     )
     from .agent_runtime import run_agent_turn
+    from .ai_credits import resolve_account, can_spend, format_reset_time
 
-    if _quota_cooldown_active() or not _request_budget_available():
-        return "I'm currently cooling down to stay within my API limits. Please try again in about 60 seconds."
+    account = resolve_account(workspace=workspace, user=user)
+
+    if _quota_cooldown_active():
+        return "I'm currently cooling down to stay within my API limits. Please try again in about 60 seconds.", []
+
+    credit_check = can_spend(account=account)
+    if not credit_check.allowed:
+        reset_note = f" They reset at {format_reset_time(credit_check.reset_at)}." if credit_check.reset_at else ""
+        return f"You've used all of {workspace.name}'s AI credits for today." + reset_note, []
 
     client = _get_chat_client()
     if not client:
-        return "I'm having trouble connecting to my AI brain right now. Please try again in a moment."
+        return "I'm having trouble connecting to my AI brain right now. Please try again in a moment.", []
 
     try:
         full_message = message
         if supplemental_context:
             full_message = f"{message}\n\n[Relevant attachment context]\n{supplemental_context}"
 
-        history = _build_workspace_chat_history(workspace, agent_type)
-        tools = _build_workspace_tools(agent_type, workspace, user=user, _handoff_depth=_handoff_depth)
-        config = _get_workspace_chat_config(agent_type, tools=tools)
+        history, history_task_refs = _build_workspace_chat_history(workspace, agent_type)
+        turn_task_refs: List[Dict[str, Any]] = []
+        tools = _build_workspace_tools(
+            agent_type, workspace, user=user, _handoff_depth=_handoff_depth, task_refs_sink=turn_task_refs,
+        )
+        config = _get_workspace_chat_config(agent_type, tools=tools, task_refs=history_task_refs)
 
         text = run_agent_turn(
             client=client,
@@ -643,12 +709,17 @@ def handle_general_chat_workspace(
             history=history,
             message=full_message,
             usage_label=f"workspace_agent_{agent_type}",
+            feature="workspace_agent",
+            account=account,
         )
-        return text or "I've processed your request but don't have anything further to add right now."
+        return text or "I've processed your request but don't have anything further to add right now.", turn_task_refs
     except Exception as e:
         if _is_quota_error(e):
             _set_quota_cooldown(_extract_retry_delay_seconds(e))
-            return "I've hit my temporary GTM strategy quota. Please try again shortly. If I'd already started anything before hitting the limit, it's saved."
+            return (
+                "I've hit my temporary GTM strategy quota. Please try again shortly. "
+                "If I'd already started anything before hitting the limit, it's saved."
+            ), []
         log_ai_error(
             f"Workspace {agent_type} agent reasoning failure",
             e,
@@ -656,7 +727,7 @@ def handle_general_chat_workspace(
             model="gemini-2.5-flash",
             extra={"workspace_id": str(workspace.id), "agent_type": agent_type},
         )
-        return "I'm processing a lot of data right now. Please try asking again in a moment."
+        return "I'm processing a lot of data right now. Please try asking again in a moment.", []
 
 
 # ================================================================
@@ -721,8 +792,18 @@ def draft_client_summary_text(workspace: Workspace, focus: str = "") -> str:
     Pure generation -- does not persist anything or touch quota-cooldown
     state; callers (the background refresh job, or the conversational tool)
     are responsible for the quota gate, persistence, and error handling
-    appropriate to their trigger path.
+    appropriate to their trigger path. Does check AI credits itself though
+    (unlike the quota-cooldown gate) since this is a standalone Gemini call
+    that can be triggered as a nested chat tool -- the outer turn's own
+    credit check doesn't see this call's separate cost.
     """
+    from .ai_credits import resolve_account, record_spend
+
+    account = resolve_account(workspace=workspace)
+    from .ai_services import _request_budget_available
+    if not _request_budget_available(account=account):
+        raise RuntimeError("AI credits exhausted for this period")
+
     client = _get_chat_client()
     if not client:
         raise RuntimeError("AI client unavailable")
@@ -736,6 +817,11 @@ def draft_client_summary_text(workspace: Workspace, focus: str = "") -> str:
         contents=[types.Content(role="user", parts=[types.Part.from_text(text=prompt)])],
         config=_get_client_summary_config(),
     )
+    if hasattr(response, "usage_metadata"):
+        total_tokens = response.usage_metadata.total_token_count
+        if MONITORING_AVAILABLE:
+            AIUsageTracker.log_usage(total_tokens, 'client_summary')
+        record_spend(account, total_tokens, "client_summary")
     if response.text is None or not response.text.strip():
         raise RuntimeError("Empty response from client summary generation")
     return response.text.strip()
@@ -759,10 +845,10 @@ def process_workspace_chat_message(
 
     try:
         workspace = Workspace.objects.get(id=workspace_id)
-        response_text = handle_general_chat_workspace(
+        response_text, task_refs = handle_general_chat_workspace(
             agent_type, workspace, message, user=user, supplemental_context=supplemental_context
         )
-        return {"success": True, "response": response_text, "intent": "general_chat"}
+        return {"success": True, "response": response_text, "intent": "general_chat", "task_refs": task_refs}
     except Workspace.DoesNotExist:
         return {"success": False, "response": "Workspace not found.", "intent": "error"}
     except Exception as e:

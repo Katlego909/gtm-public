@@ -6,6 +6,7 @@ from django.contrib import messages
 from .utils_email import send_snapshot_report_email
 from .models import AssessmentSession, ResultSnapshot, RecommendationBand, Category, Question, Response, ActionItem, ToolRecommendation, ChatMessage, WorkspaceChatMessage, AgentDocument
 from .models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation
+from .models_ai_credits import AICreditAccount, AICreditTransaction
 from dashboard.models import GapAnalysisMetric
 
 @admin.action(description="Resend report email")
@@ -277,3 +278,33 @@ class WorkspaceInvitationAdmin(admin.ModelAdmin):
             return format_html('<span style="color:red;">Expired</span>')
         return format_html('<span style="color:orange;">Pending</span>')
     status.short_description = 'Status'
+
+
+@admin.action(description="Reset current period (clear usage now)")
+def reset_credit_period(modeladmin, request, queryset):
+    from django.utils import timezone
+    count = queryset.update(tokens_used=0, period_started_at=timezone.now())
+    messages.success(request, f"Reset the current period for {count} account(s).")
+
+
+@admin.register(AICreditAccount)
+class AICreditAccountAdmin(admin.ModelAdmin):
+    actions = [reset_credit_period]
+    list_display = ('__str__', 'period_length', 'token_budget', 'tokens_used', 'period_started_at', 'updated_at')
+    list_filter = ('period_length',)
+    list_select_related = ('workspace', 'user')
+    search_fields = ('workspace__name', 'user__username', 'user__email')
+    readonly_fields = ('id', 'tokens_used', 'period_started_at', 'created_at', 'updated_at')
+    # token_budget and period_length stay editable -- this is the manual
+    # adjustment surface for v1 (no self-serve UI): raise token_budget to
+    # grant more headroom, or use the "Reset current period" action to
+    # zero out tokens_used immediately.
+
+
+@admin.register(AICreditTransaction)
+class AICreditTransactionAdmin(admin.ModelAdmin):
+    list_display = ('account', 'feature', 'tokens_spent', 'session', 'actor', 'created_at')
+    list_filter = ('feature', 'created_at')
+    list_select_related = ('account', 'session', 'actor')
+    search_fields = ('account__workspace__name', 'account__user__username')
+    date_hierarchy = 'created_at'

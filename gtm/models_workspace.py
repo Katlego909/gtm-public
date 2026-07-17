@@ -127,6 +127,11 @@ class WorkspaceMembership(models.Model):
         """Check if user can configure/revoke workspace integrations (CRM credentials, etc.)"""
         return self.role in ['admin', 'funti3r_consultant']
 
+    @property
+    def can_manage_ai_credits(self):
+        """Check if user can view/adjust this workspace's AI credit budget."""
+        return self.role in ['admin', 'funti3r_consultant']
+
 
 class WorkspaceInvitation(models.Model):
     """

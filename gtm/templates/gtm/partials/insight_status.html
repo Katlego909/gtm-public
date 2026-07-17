@@ -11,6 +11,10 @@
       </div>
       <p class="text-gray-800 mt-1 leading-snug break-words">{{ response.ai_insight }}</p>
     </div>
+  {% elif response.ai_insight_status == "no_credits" %}
+    <div class="mt-3 p-3 bg-amber-50 border-l-4 border-amber-400 rounded text-sm">
+      <p class="text-amber-700 italic">AI credits used up for today &mdash; this insight will be available once they reset.</p>
+    </div>
   {% elif response.ai_insight_status == "failed" %}
     <div class="mt-3 p-3 bg-yellow-50 border-l-4 border-yellow-400 rounded text-sm shadow-inner">
       <p class="text-yellow-700 italic">AI insight unavailable for this area.</p>

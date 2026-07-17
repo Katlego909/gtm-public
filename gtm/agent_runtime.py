@@ -6,7 +6,8 @@ already diverge per agent.
 """
 
 import logging
-from typing import Any, List, Optional, Sequence
+import re
+from typing import Any, Dict, List, Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +93,89 @@ def build_agent_directory_prompt(current_agent_type: str) -> str:
     )
 
 
+def record_task_ref(
+    sink: Optional[List[Dict[str, Any]]],
+    task_id: Any,
+    note: str,
+    cap: int = 20,
+) -> None:
+    """Record that a tool call surfaced a real ActionItem id this turn, so
+    it can be persisted structurally (see WorkspaceChatMessage/ChatMessage's
+    task_refs field) instead of only existing as a `[ID: n]` substring in
+    text the model may or may not repeat back to the user.
+
+    `sink` is a plain mutable list threaded into tool closures by the
+    caller (same idiom as gtm/action_item_completion.py's `created_doc_ids`
+    list) -- a no-op when `sink is None`, so every call site can call this
+    unconditionally instead of guarding it. Dedupes by id: a repeat id is
+    moved to the end (last-seen wins) rather than duplicated, and the sink
+    is capped at `cap` entries by evicting the oldest once it grows past
+    that, so a long tool-calling turn can't grow this unboundedly.
+    """
+    if sink is None:
+        return
+    for i, ref in enumerate(sink):
+        if ref["id"] == task_id:
+            del sink[i]
+            break
+    sink.append({"id": task_id, "note": (note or "")[:80]})
+    del sink[:-cap]
+
+
+def build_task_context_prompt(task_refs: Optional[List[Dict[str, Any]]] = None) -> str:
+    """Shared instruction appended to every agent's system prompt (workspace
+    agents, Charlie, and Team mode) covering what a task-reference chain
+    needs: today's date, so a relative reference like "the task from July
+    16th" resolves to the right year when passed to find_tasks' created_on
+    parameter, and real task IDs the conversation has already surfaced --
+    kept OUT of the visible chat bubble by design (the user chose not to
+    show raw IDs), so they're threaded back in here via system_instruction
+    rather than via conversation history text. Never append this kind of
+    text onto a *historical model turn* instead -- Team mode already hit
+    that exact failure mode once (see _build_team_history's docstring on
+    the self-tagging leak) where text appended to an agent's own past
+    turns taught it to keep re-emitting that text in new replies.
+    """
+    from django.utils import timezone
+
+    today = timezone.localdate().strftime("%B %d, %Y")
+    prompt = (
+        f"\n\nToday's date is {today}. "
+        "When you look up tasks (e.g. via find_tasks, get_overdue_tasks, or "
+        "review_current_action_items), you'll get back real IDs like '[ID: 42]' -- "
+        "these are for your own use only. Never show a literal ID or technical "
+        "identifier to the user; refer to tasks naturally by their description "
+        "instead (e.g. 'the discovery questions task'). The system tracks the real "
+        "IDs for you automatically behind the scenes, so you don't need to repeat "
+        "one back in your reply for it to be remembered -- just act on it or "
+        "describe the task in plain language."
+    )
+    if task_refs:
+        refs_text = "; ".join(f"[ID: {ref['id']}] {ref['note']}" for ref in task_refs)
+        prompt += (
+            "\n\nTasks already surfaced earlier in this conversation (system context "
+            f"only -- never repeat these IDs verbatim to the user): {refs_text}"
+        )
+    return prompt
+
+
+_TASK_ID_BRACKET_RE = re.compile(r"\s*\[ID:\s*\d+\]", re.IGNORECASE)
+
+
+def strip_task_id_brackets(text: Optional[str]) -> Optional[str]:
+    """Defensive regex failsafe: removes any literal '[ID: n]' marker a
+    model wrote into its own reply despite being told not to (see
+    build_task_context_prompt), so a leaked technical ID never reaches the
+    user even if the instruction is ignored. Mirrors the existing
+    _strip_imperative_sentences failsafe in gtm/ai_services.py, which
+    removes recommendation-style sentences from diagnostic insights for the
+    same reason: prompting alone isn't a hard guarantee."""
+    if not text:
+        return text
+    cleaned = _TASK_ID_BRACKET_RE.sub("", text)
+    return re.sub(r" {2,}", " ", cleaned).strip()
+
+
 def build_tagged_content_history(
     entries: Sequence[Any],
     max_turns: int = 16,
@@ -137,24 +221,36 @@ def run_agent_turn(
     history: List["types.Content"],
     message: str,
     usage_label: str = "agent_chat",
+    account=None,
+    session=None,
+    feature: str = None,
 ) -> Optional[str]:
     """Run one conversational turn with real multi-turn memory via
     client.chats.create(history=...).send_message(message).
 
-    Centralizes usage-tracking and the empty-response case (a turn that only
-    produced function calls, no closing text). Returns None when there is no
-    text so each call site can supply its own agent-appropriate fallback
-    copy. Raises whatever the SDK raises on failure -- callers keep their own
-    try/except + quota-cooldown handling, since the user-facing fallback
-    message differs per agent.
+    Centralizes usage-tracking (both the global observational AIUsageTracker
+    counter, keyed by `usage_label`, and, when `account` is passed, the
+    enforced per-workspace/user AI credit ledger -- see gtm/ai_credits.py,
+    keyed by `feature`, which is a stricter/coarser AICreditTransaction
+    category and defaults to `usage_label` when not given separately) and
+    the empty-response case (a turn that only produced function calls, no
+    closing text). Returns None when there is no text so each call site can
+    supply its own agent-appropriate fallback copy. Raises whatever the SDK
+    raises on failure -- callers keep their own try/except + quota-cooldown
+    handling, since the user-facing fallback message differs per agent.
     """
     chat = client.chats.create(model=model, config=config, history=history)
     response = chat.send_message(message)
 
-    if MONITORING_AVAILABLE and getattr(response, "usage_metadata", None):
-        AIUsageTracker.log_usage(response.usage_metadata.total_token_count, usage_label)
+    if getattr(response, "usage_metadata", None):
+        total_tokens = response.usage_metadata.total_token_count
+        if MONITORING_AVAILABLE:
+            AIUsageTracker.log_usage(total_tokens, usage_label)
+        if account is not None:
+            from .ai_credits import record_spend
+            record_spend(account, total_tokens, feature or usage_label, session=session)
 
     if response.text is None or not response.text.strip():
         return None
 
-    return response.text.strip()
+    return strip_task_id_brackets(response.text.strip())

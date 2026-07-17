@@ -83,7 +83,9 @@ def dashboard_workspace_agent_api(request, agent_type):
         return error_response
 
     resolved_session_id = _resolve_session_in_workspace(session_id, current_workspace)
-    attachments, attachment_context, attachment_warnings = _process_agent_attachments(uploaded_files)
+    from gtm.ai_credits import resolve_account
+    account = resolve_account(workspace=current_workspace, user=request.user)
+    attachments, attachment_context, attachment_warnings = _process_agent_attachments(uploaded_files, account=account)
 
     result = process_workspace_chat_message(
         agent_type=agent_type,
@@ -103,6 +105,7 @@ def dashboard_workspace_agent_api(request, agent_type):
             message=message,
             response=result.get("response", ""),
             attachments=attachments,
+            task_refs=result.get("task_refs", []),
             intent=result.get("intent", ""),
         )
         result["response_html"] = _md(result.get("response", ""))
@@ -197,7 +200,9 @@ def dashboard_team_agent_api(request):
     if not current_workspace and not resolved_session_id:
         return JsonResponse({"success": False, "error": "Select a workspace or assessment first."}, status=400)
 
-    attachments, attachment_context, attachment_warnings = _process_agent_attachments(uploaded_files)
+    from gtm.ai_credits import resolve_account
+    account = resolve_account(workspace=current_workspace, user=request.user)
+    attachments, attachment_context, attachment_warnings = _process_agent_attachments(uploaded_files, account=account)
 
     result = process_team_chat_message(
         workspace_id=current_workspace.id if current_workspace else None,

@@ -341,7 +341,11 @@ def _extract_json(file_path: str) -> str:
         return ""
 
 
-def _extract_image_via_gemini(file_path: str, client, model_id: str) -> str:
+def _extract_image_via_gemini(file_path: str, client, model_id: str, *, account=None) -> str:
+    from .ai_services import _quota_cooldown_active, _request_budget_available, MONITORING_AVAILABLE
+    if _quota_cooldown_active() or not _request_budget_available(account=account):
+        logger.warning("AI unavailable (cooldown/credits) — skipping image extraction for %s", file_path)
+        return ""
     try:
         from PIL import Image
         img = Image.open(file_path)
@@ -356,6 +360,13 @@ def _extract_image_via_gemini(file_path: str, client, model_id: str) -> str:
                 img,
             ]
         )
+        if hasattr(response, "usage_metadata"):
+            total_tokens = response.usage_metadata.total_token_count
+            if MONITORING_AVAILABLE:
+                from .utils_ai_monitoring import AIUsageTracker
+                AIUsageTracker.log_usage(total_tokens, 'document_ocr')
+            from .ai_credits import record_spend
+            record_spend(account, total_tokens, "document_ocr")
         return (getattr(response, 'text', '') or '').strip()
     except Exception as exc:
         logger.warning("Gemini image extraction failed for %s: %s", file_path, exc)
@@ -363,7 +374,7 @@ def _extract_image_via_gemini(file_path: str, client, model_id: str) -> str:
 
 
 def extract_text_from_path(file_path: str, file_type: str,
-                            client=None, model_id: str = "") -> str:
+                            client=None, model_id: str = "", *, account=None) -> str:
     """Route a saved file to the correct extractor and return extracted text."""
     if file_type == 'csv':
         text = _extract_csv(file_path)
@@ -377,7 +388,7 @@ def extract_text_from_path(file_path: str, file_type: str,
         text = _extract_json(file_path)
     elif file_type == 'image':
         if client:
-            text = _extract_image_via_gemini(file_path, client, model_id)
+            text = _extract_image_via_gemini(file_path, client, model_id, account=account)
         else:
             text = ""
     else:  # txt, other
@@ -954,7 +965,10 @@ def analyze_delivery_documents(session) -> dict:
     from .ai_services import (
         _get_client, _clean_json_response, _is_quota_error,
         _extract_retry_delay_seconds, _set_quota_cooldown, _quota_cooldown_active,
+        _request_budget_available, MONITORING_AVAILABLE,
     )
+    from .ai_credits import resolve_account_for_session, record_spend
+    from .utils_ai_monitoring import AIUsageTracker
     from google.genai import types as genai_types
 
     docs = DeliveryDocument.objects.filter(session=session).exclude(extracted_text='')
@@ -975,8 +989,10 @@ def analyze_delivery_documents(session) -> dict:
     logger.info("Delivery analysis — starting NLP/ML pre-processing…")
     nlp_evidence = _build_nlp_evidence(combined_text, DELIVERY_QUESTIONS)
 
+    account = resolve_account_for_session(session)
+
     client = _get_client()
-    if not client or _quota_cooldown_active():
+    if not client or _quota_cooldown_active() or not _request_budget_available(account=account):
         logger.warning("Gemini unavailable for delivery analysis — using scoring memory fallback")
         return _scoring_memory_fallback(nlp_evidence, DELIVERY_QUESTIONS)
 
@@ -995,6 +1011,12 @@ def analyze_delivery_documents(session) -> dict:
             contents=prompt,
             config=config,
         )
+        if hasattr(response, "usage_metadata"):
+            total_tokens = response.usage_metadata.total_token_count
+            if MONITORING_AVAILABLE:
+                AIUsageTracker.log_usage(total_tokens, 'delivery_analysis')
+            record_spend(account, total_tokens, "delivery_analysis", session=session)
+
         raw     = getattr(response, 'text', '') or ''
         cleaned = _clean_json_response(raw)
         result  = json.loads(cleaned)

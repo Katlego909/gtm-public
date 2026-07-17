@@ -130,13 +130,21 @@ def complete_action_item(action_item: ActionItem, user=None) -> Dict[str, Any]:
         _request_budget_available,
         _set_quota_cooldown,
     )
+    from .ai_credits import resolve_account_for_session, can_spend, record_spend, format_reset_time
 
     session = action_item.session
     if session is None:
         return {"success": False, "error": "This action item has no linked assessment, so AI can't complete it yet."}
 
-    if _quota_cooldown_active() or not _request_budget_available():
+    account = resolve_account_for_session(session, user=user)
+
+    if _quota_cooldown_active():
         return {"success": False, "error": "AI is cooling down to stay within API limits. Please try again shortly."}
+
+    credit_check = can_spend(account=account)
+    if not credit_check.allowed:
+        reset_note = f" They reset at {format_reset_time(credit_check.reset_at)}." if credit_check.reset_at else ""
+        return {"success": False, "error": "This workspace has used all of its AI credits for today." + reset_note}
 
     client = _get_chat_client()
     if not client:
@@ -175,6 +183,8 @@ def complete_action_item(action_item: ActionItem, user=None) -> Dict[str, Any]:
     usage = getattr(response, "usage_metadata", None)
     prompt_token_count = getattr(usage, "prompt_token_count", None) if usage else None
     candidates_token_count = getattr(usage, "candidates_token_count", None) if usage else None
+    if usage and getattr(usage, "total_token_count", None):
+        record_spend(account, usage.total_token_count, "action_item_completion", session=session, actor=user)
 
     deliverable = None
     if created_doc_ids:

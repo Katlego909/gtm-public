@@ -32,12 +32,22 @@ try:
     from .ai_services import (
         _is_quota_error, _extract_retry_delay_seconds,
         _set_quota_cooldown, _quota_cooldown_active,
+        _request_budget_available, MONITORING_AVAILABLE,
     )
 except (ImportError, AttributeError):
     def _is_quota_error(exc): return False
     def _extract_retry_delay_seconds(exc): return 60
     def _set_quota_cooldown(seconds): pass
     def _quota_cooldown_active(): return False
+    def _request_budget_available(**kwargs): return True
+    MONITORING_AVAILABLE = False
+
+try:
+    from .utils_ai_monitoring import AIUsageTracker
+except ImportError:
+    pass
+
+from .ai_credits import resolve_account, resolve_account_for_session, record_spend
 
 # Cached auditor client to avoid repeated initialization
 _auditor_client = None
@@ -143,7 +153,8 @@ def _extract_summary(audit_text: str, max_len: int = 300) -> str:
 
 # ─── Core audit function ──────────────────────────────────────────────────────
 
-def _run_multimodal_audit(file_bytes: bytes, mime_type: str, asset_name: str, session_context: str = "") -> str:
+def _run_multimodal_audit(file_bytes: bytes, mime_type: str, asset_name: str, session_context: str = "", *,
+                           account=None, feature: str = "evidence_audit", session=None) -> str:
     """
     Core multimodal audit. Sends file bytes + prompt to Gemini and returns raw text.
     """
@@ -153,6 +164,9 @@ def _run_multimodal_audit(file_bytes: bytes, mime_type: str, asset_name: str, se
         return ""
     if _quota_cooldown_active():
         logger.warning("Gemini quota cooldown active — skipping audit for %s", asset_name)
+        return ""
+    if not _request_budget_available(account=account):
+        logger.warning("AI credits exhausted — skipping audit for %s", asset_name)
         return ""
 
     audit_prompt = f"""You are the 'GTM Strategic Auditor'.
@@ -188,6 +202,11 @@ REPORT FORMAT:
             ],
             config=_PLAYBOOK_CONFIG,
         )
+        if hasattr(response, "usage_metadata"):
+            total_tokens = response.usage_metadata.total_token_count
+            if MONITORING_AVAILABLE:
+                AIUsageTracker.log_usage(total_tokens, feature)
+            record_spend(account, total_tokens, feature, session=session)
         return response.text or ""
     except Exception as e:
         if _is_quota_error(e):
@@ -222,16 +241,30 @@ def perform_gtm_visual_audit(session_file, session_context=None):
         logger.error(f"Failed to read GTMFile for audit: {e}")
         return "ERROR: Could not read the evidence file."
 
+    # GTMFile has its own nullable `workspace` FK (workspace-level evidence
+    # in the Asset Library may have no session at all) -- don't assume
+    # session_file.session exists.
+    session_user = session_file.session.user if session_file.session else None
+    account = resolve_account(workspace=session_file.workspace, user=session_user) \
+        or resolve_account_for_session(session_file.session)
+    if not _request_budget_available(account=account):
+        session_file.audit_status = 'no_credits'
+        session_file.save(update_fields=['audit_status'])
+        return "AI credits exhausted for this period."
+
     asset_name = session_file.get_file_type_display()
-    audit_text = _run_multimodal_audit(file_bytes, mime_type, asset_name, session_context or "")
-    
+    audit_text = _run_multimodal_audit(
+        file_bytes, mime_type, asset_name, session_context or "",
+        account=account, feature="evidence_audit", session=session_file.session,
+    )
+
     if audit_text:
         session_file.ai_audit_notes = audit_text
         session_file.ai_audit_score_modifier = _extract_score_modifier(audit_text)
         session_file.audit_status = 'complete'
     else:
         session_file.audit_status = 'failed'
-    
+
     session_file.save()
     return audit_text or "Audit could not be completed."
 
@@ -272,6 +305,12 @@ def perform_resource_audit(resource) -> bool:
         resource.save(update_fields=['audit_status'])
         return False
 
+    account = resolve_account(workspace=resource.workspace)
+    if not _request_budget_available(account=account):
+        resource.audit_status = 'no_credits'
+        resource.save(update_fields=['audit_status'])
+        return False
+
     # Build a rich context string from the resource metadata
     session_context = (
         f"Asset Name: {resource.name}\n"
@@ -279,9 +318,12 @@ def perform_resource_audit(resource) -> bool:
         f"Description: {resource.description or 'N/A'}\n"
         f"Workspace: {resource.workspace.name if resource.workspace else 'Unknown'}\n"
     )
-    
+
     asset_name = resource.get_category_display()
-    audit_text = _run_multimodal_audit(file_bytes, mime_type, asset_name, session_context)
+    audit_text = _run_multimodal_audit(
+        file_bytes, mime_type, asset_name, session_context,
+        account=account, feature="resource_audit",
+    )
 
     from django.utils import timezone
     if audit_text:

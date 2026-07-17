@@ -70,6 +70,10 @@ def playbook_status(request, session_id):
         # Generation failed — stop polling
         return render(request, "gtm/partials/playbook_failed_button.html", {"session": session})
 
+    if snap_status == "no_credits":
+        # Out of AI credits for this period — stop polling, distinct from "failed"
+        return render(request, "gtm/partials/playbook_limit_reached_button.html", {"session": session})
+
     if snap and snap_status == "pending":
         # Only kick if not already generating
         _kickoff_playbook_generation(snap, session_id=session.uuid)
@@ -119,6 +123,7 @@ def next_moves_content(request, session_id):
         "ai_playbook_html": ai_playbook_html,
         "band_actions_html": band_actions_html,
         "failed": snap_status == "failed" or is_generic_fallback,
+        "limit_reached": snap_status == "no_credits",
         "poll_url": poll_url,
         "company_name": session.company_name or "your company",
     })
@@ -148,13 +153,17 @@ def enrichment_status(request, session_id):
 
             run_in_background(_run, snap.id, name="enrichment_sections")
 
+    from ..ai_services import ENRICHMENT_NO_CREDITS
+
     fin_html = comp_html = ""
     fin_failed = (snap.ai_financial_summary == ENRICHMENT_UNAVAILABLE)
     comp_failed = (snap.ai_competitor_analysis == ENRICHMENT_UNAVAILABLE)
+    fin_no_credits = (snap.ai_financial_summary == ENRICHMENT_NO_CREDITS)
+    comp_no_credits = (snap.ai_competitor_analysis == ENRICHMENT_NO_CREDITS)
 
-    if snap.ai_financial_summary and not fin_failed:
+    if snap.ai_financial_summary and not fin_failed and not fin_no_credits:
         fin_html = mark_safe(md.markdown(_normalize_ai_playbook_markdown(snap.ai_financial_summary), extensions=["extra", "sane_lists"]))
-    if snap.ai_competitor_analysis and not comp_failed:
+    if snap.ai_competitor_analysis and not comp_failed and not comp_no_credits:
         comp_html = mark_safe(md.markdown(_normalize_ai_playbook_markdown(snap.ai_competitor_analysis), extensions=["extra", "sane_lists"]))
 
     # still_loading is True only while fields are genuinely empty (never attempted).
@@ -167,6 +176,8 @@ def enrichment_status(request, session_id):
         "comp_html": comp_html,
         "fin_failed": fin_failed,
         "comp_failed": comp_failed,
+        "fin_no_credits": fin_no_credits,
+        "comp_no_credits": comp_no_credits,
         "still_loading": still_loading,
     })
 
@@ -277,7 +288,10 @@ def playbook(request, session_id):
         _tasks_to_create = []
 
         # Try 90%: extract ~4 tasks from AI playbook
-        _ai_tasks = extract_tasks_from_playbook(_playbook_text, _company, n=4) if _playbook_text else []
+        from ..ai_credits import resolve_account_for_session
+        _ai_tasks = extract_tasks_from_playbook(
+            _playbook_text, _company, n=4, account=resolve_account_for_session(session)
+        ) if _playbook_text else []
 
         if _ai_tasks:
             _default_due = timezone.now().date() + timedelta(days=21)
@@ -393,15 +407,20 @@ def insight_status(request, session_id, response_id):
         status = getattr(response, 'ai_insight_status', 'pending')
 
         if status == "pending":
-            # Only spawn a thread if generation hasn't started yet
-            def gen_diagnostic_async(resp_id):
-                from ..models import Response
-                from ..ai_services import generate_diagnostic_insight
-                r = Response.objects.select_related("question", "session__snapshot").get(id=resp_id)
-                generate_diagnostic_insight(r)
+            from ..ai_credits import resolve_account_for_session, can_spend
+            if not can_spend(account=resolve_account_for_session(session)).allowed:
+                response.ai_insight_status = "no_credits"
+                response.save(update_fields=["ai_insight_status"])
+            else:
+                # Only spawn a thread if generation hasn't started yet
+                def gen_diagnostic_async(resp_id):
+                    from ..models import Response
+                    from ..ai_services import generate_diagnostic_insight
+                    r = Response.objects.select_related("question", "session__snapshot").get(id=resp_id)
+                    generate_diagnostic_insight(r)
 
-            run_in_background(gen_diagnostic_async, response.id, name="diagnostic_insight_poll")
-        # If status is "generating" or "failed", don't spawn another thread
+                run_in_background(gen_diagnostic_async, response.id, name="diagnostic_insight_poll")
+        # If status is "generating", "failed", or "no_credits", don't spawn another thread
 
     return render(request, "gtm/partials/insight_status.html", {
         "session": session,

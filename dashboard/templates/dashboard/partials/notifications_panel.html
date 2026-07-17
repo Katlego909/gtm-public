@@ -1,4 +1,21 @@
+{% load humanize %}
 <div class="space-y-6">
+    {% if ai_credits_budget %}
+    <div class="rounded-lg border {% if ai_credits_low %}border-amber-200 bg-amber-50{% else %}border-gray-200 bg-gray-50{% endif %} px-3 py-2.5">
+        <div class="flex items-center justify-between mb-2">
+            <p class="text-xs font-bold {% if ai_credits_low %}text-amber-700{% else %}text-gray-900{% endif %}">AI credits</p>
+            <p class="text-xs {% if ai_credits_low %}text-amber-700{% else %}text-gray-500{% endif %}">{{ ai_credits_used|intcomma }} of {{ ai_credits_budget|intcomma }} used</p>
+        </div>
+        <div class="h-1.5 w-full rounded-full bg-gray-200 overflow-hidden">
+            <div class="h-full rounded-full {% if ai_credits_low %}bg-amber-500{% else %}bg-indigo-600{% endif %}"
+                 style="width: {{ ai_credits_percent_used }}%"></div>
+        </div>
+        {% if ai_credits_low %}
+        <p class="text-[11px] text-amber-600 mt-1.5">Running low &mdash; resets {{ ai_credits_reset_at|timeuntil }} from now.</p>
+        {% endif %}
+    </div>
+    {% endif %}
+
     {% if pending_items %}
     <div class="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
         <span class="h-2 w-2 rounded-full bg-amber-500 flex-shrink-0"></span>

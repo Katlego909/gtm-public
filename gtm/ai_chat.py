@@ -11,7 +11,7 @@ import json
 import re
 import threading
 from collections import Counter
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 from .models import AssessmentSession, ResultSnapshot, Response, Question, Category, ActionItem, ChatMessage
@@ -83,13 +83,16 @@ def _build_document_tools_for_session(session: AssessmentSession, user=None) -> 
     return [create_document, edit_document, list_documents]
 
 
-def _make_session_consult_tool(target_agent_type: str, session: AssessmentSession, user=None, _handoff_depth: int = 0):
+def _make_session_consult_tool(
+    target_agent_type: str, session: AssessmentSession, user=None, _handoff_depth: int = 0,
+    task_refs_sink: Optional[List[Any]] = None,
+):
     """Build one consult_<target>_agent tool that hands a question off to
     one of the three workspace-scoped agents, via this session's workspace.
     Persists the exchange into the target agent's own conversation log so
     it genuinely remembers being consulted -- real "full sub-conversation
     handoff", not a stateless lookup."""
-    from .agent_runtime import AGENT_DIRECTORY
+    from .agent_runtime import AGENT_DIRECTORY, record_task_ref
 
     info = AGENT_DIRECTORY.get(target_agent_type, {})
     name = info.get("name", target_agent_type)
@@ -104,7 +107,7 @@ def _make_session_consult_tool(target_agent_type: str, session: AssessmentSessio
         from .workspace_agent_chat import handle_general_chat_workspace
 
         try:
-            answer = handle_general_chat_workspace(
+            answer, nested_task_refs = handle_general_chat_workspace(
                 target_agent_type, session.workspace, question, user=user, _handoff_depth=_handoff_depth + 1
             )
             WorkspaceChatMessage.objects.create(
@@ -113,8 +116,11 @@ def _make_session_consult_tool(target_agent_type: str, session: AssessmentSessio
                 user=user if user and getattr(user, "is_authenticated", False) else None,
                 message=question,
                 response=answer,
+                task_refs=nested_task_refs,
                 intent="handoff_query",
             )
+            for ref in nested_task_refs:
+                record_task_ref(task_refs_sink, ref["id"], ref["note"])
             return answer
         except Exception as e:
             logger.error(f"Handoff to {target_agent_type} failed: {e}")
@@ -128,7 +134,10 @@ def _make_session_consult_tool(target_agent_type: str, session: AssessmentSessio
     return consult_tool
 
 
-def _build_consult_tools_for_session(session: AssessmentSession, user=None, _handoff_depth: int = 0) -> List[Any]:
+def _build_consult_tools_for_session(
+    session: AssessmentSession, user=None, _handoff_depth: int = 0,
+    task_refs_sink: Optional[List[Any]] = None,
+) -> List[Any]:
     """Build consult tools to the 3 workspace agents, depth-gated so a
     handoff chain is guaranteed to terminate (see
     agent_runtime.MAX_HANDOFF_DEPTH)."""
@@ -137,7 +146,7 @@ def _build_consult_tools_for_session(session: AssessmentSession, user=None, _han
     if _handoff_depth >= MAX_HANDOFF_DEPTH:
         return []
     return [
-        _make_session_consult_tool(agent_type, session, user, _handoff_depth)
+        _make_session_consult_tool(agent_type, session, user, _handoff_depth, task_refs_sink=task_refs_sink)
         for agent_type in ("portfolio", "resource", "insights")
     ]
 
@@ -211,6 +220,7 @@ def _build_session_tools(
     user=None,
     _handoff_depth: int = 0,
     include_consult: bool = True,
+    task_refs_sink: Optional[List[Any]] = None,
 ) -> List[Any]:
     """Build the GTM Agent's tool set, scoped to the current session.
 
@@ -219,7 +229,15 @@ def _build_session_tools(
     The two mechanisms are deliberately mutually exclusive per agent turn:
     offering both invites the model to pick inconsistently between "get an
     answer and keep talking" and "hand off entirely" for similar requests.
+
+    `task_refs_sink`, when given, is the mutable list real task IDs get
+    recorded into as tools resolve them this turn (see
+    agent_runtime.record_task_ref).
     """
+    from .agent_runtime import record_task_ref
+
+    if task_refs_sink is None:
+        task_refs_sink = []
 
     get_gtm_assessment_data = _make_get_gtm_assessment_data_tool(session)
     search_internal_resources = _make_search_internal_resources_tool(session)
@@ -251,7 +269,9 @@ def _build_session_tools(
         brackets. Use this when the user asks 'what are my tasks', 'review my
         items', 'how is my progress', or 'what is pending' -- and ALWAYS use
         this first to get real IDs before calling assign_task,
-        assign_task_to_agent, or comment_on_task. Never guess or invent an ID.
+        assign_task_to_agent, or comment_on_task. Never guess or invent an
+        ID. For tasks outside this session (e.g. from other assessments in
+        the workspace), use find_tasks instead.
         """
         try:
             summary = review_action_items(session)
@@ -266,6 +286,7 @@ def _build_session_tools(
             for action in summary["open_actions"]:
                 status = action.get_status_display()
                 due = action.due_date.isoformat() if action.due_date else "No due date"
+                record_task_ref(task_refs_sink, action.id, action.note)
                 res.append(f" - [ID: {action.id}] [{status}] {action.note} (Due: {due})")
             return "\n".join(res)
         except Exception as e:
@@ -456,8 +477,16 @@ def _build_session_tools(
         customer_segment_analysis,
         audit_strategic_evidence,
         *_build_document_tools_for_session(session, user=user),
-        *(build_agent_action_tools(session.workspace, user) if session.workspace and user else []),
-        *(_build_consult_tools_for_session(session, user=user, _handoff_depth=_handoff_depth) if include_consult else []),
+        *(
+            build_agent_action_tools(session.workspace, user, task_refs_sink=task_refs_sink)
+            if session.workspace and user else []
+        ),
+        *(
+            _build_consult_tools_for_session(
+                session, user=user, _handoff_depth=_handoff_depth, task_refs_sink=task_refs_sink,
+            )
+            if include_consult else []
+        ),
     ]
 
 # ================================================================
@@ -540,9 +569,11 @@ Focus on: their strongest areas, critical gaps, and specific next steps they can
 Keep responses conversational and avoid lengthy lists. End with a specific next step."""
 
 
-def _get_chat_config(tools: Optional[List[Any]] = None):
+def _get_chat_config(tools: Optional[List[Any]] = None, task_refs: Optional[List[Any]] = None):
     """Builds the configuration for the chat agent, including its tool set."""
-    system_instruction = GTM_STRATEGIST_SYSTEM_INSTRUCTION
+    from .agent_runtime import build_task_context_prompt
+
+    system_instruction = GTM_STRATEGIST_SYSTEM_INSTRUCTION + build_task_context_prompt(task_refs)
 
     # Only mention handoff capability when a consult_ tool is actually in
     # this turn's tool list -- a depth-capped sub-agent has none, and a
@@ -971,7 +1002,7 @@ def audit_strategic_evidence(session_uuid: str, file_id: str = None) -> str:
 # ================================================================
 # AI-POWERED GTM AGENT (CONVERSATIONAL & AUTONOMOUS)
 # ================================================================
-def _build_chat_history(session: AssessmentSession, max_turns: int = 16) -> List[Any]:
+def _build_chat_history(session: AssessmentSession, max_turns: int = 16) -> Tuple[List[Any], List[Dict[str, Any]]]:
     """Reconstruct this session's shared conversation as types.Content
     history for real multi-turn memory. Merges the session's own
     ChatMessage turns (unlabeled -- "me") with, when session.workspace
@@ -984,12 +1015,17 @@ def _build_chat_history(session: AssessmentSession, max_turns: int = 16) -> List
     many sessions, so "which session's Strategist conversation" would be
     ambiguous (same reasoning as why there's no consult_gtm_strategist
     tool).
+
+    Also returns the real task IDs surfaced across these rows, aggregated
+    and capped -- see _build_workspace_chat_history in workspace_agent_chat.py
+    for why this is a separate return value rather than folded into the
+    Content history text.
     """
-    from .agent_runtime import AGENT_DIRECTORY, build_tagged_content_history
+    from .agent_runtime import AGENT_DIRECTORY, build_tagged_content_history, record_task_ref
     from .models import WorkspaceChatMessage
 
     own_rows = list(ChatMessage.objects.filter(session=session).order_by('-created_at')[:max_turns])
-    entries = [(None, row.created_at, row.message, row.response) for row in own_rows]
+    entries = [(None, row.created_at, row.message, row.response, row.task_refs) for row in own_rows]
 
     if session.workspace:
         workspace_rows = list(
@@ -998,14 +1034,21 @@ def _build_chat_history(session: AssessmentSession, max_turns: int = 16) -> List
             .order_by('-created_at')[:max_turns]
         )
         entries += [
-            (AGENT_DIRECTORY.get(row.agent_type, {}).get("name"), row.created_at, row.message, row.response)
+            (
+                AGENT_DIRECTORY.get(row.agent_type, {}).get("name"), row.created_at, row.message, row.response,
+                row.task_refs,
+            )
             for row in workspace_rows
         ]
 
     entries.sort(key=lambda entry: entry[1])
     trimmed = entries[-max_turns:]
-    tagged = [(label, message, response) for label, _created_at, message, response in trimmed]
-    return build_tagged_content_history(tagged, max_turns=max_turns)
+    tagged = [(label, message, response) for label, _created_at, message, response, _task_refs in trimmed]
+    history_task_refs: List[Dict[str, Any]] = []
+    for _label, _created_at, _message, _response, task_refs in trimmed:
+        for ref in (task_refs or []):
+            record_task_ref(history_task_refs, ref["id"], ref["note"], cap=12)
+    return build_tagged_content_history(tagged, max_turns=max_turns), history_task_refs
 
 
 def handle_general_chat(
@@ -1015,7 +1058,7 @@ def handle_general_chat(
     user=None,
     supplemental_context: str = "",
     _handoff_depth: int = 0,
-) -> str:
+) -> Tuple[str, List[Dict[str, Any]]]:
     """
     The GTM Agent: real multi-turn memory + real Gemini tool-calling (the
     tools built by _build_session_tools), instead of a single-shot call.
@@ -1028,20 +1071,38 @@ def handle_general_chat(
     stays 0 in practice today -- kept as a parameter for symmetry with
     handle_general_chat_workspace and to make that scope boundary explicit
     rather than silently assumed.
+
+    Returns `(response_text, turn_task_refs)` -- see
+    handle_general_chat_workspace in workspace_agent_chat.py for what the
+    second element carries and why.
     """
     # 1. Quota Safety Gate
     from .ai_services import _quota_cooldown_active, _request_budget_available, _is_quota_error, _set_quota_cooldown, _extract_retry_delay_seconds
     from .agent_runtime import run_agent_turn
+    from .ai_credits import resolve_account_for_session, can_spend, format_reset_time
 
-    if _quota_cooldown_active() or not _request_budget_available():
-        return "I'm currently cooling down to stay within my API limits. " + \
-               f"Your overall GTM score is **{context['overall_score']}/100**. " + \
-               "Please try asking a detailed question again in about 60 seconds."
+    account = resolve_account_for_session(session, user=user)
+
+    if _quota_cooldown_active():
+        return (
+            "I'm currently cooling down to stay within my API limits. " +
+            f"Your overall GTM score is **{context['overall_score']}/100**. " +
+            "Please try asking a detailed question again in about 60 seconds."
+        ), []
+
+    credit_check = can_spend(account=account)
+    if not credit_check.allowed:
+        reset_note = f" They reset at {format_reset_time(credit_check.reset_at)}." if credit_check.reset_at else ""
+        return (
+            "You've used all of this workspace's AI credits for today." + reset_note +
+            f" In the meantime: your overall GTM score is **{context['overall_score']}/100**. "
+            "Try asking for 'scores' or 'action items' for a non-AI answer."
+        ), []
 
     # 2. Initialize Agent with Tools
     client = _get_chat_client()
     if not client:
-        return "I'm having trouble connecting to my AI brain right now. Please try again in a moment."
+        return "I'm having trouble connecting to my AI brain right now. Please try again in a moment.", []
 
     try:
         # 3. Prepare Multimodal Parts (fetch last 3 files for visual context on this turn)
@@ -1063,9 +1124,12 @@ def handle_general_chat(
                 logger.warning(f"Failed to attach file {f.id} to chat: {fe}")
 
         # 4. Real multi-turn memory + real tool-calling
-        history = _build_chat_history(session)
-        tools = _build_session_tools(session, user=user, _handoff_depth=_handoff_depth)
-        config = _get_chat_config(tools=tools)
+        history, history_task_refs = _build_chat_history(session)
+        turn_task_refs: List[Dict[str, Any]] = []
+        tools = _build_session_tools(
+            session, user=user, _handoff_depth=_handoff_depth, task_refs_sink=turn_task_refs,
+        )
+        config = _get_chat_config(tools=tools, task_refs=history_task_refs)
 
         text = run_agent_turn(
             client=client,
@@ -1074,9 +1138,12 @@ def handle_general_chat(
             history=history,
             message=message_parts if len(message_parts) > 1 else full_message,
             usage_label="agent_chat",
+            feature="chat",
+            account=account,
+            session=session,
         )
 
-        return text or "I've processed your request. Check your action items for the results."
+        return text or "I've processed your request. Check your action items for the results.", turn_task_refs
 
     except Exception as e:
         # 5. Handle Quota/Rate Limits Gracefully
@@ -1086,7 +1153,7 @@ def handle_general_chat(
                 f"I've hit my temporary GTM strategy quota. Based on your data, your top priority is "
                 f"**{context['weakest_categories'][0]['name']}**. Let's discuss details in a minute! "
                 "If I'd already started creating anything (like tasks) before hitting the limit, it's saved."
-            )
+            ), []
 
         log_ai_error(
             "Agent reasoning loop failure",
@@ -1097,7 +1164,10 @@ def handle_general_chat(
         )
 
         # Final Fallback
-        return f"I'm processing a lot of data right now. Your current GTM score is {context['overall_score']}/100. Try asking for 'scores' or 'action items' directly."
+        return (
+            f"I'm processing a lot of data right now. Your current GTM score is {context['overall_score']}/100. "
+            "Try asking for 'scores' or 'action items' directly."
+        ), []
 
 # ================================================================
 # MAIN CHAT HANDLER
@@ -1111,6 +1181,7 @@ def process_chat_message(
     """
     Primary Entry Point: Routes user messages through the GTM Strategic Agent.
     """
+    task_refs: List[Dict[str, Any]] = []
     try:
         # Get session
         session = get_object_or_404(AssessmentSession, uuid=session_id)
@@ -1149,18 +1220,19 @@ def process_chat_message(
             response_text = handle_show_scores(session, context)
         else:
             # Let the Agent handle everything else with real memory + tool-calling
-            response_text = handle_general_chat(
+            response_text, task_refs = handle_general_chat(
                 session,
                 context,
                 message,
                 user=user,
                 supplemental_context=relevant_attachment_context,
             )
-        
+
         return {
             "success": True,
             "response": response_text,
             "intent": intent,
+            "task_refs": task_refs,
             "context": {
                 "overall_score": context['overall_score'],
                 "stage": context['stage']

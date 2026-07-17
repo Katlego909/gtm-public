@@ -275,18 +275,30 @@ def results(request, session_id):
             else:
                 q_data["ai_insight"] = response.ai_insight
 
+    # Resolved once and reused for both the batch-insight check below and
+    # the playbook kickoff further down -- avoids a duplicate
+    # get_or_create query for the same session's credit account.
+    from ..ai_credits import resolve_account_for_session, can_spend
+    ai_credit_account = resolve_account_for_session(session)
+
     # TRIGGER BATCH ASYNC GENERATION (one thread for all insights, not one per response)
     if responses_needing_insight:
         resp_ids_for_batch = [r.id for r in responses_needing_insight]
 
-        def gen_batch_async(r_ids):
-            from ..models import Response as ResponseModel
-            fresh_responses = list(
-                ResponseModel.objects.filter(id__in=r_ids).select_related("question", "session__snapshot")
-            )
-            generate_diagnostic_insights_batch(fresh_responses)
+        if not can_spend(account=ai_credit_account).allowed:
+            Response.objects.filter(id__in=resp_ids_for_batch).update(ai_insight_status="no_credits")
+            for q_data in weakest_questions:
+                if q_data.get("ai_insight_loading"):
+                    q_data["ai_insight_loading"] = False
+        else:
+            def gen_batch_async(r_ids):
+                from ..models import Response as ResponseModel
+                fresh_responses = list(
+                    ResponseModel.objects.filter(id__in=r_ids).select_related("question", "session__snapshot")
+                )
+                generate_diagnostic_insights_batch(fresh_responses)
 
-        run_in_background(gen_batch_async, resp_ids_for_batch, name="batch_diagnostic_insights")
+            run_in_background(gen_batch_async, resp_ids_for_batch, name="batch_diagnostic_insights")
 
     
     # -----------------------------
@@ -301,7 +313,7 @@ def results(request, session_id):
             snap.ai_playbook = ""
             snap.ai_playbook_status = "pending"
             snap.save(update_fields=["ai_playbook", "ai_playbook_status"])
-        _kickoff_playbook_generation(snap, session_id=session.uuid)
+        _kickoff_playbook_generation(snap, session_id=session.uuid, account=ai_credit_account)
 
     # Render AI playbook HTML for the "Recommended Next Moves" card
     ai_playbook_html = ""

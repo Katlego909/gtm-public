@@ -199,7 +199,10 @@ def analyze_category_documents(session, category: str) -> dict:
     from .ai_services import (
         _get_client, _clean_json_response, _is_quota_error,
         _extract_retry_delay_seconds, _set_quota_cooldown, _quota_cooldown_active,
+        _request_budget_available, MONITORING_AVAILABLE,
     )
+    from .ai_credits import resolve_account_for_session, record_spend
+    from .utils_ai_monitoring import AIUsageTracker
     from .delivery_analyzer import (
         extract_text_from_path, _build_nlp_evidence, _build_analysis_prompt,
         _scoring_memory_fallback, _capture_scoring_examples,
@@ -229,8 +232,10 @@ def analyze_category_documents(session, category: str) -> dict:
     logger.info("%s analysis — starting NLP/ML pre-processing…", label)
     nlp_evidence = _build_nlp_evidence(combined_text, questions)
 
+    account = resolve_account_for_session(session)
+
     client = _get_client()
-    if not client or _quota_cooldown_active():
+    if not client or _quota_cooldown_active() or not _request_budget_available(account=account):
         logger.warning("Gemini unavailable for %s analysis — using scoring memory fallback", category)
         return _scoring_memory_fallback(nlp_evidence, questions)
 
@@ -248,6 +253,12 @@ def analyze_category_documents(session, category: str) -> dict:
             contents=prompt,
             config=config,
         )
+        if hasattr(response, "usage_metadata"):
+            total_tokens = response.usage_metadata.total_token_count
+            if MONITORING_AVAILABLE:
+                AIUsageTracker.log_usage(total_tokens, 'category_analysis')
+            record_spend(account, total_tokens, "category_analysis", session=session)
+
         raw = getattr(response, 'text', '') or ''
         cleaned = _clean_json_response(raw)
         result = json.loads(cleaned)

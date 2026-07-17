@@ -95,8 +95,13 @@ def _build_question_guidance(question: Question) -> dict:
     }
 
 
-def _kickoff_playbook_generation(snapshot, session_id=None):
-    """Kick off non-blocking playbook generation once, guarded against rapid duplicate starts."""
+def _kickoff_playbook_generation(snapshot, session_id=None, account=None):
+    """Kick off non-blocking playbook generation once, guarded against rapid duplicate starts.
+
+    `account` lets a caller that already resolved the session's
+    AICreditAccount (e.g. the results view, which also needs it for the
+    batch-insight check) pass it in and avoid a second get_or_create query;
+    resolved internally when omitted."""
     if not snapshot:
         return False
     if (snapshot.ai_playbook or "").strip():
@@ -105,6 +110,19 @@ def _kickoff_playbook_generation(snapshot, session_id=None):
     # Skip if already generating, done, or failed
     snap_status = getattr(snapshot, "ai_playbook_status", "pending")
     if snap_status in ("generating", "done", "failed"):
+        return False
+
+    # Check credits BEFORE spawning the thread -- "no_credits" is
+    # deliberately not added to the skip-list above, so a later kickoff
+    # attempt (e.g. the user revisiting the results page after the period
+    # resets) naturally retries instead of getting stuck forever like a
+    # genuine "failed" status would.
+    from .ai_credits import resolve_account_for_session, can_spend
+    if account is None:
+        account = resolve_account_for_session(snapshot.session)
+    if not can_spend(account=account).allowed:
+        snapshot.ai_playbook_status = "no_credits"
+        snapshot.save(update_fields=["ai_playbook_status"])
         return False
 
     kickoff_key = f"gtm:playbook:kickoff:{snapshot.id}"

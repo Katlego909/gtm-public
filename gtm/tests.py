@@ -100,8 +100,13 @@ class ResultsQueryOptimizationTests(TestCase):
 
 		self.assertEqual(response.status_code, 200)
 		# Guardrail: large question sets should stay within a bounded query count.
+		# Threshold includes a small constant (not linear -- verified independent
+		# of question_count) allowance for the AI credits account lookup
+		# (gtm/ai_credits.py's resolve_account_for_session), whose first-ever
+		# get_or_create for a session's workspace/user costs a few extra
+		# statements (SELECT + SAVEPOINT + INSERT + RELEASE) once.
 		self.assertLessEqual(
 			len(ctx),
-			30,
+			35,
 			msg=f"Expected bounded query count, got {len(ctx)} queries",
 		)

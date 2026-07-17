@@ -350,7 +350,7 @@ def agent_hub(request):
             team_selected_session = assessments_qs.filter(uuid=agent_session_id).first()
 
         timeline = _collect_team_timeline(current_workspace, team_selected_session)
-        for agent_type, created_at, message, response in timeline:
+        for agent_type, created_at, message, response, _task_refs in timeline:
             team_agent_history.append({
                 'agent_type': agent_type,
                 'agent_label': agent_display_label(agent_type),

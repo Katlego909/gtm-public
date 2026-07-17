@@ -23,7 +23,7 @@ executing it.
 """
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from .ai_chat import GENAI_AVAILABLE, GTM_STRATEGIST_SYSTEM_INSTRUCTION, _build_session_tools, _get_chat_client
 from .models import AssessmentSession
@@ -73,11 +73,11 @@ def _collect_team_timeline(workspace: Optional[Workspace], session: Optional[Ass
             .exclude(intent__in=["insights_digest", "client_summary"])
             .order_by('-created_at')[:max_turns]
         )
-        entries += [(row.agent_type, row.created_at, row.message, row.response) for row in rows]
+        entries += [(row.agent_type, row.created_at, row.message, row.response, row.task_refs) for row in rows]
 
     if session is not None:
         rows = list(ChatMessage.objects.filter(session=session).order_by('-created_at')[:max_turns])
-        entries += [("gtm_strategist", row.created_at, row.message, row.response) for row in rows]
+        entries += [("gtm_strategist", row.created_at, row.message, row.response, row.task_refs) for row in rows]
 
     entries.sort(key=lambda entry: entry[1])
     return entries[-max_turns:]
@@ -100,15 +100,19 @@ def _build_team_history(
     session: Optional[AssessmentSession],
     viewer_agent_type: str,
     max_turns: int = 16,
-) -> List[Any]:
+) -> Tuple[List[Any], List[Dict[str, Any]]]:
     """Build history for whichever agent (`viewer_agent_type`) is about to
     generate this turn. Every OTHER agent's rows get tagged; this agent's
     OWN past rows do NOT (same rule as the individual tabs in Part A) --
     tagging an agent's own history with its own name teaches it, by literal
     pattern-continuation, to keep prefixing that tag onto its new replies
     too, overriding the explicit instruction not to. Confirmed by testing:
-    self-tagging in Team mode caused exactly that leak."""
-    from .agent_runtime import AGENT_DIRECTORY, build_tagged_content_history
+    self-tagging in Team mode caused exactly that leak.
+
+    Also returns the real task IDs surfaced across this timeline, aggregated
+    and capped for system_instruction use -- NOT folded into the tagged
+    Content text above, for the same self-tagging-leak reason."""
+    from .agent_runtime import AGENT_DIRECTORY, build_tagged_content_history, record_task_ref
 
     timeline = _collect_team_timeline(workspace, session, max_turns=max_turns)
     tagged = [
@@ -117,9 +121,13 @@ def _build_team_history(
             message,
             response,
         )
-        for agent_type, _created_at, message, response in timeline
+        for agent_type, _created_at, message, response, _task_refs in timeline
     ]
-    return build_tagged_content_history(tagged, max_turns=max_turns)
+    history_task_refs: List[Dict[str, Any]] = []
+    for _agent_type, _created_at, _message, _response, task_refs in timeline:
+        for ref in (task_refs or []):
+            record_task_ref(history_task_refs, ref["id"], ref["note"], cap=12)
+    return build_tagged_content_history(tagged, max_turns=max_turns), history_task_refs
 
 
 # ================================================================
@@ -199,7 +207,9 @@ def _build_team_directory_prompt(current_agent_type: str) -> str:
     )
 
 
-def _get_team_config(agent_type: str, tools: List[Any]):
+def _get_team_config(agent_type: str, tools: List[Any], task_refs: Optional[List[Any]] = None):
+    from .agent_runtime import build_task_context_prompt
+
     if agent_type == "gtm_strategist":
         base_instruction = GTM_STRATEGIST_SYSTEM_INSTRUCTION
         temperature = 0.8
@@ -209,7 +219,9 @@ def _get_team_config(agent_type: str, tools: List[Any]):
         temperature = 0.7
         max_output_tokens = 1536
 
-    system_instruction = base_instruction + _build_team_directory_prompt(agent_type)
+    system_instruction = (
+        base_instruction + _build_team_directory_prompt(agent_type) + build_task_context_prompt(task_refs)
+    )
 
     return types.GenerateContentConfig(
         system_instruction=system_instruction,
@@ -242,49 +254,94 @@ def _call_tool(name: str, args: Optional[Dict[str, Any]], tool_map: Dict[str, An
 def _run_team_turn(agent_type, workspace, session, message, user, allow_transfer):
     """Run one agent's turn in Team mode via a manual function-calling
     loop. Returns (agent_type, text_or_None, transfer_target_or_None,
-    transfer_reason_or_None) -- text is None exactly when a transfer was
-    requested, and vice versa."""
+    transfer_reason_or_None, turn_task_refs) -- text is None exactly when a
+    transfer was requested, and vice versa. turn_task_refs carries real
+    task IDs this turn's tool calls surfaced (see
+    agent_runtime.record_task_ref) even on a transfer -- an agent may call
+    find_tasks right before deciding to hand off, and that grounding still
+    needs to reach whoever ultimately persists the turn."""
+    from .agent_runtime import strip_task_id_brackets
     from .ai_services import (
         _extract_retry_delay_seconds,
         _is_quota_error,
         _quota_cooldown_active,
         _request_budget_available,
         _set_quota_cooldown,
+        MONITORING_AVAILABLE,
     )
+    from .ai_credits import resolve_account, resolve_account_for_session, can_spend, record_spend, format_reset_time
+    from .utils_ai_monitoring import AIUsageTracker
 
-    if _quota_cooldown_active() or not _request_budget_available():
-        return agent_type, "I'm currently cooling down to stay within my API limits. Please try again in about 60 seconds.", None, None
+    turn_task_refs: List[Dict[str, Any]] = []
+
+    account = resolve_account(workspace=workspace, user=user) or resolve_account_for_session(session, user=user)
+
+    if _quota_cooldown_active():
+        return (
+            agent_type,
+            "I'm currently cooling down to stay within my API limits. Please try again in about 60 seconds.",
+            None, None, turn_task_refs,
+        )
+
+    credit_check = can_spend(account=account)
+    if not credit_check.allowed:
+        reset_note = f" They reset at {format_reset_time(credit_check.reset_at)}." if credit_check.reset_at else ""
+        return (
+            agent_type, "This workspace has used all of its AI credits for today." + reset_note,
+            None, None, turn_task_refs,
+        )
+
+    def _record_usage(resp):
+        if not getattr(resp, "usage_metadata", None):
+            return
+        total_tokens = resp.usage_metadata.total_token_count
+        if MONITORING_AVAILABLE:
+            AIUsageTracker.log_usage(total_tokens, f"team_chat_{agent_type}")
+        record_spend(account, total_tokens, "team_chat", session=session)
 
     client = _get_chat_client()
     if not client:
-        return agent_type, "I'm having trouble connecting to my AI brain right now. Please try again in a moment.", None, None
+        return (
+            agent_type, "I'm having trouble connecting to my AI brain right now. Please try again in a moment.",
+            None, None, turn_task_refs,
+        )
 
     if agent_type == "gtm_strategist":
-        domain_tools = _build_session_tools(session, user=user, include_consult=False) if session else []
+        domain_tools = (
+            _build_session_tools(session, user=user, include_consult=False, task_refs_sink=turn_task_refs)
+            if session else []
+        )
     else:
-        domain_tools = _build_workspace_tools(agent_type, workspace, user=user, include_consult=False)
+        domain_tools = _build_workspace_tools(
+            agent_type, workspace, user=user, include_consult=False, task_refs_sink=turn_task_refs,
+        )
 
     transfer_tools = _build_transfer_tools(agent_type, has_session=session is not None) if allow_transfer else []
     tool_map = {fn.__name__: fn for fn in domain_tools}  # transfer tools intentionally excluded -- never executed
 
-    history = _build_team_history(workspace, session, viewer_agent_type=agent_type)
-    config = _get_team_config(agent_type, tools=domain_tools + transfer_tools)
+    history, history_task_refs = _build_team_history(workspace, session, viewer_agent_type=agent_type)
+    config = _get_team_config(agent_type, tools=domain_tools + transfer_tools, task_refs=history_task_refs)
 
     try:
         chat = client.chats.create(model="gemini-2.5-flash", config=config, history=history)
         response = chat.send_message(message)
+        _record_usage(response)
 
         for _ in range(MAX_TOOL_ROUNDS):
             calls = list(getattr(response, "function_calls", None) or [])
             if not calls:
-                text = (response.text or "").strip()
-                return agent_type, text or "I've processed your request but don't have anything further to add right now.", None, None
+                text = strip_task_id_brackets((response.text or "").strip())
+                return (
+                    agent_type,
+                    text or "I've processed your request but don't have anything further to add right now.",
+                    None, None, turn_task_refs,
+                )
 
             transfer_call = next((c for c in calls if c.name.startswith("transfer_to_")), None)
             if transfer_call:
                 target = _agent_type_from_transfer_tool_name(transfer_call.name)
                 reason = (transfer_call.args or {}).get("reason", "")
-                return agent_type, None, target, reason
+                return agent_type, None, target, reason, turn_task_refs
 
             parts = [
                 types.Part.from_function_response(
@@ -294,15 +351,23 @@ def _run_team_turn(agent_type, workspace, session, message, user, allow_transfer
                 for call in calls
             ]
             response = chat.send_message(parts)
+            _record_usage(response)
 
         # Exhausted the manual round cap without a final text answer.
-        text = (response.text or "").strip()
-        return agent_type, text or "I've processed your request but don't have anything further to add right now.", None, None
+        text = strip_task_id_brackets((response.text or "").strip())
+        return (
+            agent_type,
+            text or "I've processed your request but don't have anything further to add right now.",
+            None, None, turn_task_refs,
+        )
 
     except Exception as e:
         if _is_quota_error(e):
             _set_quota_cooldown(_extract_retry_delay_seconds(e))
-            return agent_type, "I've hit my temporary GTM strategy quota. Please try again shortly.", None, None
+            return (
+                agent_type, "I've hit my temporary GTM strategy quota. Please try again shortly.",
+                None, None, turn_task_refs,
+            )
         log_ai_error(
             f"Team chat turn failure ({agent_type})",
             e,
@@ -310,10 +375,13 @@ def _run_team_turn(agent_type, workspace, session, message, user, allow_transfer
             model="gemini-2.5-flash",
             extra={"workspace_id": str(workspace.id) if workspace else None, "agent_type": agent_type},
         )
-        return agent_type, "I'm processing a lot of data right now. Please try asking again in a moment.", None, None
+        return (
+            agent_type, "I'm processing a lot of data right now. Please try asking again in a moment.",
+            None, None, turn_task_refs,
+        )
 
 
-def _persist_team_turn(agent_type, workspace, session, message, text, user, attachments=None):
+def _persist_team_turn(agent_type, workspace, session, message, text, user, attachments=None, task_refs=None):
     """Persist into exactly the same table the responding agent would use
     if talked to directly -- so a Team-tab exchange is immediately visible
     from that agent's own tab too (same underlying storage, no new model)."""
@@ -327,6 +395,7 @@ def _persist_team_turn(agent_type, workspace, session, message, text, user, atta
             message=message,
             response=text,
             attachments=attachments or [],
+            task_refs=task_refs or [],
             intent="general_chat",
         )
     else:
@@ -341,6 +410,7 @@ def _persist_team_turn(agent_type, workspace, session, message, text, user, atta
             message=message,
             response=text,
             attachments=attachments or [],
+            task_refs=task_refs or [],
             intent="general_chat",
         )
 
@@ -373,18 +443,27 @@ def process_team_chat_message(
         if workspace is None and session is None:
             return {"success": False, "response": "Select a workspace or assessment first.", "agent_type": None}
 
+        from .agent_runtime import record_task_ref
+
         active_type = _resolve_active_agent_type(workspace, session)
         llm_message = message
         if supplemental_context:
             llm_message = f"{message}\n\n[Relevant attachment context]\n{supplemental_context}"
         current_message = llm_message
         transfers = 0
+        accumulated_task_refs: List[Dict[str, Any]] = []
 
         while True:
-            agent_type, text, transfer_target, transfer_reason = _run_team_turn(
+            agent_type, text, transfer_target, transfer_reason, turn_task_refs = _run_team_turn(
                 active_type, workspace, session, current_message, user,
                 allow_transfer=(transfers < max_transfers),
             )
+            # A transferring agent may have called find_tasks right before
+            # handing off -- keep that grounding even though its own text
+            # reply is None and gets discarded below.
+            for ref in turn_task_refs:
+                record_task_ref(accumulated_task_refs, ref["id"], ref["note"])
+
             if transfer_target:
                 transfers += 1
                 active_type = transfer_target
@@ -400,7 +479,10 @@ def process_team_chat_message(
                     current_message += f"\n\n[A teammate handed this to you, noting: {transfer_reason}]"
                 continue
 
-            _persist_team_turn(agent_type, workspace, session, message, text, user, attachments=attachments)
+            _persist_team_turn(
+                agent_type, workspace, session, message, text, user, attachments=attachments,
+                task_refs=accumulated_task_refs,
+            )
             return {"success": True, "response": text, "agent_type": agent_type}
 
     except Exception as e:

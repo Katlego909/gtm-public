@@ -178,10 +178,31 @@ def _build_sidebar_notifications_context(request, current_workspace):
         ).exclude(status='done').count() if request.user.is_authenticated else 0
         recent_activity = []
 
+    ai_credits_remaining = ai_credits_budget = ai_credits_reset_at = ai_credits_used = None
+    ai_credits_percent_used = 0
+    ai_credits_low = False
+    if current_workspace:
+        from gtm.ai_credits import can_spend
+        credit_check = can_spend(workspace=current_workspace)
+        if credit_check.account is not None:
+            ai_credits_remaining = credit_check.remaining
+            ai_credits_budget = credit_check.account.token_budget
+            ai_credits_reset_at = credit_check.reset_at
+            ai_credits_used = max(ai_credits_budget - ai_credits_remaining, 0)
+            ai_credits_low = ai_credits_budget > 0 and (ai_credits_remaining / ai_credits_budget) < 0.1
+            if ai_credits_budget > 0:
+                ai_credits_percent_used = min(round(ai_credits_used / ai_credits_budget * 100), 100)
+
     return {
         'pending_items': pending_items,
         'sidebar_recent_activity': recent_activity,
         'sidebar_workspace': current_workspace,
+        'ai_credits_remaining': ai_credits_remaining,
+        'ai_credits_budget': ai_credits_budget,
+        'ai_credits_used': ai_credits_used,
+        'ai_credits_percent_used': ai_credits_percent_used,
+        'ai_credits_reset_at': ai_credits_reset_at,
+        'ai_credits_low': ai_credits_low,
     }
 
 
@@ -334,9 +355,13 @@ def _ai_gap_suggestions_from_assessment(session):
     allowed_priorities = [name for name, _ in GapAnalysisMetric.PRIORITY_CHOICES]
 
     client = None
+    account = None
     try:
-        from gtm.ai_services import _get_client
-        client = _get_client()
+        from gtm.ai_services import _get_client, _quota_cooldown_active, _request_budget_available
+        from gtm.ai_credits import resolve_account_for_session
+        account = resolve_account_for_session(session)
+        if not _quota_cooldown_active() and _request_budget_available(account=account):
+            client = _get_client()
     except Exception as exc:
         logger.warning('Vertex AI client unavailable: %s', exc)
 
@@ -366,6 +391,9 @@ Assessment context:
 
     try:
         ai_response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+        if hasattr(ai_response, 'usage_metadata'):
+            from gtm.ai_credits import record_spend
+            record_spend(account, ai_response.usage_metadata.total_token_count, "gap_suggestions", session=session)
         payload = json.loads(_clean_json_payload(getattr(ai_response, 'text', '')))
         raw_suggestions = payload.get('suggestions', []) if isinstance(payload, dict) else []
     except Exception as exc:
@@ -436,7 +464,7 @@ Assessment context:
 MAX_ACTION_ITEMS_PER_GAP = 3
 
 
-def _ai_action_items_for_gap_metric(metric):
+def _ai_action_items_for_gap_metric(metric, *, account=None):
     """Break a GapAnalysisMetric's standing recommendation into concrete,
     executable action items via one real Gemini call -- turning a static
     'here's what you should do' row into real Tasks-board items the AI
@@ -445,10 +473,16 @@ def _ai_action_items_for_gap_metric(metric):
     unavailable, so this never silently produces nothing."""
     fallback = [metric.recommendation[:240]] if metric.recommendation else [f"Address the {metric.metric} gap ({metric.category})"]
 
+    if account is None:
+        from gtm.ai_credits import resolve_account, resolve_account_for_session
+        account = resolve_account(workspace=metric.workspace, user=metric.user) \
+            or resolve_account_for_session(metric.session)
+
     client = None
     try:
-        from gtm.ai_services import _get_client
-        client = _get_client()
+        from gtm.ai_services import _get_client, _quota_cooldown_active, _request_budget_available
+        if not _quota_cooldown_active() and _request_budget_available(account=account):
+            client = _get_client()
     except Exception as exc:
         logger.warning('Vertex AI client unavailable: %s', exc)
 
@@ -471,6 +505,9 @@ Output STRICT JSON only: {{"action_items": ["...", "..."]}}
 
     try:
         ai_response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+        if hasattr(ai_response, 'usage_metadata'):
+            from gtm.ai_credits import record_spend
+            record_spend(account, ai_response.usage_metadata.total_token_count, "gap_action_items", session=metric.session)
         payload = json.loads(_clean_json_payload(getattr(ai_response, 'text', '')))
         items = payload.get('action_items', []) if isinstance(payload, dict) else []
     except Exception as exc:

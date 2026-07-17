@@ -145,6 +145,7 @@ class Resource(models.Model):
         ('auditing', 'Auditing…'),
         ('complete', 'Audit Complete'),
         ('failed', 'Audit Failed'),
+        ('no_credits', 'AI Credits Exhausted'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

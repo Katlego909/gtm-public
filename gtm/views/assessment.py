@@ -388,7 +388,7 @@ def rewrite_context_note(request, session_id):
     if not note_text:
         return JsonResponse({"success": False, "error": "Please add some text first."}, status=400)
 
-    rewritten = rewrite_context_note_with_ai(note_text=note_text, question_text=question_text, mode=mode)
+    rewritten = rewrite_context_note_with_ai(note_text=note_text, question_text=question_text, mode=mode, session=session)
     if not rewritten:
         return JsonResponse({"success": False, "error": "Could not rewrite note right now."}, status=500)
 

@@ -6,6 +6,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 # Import workspace models so Django can find them
 from .models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation
 from .models_integrations import WorkspaceIntegration
+from .models_ai_credits import AICreditAccount, AICreditTransaction
 
 # AI generation status choices
 AI_STATUS_CHOICES = [
@@ -13,6 +14,7 @@ AI_STATUS_CHOICES = [
     ("generating", "Generating"),
     ("done", "Done"),
     ("failed", "Failed"),
+    ("no_credits", "AI Credits Exhausted"),
 ]
 
 class Category(models.Model):
@@ -317,12 +319,13 @@ class ChatMessage(models.Model):
         null=True,
         blank=True
     )
-    message = models.TextField()  
-    response = models.TextField()  
+    message = models.TextField()
+    response = models.TextField()
     attachments = models.JSONField(default=list, blank=True)
-    intent = models.CharField(max_length=50, blank=True)  
+    task_refs = models.JSONField(default=list, blank=True)
+    intent = models.CharField(max_length=50, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         ordering = ['created_at']
 
@@ -363,6 +366,7 @@ class WorkspaceChatMessage(models.Model):
     message = models.TextField()
     response = models.TextField()
     attachments = models.JSONField(default=list, blank=True)
+    task_refs = models.JSONField(default=list, blank=True)
     intent = models.CharField(max_length=50, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -453,11 +457,12 @@ class GTMFile(models.Model):
         ('auditing', 'Auditing…'),
         ('complete', 'Audit Complete'),
         ('failed', 'Audit Failed'),
+        ('no_credits', 'AI Credits Exhausted'),
     ]
-    
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     session = models.ForeignKey(
-        AssessmentSession, 
+        AssessmentSession,
         on_delete=models.CASCADE, 
         related_name="evidence_files",
         null=True, blank=True,
@@ -517,6 +522,7 @@ class DeliveryDocument(models.Model):
         ('analyzing', 'Analyzing'),
         ('complete', 'Analysis Complete'),
         ('failed', 'Analysis Failed'),
+        ('no_credits', 'AI Credits Exhausted'),
     ]
 
     FILE_TYPE_CHOICES = [
@@ -568,6 +574,7 @@ class CategoryDocument(models.Model):
         ('analyzing', 'Analyzing'),
         ('complete', 'Analysis Complete'),
         ('failed', 'Analysis Failed'),
+        ('no_credits', 'AI Credits Exhausted'),
     ]
 
     FILE_TYPE_CHOICES = [

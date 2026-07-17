@@ -116,7 +116,9 @@ def dashboard_agent_api(request):
     elif session.user_id != request.user.id:
         return JsonResponse({"success": False, "error": "You do not have access to that assessment."}, status=403)
 
-    attachments, attachment_context, attachment_warnings = _process_agent_attachments(uploaded_files)
+    from gtm.ai_credits import resolve_account
+    account = resolve_account(workspace=current_workspace, user=request.user)
+    attachments, attachment_context, attachment_warnings = _process_agent_attachments(uploaded_files, account=account)
 
     # [VISION BRIDGE] Save strategic evidence files to GTMFile
     for uploaded_file in uploaded_files:
@@ -173,6 +175,7 @@ def dashboard_agent_api(request):
             message=message,
             response=result.get("response", ""),
             attachments=attachments,
+            task_refs=result.get("task_refs", []),
             intent=result.get("intent", ""),
         )
         result["response_html"] = _md(result.get("response", ""))

@@ -46,13 +46,22 @@ def _agent_name_hint(candidate: str, *, action: str = "consult") -> Optional[str
     return None
 
 
-def build_agent_action_tools(workspace, user) -> List[Any]:
+def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]] = None) -> List[Any]:
     """Build the shared set of workspace-collaboration tools available to
-    any agent chatting on behalf of `user` within `workspace`."""
+    any agent chatting on behalf of `user` within `workspace`.
+
+    `task_refs_sink`, when given, is a mutable list that find_tasks and the
+    task-resolving tools below (comment_on_task, assign_task,
+    assign_task_to_agent) record real ActionItem ids into as they resolve
+    them -- see agent_runtime.record_task_ref. Callers read this back after
+    the turn to persist structured task grounding (WorkspaceChatMessage/
+    ChatMessage.task_refs) independent of whatever text the model wrote."""
     from dashboard.parsers import _resolve_assignee, log_workspace_activity
     from dashboard.utils_notifications import send_notification
     from dashboard.views.helpers import _upsert_gap_metric_in_scope
     from dashboard.models import AIResourceRecommendation, GapAnalysisMetric, Resource
+    from django.utils.dateparse import parse_date
+    from .agent_runtime import record_task_ref
 
     def notify_teammate(username: str, title: str, message: str, link: str = "") -> str:
         """Send an in-app notification to a specific teammate in this
@@ -71,13 +80,15 @@ def build_agent_action_tools(workspace, user) -> List[Any]:
 
     def comment_on_task(action_item_id: str, comment_text: str) -> str:
         """Post a comment on a task (ActionItem) in this workspace, visible
-        to the team on the Tasks board. Use this to share findings or ask a
-        question about a specific task without changing its status.
+        to the team on the Tasks board. Use find_tasks first if you don't
+        already have this task's real ID. Use this to share findings or ask
+        a question about a specific task without changing its status.
         """
         try:
             item = ActionItem.objects.get(pk=int(action_item_id), workspace=workspace)
         except (ActionItem.DoesNotExist, ValueError, TypeError):
             return f"I couldn't find task {action_item_id} in this workspace."
+        record_task_ref(task_refs_sink, item.id, item.note)
         ActionItemComment.objects.create(action_item=item, user=user, text=comment_text)
         log_workspace_activity(
             workspace, user, 'comment_added',
@@ -87,7 +98,8 @@ def build_agent_action_tools(workspace, user) -> List[Any]:
         return f'Commented on "{item.note[:50]}".'
 
     def assign_task(action_item_id: str, assignee: str) -> str:
-        """Assign a task (ActionItem) to a specific teammate. `assignee` can
+        """Assign a task (ActionItem) to a specific teammate. Use find_tasks
+        first if you don't already have this task's real ID. `assignee` can
         be a name, username, or email. Only usable if the requesting user
         has task-assignment permission in this workspace.
         """
@@ -100,6 +112,7 @@ def build_agent_action_tools(workspace, user) -> List[Any]:
             item = ActionItem.objects.get(pk=int(action_item_id), workspace=workspace)
         except (ActionItem.DoesNotExist, ValueError, TypeError):
             return f"I couldn't find task {action_item_id} in this workspace."
+        record_task_ref(task_refs_sink, item.id, item.note)
         recipient = _resolve_assignee(workspace, assignee)
         if not recipient:
             hint = _agent_name_hint(assignee, action="assign")
@@ -114,7 +127,8 @@ def build_agent_action_tools(workspace, user) -> List[Any]:
         on the Tasks board) and kicks off their real completion attempt in
         the background, the same as a human clicking "Complete with AI".
         `agent_type` must be one of: gtm_strategist (Charlie), portfolio
-        (Nora), resource (Theo), insights (Milo). Only usable if the
+        (Nora), resource (Theo), insights (Milo). Use find_tasks first if
+        you don't already have this task's real ID. Only usable if the
         requesting user has task-assignment permission in this workspace.
         """
         from .agent_runtime import AGENT_DIRECTORY
@@ -132,6 +146,7 @@ def build_agent_action_tools(workspace, user) -> List[Any]:
             item = ActionItem.objects.get(pk=int(action_item_id), workspace=workspace)
         except (ActionItem.DoesNotExist, ValueError, TypeError):
             return f"I couldn't find task {action_item_id} in this workspace."
+        record_task_ref(task_refs_sink, item.id, item.note)
 
         agent_name = AGENT_DIRECTORY[agent_type]['name']
         item.assigned_agent_type = agent_type
@@ -168,6 +183,58 @@ def build_agent_action_tools(workspace, user) -> List[Any]:
             name=f"action_item_complete:{item.id}",
         )
         return f'Routed "{item.note[:50]}" to {agent_name} -- they\'re attempting it now.'
+
+    def find_tasks(query: str = "", status: str = "", assignee: str = "", created_on: str = "") -> str:
+        """Search for tasks (ActionItems) in this workspace and get back
+        their real IDs. ALWAYS call this before commenting on, assigning, or
+        routing a task unless you already have its real ID from earlier in
+        this same conversation -- never guess or invent one. `query`
+        matches (partial, case-insensitive) against the task's note text.
+        `status` is one of: todo, doing, done (leave blank to search open
+        tasks only, i.e. todo + doing). `assignee` filters to tasks
+        already assigned to a specific teammate (name, username, or
+        email). `created_on` is an exact date in YYYY-MM-DD format if the
+        user referenced a specific day (e.g. 'the task from July 16th' --
+        use today's date, given in your instructions, to resolve the
+        year). Returns up to 10 matches, most recently created first.
+        """
+        from .agent_runtime import AGENT_DIRECTORY
+
+        qs = ActionItem.objects.filter(workspace=workspace)
+        if status:
+            qs = qs.filter(status=status)
+        else:
+            qs = qs.exclude(status="done")
+        if query.strip():
+            qs = qs.filter(note__icontains=query.strip())
+        if assignee.strip():
+            recipient = _resolve_assignee(workspace, assignee)
+            if not recipient:
+                return _agent_name_hint(assignee) or f"I couldn't find a teammate matching '{assignee}' in this workspace."
+            qs = qs.filter(assigned_to=recipient)
+        if created_on.strip():
+            parsed_date = parse_date(created_on.strip())
+            if parsed_date:
+                qs = qs.filter(created_at__date=parsed_date)
+
+        tasks = list(qs.select_related("assigned_to").order_by("-created_at")[:10])
+        if not tasks:
+            return "No matching tasks found in this workspace."
+
+        lines = ["Matching tasks:"]
+        for item in tasks:
+            record_task_ref(task_refs_sink, item.id, item.note)
+            if item.assigned_to:
+                assignee_label = item.assigned_to.get_full_name() or item.assigned_to.username
+            elif item.assigned_agent_type:
+                assignee_label = AGENT_DIRECTORY.get(item.assigned_agent_type, {}).get("name", item.assigned_agent_type)
+            else:
+                assignee_label = "Unassigned"
+            lines.append(
+                f"- [ID: {item.id}] {item.note} ({item.get_status_display()}, "
+                f"created {item.created_at.strftime('%b %d, %Y')}, {assignee_label})"
+            )
+        return "\n".join(lines)
 
     def escalate_gap(category: str, metric: str, current: float, target: float, recommendation: str) -> str:
         """Flag a GTM gap for human review in the Gap Analysis panel. This
@@ -317,6 +384,6 @@ def build_agent_action_tools(workspace, user) -> List[Any]:
         return f'{action_verb} "{subject}" to HubSpot as a task on {company_name}.'
 
     return [
-        notify_teammate, comment_on_task, assign_task, assign_task_to_agent, escalate_gap, recommend_resource,
-        lookup_crm_company, log_insight_to_crm, create_crm_follow_up_task,
+        notify_teammate, comment_on_task, assign_task, assign_task_to_agent, find_tasks, escalate_gap,
+        recommend_resource, lookup_crm_company, log_insight_to_crm, create_crm_follow_up_task,
     ]

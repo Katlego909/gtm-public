@@ -125,6 +125,22 @@
           </div>
         </div>
 
+      {% elif status == 'no_credits' %}
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 text-amber-600">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span class="text-xs font-medium">AI credits exhausted for today</span>
+          </div>
+          {% if resource.resource_type == 'file' %}
+            <button hx-post="{% url 'trigger_asset_audit' resource.id %}{% if current_workspace %}?workspace={{ current_workspace.id }}{% endif %}"
+                    hx-target="#asset-card-{{ resource.id }}"
+                    hx-swap="outerHTML"
+                    class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
+              Retry →
+            </button>
+          {% endif %}
+        </div>
+
       {% elif status == 'failed' %}
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2 text-rose-600">
