@@ -356,8 +356,8 @@
         </button>
 
         <section id="global-agent-panel" class="hidden relative mt-3 w-[min(92vw,420px)] h-[min(72vh,620px)] bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col">
-            <div id="global-agent-confirm-overlay" class="hidden absolute inset-0 z-20 bg-black/40 flex items-center justify-center p-4">
-                <div id="global-agent-confirm-content" class="w-full"></div>
+            <div id="global-agent-confirm-overlay" class="hidden absolute inset-0 z-20 bg-black/40 flex items-center justify-center p-4 transition-opacity duration-150 ease-out opacity-0">
+                <div id="global-agent-confirm-content" class="w-full transition-all duration-150 ease-out transform opacity-0 scale-95"></div>
             </div>
             <header class="px-4 py-3 bg-gray-900">
                 <div class="flex items-center justify-between gap-3">
@@ -513,8 +513,32 @@
     });
 
     // Modal functions
+    const MODAL_TRANSITION_MS = 150;
+
     function openModal() {
-        document.getElementById('modal').classList.remove('hidden');
+        const modal = document.getElementById('modal');
+        const backdrop = document.getElementById('modal-backdrop');
+        const panel = document.getElementById('modal-panel');
+        const contentEl = document.getElementById('modal-content');
+
+        modal.classList.remove('hidden');
+        requestAnimationFrame(() => backdrop.classList.remove('opacity-0'));
+
+        const revealPanel = () => {
+            if (modal.classList.contains('hidden')) return; // closed again before content arrived
+            panel.classList.remove('opacity-0', 'scale-95');
+        };
+
+        if (contentEl.innerHTML.trim()) {
+            // Content already set by the caller (e.g. the JS-driven "clear chat"
+            // confirmations) -- reveal now rather than waiting for a swap that
+            // will never happen.
+            requestAnimationFrame(revealPanel);
+        } else {
+            // htmx-driven modal: hold the panel invisible until content has
+            // actually swapped in, so we never flash an empty white box.
+            contentEl.addEventListener('htmx:afterSettle', revealPanel, { once: true });
+        }
     }
     window.openModal = openModal;
 
@@ -524,13 +548,19 @@
         // that override can never leak into the next, unrelated modal
         // regardless of how this one was dismissed (button, backdrop click,
         // htmx auto-close, etc).
-        const modalWrapper = document.getElementById('modal-content')?.parentElement;
-        if (modalWrapper) {
-            modalWrapper.classList.remove('sm:max-w-3xl');
-            modalWrapper.classList.add('sm:max-w-lg');
-        }
-        document.getElementById('modal').classList.add('hidden');
-        document.getElementById('modal-content').innerHTML = '';
+        const modal = document.getElementById('modal');
+        const backdrop = document.getElementById('modal-backdrop');
+        const panel = document.getElementById('modal-panel');
+
+        backdrop.classList.add('opacity-0');
+        panel.classList.add('opacity-0', 'scale-95');
+        panel.classList.remove('sm:max-w-3xl');
+        panel.classList.add('sm:max-w-lg');
+
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            document.getElementById('modal-content').innerHTML = '';
+        }, MODAL_TRANSITION_MS);
     }
     window.closeModal = closeModal;
 
@@ -846,8 +876,12 @@
             `;
 
             const closeOverlay = () => {
-                overlay.classList.add('hidden');
-                overlayContent.innerHTML = '';
+                overlay.classList.add('opacity-0');
+                overlayContent.classList.add('opacity-0', 'scale-95');
+                setTimeout(() => {
+                    overlay.classList.add('hidden');
+                    overlayContent.innerHTML = '';
+                }, MODAL_TRANSITION_MS);
             };
 
             const cancelBtn = document.getElementById('global-agent-clear-cancel');
@@ -862,6 +896,10 @@
             }, { once: true });
 
             overlay.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                overlay.classList.remove('opacity-0');
+                overlayContent.classList.remove('opacity-0', 'scale-95');
+            });
         }
 
         async function executeGlobalAgentClear(sessionId) {
@@ -956,11 +994,11 @@
     <!-- HTMX Modal -->
     <div id="modal" class="hidden fixed inset-0 z-[1300] overflow-y-auto">
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeModal()"></div>
+            <div id="modal-backdrop" class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity duration-150 ease-out opacity-0" onclick="closeModal()"></div>
 
             <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-            <div class="relative inline-block align-bottom bg-white rounded-lg border border-gray-200 text-left overflow-hidden sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div id="modal-panel" class="relative inline-block align-bottom bg-white rounded-lg border border-gray-200 text-left overflow-hidden sm:my-8 sm:align-middle sm:max-w-lg sm:w-full transition-all duration-150 ease-out transform opacity-0 scale-95">
                 <div id="modal-content"></div>
             </div>
         </div>
