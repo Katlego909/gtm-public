@@ -370,8 +370,13 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
     if latest_completed_gap_session:
         ai_resource_recommendations = list(latest_completed_gap_session.ai_resource_matches.all().select_related('resource'))
 
-    for metric in gap_analysis:
-        calculate_gap_metric_display_properties(metric)
+    # Deferred import: dashboard.views.helpers imports this module at load time.
+    from dashboard.views.helpers import prepare_gap_metrics_for_display
+    gap_analysis = prepare_gap_metrics_for_display(
+        gap_analysis,
+        current_workspace,
+        request.user if request.user.is_authenticated else None,
+    )
 
     gap_suggestions = _load_pending_gap_suggestions(request, current_workspace) if request.user.is_authenticated else []
 

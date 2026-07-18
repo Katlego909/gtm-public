@@ -217,6 +217,14 @@ class ActionItem(models.Model):
         help_text="The concrete artifact an AI agent produced to complete this task, if any.",
     )
 
+    gap_metric = models.ForeignKey(
+        'dashboard.GapAnalysisMetric',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="action_items",
+        help_text="The gap this task was generated to help close, if any.",
+    )
+
     CRM_SYNC_STATUS_CHOICES = [
         ("not_synced", "Not Synced"),
         ("synced", "Synced"),

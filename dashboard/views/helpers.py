@@ -575,6 +575,12 @@ def _upsert_gap_metric_in_scope(*, user, workspace, session, payload, source='AI
         existing.user = user
         if session:
             existing.session = session
+        # Re-flagging a metric (new suggestion accepted / re-added manually)
+        # reopens it -- a previously closed gap that got flagged again is a
+        # fresh gap, not a closed one.
+        existing.status = 'open'
+        existing.closed_reason = ''
+        existing.closed_at = None
         existing.save()
         return existing, False
 
@@ -603,5 +609,99 @@ def _gap_percent_value(metric):
     if metric.metric == 'CAC Payback Period':
         return (target - current) / target * 100
     return (current - target) / target * 100
+
+
+def apply_measured_closure(metric):
+    """Close a gap when a real, measured value has reached its target.
+
+    Only call this after a genuine measurement updated metric.current
+    (manual check-in now, CRM pull later) -- AI-estimated values must
+    never close a gap. Direction-aware via _gap_percent_value (which
+    already inverts CAC Payback Period, where lower is better).
+    """
+    if metric.status == 'closed':
+        return False
+    if _gap_percent_value(metric) < 0:
+        return False
+    metric.status = 'closed'
+    metric.closed_reason = 'target_reached'
+    metric.closed_at = timezone.now()
+    metric.save(update_fields=['status', 'closed_reason', 'closed_at'])
+    return True
+
+
+def prepare_gap_metrics_for_display(metrics, workspace, user):
+    """Annotate gap metrics with everything the table row renders: the
+    existing gap%/priority styling, linked-task progress, deterministic
+    pillar score movement against the latest completed assessment, and
+    the retake-assessment hint. Single shared path for all render sites."""
+    metrics = list(metrics)
+    if not metrics:
+        return metrics
+
+    task_counts = {
+        row['gap_metric_id']: row
+        for row in ActionItem.objects.filter(gap_metric__in=metrics)
+        .values('gap_metric_id')
+        .annotate(
+            total=models.Count('id'),
+            done=models.Count('id', filter=models.Q(status='done')),
+        )
+    }
+
+    if workspace:
+        latest_session = AssessmentSession.objects.filter(
+            workspace=workspace, is_completed=True,
+        ).order_by('-created_at').first()
+    else:
+        latest_session = AssessmentSession.objects.filter(
+            user=user, is_completed=True,
+        ).order_by('-created_at').first()
+
+    # _compute_scores per distinct session, cached across rows (max 6 rows/scope).
+    score_cache = {}
+
+    def _pillar_scores(session):
+        if session.uuid not in score_cache:
+            cat_scores, _overall = _compute_scores(session)
+            score_cache[session.uuid] = {
+                row['category'].name: float(row['avg']) for row in cat_scores
+            }
+        return score_cache[session.uuid]
+
+    for metric in metrics:
+        calculate_gap_metric_display_properties(metric)
+
+        counts = task_counts.get(metric.id, {})
+        metric.task_count = counts.get('total', 0)
+        metric.done_task_count = counts.get('done', 0)
+
+        metric.score_movement = None
+        has_newer_assessment = bool(
+            metric.session_id
+            and latest_session
+            and latest_session.uuid != metric.session_id
+            and latest_session.created_at > metric.session.created_at
+        )
+        if has_newer_assessment:
+            pillar = metric.pillar_name
+            baseline = _pillar_scores(metric.session).get(pillar)
+            latest = _pillar_scores(latest_session).get(pillar)
+            if pillar and baseline is not None and latest is not None:
+                metric.score_movement = {
+                    'pillar': pillar,
+                    'baseline': round(baseline, 1),
+                    'latest': round(latest, 1),
+                    'delta': round(latest - baseline, 1),
+                }
+
+        metric.suggest_reassessment = bool(
+            metric.status == 'open'
+            and metric.task_count > 0
+            and metric.task_count == metric.done_task_count
+            and not has_newer_assessment
+        )
+
+    return metrics
 
 

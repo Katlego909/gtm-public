@@ -448,6 +448,8 @@ class GapMetricActionItemGenerationTests(TestCase):
         self.assertEqual(created[0].note, "Audit top 3 underperforming ad channels")
         self.assertEqual(created[0].session, self.session)
         self.assertEqual(created[0].status, "todo")
+        self.assertEqual(created[0].gap_metric_id, metric.id)
+        self.assertEqual(created[1].gap_metric_id, metric.id)
 
         self.assertTrue(
             WorkspaceActivityEvent.objects.filter(

@@ -60,6 +60,19 @@ class GapAnalysisMetricForm(forms.ModelForm):
                 # Add current metric to choices so it can be displayed for existing records
                 self.fields['metric'].choices = [(metric_value, metric_value)] + list(self.fields['metric'].choices)
 
+
+class GapMeasurementForm(forms.Form):
+    value = forms.FloatField(
+        label="Measured value",
+        widget=forms.NumberInput(attrs={'class': 'w-full p-2 border rounded', 'step': 'any', 'autofocus': True})
+    )
+    note = forms.CharField(
+        required=False,
+        max_length=240,
+        label="Note (optional)",
+        widget=forms.TextInput(attrs={'class': 'w-full p-2 border rounded', 'placeholder': 'Where this number comes from, e.g. CRM report for June'})
+    )
+
 class ActionItemForm(forms.ModelForm):
     due_date = forms.DateField(
         required=False, 

@@ -18,9 +18,12 @@ from .gap_analysis import (
     generate_action_items_for_gap,
     generate_gap_suggestions,
     get_gap_metric_row,
+    log_gap_measurement,
     refresh_gap_analysis_table,
     refresh_gap_suggestions,
     reject_gap_suggestion,
+    reopen_gap_metric,
+    resolve_gap_metric,
 )
 from .resources import (
     add_edit_resource,

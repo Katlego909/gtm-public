@@ -49,8 +49,8 @@ from gtm.models import (
 from gtm.models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation, WorkspaceActivityEvent
 from gtm.ai_chat import get_suggested_prompts, process_chat_message
 from gtm.decorators import workspace_permission_required, workspace_member_required
-from dashboard.models import Channel, ChannelAnalytics, GapAnalysisMetric, GapAnalysisSuggestion, Resource, Notification, UserSettings
-from dashboard.forms import GapAnalysisMetricForm, ActionItemForm, UserProfileForm, UserSettingsForm
+from dashboard.models import Channel, ChannelAnalytics, GapAnalysisMetric, GapAnalysisSuggestion, GapMetricMeasurement, Resource, Notification, UserSettings
+from dashboard.forms import GapAnalysisMetricForm, GapMeasurementForm, ActionItemForm, UserProfileForm, UserSettingsForm
 from dashboard.utils_notifications import send_notification
 from ..forms import GapAnalysisMetricForm, ActionItemForm, UserProfileForm, ResourceForm
 from gtm.views import _compute_scores, _band_for_score
@@ -90,6 +90,8 @@ from .helpers import (
     _md,
     _resolve_dashboard_workspace,
     _upsert_gap_metric_in_scope,
+    apply_measured_closure,
+    prepare_gap_metrics_for_display,
 )
 
 @require_http_methods(["GET"])
@@ -240,9 +242,15 @@ def generate_action_items_for_gap(request, pk):
             status='todo',
             created_by=request.user,
             owner=request.user.get_full_name() or request.user.username,
+            gap_metric=metric,
         )
         if was_created:
             created.append(item)
+        elif item is not None and item.gap_metric_id is None:
+            # A note-identical task created some other way still counts as
+            # remediation for this gap -- link it so progress tracks it.
+            item.gap_metric = metric
+            item.save(update_fields=['gap_metric'])
 
     for item in created:
         log_workspace_activity(
@@ -263,6 +271,7 @@ def generate_action_items_for_gap(request, pk):
 
     response = HttpResponse(status=204)
     response['HX-Trigger'] = json.dumps({
+        'gapAnalysisUpdated': True,
         'refreshAgentActions': True,
         'refreshNotifications': True,
         'resourceToast': {
@@ -271,6 +280,86 @@ def generate_action_items_for_gap(request, pk):
         }
     })
     return response
+
+
+def _get_scoped_gap_metric_or_404(request, pk):
+    """Shared scope check for per-metric actions: workspace members act on
+    workspace metrics, otherwise only the owner's unscoped metrics."""
+    current_workspace, latest_completed_session = _get_gap_scope(request)
+    metric_qs = GapAnalysisMetric.objects.filter(workspace=current_workspace) if current_workspace \
+        else GapAnalysisMetric.objects.filter(user=request.user, workspace__isnull=True)
+    return get_object_or_404(metric_qs, pk=pk), current_workspace, latest_completed_session
+
+
+def _render_gap_metric_row(request, metric, current_workspace):
+    prepare_gap_metrics_for_display([metric], current_workspace, request.user)
+    return render(request, 'dashboard/partials/_gap_analysis_row.html', {'gap': metric})
+
+
+@login_required
+def log_gap_measurement(request, pk):
+    """Record a real, measured current value for a gap metric. This is the
+    only path (besides the future CRM pull) that can auto-close a gap:
+    measured data reaching target, never task completion or AI estimates."""
+    metric, current_workspace, _ = _get_scoped_gap_metric_or_404(request, pk)
+
+    if request.method == 'POST':
+        form = GapMeasurementForm(request.POST)
+        if form.is_valid():
+            value = form.cleaned_data['value']
+            GapMetricMeasurement.objects.create(
+                gap_metric=metric,
+                value=value,
+                source='manual',
+                note=form.cleaned_data.get('note', ''),
+                recorded_by=request.user,
+            )
+            metric.current = value
+            metric.save(update_fields=['current'])
+            closed = apply_measured_closure(metric)
+
+            response = _render_gap_metric_row(request, metric, current_workspace)
+            toast = f"Gap closed: {metric.metric} reached its target ({value} vs {metric.target})." if closed \
+                else f"Logged {metric.metric} at {value}. Target: {metric.target}."
+            response['HX-Trigger'] = json.dumps({
+                'closeModal': True,
+                'resourceToast': {'message': toast, 'level': 'success'},
+            })
+            response['HX-Retarget'] = f"#gap-metric-{metric.id}"
+            response['HX-Reswap'] = 'outerHTML'
+            return response
+    else:
+        form = GapMeasurementForm()
+
+    return render(request, 'dashboard/partials/gap_measurement_form.html', {
+        'form': form,
+        'metric': metric,
+        'measurements': metric.measurements.all()[:5],
+    })
+
+
+@require_http_methods(["POST"])
+@login_required
+def resolve_gap_metric(request, pk):
+    """Manually mark a gap resolved -- the human confirms the outcome; the
+    system never claims closure on its own without measured data."""
+    metric, current_workspace, _ = _get_scoped_gap_metric_or_404(request, pk)
+    metric.status = 'closed'
+    metric.closed_reason = 'manual'
+    metric.closed_at = timezone.now()
+    metric.save(update_fields=['status', 'closed_reason', 'closed_at'])
+    return _render_gap_metric_row(request, metric, current_workspace)
+
+
+@require_http_methods(["POST"])
+@login_required
+def reopen_gap_metric(request, pk):
+    metric, current_workspace, _ = _get_scoped_gap_metric_or_404(request, pk)
+    metric.status = 'open'
+    metric.closed_reason = ''
+    metric.closed_at = None
+    metric.save(update_fields=['status', 'closed_reason', 'closed_at'])
+    return _render_gap_metric_row(request, metric, current_workspace)
 
 
 @require_http_methods(["POST"])
@@ -366,8 +455,7 @@ def add_edit_gap_metric(request, pk=None):
                     gap_analysis = GapAnalysisMetric.objects.filter(
                         user=request.user, workspace__isnull=True
                     ).order_by('category', 'priority')
-                for metric in gap_analysis:
-                    calculate_gap_metric_display_properties(metric)
+                gap_analysis = prepare_gap_metrics_for_display(gap_analysis, current_workspace, request.user)
                 response = HttpResponse(render(request, 'dashboard/partials/gap_analysis_table.html', {'gap_analysis': gap_analysis}).content)
                 response['HX-Trigger'] = 'closeModal'
                 return response
@@ -466,9 +554,8 @@ def gap_analysis_table(request):
             user=request.user,
             workspace__isnull=True,
         )
-    for gap in gap_analysis:
-        calculate_gap_metric_display_properties(gap)
-            
+    gap_analysis = prepare_gap_metrics_for_display(gap_analysis, workspace_id, request.user)
+
     return render(request, 'dashboard/partials/gap_analysis_table.html', {'gap_analysis': gap_analysis})
 
 
@@ -487,9 +574,8 @@ def gap_report(request):
         suggestions_qs = GapAnalysisSuggestion.objects.filter(user=request.user, workspace__isnull=True)
         assessment_scope = AssessmentSession.objects.filter(user=request.user)
 
-    metrics = list(metrics_qs)
+    metrics = prepare_gap_metrics_for_display(metrics_qs, current_workspace, request.user)
     for metric in metrics:
-        calculate_gap_metric_display_properties(metric)
         metric.gap_numeric = _gap_percent_value(metric)
         metric.is_behind = metric.gap_numeric < 0
 
@@ -569,12 +655,12 @@ def get_gap_metric_row(request, pk):
             GapAnalysisMetric.objects.filter(
                 user=request.user,
                 workspace__isnull=True,
-            ), 
+            ),
             pk=pk
         )
-    
-    calculate_gap_metric_display_properties(metric)
-        
+
+    prepare_gap_metrics_for_display([metric], workspace_id, request.user)
+
     return render(request, 'dashboard/partials/_gap_analysis_row.html', {'gap': metric})
 
 def refresh_gap_analysis_table(request):
@@ -588,10 +674,9 @@ def refresh_gap_analysis_table(request):
             user=request.user,
             workspace__isnull=True,
         ).order_by('category', 'priority')
-    
-    for metric in gap_analysis:
-        calculate_gap_metric_display_properties(metric)
-            
+
+    gap_analysis = prepare_gap_metrics_for_display(gap_analysis, workspace_id, request.user)
+
     return render(request, 'dashboard/partials/_gap_analysis_table_rows.html', {'gap_analysis': gap_analysis})
 
 

@@ -47,6 +47,25 @@ class GapAnalysisMetric(models.Model):
         'CAC Payback Period': 'cac_payback_period',
     }
     METRIC_CHOICES = [(metric_name, metric_name) for metric_name in METRIC_FIELD_MAPPING.keys()]
+    # Maps each gap category to the assessment pillar (Category.name in the
+    # gtm app) whose deterministic score movement is the honest progress
+    # signal for gaps in that category.
+    CATEGORY_PILLAR_MAPPING = {
+        'Lead Generation': 'Demand',
+        'Marketing ROI': 'Demand',
+        'Product Marketing': 'Demand',
+        'Sales Efficiency': 'Conversion',
+        'Sales Velocity': 'Conversion',
+        'Customer Success': 'Delivery',
+    }
+    STATUS_CHOICES = [
+        ('open', 'Open'),
+        ('closed', 'Closed'),
+    ]
+    CLOSED_REASON_CHOICES = [
+        ('target_reached', 'Target reached'),
+        ('manual', 'Manually resolved'),
+    ]
 
     category = models.CharField(max_length=100, choices=CATEGORY_CHOICES)
     metric = models.CharField(max_length=100, choices=METRIC_CHOICES)
@@ -59,6 +78,10 @@ class GapAnalysisMetric(models.Model):
     workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='gap_metrics', null=True, blank=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='gap_metrics', null=True, blank=True)
 
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='open')
+    closed_reason = models.CharField(max_length=20, choices=CLOSED_REASON_CHOICES, blank=True, default='')
+    closed_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         unique_together = ('metric', 'session', 'workspace')
 
@@ -68,6 +91,37 @@ class GapAnalysisMetric(models.Model):
     @property
     def metric_field_name(self):
         return self.METRIC_FIELD_MAPPING.get(self.metric)
+
+    @property
+    def pillar_name(self):
+        return self.CATEGORY_PILLAR_MAPPING.get(self.category)
+
+
+class GapMetricMeasurement(models.Model):
+    """One real, dated data point for a gap metric's current value.
+
+    Only genuinely measured values belong here (a human check-in today,
+    a CRM pull later) -- AI estimates never create measurements, so this
+    history is what makes 'gap closed' an honest claim.
+    """
+
+    SOURCE_CHOICES = [
+        ('manual', 'Manual check-in'),
+        ('crm', 'CRM'),
+    ]
+
+    gap_metric = models.ForeignKey(GapAnalysisMetric, on_delete=models.CASCADE, related_name='measurements')
+    value = models.FloatField()
+    source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default='manual')
+    note = models.CharField(max_length=240, blank=True, default='')
+    recorded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='gap_measurements')
+    measured_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-measured_at']
+
+    def __str__(self):
+        return f"{self.gap_metric.metric}: {self.value} ({self.measured_at:%Y-%m-%d})"
 
 
 class GapAnalysisSuggestion(models.Model):
