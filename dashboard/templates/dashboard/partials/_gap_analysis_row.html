@@ -45,46 +45,59 @@
                     Tasks done &mdash; retake assessment to measure
                 </a>
             {% endif %}
-            <div class="flex items-center justify-center gap-4">
+            <div class="flex items-center justify-center gap-2">
                 {% if gap.status != 'closed' %}
                 <button type="button"
                         hx-post="{% url 'generate_action_items_for_gap' pk=gap.id %}"
                         hx-include="#workspace-selector"
                         hx-swap="none"
                         title="Have AI break this recommendation into concrete Tasks"
-                        class="cursor-pointer text-sm font-medium text-indigo-600 hover:text-indigo-800 bg-transparent border-0 p-0">Create Tasks</button>
+                        class="cursor-pointer inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 transition-colors">Create Tasks</button>
                 <button type="button"
                         hx-get="{% url 'log_gap_measurement' pk=gap.id %}"
                         hx-target="#modal-content"
                         onclick="openModal()"
                         title="Log the real, measured value of this metric. Reaching the target closes the gap."
-                        class="cursor-pointer text-sm font-medium text-blue-600 hover:text-blue-800 bg-transparent border-0 p-0">Log Value</button>
+                        class="cursor-pointer inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-colors">Log Value</button>
                 {% endif %}
-                <button type="button"
-                        hx-get="{% url 'edit_gap_metric' pk=gap.id %}"
-                        hx-target="#modal-content"
-                        onclick="openModal()"
-                        class="cursor-pointer text-sm font-medium text-green-600 hover:text-green-800 bg-transparent border-0 p-0">Edit</button>
-                <button type="button"
-                        hx-get="{% url 'delete_gap_metric' pk=gap.id %}"
-                        hx-target="#gap-metric-{{ gap.id }}"
-                        hx-swap="outerHTML"
-                        class="cursor-pointer text-sm font-medium text-red-600 hover:text-red-800 bg-transparent border-0 p-0">Delete</button>
-                {% if gap.status == 'closed' %}
-                <button type="button"
-                        hx-post="{% url 'reopen_gap_metric' pk=gap.id %}"
-                        hx-target="#gap-metric-{{ gap.id }}"
-                        hx-swap="outerHTML"
-                        title="Reopen this gap and keep tracking it"
-                        class="cursor-pointer text-sm font-medium text-amber-600 hover:text-amber-800 bg-transparent border-0 p-0">Reopen</button>
-                {% else %}
-                <button type="button"
-                        hx-post="{% url 'resolve_gap_metric' pk=gap.id %}"
-                        hx-target="#gap-metric-{{ gap.id }}"
-                        hx-swap="outerHTML"
-                        title="Mark this gap resolved based on your own verification"
-                        class="cursor-pointer text-sm font-medium text-gray-500 hover:text-gray-700 bg-transparent border-0 p-0">Resolve</button>
-                {% endif %}
+                <div class="relative js-dropdown-trigger" data-panel="gap-actions-menu-{{ gap.id }}">
+                    <button type="button"
+                            onclick="toggleGapActionsMenu(this, 'gap-actions-menu-{{ gap.id }}')"
+                            title="More actions"
+                            aria-label="More actions"
+                            class="cursor-pointer p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6h.01M12 12h.01M12 18h.01" />
+                        </svg>
+                    </button>
+                    <div id="gap-actions-menu-{{ gap.id }}" class="hidden flex flex-col w-36 bg-white border border-gray-200 rounded-lg z-50 py-1">
+                        <button type="button"
+                                hx-get="{% url 'edit_gap_metric' pk=gap.id %}"
+                                hx-target="#modal-content"
+                                onclick="openModal(); toggleDropdownPanel('gap-actions-menu-{{ gap.id }}')"
+                                class="cursor-pointer w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">Edit</button>
+                        {% if gap.status == 'closed' %}
+                        <button type="button"
+                                hx-post="{% url 'reopen_gap_metric' pk=gap.id %}"
+                                hx-target="#gap-metric-{{ gap.id }}"
+                                hx-swap="outerHTML"
+                                title="Reopen this gap and keep tracking it"
+                                class="cursor-pointer w-full text-left px-3 py-1.5 text-sm text-amber-600 hover:bg-amber-50">Reopen</button>
+                        {% else %}
+                        <button type="button"
+                                hx-post="{% url 'resolve_gap_metric' pk=gap.id %}"
+                                hx-target="#gap-metric-{{ gap.id }}"
+                                hx-swap="outerHTML"
+                                title="Mark this gap resolved based on your own verification"
+                                class="cursor-pointer w-full text-left px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-50">Resolve</button>
+                        {% endif %}
+                        <button type="button"
+                                hx-get="{% url 'delete_gap_metric' pk=gap.id %}"
+                                hx-target="#gap-metric-{{ gap.id }}"
+                                hx-swap="outerHTML"
+                                class="cursor-pointer w-full text-left px-3 py-1.5 text-sm text-red-600 hover:bg-red-50">Delete</button>
+                    </div>
+                </div>
             </div>
         </div>
     </td>

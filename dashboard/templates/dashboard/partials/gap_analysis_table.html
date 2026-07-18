@@ -27,3 +27,30 @@
         </tbody>
     </table>
 </div>
+<script>
+    // This table wrapper is overflow-x-auto, which per the CSS overflow spec
+    // implicitly clips overflow-y too -- a plain `absolute` dropdown panel
+    // for a row's "More actions" menu gets cut off instead of floating over
+    // the page. Fixed positioning computed from the trigger's actual screen
+    // position escapes that clipping entirely. Reuses the .js-dropdown-trigger
+    // / data-panel outside-click-to-close behavior already defined globally
+    // (see notification_bell.html) -- only the open/position logic differs.
+    function toggleGapActionsMenu(triggerEl, panelId) {
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+        const isHidden = panel.classList.contains('hidden');
+        document.querySelectorAll('[id^="gap-actions-menu-"]').forEach(function (p) {
+            if (p !== panel) p.classList.add('hidden');
+        });
+        if (isHidden) {
+            const rect = triggerEl.getBoundingClientRect();
+            panel.style.position = 'fixed';
+            panel.style.top = (rect.bottom + 4) + 'px';
+            panel.style.right = (window.innerWidth - rect.right) + 'px';
+            panel.style.left = 'auto';
+            panel.classList.remove('hidden');
+        } else {
+            panel.classList.add('hidden');
+        }
+    }
+</script>
