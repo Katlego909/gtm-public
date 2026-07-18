@@ -38,16 +38,23 @@ except ImportError:
 # parameter, so the model can call these but can never supply *which*
 # session to act on.
 
-def _build_document_tools_for_session(session: AssessmentSession, user=None) -> List[Any]:
+def _build_document_tools_for_session(
+    session: AssessmentSession, user=None, document_refs_sink: Optional[List[Any]] = None,
+) -> List[Any]:
     """Generic create/edit/list/read/search document tools, scoped to this
     session. New documents are tagged with both `session` and
     `session.workspace` (when present) so they're visible from the
     workspace-wide Documents panel too; edit/list/read/search here stay
-    narrowly scoped to this session's own docs."""
+    narrowly scoped to this session's own docs.
+
+    `document_refs_sink`, when given, is the mutable list create_document/
+    edit_document record real AgentDocument refs into as they resolve them
+    this turn -- see agent_runtime.record_document_ref."""
     from .agent_documents import (
         create_agent_document, edit_agent_document, get_agent_document, list_agent_documents,
         search_agent_documents, _snippet_around,
     )
+    from .agent_runtime import record_document_ref
 
     def create_document(title: str, content: str, doc_type: str = "other") -> str:
         """Create and save a new document (e.g. an action plan, roadmap, or
@@ -59,6 +66,7 @@ def _build_document_tools_for_session(session: AssessmentSession, user=None) -> 
             agent_type="gtm_strategist", title=title, content=content, doc_type=doc_type,
             workspace=session.workspace, session=session, user=user,
         )
+        record_document_ref(document_refs_sink, doc, action="created")
         return f'Saved "{doc.title}" (ID {doc.pk}) -- you can review and export it from the Documents panel.'
 
     def edit_document(document_id: str, new_content: str) -> str:
@@ -69,6 +77,7 @@ def _build_document_tools_for_session(session: AssessmentSession, user=None) -> 
         doc = edit_agent_document(document_id, new_content, session=session)
         if not doc:
             return "I couldn't find a document with that ID for this assessment."
+        record_document_ref(document_refs_sink, doc, action="updated")
         return f'Updated "{doc.title}" to version {doc.version}.'
 
     def list_documents(doc_type: str = "") -> str:
@@ -138,14 +147,14 @@ def _build_document_tools_for_session(session: AssessmentSession, user=None) -> 
 
 def _make_session_consult_tool(
     target_agent_type: str, session: AssessmentSession, user=None, _handoff_depth: int = 0,
-    task_refs_sink: Optional[List[Any]] = None,
+    task_refs_sink: Optional[List[Any]] = None, document_refs_sink: Optional[List[Any]] = None,
 ):
     """Build one consult_<target>_agent tool that hands a question off to
     one of the three workspace-scoped agents, via this session's workspace.
     Persists the exchange into the target agent's own conversation log so
     it genuinely remembers being consulted -- real "full sub-conversation
     handoff", not a stateless lookup."""
-    from .agent_runtime import AGENT_DIRECTORY, record_task_ref
+    from .agent_runtime import AGENT_DIRECTORY, record_document_ref, record_task_ref
 
     info = AGENT_DIRECTORY.get(target_agent_type, {})
     name = info.get("name", target_agent_type)
@@ -160,7 +169,7 @@ def _make_session_consult_tool(
         from .workspace_agent_chat import handle_general_chat_workspace
 
         try:
-            answer, nested_task_refs = handle_general_chat_workspace(
+            answer, nested_task_refs, nested_document_refs = handle_general_chat_workspace(
                 target_agent_type, session.workspace, question, user=user, _handoff_depth=_handoff_depth + 1
             )
             WorkspaceChatMessage.objects.create(
@@ -170,10 +179,13 @@ def _make_session_consult_tool(
                 message=question,
                 response=answer,
                 task_refs=nested_task_refs,
+                document_refs=nested_document_refs,
                 intent="handoff_query",
             )
             for ref in nested_task_refs:
                 record_task_ref(task_refs_sink, ref["id"], ref["note"])
+            for ref in nested_document_refs:
+                record_document_ref(document_refs_sink, ref)
             return answer
         except Exception as e:
             logger.error(f"Handoff to {target_agent_type} failed: {e}")
@@ -189,7 +201,7 @@ def _make_session_consult_tool(
 
 def _build_consult_tools_for_session(
     session: AssessmentSession, user=None, _handoff_depth: int = 0,
-    task_refs_sink: Optional[List[Any]] = None,
+    task_refs_sink: Optional[List[Any]] = None, document_refs_sink: Optional[List[Any]] = None,
 ) -> List[Any]:
     """Build consult tools to the 3 workspace agents, depth-gated so a
     handoff chain is guaranteed to terminate (see
@@ -199,7 +211,10 @@ def _build_consult_tools_for_session(
     if _handoff_depth >= MAX_HANDOFF_DEPTH:
         return []
     return [
-        _make_session_consult_tool(agent_type, session, user, _handoff_depth, task_refs_sink=task_refs_sink)
+        _make_session_consult_tool(
+            agent_type, session, user, _handoff_depth,
+            task_refs_sink=task_refs_sink, document_refs_sink=document_refs_sink,
+        )
         for agent_type in ("portfolio", "resource", "insights")
     ]
 
@@ -274,6 +289,7 @@ def _build_session_tools(
     _handoff_depth: int = 0,
     include_consult: bool = True,
     task_refs_sink: Optional[List[Any]] = None,
+    document_refs_sink: Optional[List[Any]] = None,
 ) -> List[Any]:
     """Build the GTM Agent's tool set, scoped to the current session.
 
@@ -285,12 +301,16 @@ def _build_session_tools(
 
     `task_refs_sink`, when given, is the mutable list real task IDs get
     recorded into as tools resolve them this turn (see
-    agent_runtime.record_task_ref).
+    agent_runtime.record_task_ref). `document_refs_sink` is the equivalent
+    for real AgentDocuments created/edited this turn (see
+    agent_runtime.record_document_ref).
     """
     from .agent_runtime import record_task_ref
 
     if task_refs_sink is None:
         task_refs_sink = []
+    if document_refs_sink is None:
+        document_refs_sink = []
 
     get_gtm_assessment_data = _make_get_gtm_assessment_data_tool(session)
     search_internal_resources = _make_search_internal_resources_tool(session)
@@ -531,7 +551,7 @@ def _build_session_tools(
         resource_allocation_guidance,
         customer_segment_analysis,
         audit_strategic_evidence,
-        *_build_document_tools_for_session(session, user=user),
+        *_build_document_tools_for_session(session, user=user, document_refs_sink=document_refs_sink),
         *build_web_tools(session=session, user=user),
         *build_dashboard_tools(workspace=session.workspace, session=session, user=user, task_refs_sink=task_refs_sink),
         *(
@@ -540,7 +560,8 @@ def _build_session_tools(
         ),
         *(
             _build_consult_tools_for_session(
-                session, user=user, _handoff_depth=_handoff_depth, task_refs_sink=task_refs_sink,
+                session, user=user, _handoff_depth=_handoff_depth,
+                task_refs_sink=task_refs_sink, document_refs_sink=document_refs_sink,
             )
             if include_consult else []
         ),
@@ -1122,7 +1143,7 @@ def handle_general_chat(
     user=None,
     supplemental_context: str = "",
     _handoff_depth: int = 0,
-) -> Tuple[str, List[Dict[str, Any]]]:
+) -> Tuple[str, List[Dict[str, Any]], List[Dict[str, Any]]]:
     """
     The GTM Agent: real multi-turn memory + real Gemini tool-calling (the
     tools built by _build_session_tools), instead of a single-shot call.
@@ -1136,9 +1157,9 @@ def handle_general_chat(
     handle_general_chat_workspace and to make that scope boundary explicit
     rather than silently assumed.
 
-    Returns `(response_text, turn_task_refs)` -- see
+    Returns `(response_text, turn_task_refs, turn_document_refs)` -- see
     handle_general_chat_workspace in workspace_agent_chat.py for what the
-    second element carries and why.
+    second and third elements carry and why.
     """
     # 1. Quota Safety Gate
     from .ai_services import _quota_cooldown_active, _request_budget_available, _is_quota_error, _set_quota_cooldown, _extract_retry_delay_seconds
@@ -1152,7 +1173,7 @@ def handle_general_chat(
             "I'm currently cooling down to stay within my API limits. " +
             f"Your overall GTM score is **{context['overall_score']}/100**. " +
             "Please try asking a detailed question again in about 60 seconds."
-        ), []
+        ), [], []
 
     credit_check = can_spend(account=account)
     if not credit_check.allowed:
@@ -1161,12 +1182,12 @@ def handle_general_chat(
             "You've used all of this workspace's AI credits for today." + reset_note +
             f" In the meantime: your overall GTM score is **{context['overall_score']}/100**. "
             "Try asking for 'scores' or 'action items' for a non-AI answer."
-        ), []
+        ), [], []
 
     # 2. Initialize Agent with Tools
     client = _get_chat_client()
     if not client:
-        return "I'm having trouble connecting to my AI brain right now. Please try again in a moment.", []
+        return "I'm having trouble connecting to my AI brain right now. Please try again in a moment.", [], []
 
     try:
         # 3. Prepare Multimodal Parts (fetch last 3 files for visual context on this turn)
@@ -1190,8 +1211,10 @@ def handle_general_chat(
         # 4. Real multi-turn memory + real tool-calling
         history, history_task_refs = _build_chat_history(session)
         turn_task_refs: List[Dict[str, Any]] = []
+        turn_document_refs: List[Dict[str, Any]] = []
         tools = _build_session_tools(
-            session, user=user, _handoff_depth=_handoff_depth, task_refs_sink=turn_task_refs,
+            session, user=user, _handoff_depth=_handoff_depth,
+            task_refs_sink=turn_task_refs, document_refs_sink=turn_document_refs,
         )
         config = _get_chat_config(tools=tools, task_refs=history_task_refs, session=session, user=user)
 
@@ -1207,7 +1230,7 @@ def handle_general_chat(
             session=session,
         )
 
-        return text or "I've processed your request. Check your action items for the results.", turn_task_refs
+        return text or "I've processed your request. Check your action items for the results.", turn_task_refs, turn_document_refs
 
     except Exception as e:
         # 5. Handle Quota/Rate Limits Gracefully
@@ -1217,7 +1240,7 @@ def handle_general_chat(
                 f"I've hit my temporary GTM strategy quota. Based on your data, your top priority is "
                 f"**{context['weakest_categories'][0]['name']}**. Let's discuss details in a minute! "
                 "If I'd already started creating anything (like tasks) before hitting the limit, it's saved."
-            ), []
+            ), [], []
 
         log_ai_error(
             "Agent reasoning loop failure",
@@ -1231,7 +1254,7 @@ def handle_general_chat(
         return (
             f"I'm processing a lot of data right now. Your current GTM score is {context['overall_score']}/100. "
             "Try asking for 'scores' or 'action items' directly."
-        ), []
+        ), [], []
 
 # ================================================================
 # MAIN CHAT HANDLER
@@ -1246,6 +1269,7 @@ def process_chat_message(
     Primary Entry Point: Routes user messages through the GTM Strategic Agent.
     """
     task_refs: List[Dict[str, Any]] = []
+    document_refs: List[Dict[str, Any]] = []
     try:
         # Get session
         session = get_object_or_404(AssessmentSession, uuid=session_id)
@@ -1284,7 +1308,7 @@ def process_chat_message(
             response_text = handle_show_scores(session, context)
         else:
             # Let the Agent handle everything else with real memory + tool-calling
-            response_text, task_refs = handle_general_chat(
+            response_text, task_refs, document_refs = handle_general_chat(
                 session,
                 context,
                 message,
@@ -1297,6 +1321,7 @@ def process_chat_message(
             "response": response_text,
             "intent": intent,
             "task_refs": task_refs,
+            "document_refs": document_refs,
             "context": {
                 "overall_score": context['overall_score'],
                 "stage": context['stage']

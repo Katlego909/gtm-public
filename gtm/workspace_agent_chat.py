@@ -231,7 +231,9 @@ def format_insights_digest_text(context: Dict[str, Any]) -> str:
 # *which* workspace to act on. Each closure wraps one of the response
 # formatters above, computed against a single fresh context per request.
 
-def _make_draft_client_summary_tool(agent_type: str, workspace: Workspace, user=None):
+def _make_draft_client_summary_tool(
+    agent_type: str, workspace: Workspace, user=None, document_refs_sink: Optional[List[Any]] = None,
+):
     """Shared closure factory for the draft_client_summary tool, made
     available on both the portfolio and insights agents (not resource --
     its job is finding docs/tools, not writing client prose). Uses the
@@ -248,6 +250,7 @@ def _make_draft_client_summary_tool(agent_type: str, workspace: Workspace, user=
         emphasize, e.g. 'focus on Delivery'.
         """
         from .agent_documents import create_agent_document
+        from .agent_runtime import record_document_ref
 
         try:
             summary_text = draft_client_summary_text(workspace, focus)
@@ -260,6 +263,7 @@ def _make_draft_client_summary_tool(agent_type: str, workspace: Workspace, user=
                 workspace=workspace,
                 user=user,
             )
+            record_document_ref(document_refs_sink, doc, action="created")
             return (
                 f"I've drafted a client summary (ID {doc.pk}) -- you can review and export it "
                 "as PDF, Word, or Markdown from the Documents panel."
@@ -271,7 +275,9 @@ def _make_draft_client_summary_tool(agent_type: str, workspace: Workspace, user=
     return draft_client_summary
 
 
-def _build_document_tools(agent_type: str, workspace: Workspace, user=None) -> List[Any]:
+def _build_document_tools(
+    agent_type: str, workspace: Workspace, user=None, document_refs_sink: Optional[List[Any]] = None,
+) -> List[Any]:
     """Generic create/edit/list/read/search document tools, available to
     every workspace agent (not just the ones with a specialized
     draft_client_summary)."""
@@ -279,6 +285,7 @@ def _build_document_tools(agent_type: str, workspace: Workspace, user=None) -> L
         create_agent_document, edit_agent_document, get_agent_document, list_agent_documents,
         search_agent_documents, _snippet_around,
     )
+    from .agent_runtime import record_document_ref
 
     def create_document(title: str, content: str, doc_type: str = "other") -> str:
         """Create and save a new document (e.g. an action plan, roadmap, or
@@ -290,6 +297,7 @@ def _build_document_tools(agent_type: str, workspace: Workspace, user=None) -> L
             agent_type=agent_type, title=title, content=content, doc_type=doc_type,
             workspace=workspace, user=user,
         )
+        record_document_ref(document_refs_sink, doc, action="created")
         return f'Saved "{doc.title}" (ID {doc.pk}) -- you can review and export it from the Documents panel.'
 
     def edit_document(document_id: str, new_content: str) -> str:
@@ -300,6 +308,7 @@ def _build_document_tools(agent_type: str, workspace: Workspace, user=None) -> L
         doc = edit_agent_document(document_id, new_content, workspace=workspace)
         if not doc:
             return "I couldn't find a document with that ID in this workspace."
+        record_document_ref(document_refs_sink, doc, action="updated")
         return f'Updated "{doc.title}" to version {doc.version}.'
 
     def list_documents(doc_type: str = "") -> str:
@@ -377,13 +386,13 @@ def _build_document_tools(agent_type: str, workspace: Workspace, user=None) -> L
 
 def _make_consult_tool(
     target_agent_type: str, workspace: Workspace, user=None, _handoff_depth: int = 0,
-    task_refs_sink: Optional[List[Any]] = None,
+    task_refs_sink: Optional[List[Any]] = None, document_refs_sink: Optional[List[Any]] = None,
 ):
     """Build one consult_<target>_agent tool that hands the question off to
     another workspace agent's full entry point (real memory + real tools),
     and persists the exchange into the target agent's own conversation log
     so it genuinely remembers being consulted."""
-    from .agent_runtime import AGENT_DIRECTORY, record_task_ref
+    from .agent_runtime import AGENT_DIRECTORY, record_document_ref, record_task_ref
 
     info = AGENT_DIRECTORY.get(target_agent_type, {})
     name = info.get("name", target_agent_type)
@@ -394,7 +403,7 @@ def _make_consult_tool(
         from .models import WorkspaceChatMessage
 
         try:
-            answer, nested_task_refs = handle_general_chat_workspace(
+            answer, nested_task_refs, nested_document_refs = handle_general_chat_workspace(
                 target_agent_type, workspace, question, user=user, _handoff_depth=_handoff_depth + 1
             )
             WorkspaceChatMessage.objects.create(
@@ -404,6 +413,7 @@ def _make_consult_tool(
                 message=question,
                 response=answer,
                 task_refs=nested_task_refs,
+                document_refs=nested_document_refs,
                 intent="handoff_query",
             )
             # The consulted peer's own tool calls surfaced these -- fold
@@ -411,6 +421,8 @@ def _make_consult_tool(
             # learned by asking Theo is still actable this same turn.
             for ref in nested_task_refs:
                 record_task_ref(task_refs_sink, ref["id"], ref["note"])
+            for ref in nested_document_refs:
+                record_document_ref(document_refs_sink, ref)
             return answer
         except Exception as e:
             logger.error(f"Handoff to {target_agent_type} failed: {e}")
@@ -426,7 +438,7 @@ def _make_consult_tool(
 
 def _build_consult_tools(
     agent_type: str, workspace: Workspace, user=None, _handoff_depth: int = 0,
-    task_refs_sink: Optional[List[Any]] = None,
+    task_refs_sink: Optional[List[Any]] = None, document_refs_sink: Optional[List[Any]] = None,
 ) -> List[Any]:
     """Build consult tools to this agent's peers, depth-gated so a handoff
     chain is guaranteed to terminate (see agent_runtime.MAX_HANDOFF_DEPTH)."""
@@ -437,7 +449,10 @@ def _build_consult_tools(
 
     peers = [t for t in AGENT_TYPES if t != agent_type]
     return [
-        _make_consult_tool(peer, workspace, user, _handoff_depth, task_refs_sink=task_refs_sink)
+        _make_consult_tool(
+            peer, workspace, user, _handoff_depth,
+            task_refs_sink=task_refs_sink, document_refs_sink=document_refs_sink,
+        )
         for peer in peers
     ]
 
@@ -449,6 +464,7 @@ def _build_workspace_tools(
     _handoff_depth: int = 0,
     include_consult: bool = True,
     task_refs_sink: Optional[List[Any]] = None,
+    document_refs_sink: Optional[List[Any]] = None,
 ) -> List[Any]:
     """Build the tool set for one workspace agent, scoped to `workspace`.
 
@@ -459,6 +475,8 @@ def _build_workspace_tools(
     `task_refs_sink`, when given, is the mutable list real task IDs get
     recorded into as tools resolve them this turn -- see
     agent_runtime.record_task_ref and gtm/agent_actions.py.
+    `document_refs_sink` is the equivalent for real AgentDocuments
+    created/edited this turn -- see agent_runtime.record_document_ref.
     """
     from .agent_actions import build_agent_action_tools
     from .agent_dashboard_tools import build_dashboard_tools
@@ -466,15 +484,18 @@ def _build_workspace_tools(
 
     if task_refs_sink is None:
         task_refs_sink = []
+    if document_refs_sink is None:
+        document_refs_sink = []
 
     context = build_workspace_agent_context(agent_type, workspace, user=user)
-    document_tools = _build_document_tools(agent_type, workspace, user=user)
+    document_tools = _build_document_tools(agent_type, workspace, user=user, document_refs_sink=document_refs_sink)
     web_tools = build_web_tools(workspace=workspace, user=user)
     action_tools = build_agent_action_tools(workspace, user, task_refs_sink=task_refs_sink) if user else []
     dashboard_tools = build_dashboard_tools(workspace=workspace, user=user, task_refs_sink=task_refs_sink) if user else []
     consult_tools = (
         _build_consult_tools(
-            agent_type, workspace, user=user, _handoff_depth=_handoff_depth, task_refs_sink=task_refs_sink,
+            agent_type, workspace, user=user, _handoff_depth=_handoff_depth,
+            task_refs_sink=task_refs_sink, document_refs_sink=document_refs_sink,
         )
         if include_consult else []
     )
@@ -514,7 +535,7 @@ def _build_workspace_tools(
             get_category_trend,
             compare_sessions,
             get_assessment_history,
-            _make_draft_client_summary_tool("portfolio", workspace, user),
+            _make_draft_client_summary_tool("portfolio", workspace, user, document_refs_sink=document_refs_sink),
             *document_tools,
             *web_tools,
             *action_tools,
@@ -594,7 +615,7 @@ def _build_workspace_tools(
             get_activity_summary,
             get_pending_reviews,
             get_overdue_tasks,
-            _make_draft_client_summary_tool("insights", workspace, user),
+            _make_draft_client_summary_tool("insights", workspace, user, document_refs_sink=document_refs_sink),
             *document_tools,
             *web_tools,
             *action_tools,
@@ -720,7 +741,7 @@ def handle_general_chat_workspace(
     user=None,
     _handoff_depth: int = 0,
     supplemental_context: str = "",
-) -> Tuple[str, List[Dict[str, Any]]]:
+) -> Tuple[str, List[Dict[str, Any]], List[Dict[str, Any]]]:
     """The workspace agent's conversational path: real multi-turn memory +
     real Gemini tool-calling via the tools built by _build_workspace_tools.
 
@@ -735,11 +756,13 @@ def handle_general_chat_workspace(
     model but not into `message` itself, so the persisted/displayed chat
     bubble stays the clean text the user actually typed.
 
-    Returns `(response_text, turn_task_refs)` -- the second element is the
-    real ActionItem ids/notes any tool call surfaced this turn (see
-    agent_runtime.record_task_ref), for the caller to persist alongside the
-    response so a later turn can still act on them without either party
-    having shown the raw ID."""
+    Returns `(response_text, turn_task_refs, turn_document_refs)` -- the
+    second element is the real ActionItem ids/notes any tool call surfaced
+    this turn (see agent_runtime.record_task_ref), the third is the real
+    AgentDocument refs any tool call created/edited this turn (see
+    agent_runtime.record_document_ref), for the caller to persist alongside
+    the response so a later turn -- or the chat UI itself -- can still act
+    on them without either party having shown the raw ID."""
     from .ai_services import (
         _extract_retry_delay_seconds,
         _is_quota_error,
@@ -753,16 +776,16 @@ def handle_general_chat_workspace(
     account = resolve_account(workspace=workspace, user=user)
 
     if _quota_cooldown_active():
-        return "I'm currently cooling down to stay within my API limits. Please try again in about 60 seconds.", []
+        return "I'm currently cooling down to stay within my API limits. Please try again in about 60 seconds.", [], []
 
     credit_check = can_spend(account=account)
     if not credit_check.allowed:
         reset_note = f" They reset at {format_reset_time(credit_check.reset_at)}." if credit_check.reset_at else ""
-        return f"You've used all of {workspace.name}'s AI credits for today." + reset_note, []
+        return f"You've used all of {workspace.name}'s AI credits for today." + reset_note, [], []
 
     client = _get_chat_client()
     if not client:
-        return "I'm having trouble connecting to my AI brain right now. Please try again in a moment.", []
+        return "I'm having trouble connecting to my AI brain right now. Please try again in a moment.", [], []
 
     try:
         full_message = message
@@ -771,8 +794,10 @@ def handle_general_chat_workspace(
 
         history, history_task_refs = _build_workspace_chat_history(workspace, agent_type)
         turn_task_refs: List[Dict[str, Any]] = []
+        turn_document_refs: List[Dict[str, Any]] = []
         tools = _build_workspace_tools(
-            agent_type, workspace, user=user, _handoff_depth=_handoff_depth, task_refs_sink=turn_task_refs,
+            agent_type, workspace, user=user, _handoff_depth=_handoff_depth,
+            task_refs_sink=turn_task_refs, document_refs_sink=turn_document_refs,
         )
         config = _get_workspace_chat_config(agent_type, tools=tools, task_refs=history_task_refs, workspace=workspace, user=user)
 
@@ -786,14 +811,14 @@ def handle_general_chat_workspace(
             feature="workspace_agent",
             account=account,
         )
-        return text or "I've processed your request but don't have anything further to add right now.", turn_task_refs
+        return text or "I've processed your request but don't have anything further to add right now.", turn_task_refs, turn_document_refs
     except Exception as e:
         if _is_quota_error(e):
             _set_quota_cooldown(_extract_retry_delay_seconds(e))
             return (
                 "I've hit my temporary GTM strategy quota. Please try again shortly. "
                 "If I'd already started anything before hitting the limit, it's saved."
-            ), []
+            ), [], []
         log_ai_error(
             f"Workspace {agent_type} agent reasoning failure",
             e,
@@ -801,7 +826,7 @@ def handle_general_chat_workspace(
             model="gemini-2.5-flash",
             extra={"workspace_id": str(workspace.id), "agent_type": agent_type},
         )
-        return "I'm processing a lot of data right now. Please try asking again in a moment.", []
+        return "I'm processing a lot of data right now. Please try asking again in a moment.", [], []
 
 
 # ================================================================
@@ -919,10 +944,13 @@ def process_workspace_chat_message(
 
     try:
         workspace = Workspace.objects.get(id=workspace_id)
-        response_text, task_refs = handle_general_chat_workspace(
+        response_text, task_refs, document_refs = handle_general_chat_workspace(
             agent_type, workspace, message, user=user, supplemental_context=supplemental_context
         )
-        return {"success": True, "response": response_text, "intent": "general_chat", "task_refs": task_refs}
+        return {
+            "success": True, "response": response_text, "intent": "general_chat",
+            "task_refs": task_refs, "document_refs": document_refs,
+        }
     except Workspace.DoesNotExist:
         return {"success": False, "response": "Workspace not found.", "intent": "error"}
     except Exception as e:

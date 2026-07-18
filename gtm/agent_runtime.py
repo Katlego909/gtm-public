@@ -122,6 +122,54 @@ def record_task_ref(
     del sink[:-cap]
 
 
+def record_document_ref(
+    sink: Optional[List[Dict[str, Any]]],
+    document_or_ref: Any,
+    action: str = "created",
+    cap: int = 10,
+) -> None:
+    """Record that a tool call created/edited a real AgentDocument this
+    turn, so it can be persisted structurally (see ChatMessage/
+    WorkspaceChatMessage's document_refs field) and rendered as an inline
+    card in the chat bubble instead of only surfacing later in the sidebar
+    Documents panel.
+
+    Accepts either a real AgentDocument instance (the normal case, called
+    right after create_agent_document/edit_agent_document returns -- pass
+    `action="created"`/`"updated"` accordingly) or an already-built ref
+    dict (bubbling a nested turn's document_refs up through a
+    consult/handoff boundary, same idiom record_task_ref uses for task
+    refs). `sink` is a no-op when None. Dedupes by id (repeat id moves to
+    the end, last write wins) and caps at `cap` entries.
+
+    Deliberately does NOT feed into build_task_context_prompt/
+    system_instruction the way record_task_ref does -- document_refs
+    exists purely for client-side display, not for the model's own
+    turn-to-turn grounding (the model already got the doc's id/title back
+    as its own tool-call result text).
+    """
+    if sink is None:
+        return
+    if isinstance(document_or_ref, dict):
+        ref = dict(document_or_ref)
+    else:
+        doc = document_or_ref
+        ref = {
+            "id": str(doc.pk),
+            "title": (doc.title or "Untitled document")[:200],
+            "doc_type": doc.doc_type,
+            "doc_type_display": doc.get_doc_type_display(),
+            "version": doc.version,
+            "action": action,
+        }
+    for i, existing in enumerate(sink):
+        if existing["id"] == ref["id"]:
+            del sink[i]
+            break
+    sink.append(ref)
+    del sink[:-cap]
+
+
 def build_task_context_prompt(task_refs: Optional[List[Dict[str, Any]]] = None) -> str:
     """Shared instruction appended to every agent's system prompt (workspace
     agents, Charlie, and Team mode) covering what a task-reference chain

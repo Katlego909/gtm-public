@@ -335,6 +335,7 @@ def agent_hub(request):
     workspace_agent_history = []
     team_agent_history = []
     team_selected_session = None
+    document_scope_qs = ''
 
     if active_agent_type == 'team':
         from gtm.team_chat import _collect_team_timeline
@@ -350,14 +351,21 @@ def agent_hub(request):
             team_selected_session = assessments_qs.filter(uuid=agent_session_id).first()
 
         timeline = _collect_team_timeline(current_workspace, team_selected_session)
-        for agent_type, created_at, message, response, _task_refs in timeline:
+        for agent_type, created_at, message, response, _task_refs, document_refs in timeline:
             team_agent_history.append({
                 'agent_type': agent_type,
                 'agent_label': agent_display_label(agent_type),
                 'message': message,
                 'response_html': _md(response or ''),
                 'created_at': created_at,
+                'document_refs': document_refs or [],
             })
+        if current_workspace:
+            document_scope_qs = f'?workspace={current_workspace.id}'
+            if team_selected_session:
+                document_scope_qs += f'&session_id={team_selected_session.uuid}'
+        elif team_selected_session:
+            document_scope_qs = f'?session_id={team_selected_session.uuid}'
     elif active_agent_type == 'session':
         completed_sessions = assessments_qs.filter(is_completed=True).order_by('-created_at')[:10]
         agent_session_options = [
@@ -389,6 +397,9 @@ def agent_hub(request):
             for chat in chats:
                 chat.response_html = _md(chat.response or '')
             dashboard_agent_history = chats
+            document_scope_qs = f'?session_id={dashboard_agent_session.uuid}'
+            if current_workspace:
+                document_scope_qs += f'&workspace={current_workspace.id}'
     elif current_workspace:
         workspace_agent_prompts = get_suggested_prompts_for_agent(active_agent_type, current_workspace)
         history_qs = WorkspaceChatMessage.objects.filter(
@@ -398,6 +409,7 @@ def agent_hub(request):
         for chat in chats:
             chat.response_html = _md(chat.response or '')
         workspace_agent_history = chats
+        document_scope_qs = f'?workspace={current_workspace.id}'
 
     # 'session' maps to the "gtm_strategist" AGENT_DIRECTORY entry; the 3
     # workspace agent tabs use their agent_type directly as the key.
@@ -416,11 +428,11 @@ def agent_hub(request):
         'active_agent_name': active_agent_name,
         'active_agent_display': active_agent_display,
         'agent_tabs': [
-            ('session', f"{AGENT_DIRECTORY['gtm_strategist']['name']} · GTM Agent"),
-            ('portfolio', f"{AGENT_DIRECTORY['portfolio']['name']} · Portfolio"),
-            ('resource', f"{AGENT_DIRECTORY['resource']['name']} · Resources"),
-            ('insights', f"{AGENT_DIRECTORY['insights']['name']} · Insights"),
-            ('team', 'Team'),
+            ('session', f"{AGENT_DIRECTORY['gtm_strategist']['name']} · GTM Agent", AGENT_DIRECTORY['gtm_strategist']['name'][0]),
+            ('portfolio', f"{AGENT_DIRECTORY['portfolio']['name']} · Portfolio", AGENT_DIRECTORY['portfolio']['name'][0]),
+            ('resource', f"{AGENT_DIRECTORY['resource']['name']} · Resources", AGENT_DIRECTORY['resource']['name'][0]),
+            ('insights', f"{AGENT_DIRECTORY['insights']['name']} · Insights", AGENT_DIRECTORY['insights']['name'][0]),
+            ('team', 'Team · All Agents', None),
         ],
         'agent_display_labels': {at: agent_display_label(at) for at in AGENT_DIRECTORY},
         'agent_session_options': agent_session_options,
@@ -432,6 +444,7 @@ def agent_hub(request):
         'team_agent_history': team_agent_history,
         'team_selected_session': team_selected_session,
         'team_agent_names_display': team_agent_names_display,
+        'document_scope_qs': document_scope_qs,
         'pending_items': pending_items,
         'page_title': 'Team',
     }

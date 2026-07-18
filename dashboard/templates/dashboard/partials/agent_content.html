@@ -28,14 +28,21 @@
             <p class="text-gray-600 mt-2">Talk to your GTM agent with persistent context and history.</p>
         </div>
 
-        <div class="mb-6 flex flex-wrap gap-2 border-b border-gray-200">
-            {% for tab_type, tab_label in agent_tabs %}
+        <div class="mb-6 flex flex-wrap gap-2">
+            {% for tab_type, tab_label, tab_initial in agent_tabs %}
             <a href="{% url 'agent_hub' %}?agent_type={{ tab_type }}{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
                hx-get="{% url 'agent_hub' %}?agent_type={{ tab_type }}{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
                hx-target="#main-content"
                hx-swap="innerHTML swap:200ms"
                hx-push-url="true"
-               class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition {% if active_agent_type == tab_type %}border-indigo-600 text-indigo-700{% else %}border-transparent text-gray-500 hover:text-gray-700{% endif %}">
+               class="app-chip transition {% if active_agent_type == tab_type %}bg-indigo-600 text-white{% else %}bg-gray-50 border border-gray-200 text-gray-600 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700{% endif %}">
+                <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 {% if active_agent_type == tab_type %}bg-white/20 text-white{% else %}bg-indigo-100 text-indigo-700{% endif %}">
+                    {% if tab_initial %}{{ tab_initial }}{% else %}
+                    <svg viewBox="0 0 16 16" fill="currentColor" class="w-2.5 h-2.5" aria-hidden="true">
+                        <circle cx="4" cy="4" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/>
+                    </svg>
+                    {% endif %}
+                </span>
                 {{ tab_label }}
             </a>
             {% endfor %}
@@ -43,7 +50,7 @@
 
         {% if active_agent_type == 'session' %}
         {% if agent_session_options %}
-        <div class="grid grid-cols-1 xl:grid-cols-[320px,1fr] gap-6">
+        <div class="grid grid-cols-1 xl:grid-cols-[320px,1fr] gap-6 items-start">
             <aside class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 h-fit sticky top-4">
                 {% if active_agent_display %}<p class="text-xs font-semibold text-indigo-600 mb-3">{{ active_agent_display }}</p>{% endif %}
                 <div>
@@ -92,7 +99,7 @@
                         <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Documents</p>
                         <button type="button" onclick="refreshDocumentsPanel()" class="text-xs text-indigo-600 hover:underline">Refresh</button>
                     </div>
-                    <div id="documents-list" data-scope-qs="?session_id={{ dashboard_agent_session.uuid }}{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}&exclude_doc_type=action_item_deliverable" class="space-y-2 text-sm text-gray-500">Loading...</div>
+                    <div id="documents-list" data-scope-qs="?session_id={{ dashboard_agent_session.uuid }}{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}&exclude_doc_type=action_item_deliverable" class="text-sm text-gray-500">Loading...</div>
                 </div>
             </aside>
 
@@ -102,8 +109,9 @@
                     <div class="flex items-start gap-3 justify-end">
                         <div class="bg-gray-900 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm max-w-3xl whitespace-pre-wrap">{{ chat.message }}</div>
                     </div>
-                    <div class="flex items-start gap-3">
+                    <div class="flex flex-col items-start gap-1">
                         <div class="agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl">{{ chat.response_html|safe }}</div>
+                        {% include 'dashboard/partials/_document_ref_cards.html' with refs=chat.document_refs scope_qs=document_scope_qs %}
                     </div>
                     {% endfor %}
 
@@ -151,7 +159,7 @@
         {% endif %}
         {% elif active_agent_type == 'team' %}
         {% if current_workspace or agent_session_options %}
-        <div class="grid grid-cols-1 xl:grid-cols-[320px,1fr] gap-6">
+        <div class="grid grid-cols-1 xl:grid-cols-[320px,1fr] gap-6 items-start">
             <aside class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 h-fit sticky top-4">
                 <p class="text-sm font-semibold text-gray-700 mb-2">Team Chat</p>
                 <p class="text-xs text-gray-500">
@@ -176,7 +184,7 @@
                         <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Documents</p>
                         <button type="button" onclick="refreshDocumentsPanel()" class="text-xs text-indigo-600 hover:underline">Refresh</button>
                     </div>
-                    <div id="documents-list" data-scope-qs="?{% if current_workspace %}workspace={{ current_workspace.id }}{% if team_selected_session %}&session_id={{ team_selected_session.uuid }}{% endif %}{% elif team_selected_session %}session_id={{ team_selected_session.uuid }}{% endif %}&exclude_doc_type=action_item_deliverable" class="space-y-2 text-sm text-gray-500">Loading...</div>
+                    <div id="documents-list" data-scope-qs="?{% if current_workspace %}workspace={{ current_workspace.id }}{% if team_selected_session %}&session_id={{ team_selected_session.uuid }}{% endif %}{% elif team_selected_session %}session_id={{ team_selected_session.uuid }}{% endif %}&exclude_doc_type=action_item_deliverable" class="text-sm text-gray-500">Loading...</div>
                 </div>
             </aside>
 
@@ -189,6 +197,7 @@
                     <div class="flex flex-col items-start gap-1">
                         <span class="text-xs font-semibold text-indigo-600 ml-1">{{ chat.agent_label }}</span>
                         <div class="agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl">{{ chat.response_html|safe }}</div>
+                        {% include 'dashboard/partials/_document_ref_cards.html' with refs=chat.document_refs scope_qs=document_scope_qs %}
                     </div>
                     {% endfor %}
 
@@ -234,7 +243,7 @@
             <p class="text-sm text-gray-500 mt-2">Portfolio, Resource, and Insights agents reason across a workspace's assessments.</p>
         </div>
         {% else %}
-        <div class="grid grid-cols-1 xl:grid-cols-[320px,1fr] gap-6">
+        <div class="grid grid-cols-1 xl:grid-cols-[320px,1fr] gap-6 items-start">
             <aside class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 h-fit sticky top-4">
                 {% if active_agent_display %}<p class="text-xs font-semibold text-indigo-600 mb-1">{{ active_agent_display }}</p>{% endif %}
                 <p class="text-sm font-semibold text-gray-700 mb-2">{{ current_workspace.name }}</p>
@@ -264,7 +273,7 @@
                         </button>
                         {% endfor %}
                         {% if active_agent_type == 'portfolio' or active_agent_type == 'insights' %}
-                        <button type="button" onclick="sendWorkspaceAgentPrompt('Draft a client summary I can send to the client')" class="px-3 py-2 text-sm text-left rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition">
+                        <button type="button" onclick="sendWorkspaceAgentPrompt('Draft a client summary I can send to the client')" class="px-3 py-2 text-sm text-left rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition">
                             Draft a client summary
                         </button>
                         {% endif %}
@@ -277,7 +286,7 @@
                         <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Documents</p>
                         <button type="button" onclick="refreshDocumentsPanel()" class="text-xs text-indigo-600 hover:underline">Refresh</button>
                     </div>
-                    <div id="documents-list" data-scope-qs="?workspace={{ current_workspace.id }}&exclude_doc_type=action_item_deliverable" class="space-y-2 text-sm text-gray-500">Loading...</div>
+                    <div id="documents-list" data-scope-qs="?workspace={{ current_workspace.id }}&exclude_doc_type=action_item_deliverable" class="text-sm text-gray-500">Loading...</div>
                 </div>
             </aside>
 
@@ -287,8 +296,9 @@
                     <div class="flex items-start gap-3 justify-end">
                         <div class="bg-gray-900 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm max-w-3xl whitespace-pre-wrap">{{ chat.message }}</div>
                     </div>
-                    <div class="flex items-start gap-3">
+                    <div class="flex flex-col items-start gap-1">
                         <div class="agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl">{{ chat.response_html|safe }}</div>
+                        {% include 'dashboard/partials/_document_ref_cards.html' with refs=chat.document_refs scope_qs=document_scope_qs %}
                     </div>
                     {% endfor %}
 
@@ -336,7 +346,7 @@
 </div>
 
 <script>
-function appendDashboardAgentMessage(message, isUser, responseHtml, containerId) {
+function appendDashboardAgentMessage(message, isUser, responseHtml, containerId, documentRefs) {
     const container = document.getElementById(containerId || 'dashboard-agent-messages');
     if (!container) return;
 
@@ -346,7 +356,7 @@ function appendDashboardAgentMessage(message, isUser, responseHtml, containerId)
         .replaceAll('>', '&gt;');
 
     const wrapper = document.createElement('div');
-    wrapper.className = isUser ? 'flex items-start gap-3 justify-end' : 'flex items-start gap-3';
+    wrapper.className = isUser ? 'flex items-start gap-3 justify-end' : 'flex flex-col items-start gap-1';
 
     if (isUser) {
         wrapper.innerHTML = `
@@ -360,8 +370,13 @@ function appendDashboardAgentMessage(message, isUser, responseHtml, containerId)
         } else {
             bubble.textContent = message || '';
         }
-        wrapper.innerHTML = ``;
         wrapper.appendChild(bubble);
+        const cardsHtml = renderDocumentRefCardsHTML(documentRefs);
+        if (cardsHtml) {
+            const cardsWrapper = document.createElement('div');
+            cardsWrapper.innerHTML = cardsHtml;
+            wrapper.appendChild(cardsWrapper);
+        }
     }
 
     container.appendChild(wrapper);
@@ -437,7 +452,10 @@ async function sendDashboardAgentMessage(message) {
         }
 
         const data = await response.json();
-        appendDashboardAgentMessage(data.success ? data.response : `Error: ${data.error || 'Unknown error'}`, false, data.response_html || '');
+        appendDashboardAgentMessage(data.success ? data.response : `Error: ${data.error || 'Unknown error'}`, false, data.response_html || '', null, data.document_refs);
+        if (data.success && data.document_refs && data.document_refs.length) {
+            refreshDocumentsPanel();
+        }
 
         if (data.success && data.intent === 'dashboard_action' && window.htmx) {
             htmx.trigger(document.body, 'refreshNotifications');
@@ -714,8 +732,12 @@ async function sendWorkspaceAgentMessage(agentType, message) {
             data.success ? data.response : `Error: ${data.error || 'Unknown error'}`,
             false,
             data.response_html || '',
-            'workspace-agent-messages'
+            'workspace-agent-messages',
+            data.document_refs
         );
+        if (data.success && data.document_refs && data.document_refs.length) {
+            refreshDocumentsPanel();
+        }
     } catch (error) {
         appendDashboardAgentMessage('Error: Could not reach the dashboard agent.', false, null, 'workspace-agent-messages');
     } finally {
@@ -883,23 +905,45 @@ function escapeHtml(str) {
 function renderDocumentsList(docs) {
     const container = document.getElementById('documents-list');
     if (!container) return;
-    const scopeQs = container.dataset.scopeQs || '';
 
     if (!docs.length) {
         container.innerHTML = '<p class="text-xs text-gray-400">No documents saved yet. Ask the agent to create one, e.g. "save this as a document."</p>';
         return;
     }
 
-    container.innerHTML = docs.map(d => `
-        <div class="border border-gray-200 rounded-lg p-3">
-            <p class="text-sm font-medium text-gray-800">${escapeHtml(d.title)}</p>
-            <p class="text-xs text-gray-400">${escapeHtml(d.doc_type_display)} &middot; v${d.version} &middot; ${new Date(d.updated_at).toLocaleDateString()}</p>
-            <div class="mt-2 flex flex-wrap gap-2 text-xs">
-                <button type="button" onclick="openDocumentEditor('${d.id}')" class="text-indigo-600 hover:underline">Edit</button>
-                <a href="/dashboard/documents/${d.id}/export/pdf/${scopeQs}" target="_blank" class="text-indigo-600 hover:underline">PDF</a>
-                <a href="/dashboard/documents/${d.id}/export/docx/${scopeQs}" target="_blank" class="text-indigo-600 hover:underline">Word</a>
-                <a href="/dashboard/documents/${d.id}/export/md/${scopeQs}" target="_blank" class="text-indigo-600 hover:underline">Markdown</a>
-            </div>
+    // Full documents (title, version, edit/export links) surface as inline
+    // cards in the chat itself right when they're created/edited (see
+    // renderDocumentRefCardsHTML) -- this sidebar stays a compact pointer
+    // to the complete cross-agent history in the Library, not a duplicate
+    // full list, so it can never grow tall enough to stretch this panel.
+    const count = docs.length;
+    container.innerHTML = `
+        <a href="/dashboard/assets/" hx-get="/dashboard/assets/" hx-target="#main-content" hx-push-url="true"
+           class="text-xs text-indigo-600 hover:underline">
+            ${count} document${count === 1 ? '' : 's'} &middot; View all in Library &rarr;
+        </a>
+    `;
+    // Dynamically-injected HTML isn't auto-wired by HTMX -- unlike the
+    // static hx-get links elsewhere on this page, this one only exists
+    // after this fetch resolves, so it needs an explicit process() call.
+    if (window.htmx) {
+        htmx.process(container);
+    }
+}
+
+function renderDocumentRefCardsHTML(refs) {
+    if (!refs || !refs.length) return '';
+    const listContainer = document.getElementById('documents-list');
+    const scopeQs = (listContainer && listContainer.dataset.scopeQs) || '';
+    return refs.map(ref => `
+        <div class="mb-2">
+            <a href="/dashboard/documents/${ref.id}/export/pdf/${scopeQs}" target="_blank"
+               class="inline-flex items-center gap-2 px-2 py-1 bg-indigo-50 text-indigo-700 text-xs rounded-md hover:bg-indigo-100 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                ${escapeHtml((ref.action || 'created').replace(/^./, c => c.toUpperCase()))}: ${escapeHtml(ref.title)} (${escapeHtml(ref.doc_type_display)}, v${ref.version})
+            </a>
         </div>
     `).join('');
 }
@@ -1048,7 +1092,7 @@ function initWorkspaceAgent() {
 
 const TEAM_AGENT_LABELS = JSON.parse(document.getElementById('agent-display-labels').textContent);
 
-function appendTeamAgentMessage(message, isUser, responseHtml, agentType) {
+function appendTeamAgentMessage(message, isUser, responseHtml, agentType, documentRefs) {
     const container = document.getElementById('team-agent-messages');
     if (!container) return;
 
@@ -1079,6 +1123,12 @@ function appendTeamAgentMessage(message, isUser, responseHtml, agentType) {
         }
         wrapper.appendChild(labelEl);
         wrapper.appendChild(bubble);
+        const cardsHtml = renderDocumentRefCardsHTML(documentRefs);
+        if (cardsHtml) {
+            const cardsWrapper = document.createElement('div');
+            cardsWrapper.innerHTML = cardsHtml;
+            wrapper.appendChild(cardsWrapper);
+        }
     }
 
     container.appendChild(wrapper);
@@ -1147,8 +1197,12 @@ async function sendTeamAgentMessage(message) {
             data.success ? data.response : `Error: ${data.error || 'Unknown error'}`,
             false,
             data.response_html || '',
-            data.agent_type
+            data.agent_type,
+            data.document_refs
         );
+        if (data.success && data.document_refs && data.document_refs.length) {
+            refreshDocumentsPanel();
+        }
     } catch (error) {
         appendTeamAgentMessage('Error: Could not reach the team agent.', false, null, null);
     } finally {

@@ -214,17 +214,23 @@ class TaskIdGroundingTests(TestCase):
 
     def test_consult_tool_merges_nested_task_refs_into_outer_sink(self):
         outer_sink = []
+        outer_document_sink = []
         with patch(
             "gtm.workspace_agent_chat.handle_general_chat_workspace",
-            return_value=("Theo's answer.", [{"id": 999, "note": "Nested task"}]),
+            return_value=("Theo's answer.", [{"id": 999, "note": "Nested task"}], [
+                {"id": "doc-1", "title": "Nested doc", "doc_type": "other",
+                 "doc_type_display": "Other", "version": 1, "action": "created"},
+            ]),
         ):
             tools = {
                 t.__name__: t
                 for t in _build_workspace_tools(
-                    "portfolio", self.workspace, user=self.user, task_refs_sink=outer_sink,
+                    "portfolio", self.workspace, user=self.user,
+                    task_refs_sink=outer_sink, document_refs_sink=outer_document_sink,
                 )
             }
             result = tools["consult_resource_agent"]("What resources do we have?")
 
         self.assertEqual(result, "Theo's answer.")
         self.assertIn({"id": 999, "note": "Nested task"}, outer_sink)
+        self.assertEqual(outer_document_sink[0]["id"], "doc-1")

@@ -384,6 +384,7 @@ class ChatMessage(models.Model):
     response = models.TextField()
     attachments = models.JSONField(default=list, blank=True)
     task_refs = models.JSONField(default=list, blank=True)
+    document_refs = models.JSONField(default=list, blank=True)
     intent = models.CharField(max_length=50, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -428,6 +429,7 @@ class WorkspaceChatMessage(models.Model):
     response = models.TextField()
     attachments = models.JSONField(default=list, blank=True)
     task_refs = models.JSONField(default=list, blank=True)
+    document_refs = models.JSONField(default=list, blank=True)
     intent = models.CharField(max_length=50, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

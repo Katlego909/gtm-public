@@ -106,6 +106,7 @@ def dashboard_workspace_agent_api(request, agent_type):
             response=result.get("response", ""),
             attachments=attachments,
             task_refs=result.get("task_refs", []),
+            document_refs=result.get("document_refs", []),
             intent=result.get("intent", ""),
         )
         result["response_html"] = _md(result.get("response", ""))

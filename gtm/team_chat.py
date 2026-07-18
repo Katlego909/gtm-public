@@ -73,11 +73,17 @@ def _collect_team_timeline(workspace: Optional[Workspace], session: Optional[Ass
             .exclude(intent__in=["insights_digest", "client_summary"])
             .order_by('-created_at')[:max_turns]
         )
-        entries += [(row.agent_type, row.created_at, row.message, row.response, row.task_refs) for row in rows]
+        entries += [
+            (row.agent_type, row.created_at, row.message, row.response, row.task_refs, row.document_refs)
+            for row in rows
+        ]
 
     if session is not None:
         rows = list(ChatMessage.objects.filter(session=session).order_by('-created_at')[:max_turns])
-        entries += [("gtm_strategist", row.created_at, row.message, row.response, row.task_refs) for row in rows]
+        entries += [
+            ("gtm_strategist", row.created_at, row.message, row.response, row.task_refs, row.document_refs)
+            for row in rows
+        ]
 
     entries.sort(key=lambda entry: entry[1])
     return entries[-max_turns:]
@@ -121,10 +127,10 @@ def _build_team_history(
             message,
             response,
         )
-        for agent_type, _created_at, message, response, _task_refs in timeline
+        for agent_type, _created_at, message, response, _task_refs, _document_refs in timeline
     ]
     history_task_refs: List[Dict[str, Any]] = []
-    for _agent_type, _created_at, _message, _response, task_refs in timeline:
+    for _agent_type, _created_at, _message, _response, task_refs, _document_refs in timeline:
         for ref in (task_refs or []):
             record_task_ref(history_task_refs, ref["id"], ref["note"], cap=12)
     return build_tagged_content_history(tagged, max_turns=max_turns), history_task_refs
@@ -261,12 +267,13 @@ def _call_tool(name: str, args: Optional[Dict[str, Any]], tool_map: Dict[str, An
 def _run_team_turn(agent_type, workspace, session, message, user, allow_transfer):
     """Run one agent's turn in Team mode via a manual function-calling
     loop. Returns (agent_type, text_or_None, transfer_target_or_None,
-    transfer_reason_or_None, turn_task_refs) -- text is None exactly when a
-    transfer was requested, and vice versa. turn_task_refs carries real
-    task IDs this turn's tool calls surfaced (see
-    agent_runtime.record_task_ref) even on a transfer -- an agent may call
-    find_tasks right before deciding to hand off, and that grounding still
-    needs to reach whoever ultimately persists the turn."""
+    transfer_reason_or_None, turn_task_refs, turn_document_refs) -- text is
+    None exactly when a transfer was requested, and vice versa.
+    turn_task_refs/turn_document_refs carry real task IDs and AgentDocument
+    refs this turn's tool calls surfaced (see agent_runtime.record_task_ref/
+    record_document_ref) even on a transfer -- an agent may call find_tasks
+    or create_document right before deciding to hand off, and that
+    grounding still needs to reach whoever ultimately persists the turn."""
     from .agent_runtime import strip_task_id_brackets
     from .ai_services import (
         _extract_retry_delay_seconds,
@@ -280,6 +287,7 @@ def _run_team_turn(agent_type, workspace, session, message, user, allow_transfer
     from .utils_ai_monitoring import AIUsageTracker
 
     turn_task_refs: List[Dict[str, Any]] = []
+    turn_document_refs: List[Dict[str, Any]] = []
 
     account = resolve_account(workspace=workspace, user=user) or resolve_account_for_session(session, user=user)
 
@@ -287,7 +295,7 @@ def _run_team_turn(agent_type, workspace, session, message, user, allow_transfer
         return (
             agent_type,
             "I'm currently cooling down to stay within my API limits. Please try again in about 60 seconds.",
-            None, None, turn_task_refs,
+            None, None, turn_task_refs, turn_document_refs,
         )
 
     credit_check = can_spend(account=account)
@@ -295,7 +303,7 @@ def _run_team_turn(agent_type, workspace, session, message, user, allow_transfer
         reset_note = f" They reset at {format_reset_time(credit_check.reset_at)}." if credit_check.reset_at else ""
         return (
             agent_type, "This workspace has used all of its AI credits for today." + reset_note,
-            None, None, turn_task_refs,
+            None, None, turn_task_refs, turn_document_refs,
         )
 
     def _record_usage(resp):
@@ -310,17 +318,21 @@ def _run_team_turn(agent_type, workspace, session, message, user, allow_transfer
     if not client:
         return (
             agent_type, "I'm having trouble connecting to my AI brain right now. Please try again in a moment.",
-            None, None, turn_task_refs,
+            None, None, turn_task_refs, turn_document_refs,
         )
 
     if agent_type == "gtm_strategist":
         domain_tools = (
-            _build_session_tools(session, user=user, include_consult=False, task_refs_sink=turn_task_refs)
+            _build_session_tools(
+                session, user=user, include_consult=False,
+                task_refs_sink=turn_task_refs, document_refs_sink=turn_document_refs,
+            )
             if session else []
         )
     else:
         domain_tools = _build_workspace_tools(
-            agent_type, workspace, user=user, include_consult=False, task_refs_sink=turn_task_refs,
+            agent_type, workspace, user=user, include_consult=False,
+            task_refs_sink=turn_task_refs, document_refs_sink=turn_document_refs,
         )
 
     transfer_tools = _build_transfer_tools(agent_type, has_session=session is not None) if allow_transfer else []
@@ -344,14 +356,14 @@ def _run_team_turn(agent_type, workspace, session, message, user, allow_transfer
                 return (
                     agent_type,
                     text or "I've processed your request but don't have anything further to add right now.",
-                    None, None, turn_task_refs,
+                    None, None, turn_task_refs, turn_document_refs,
                 )
 
             transfer_call = next((c for c in calls if c.name.startswith("transfer_to_")), None)
             if transfer_call:
                 target = _agent_type_from_transfer_tool_name(transfer_call.name)
                 reason = (transfer_call.args or {}).get("reason", "")
-                return agent_type, None, target, reason, turn_task_refs
+                return agent_type, None, target, reason, turn_task_refs, turn_document_refs
 
             parts = [
                 types.Part.from_function_response(
@@ -368,7 +380,7 @@ def _run_team_turn(agent_type, workspace, session, message, user, allow_transfer
         return (
             agent_type,
             text or "I've processed your request but don't have anything further to add right now.",
-            None, None, turn_task_refs,
+            None, None, turn_task_refs, turn_document_refs,
         )
 
     except Exception as e:
@@ -376,7 +388,7 @@ def _run_team_turn(agent_type, workspace, session, message, user, allow_transfer
             _set_quota_cooldown(_extract_retry_delay_seconds(e))
             return (
                 agent_type, "I've hit my temporary GTM strategy quota. Please try again shortly.",
-                None, None, turn_task_refs,
+                None, None, turn_task_refs, turn_document_refs,
             )
         log_ai_error(
             f"Team chat turn failure ({agent_type})",
@@ -387,11 +399,14 @@ def _run_team_turn(agent_type, workspace, session, message, user, allow_transfer
         )
         return (
             agent_type, "I'm processing a lot of data right now. Please try asking again in a moment.",
-            None, None, turn_task_refs,
+            None, None, turn_task_refs, turn_document_refs,
         )
 
 
-def _persist_team_turn(agent_type, workspace, session, message, text, user, attachments=None, task_refs=None):
+def _persist_team_turn(
+    agent_type, workspace, session, message, text, user,
+    attachments=None, task_refs=None, document_refs=None,
+):
     """Persist into exactly the same table the responding agent would use
     if talked to directly -- so a Team-tab exchange is immediately visible
     from that agent's own tab too (same underlying storage, no new model)."""
@@ -406,6 +421,7 @@ def _persist_team_turn(agent_type, workspace, session, message, text, user, atta
             response=text,
             attachments=attachments or [],
             task_refs=task_refs or [],
+            document_refs=document_refs or [],
             intent="general_chat",
         )
     else:
@@ -421,6 +437,7 @@ def _persist_team_turn(agent_type, workspace, session, message, text, user, atta
             response=text,
             attachments=attachments or [],
             task_refs=task_refs or [],
+            document_refs=document_refs or [],
             intent="general_chat",
         )
 
@@ -453,7 +470,7 @@ def process_team_chat_message(
         if workspace is None and session is None:
             return {"success": False, "response": "Select a workspace or assessment first.", "agent_type": None}
 
-        from .agent_runtime import record_task_ref
+        from .agent_runtime import record_document_ref, record_task_ref
 
         active_type = _resolve_active_agent_type(workspace, session)
         llm_message = message
@@ -462,17 +479,20 @@ def process_team_chat_message(
         current_message = llm_message
         transfers = 0
         accumulated_task_refs: List[Dict[str, Any]] = []
+        accumulated_document_refs: List[Dict[str, Any]] = []
 
         while True:
-            agent_type, text, transfer_target, transfer_reason, turn_task_refs = _run_team_turn(
+            agent_type, text, transfer_target, transfer_reason, turn_task_refs, turn_document_refs = _run_team_turn(
                 active_type, workspace, session, current_message, user,
                 allow_transfer=(transfers < max_transfers),
             )
-            # A transferring agent may have called find_tasks right before
-            # handing off -- keep that grounding even though its own text
-            # reply is None and gets discarded below.
+            # A transferring agent may have called find_tasks/create_document
+            # right before handing off -- keep that grounding even though
+            # its own text reply is None and gets discarded below.
             for ref in turn_task_refs:
                 record_task_ref(accumulated_task_refs, ref["id"], ref["note"])
+            for ref in turn_document_refs:
+                record_document_ref(accumulated_document_refs, ref)
 
             if transfer_target:
                 transfers += 1
@@ -491,9 +511,12 @@ def process_team_chat_message(
 
             _persist_team_turn(
                 agent_type, workspace, session, message, text, user, attachments=attachments,
-                task_refs=accumulated_task_refs,
+                task_refs=accumulated_task_refs, document_refs=accumulated_document_refs,
             )
-            return {"success": True, "response": text, "agent_type": agent_type}
+            return {
+                "success": True, "response": text, "agent_type": agent_type,
+                "document_refs": accumulated_document_refs,
+            }
 
     except Exception as e:
         logger.error(f"Team chat processing error: {e}")
