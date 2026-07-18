@@ -118,15 +118,21 @@ def build_resource_gap_matches(workspace: Workspace) -> Dict[str, Any]:
     }
 
 
-def build_workspace_insights_digest(workspace: Workspace, persist: bool = True) -> Dict[str, Any]:
+def build_workspace_insights_digest(workspace: Workspace, user=None, persist: bool = True) -> Dict[str, Any]:
     """Aggregate recent activity, score deltas, and pending review items into a digest.
 
     `persist` controls whether callers intend to save the digest text as a
     WorkspaceChatMessage — this function itself only computes the data, it
     does not write to the DB (persistence is the caller's responsibility so
     this stays testable without hitting the chat table).
+
+    `user`, when given, adds that user's own unread-notification count.
+    Omit it for a workspace-wide broadcast digest (e.g. the scheduled
+    refresh notified out to several recipients) where a single user's
+    inbox count wouldn't mean anything to the group.
     """
-    from dashboard.models import GapAnalysisSuggestion
+    from dashboard.models import GapAnalysisSuggestion, Notification
+    from dashboard.views.helpers import _gap_metric_scope_queryset
 
     trends = build_portfolio_trends(workspace)
 
@@ -146,6 +152,13 @@ def build_workspace_insights_digest(workspace: Workspace, persist: bool = True) 
     overdue_actions = list(open_actions.filter(due_date__lt=today).select_related("assigned_to"))
     open_count = open_actions.count()
 
+    open_gaps = _gap_metric_scope_queryset(user, workspace).filter(status="open")
+    open_gap_count = open_gaps.count()
+    high_priority_open_gap_count = open_gaps.filter(priority="High").count()
+    unread_notification_count = (
+        Notification.objects.filter(recipient=user, workspace=workspace, is_read=False).count() if user else 0
+    )
+
     return {
         "trends": trends,
         "recent_events": recent_events,
@@ -154,5 +167,8 @@ def build_workspace_insights_digest(workspace: Workspace, persist: bool = True) 
         "open_action_count": open_count,
         "overdue_actions": overdue_actions,
         "overdue_action_count": len(overdue_actions),
+        "open_gap_count": open_gap_count,
+        "high_priority_open_gap_count": high_priority_open_gap_count,
+        "unread_notification_count": unread_notification_count,
         "generated_at": timezone.now(),
     }

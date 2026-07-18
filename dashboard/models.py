@@ -139,6 +139,7 @@ class GapMetricMeasurement(models.Model):
     SOURCE_CHOICES = [
         ('manual', 'Manual check-in'),
         ('crm', 'CRM'),
+        ('agent', 'AI agent (chat-relayed)'),
     ]
 
     gap_metric = models.ForeignKey(GapAnalysisMetric, on_delete=models.CASCADE, related_name='measurements')

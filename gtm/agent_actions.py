@@ -13,7 +13,6 @@ from typing import Any, List, Optional
 from django.utils import timezone
 
 from .models import ActionItem, ActionItemComment, AssessmentSession
-from .models_workspace import WorkspaceMembership
 
 
 def _agent_name_hint(candidate: str, *, action: str = "consult") -> Optional[str]:
@@ -61,6 +60,7 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
     from dashboard.views.helpers import _upsert_gap_metric_in_scope
     from dashboard.models import AIResourceRecommendation, GapAnalysisMetric, Resource
     from django.utils.dateparse import parse_date
+    from .agent_dashboard_tools import _check_workspace_permission
     from .agent_runtime import record_task_ref
 
     def notify_teammate(username: str, title: str, message: str, link: str = "") -> str:
@@ -68,6 +68,9 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
         workspace. `username` can be a name, username, or email. Use this to
         flag something to a specific person instead of only replying in chat.
         """
+        denial = _check_workspace_permission(workspace, user)
+        if denial:
+            return denial
         recipient = _resolve_assignee(workspace, username)
         if not recipient:
             return _agent_name_hint(username) or f"I couldn't find a teammate matching '{username}' in this workspace."
@@ -84,6 +87,9 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
         already have this task's real ID. Use this to share findings or ask
         a question about a specific task without changing its status.
         """
+        denial = _check_workspace_permission(workspace, user)
+        if denial:
+            return denial
         try:
             item = ActionItem.objects.get(pk=int(action_item_id), workspace=workspace)
         except (ActionItem.DoesNotExist, ValueError, TypeError):
@@ -103,11 +109,9 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
         be a name, username, or email. Only usable if the requesting user
         has task-assignment permission in this workspace.
         """
-        membership = WorkspaceMembership.objects.filter(
-            workspace=workspace, user=user, is_active=True
-        ).first()
-        if not membership or not membership.can_assign_tasks:
-            return "You don't have permission to assign tasks in this workspace."
+        denial = _check_workspace_permission(workspace, user, permission="can_assign_tasks")
+        if denial:
+            return denial
         try:
             item = ActionItem.objects.get(pk=int(action_item_id), workspace=workspace)
         except (ActionItem.DoesNotExist, ValueError, TypeError):
@@ -137,11 +141,9 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
             valid = ", ".join(AGENT_DIRECTORY.keys())
             return f"'{agent_type}' isn't a recognized agent type. Use one of: {valid}."
 
-        membership = WorkspaceMembership.objects.filter(
-            workspace=workspace, user=user, is_active=True
-        ).first()
-        if not membership or not membership.can_assign_tasks:
-            return "You don't have permission to assign tasks in this workspace."
+        denial = _check_workspace_permission(workspace, user, permission="can_assign_tasks")
+        if denial:
+            return denial
         try:
             item = ActionItem.objects.get(pk=int(action_item_id), workspace=workspace)
         except (ActionItem.DoesNotExist, ValueError, TypeError):
@@ -244,6 +246,9 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
         `metric` must be one of: Monthly Qualified Leads, Average Deal Size,
         Net Revenue Retention, Product Qualified Leads, Win Rate, CAC Payback Period.
         """
+        denial = _check_workspace_permission(workspace, user)
+        if denial:
+            return denial
         if category not in dict(GapAnalysisMetric.CATEGORY_CHOICES):
             return f"'{category}' isn't a recognized gap category."
         if metric not in dict(GapAnalysisMetric.METRIC_CHOICES):
@@ -264,6 +269,9 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
         specific assessment session. Use a list/search tool first if you
         don't already know the resource name or session ID.
         """
+        denial = _check_workspace_permission(workspace, user)
+        if denial:
+            return denial
         try:
             session = AssessmentSession.objects.get(uuid=session_id, workspace=workspace)
         except (AssessmentSession.DoesNotExist, ValueError, TypeError):
@@ -296,6 +304,9 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
         stage) into a GTM insight, playbook, or chat answer. Read-only.
         Requires HubSpot to be connected under Workspace Settings > Integrations.
         """
+        denial = _check_workspace_permission(workspace, user)
+        if denial:
+            return denial
         from .integrations.hubspot_client import HubSpotAPIError
 
         client, error = _hubspot_or_message(workspace)
@@ -318,8 +329,13 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
     def log_insight_to_crm(company_identifier: str, summary: str) -> str:
         """Write a GTM finding as a Note on the matching HubSpot company
         record (domain or name), so the workspace's HubSpot users see it
-        without leaving their CRM. Requires HubSpot to be connected.
+        without leaving their CRM. Requires HubSpot to be connected and the
+        requesting user to have task-assignment permission in this
+        workspace (same requirement as create_crm_follow_up_task).
         """
+        denial = _check_workspace_permission(workspace, user, permission="can_assign_tasks")
+        if denial:
+            return denial
         from .integrations.hubspot_client import HubSpotAPIError
 
         client, error = _hubspot_or_message(workspace)
@@ -346,11 +362,9 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
         """
         from .integrations.hubspot_client import HubSpotAPIError
 
-        membership = WorkspaceMembership.objects.filter(
-            workspace=workspace, user=user, is_active=True
-        ).first()
-        if not membership or not membership.can_assign_tasks:
-            return "You don't have permission to push tasks to the CRM in this workspace."
+        denial = _check_workspace_permission(workspace, user, permission="can_assign_tasks")
+        if denial:
+            return denial
         try:
             item = ActionItem.objects.get(pk=int(action_item_id), workspace=workspace)
         except (ActionItem.DoesNotExist, ValueError, TypeError):

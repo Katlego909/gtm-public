@@ -57,9 +57,20 @@ def _build_completion_tools(action_item: ActionItem, user, created_doc_ids: List
     what already exists rather than duplicating work) plus document tools
     that record the id of anything created/edited, so the caller can tell
     whether real work actually happened."""
+    from .agent_dashboard_tools import build_dashboard_tools
+
     session = action_item.session
     get_gtm_assessment_data = _make_get_gtm_assessment_data_tool(session)
     search_internal_resources = _make_search_internal_resources_tool(session)
+    # Read-only dashboard tools (gap/notification context) so a completion
+    # turn can ground its deliverable in real data. The write tool
+    # (log_gap_measurement_from_chat) is excluded -- this is a one-shot,
+    # single-purpose turn with no user in the loop to have "said a number
+    # in chat", so there's nothing legitimate for it to relay.
+    dashboard_read_tools = [
+        tool for tool in build_dashboard_tools(workspace=session.workspace, session=session, user=user)
+        if tool.__name__ != "log_gap_measurement_from_chat"
+    ]
 
     def create_document(title: str, content: str, doc_type: str = "action_item_deliverable") -> str:
         """Create and save the concrete deliverable this task calls for
@@ -155,7 +166,7 @@ def _build_completion_tools(action_item: ActionItem, user, created_doc_ids: List
 
     return [
         get_gtm_assessment_data, search_internal_resources, create_document, edit_document, list_documents,
-        read_document, search_documents, search_evidence,
+        read_document, search_documents, search_evidence, *dashboard_read_tools,
     ]
 
 

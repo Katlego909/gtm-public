@@ -207,7 +207,11 @@ def _build_team_directory_prompt(current_agent_type: str) -> str:
     )
 
 
-def _get_team_config(agent_type: str, tools: List[Any], task_refs: Optional[List[Any]] = None):
+def _get_team_config(
+    agent_type: str, tools: List[Any], task_refs: Optional[List[Any]] = None,
+    workspace=None, session=None, user=None,
+):
+    from .agent_dashboard_tools import build_dashboard_ambient_context
     from .agent_runtime import build_task_context_prompt
 
     if agent_type == "gtm_strategist":
@@ -221,6 +225,9 @@ def _get_team_config(agent_type: str, tools: List[Any], task_refs: Optional[List
 
     system_instruction = (
         base_instruction + _build_team_directory_prompt(agent_type) + build_task_context_prompt(task_refs)
+    )
+    system_instruction += build_dashboard_ambient_context(
+        workspace=workspace, session=session, user=user,
     )
 
     return types.GenerateContentConfig(
@@ -320,7 +327,10 @@ def _run_team_turn(agent_type, workspace, session, message, user, allow_transfer
     tool_map = {fn.__name__: fn for fn in domain_tools}  # transfer tools intentionally excluded -- never executed
 
     history, history_task_refs = _build_team_history(workspace, session, viewer_agent_type=agent_type)
-    config = _get_team_config(agent_type, tools=domain_tools + transfer_tools, task_refs=history_task_refs)
+    config = _get_team_config(
+        agent_type, tools=domain_tools + transfer_tools, task_refs=history_task_refs,
+        workspace=workspace, session=session, user=user,
+    )
 
     try:
         chat = client.chats.create(model="gemini-2.5-flash", config=config, history=history)

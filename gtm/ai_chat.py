@@ -517,6 +517,7 @@ def _build_session_tools(
             return f"The audit system encountered a technical error: {str(e)}. Please try re-uploading the asset."
 
     from .agent_actions import build_agent_action_tools
+    from .agent_dashboard_tools import build_dashboard_tools
     from .web_tools import build_web_tools
 
     return [
@@ -532,6 +533,7 @@ def _build_session_tools(
         audit_strategic_evidence,
         *_build_document_tools_for_session(session, user=user),
         *build_web_tools(session=session, user=user),
+        *build_dashboard_tools(workspace=session.workspace, session=session, user=user, task_refs_sink=task_refs_sink),
         *(
             build_agent_action_tools(session.workspace, user, task_refs_sink=task_refs_sink)
             if session.workspace and user else []
@@ -624,11 +626,18 @@ Focus on: their strongest areas, critical gaps, and specific next steps they can
 Keep responses conversational and avoid lengthy lists. End with a specific next step."""
 
 
-def _get_chat_config(tools: Optional[List[Any]] = None, task_refs: Optional[List[Any]] = None):
+def _get_chat_config(
+    tools: Optional[List[Any]] = None, task_refs: Optional[List[Any]] = None,
+    session=None, user=None,
+):
     """Builds the configuration for the chat agent, including its tool set."""
+    from .agent_dashboard_tools import build_dashboard_ambient_context
     from .agent_runtime import build_task_context_prompt
 
     system_instruction = GTM_STRATEGIST_SYSTEM_INSTRUCTION + build_task_context_prompt(task_refs)
+    system_instruction += build_dashboard_ambient_context(
+        workspace=session.workspace if session else None, session=session, user=user,
+    )
 
     # Only mention handoff capability when a consult_ tool is actually in
     # this turn's tool list -- a depth-capped sub-agent has none, and a
@@ -1184,7 +1193,7 @@ def handle_general_chat(
         tools = _build_session_tools(
             session, user=user, _handoff_depth=_handoff_depth, task_refs_sink=turn_task_refs,
         )
-        config = _get_chat_config(tools=tools, task_refs=history_task_refs)
+        config = _get_chat_config(tools=tools, task_refs=history_task_refs, session=session, user=user)
 
         text = run_agent_turn(
             client=client,

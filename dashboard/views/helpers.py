@@ -595,11 +595,22 @@ def _load_pending_gap_suggestions(request, current_workspace):
     return suggestions
 
 
-def _gap_metric_scope_queryset(user, workspace, metric_name):
-    """Return scope-aware queryset for a metric, used to enforce idempotent writes."""
-    if workspace:
-        return GapAnalysisMetric.objects.filter(workspace=workspace, metric=metric_name)
-    return GapAnalysisMetric.objects.filter(workspace__isnull=True, user=user, metric=metric_name)
+def _gap_metric_scope_queryset(user, workspace, metric_name=None):
+    """Return scope-aware queryset for gap metrics: workspace-wins, user-fallback.
+
+    `metric_name` narrows to one metric (used to enforce idempotent writes);
+    omit it to list every metric in scope. With no workspace and no
+    authenticated user there is no legitimate scope to query, so this
+    returns an empty queryset rather than falling through to `user=None`,
+    which Django would otherwise turn into `user_id IS NULL` -- matching
+    every anonymous-owned metric, not just the caller's.
+    """
+    if not workspace and not (user and user.is_authenticated):
+        return GapAnalysisMetric.objects.none()
+    qs = GapAnalysisMetric.objects.filter(workspace=workspace) if workspace else GapAnalysisMetric.objects.filter(workspace__isnull=True, user=user)
+    if metric_name:
+        qs = qs.filter(metric=metric_name)
+    return qs
 
 
 def estimate_method_from_generator(generator):

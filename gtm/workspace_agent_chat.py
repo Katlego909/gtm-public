@@ -38,16 +38,16 @@ AGENT_TYPES = ("portfolio", "resource", "insights")
 # CONTEXT BUILDERS
 # ================================================================
 
-def build_portfolio_context(workspace: Workspace) -> Dict[str, Any]:
+def build_portfolio_context(workspace: Workspace, user=None) -> Dict[str, Any]:
     return {"workspace_name": workspace.name, **build_portfolio_trends(workspace)}
 
 
-def build_resource_context(workspace: Workspace) -> Dict[str, Any]:
+def build_resource_context(workspace: Workspace, user=None) -> Dict[str, Any]:
     return {"workspace_name": workspace.name, **build_resource_gap_matches(workspace)}
 
 
-def build_insights_context(workspace: Workspace) -> Dict[str, Any]:
-    return {"workspace_name": workspace.name, **build_workspace_insights_digest(workspace)}
+def build_insights_context(workspace: Workspace, user=None) -> Dict[str, Any]:
+    return {"workspace_name": workspace.name, **build_workspace_insights_digest(workspace, user=user)}
 
 
 CONTEXT_BUILDERS = {
@@ -57,11 +57,11 @@ CONTEXT_BUILDERS = {
 }
 
 
-def build_workspace_agent_context(agent_type: str, workspace: Workspace) -> Dict[str, Any]:
+def build_workspace_agent_context(agent_type: str, workspace: Workspace, user=None) -> Dict[str, Any]:
     builder = CONTEXT_BUILDERS.get(agent_type)
     if not builder:
         raise ValueError(f"Unknown agent_type: {agent_type}")
-    return builder(workspace)
+    return builder(workspace, user=user)
 
 
 # ================================================================
@@ -461,15 +461,17 @@ def _build_workspace_tools(
     agent_runtime.record_task_ref and gtm/agent_actions.py.
     """
     from .agent_actions import build_agent_action_tools
+    from .agent_dashboard_tools import build_dashboard_tools
     from .web_tools import build_web_tools
 
     if task_refs_sink is None:
         task_refs_sink = []
 
-    context = build_workspace_agent_context(agent_type, workspace)
+    context = build_workspace_agent_context(agent_type, workspace, user=user)
     document_tools = _build_document_tools(agent_type, workspace, user=user)
     web_tools = build_web_tools(workspace=workspace, user=user)
     action_tools = build_agent_action_tools(workspace, user, task_refs_sink=task_refs_sink) if user else []
+    dashboard_tools = build_dashboard_tools(workspace=workspace, user=user, task_refs_sink=task_refs_sink) if user else []
     consult_tools = (
         _build_consult_tools(
             agent_type, workspace, user=user, _handoff_depth=_handoff_depth, task_refs_sink=task_refs_sink,
@@ -516,6 +518,7 @@ def _build_workspace_tools(
             *document_tools,
             *web_tools,
             *action_tools,
+            *dashboard_tools,
             *consult_tools,
         ]
 
@@ -553,6 +556,7 @@ def _build_workspace_tools(
             *document_tools,
             *web_tools,
             *action_tools,
+            *dashboard_tools,
             *consult_tools,
         ]
 
@@ -594,6 +598,7 @@ def _build_workspace_tools(
             *document_tools,
             *web_tools,
             *action_tools,
+            *dashboard_tools,
             *consult_tools,
         ]
 
@@ -623,7 +628,9 @@ SYSTEM_INSTRUCTIONS = {
 
 def _get_workspace_chat_config(
     agent_type: str, tools: Optional[List[Any]] = None, task_refs: Optional[List[Any]] = None,
+    workspace=None, user=None,
 ):
+    from .agent_dashboard_tools import build_dashboard_ambient_context
     from .agent_runtime import build_agent_directory_prompt, build_task_context_prompt
 
     base_instruction = SYSTEM_INSTRUCTIONS.get(agent_type, "You are a helpful GTM strategy assistant.")
@@ -641,6 +648,7 @@ def _get_workspace_chat_config(
         "than repeating or lightly rewording something a teammate said about a different question."
     )
     system_instruction = base_instruction + tool_guidance + build_task_context_prompt(task_refs)
+    system_instruction += build_dashboard_ambient_context(workspace=workspace, user=user)
 
     # Only mention handoff capability when a consult_ tool is actually in
     # this turn's tool list -- a depth-capped sub-agent has none, and a
@@ -766,7 +774,7 @@ def handle_general_chat_workspace(
         tools = _build_workspace_tools(
             agent_type, workspace, user=user, _handoff_depth=_handoff_depth, task_refs_sink=turn_task_refs,
         )
-        config = _get_workspace_chat_config(agent_type, tools=tools, task_refs=history_task_refs)
+        config = _get_workspace_chat_config(agent_type, tools=tools, task_refs=history_task_refs, workspace=workspace, user=user)
 
         text = run_agent_turn(
             client=client,
