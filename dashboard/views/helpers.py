@@ -147,7 +147,7 @@ def _resolve_dashboard_workspace(request):
     user_workspaces = []
 
     if request.user.is_authenticated:
-        memberships = WorkspaceMembership.objects.filter(user=request.user, is_active=True).select_related('workspace')
+        memberships = WorkspaceMembership.objects.filter(user=request.user, is_active=True, workspace__is_active=True).select_related('workspace')
         user_workspaces = [m.workspace for m in memberships]
         if workspace_id:
             try:

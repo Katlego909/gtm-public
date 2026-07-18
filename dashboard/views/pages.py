@@ -47,6 +47,7 @@ from gtm.models import (
     GTMFile,
 )
 from gtm.models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation, WorkspaceActivityEvent
+from gtm.forms import WorkspaceForm
 from gtm.ai_chat import get_suggested_prompts, process_chat_message
 from gtm.decorators import workspace_permission_required, workspace_member_required
 from dashboard.models import Channel, ChannelAnalytics, GapAnalysisMetric, GapAnalysisSuggestion, Resource, Notification, UserSettings
@@ -229,6 +230,65 @@ def invite_to_workspace(request, workspace_id):
             'resourceToast': {'message': error, 'level': 'error'}
         })
     return response
+
+
+@workspace_permission_required('can_edit_workspace', workspace_param='workspace_id')
+def edit_workspace(request, workspace_id):
+    """Edit workspace details (name, industry, company size, website) from the dashboard hub."""
+    workspace = request.workspace
+
+    if request.method == 'POST':
+        form = WorkspaceForm(request.POST, instance=workspace)
+        if form.is_valid():
+            form.save()
+            response = render(request, 'dashboard/partials/edit_workspace_modal.html', {
+                'success': True,
+                'workspace': workspace,
+                'can_delete_workspace': request.membership.can_delete_workspace,
+            })
+            response['HX-Trigger'] = json.dumps({
+                'workspaceUpdated': True,
+                'resourceToast': {'message': 'Workspace updated.', 'level': 'success'}
+            })
+            return response
+        return render(request, 'dashboard/partials/edit_workspace_modal.html', {
+            'form': form,
+            'workspace': workspace,
+            'can_delete_workspace': request.membership.can_delete_workspace,
+        })
+
+    form = WorkspaceForm(instance=workspace)
+    return render(request, 'dashboard/partials/edit_workspace_modal.html', {
+        'form': form,
+        'workspace': workspace,
+        'can_delete_workspace': request.membership.can_delete_workspace,
+    })
+
+
+@workspace_permission_required('can_delete_workspace', workspace_param='workspace_id')
+def delete_workspace(request, workspace_id):
+    """Soft-delete (deactivate) a workspace after the user types its exact name to confirm."""
+    workspace = request.workspace
+
+    if request.method == 'POST':
+        confirm_name = request.POST.get('confirm_name', '').strip()
+        if confirm_name != workspace.name:
+            return render(request, 'dashboard/partials/delete_workspace_modal.html', {
+                'workspace': workspace,
+                'error': 'The name you typed does not match. Please type the workspace name exactly to confirm.',
+            })
+
+        workspace.is_active = False
+        workspace.save(update_fields=['is_active'])
+        if request.session.get('current_workspace_id') == str(workspace.id):
+            del request.session['current_workspace_id']
+
+        return render(request, 'dashboard/partials/delete_workspace_modal.html', {
+            'success': True,
+            'workspace': workspace,
+        })
+
+    return render(request, 'dashboard/partials/delete_workspace_modal.html', {'workspace': workspace})
 
 
 @vary_on_headers('HX-Request')

@@ -77,6 +77,8 @@ urlpatterns = [
     # Workspace management from dashboard
     path('workspace/create/', views.create_workspace_dashboard, name='create_workspace_dashboard'),
     path('workspace/<uuid:workspace_id>/invite/', views.invite_to_workspace, name='invite_to_workspace'),
+    path('workspace/<uuid:workspace_id>/edit/', views.edit_workspace, name='edit_workspace'),
+    path('workspace/<uuid:workspace_id>/delete/', views.delete_workspace, name='delete_workspace'),
     
     # Resource Library
     path('resources/', views.refresh_resources, name='refresh_resources'),

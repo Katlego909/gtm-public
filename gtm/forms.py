@@ -1,6 +1,6 @@
 from django import forms
 from .models import AssessmentSession
-from .models_workspace import WorkspaceInvitation
+from .models_workspace import Workspace, WorkspaceInvitation
 
 # Curated dropdown options for start.html's "select + Other" fields.
 # Plain string lists (not model choices=) so a legacy/custom value that isn't
@@ -69,4 +69,16 @@ class WorkspaceInvitationForm(forms.ModelForm):
         widgets = {
             'email': forms.EmailInput(attrs={'class': 'w-full border rounded px-3 py-2', 'placeholder': 'Enter email to invite'}),
             'role': forms.Select(attrs={'class': 'w-full border rounded px-3 py-2'}),
+        }
+
+
+class WorkspaceForm(forms.ModelForm):
+    class Meta:
+        model = Workspace
+        fields = ['name', 'company_size', 'industry', 'website']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500'}),
+            'company_size': forms.TextInput(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500'}),
+            'industry': forms.TextInput(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500'}),
+            'website': forms.URLInput(attrs={'class': 'w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500'}),
         }

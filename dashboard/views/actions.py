@@ -121,7 +121,7 @@ def refresh_action_items(request):
     current_workspace = None
     
     if request.user.is_authenticated and workspace_id:
-        memberships = WorkspaceMembership.objects.filter(user=request.user).select_related('workspace')
+        memberships = WorkspaceMembership.objects.filter(user=request.user, workspace__is_active=True).select_related('workspace')
         user_workspaces = [m.workspace for m in memberships]
         try:
             current_workspace = next(w for w in user_workspaces if str(w.id) == str(workspace_id))

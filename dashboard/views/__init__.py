@@ -80,6 +80,8 @@ from .actions import (
 )
 from .pages import (
     create_workspace_dashboard,
+    delete_workspace,
+    edit_workspace,
     invite_to_workspace,
     notifications_panel,
     profile,

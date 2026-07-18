@@ -128,6 +128,16 @@ class WorkspaceMembership(models.Model):
         return self.role in ['admin', 'funti3r_consultant']
 
     @property
+    def can_edit_workspace(self):
+        """Check if user can edit workspace details (name, industry, company size, website)"""
+        return self.role in ['admin', 'funti3r_consultant']
+
+    @property
+    def can_delete_workspace(self):
+        """Check if user can delete (deactivate) the workspace"""
+        return self.role == 'admin'
+
+    @property
     def can_manage_ai_credits(self):
         """Check if user can view/adjust this workspace's AI credit budget."""
         return self.role in ['admin', 'funti3r_consultant']

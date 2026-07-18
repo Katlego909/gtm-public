@@ -159,7 +159,7 @@ def workspace_hub(request):
     user_workspaces = []
     
     if request.user.is_authenticated:
-        memberships = WorkspaceMembership.objects.filter(user=request.user).select_related('workspace')
+        memberships = WorkspaceMembership.objects.filter(user=request.user, workspace__is_active=True).select_related('workspace')
         user_workspaces = [m.workspace for m in memberships]
         if workspace_id:
             try:
@@ -228,6 +228,7 @@ def workspace_hub(request):
         'accepted_awaiting': accepted_awaiting,
         'hubspot_integration': hubspot_integration,
         'user_can_manage_integrations': bool(user_membership and user_membership.can_manage_integrations),
+        'user_can_edit_workspace': bool(user_membership and user_membership.can_edit_workspace),
         'page_title': 'Workspace Hub'
     }
 
@@ -246,7 +247,7 @@ def tasks_board(request):
     user_workspaces = []
     
     if request.user.is_authenticated:
-        memberships = WorkspaceMembership.objects.filter(user=request.user).select_related('workspace')
+        memberships = WorkspaceMembership.objects.filter(user=request.user, workspace__is_active=True).select_related('workspace')
         user_workspaces = [m.workspace for m in memberships]
         if workspace_id:
             try:
@@ -307,7 +308,7 @@ def agent_hub(request):
     user_workspaces = []
 
     if request.user.is_authenticated:
-        memberships = WorkspaceMembership.objects.filter(user=request.user).select_related('workspace')
+        memberships = WorkspaceMembership.objects.filter(user=request.user, workspace__is_active=True).select_related('workspace')
         user_workspaces = [m.workspace for m in memberships]
         if workspace_id:
             try:
@@ -497,7 +498,7 @@ def dashboard(request):
     
     if request.user.is_authenticated:
         # Get user's workspaces
-        memberships = WorkspaceMembership.objects.filter(user=request.user).select_related('workspace')
+        memberships = WorkspaceMembership.objects.filter(user=request.user, workspace__is_active=True).select_related('workspace')
         user_workspaces = [m.workspace for m in memberships]
         
         # If workspace_id provided, validate user has access
