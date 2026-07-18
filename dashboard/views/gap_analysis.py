@@ -91,6 +91,7 @@ from .helpers import (
     _resolve_dashboard_workspace,
     _upsert_gap_metric_in_scope,
     apply_measured_closure,
+    estimate_method_from_generator,
     prepare_gap_metrics_for_display,
 )
 
@@ -184,6 +185,8 @@ def accept_gap_suggestion(request, suggestion_id):
         suggestion_qs = suggestion_qs.filter(workspace__isnull=True)
     suggestion = get_object_or_404(suggestion_qs)
 
+    generator = suggestion.source_payload.get('generator') if isinstance(suggestion.source_payload, dict) else None
+
     with transaction.atomic():
         _upsert_gap_metric_in_scope(
             user=request.user,
@@ -198,6 +201,7 @@ def accept_gap_suggestion(request, suggestion_id):
                 'recommendation': suggestion.recommendation,
             },
             source='AI',
+            estimate_method=estimate_method_from_generator(generator),
         )
         suggestion.status = 'accepted'
         suggestion.save(update_fields=['status', 'updated_at'])
@@ -315,7 +319,8 @@ def log_gap_measurement(request, pk):
                 recorded_by=request.user,
             )
             metric.current = value
-            metric.save(update_fields=['current'])
+            metric.estimate_method = 'measured'
+            metric.save(update_fields=['current', 'estimate_method'])
             closed = apply_measured_closure(metric)
 
             response = _render_gap_metric_row(request, metric, current_workspace)
@@ -427,6 +432,7 @@ def add_edit_gap_metric(request, pk=None):
         if form.is_valid():
             if instance and instance.pk:
                 instance = form.save(commit=False)
+                instance.estimate_method = 'manual_entry'
                 instance.save()
             else:
                 cleaned = form.cleaned_data
@@ -443,6 +449,7 @@ def add_edit_gap_metric(request, pk=None):
                         'recommendation': cleaned['recommendation'],
                     },
                     source='USER',
+                    estimate_method='manual_entry',
                 )
             
             if request.htmx:

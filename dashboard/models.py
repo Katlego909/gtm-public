@@ -66,6 +66,24 @@ class GapAnalysisMetric(models.Model):
         ('target_reached', 'Target reached'),
         ('manual', 'Manually resolved'),
     ]
+    ESTIMATE_METHOD_CHOICES = [
+        ('gemini', 'AI Estimate'),
+        ('formula', 'Formula Estimate'),
+        ('manual_entry', 'Manual Entry'),
+        ('measured', 'Measured'),
+    ]
+    # How precise a number for this metric is honest to display -- current/
+    # target get rounded to the nearest multiple of this, regardless of what
+    # the AI (or the fallback formula) returns, so a rough estimate never
+    # implies false precision (e.g. "96.3 leads").
+    METRIC_VALUE_GRANULARITY = {
+        'Monthly Qualified Leads': 1,
+        'Product Qualified Leads': 1,
+        'Win Rate': 1,
+        'Net Revenue Retention': 1,
+        'Average Deal Size': 100,
+        'CAC Payback Period': 0.5,
+    }
 
     category = models.CharField(max_length=100, choices=CATEGORY_CHOICES)
     metric = models.CharField(max_length=100, choices=METRIC_CHOICES)
@@ -81,6 +99,11 @@ class GapAnalysisMetric(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='open')
     closed_reason = models.CharField(max_length=20, choices=CLOSED_REASON_CHOICES, blank=True, default='')
     closed_at = models.DateTimeField(null=True, blank=True)
+    estimate_method = models.CharField(
+        max_length=20, choices=ESTIMATE_METHOD_CHOICES, blank=True, default='',
+        help_text="Where the current value actually came from -- an AI guess, a deterministic "
+                   "fallback formula, a manually typed number, or a real measured check-in.",
+    )
 
     class Meta:
         unique_together = ('metric', 'session', 'workspace')
@@ -95,6 +118,14 @@ class GapAnalysisMetric(models.Model):
     @property
     def pillar_name(self):
         return self.CATEGORY_PILLAR_MAPPING.get(self.category)
+
+    @classmethod
+    def round_metric_value(cls, metric_name, value):
+        """Round a current/target value to the precision that's honest for
+        this metric, instead of showing spurious decimal precision from an
+        AI guess or a formula."""
+        step = cls.METRIC_VALUE_GRANULARITY.get(metric_name, 1)
+        return round(round(value / step) * step, 2)
 
 
 class GapMetricMeasurement(models.Model):

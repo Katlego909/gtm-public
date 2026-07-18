@@ -235,7 +235,19 @@ def _get_gap_scope(request):
 
 
 def _fallback_gap_suggestions(cat_scores):
-    """Deterministic fallback suggestions when AI is unavailable."""
+    """Deterministic fallback suggestions when AI is unavailable. Covers all
+    6 metrics, each driven by its category's assessment pillar score via
+    GapAnalysisMetric.CATEGORY_PILLAR_MAPPING -- the same mapping used for
+    score-movement tracking, so there's one source of truth for which
+    pillar drives which metric instead of a second, ad-hoc lookup here.
+
+    Known limitation, not a bug: there are only 3 real assessment pillars
+    driving 6 metrics, so at least two metrics per pillar will always
+    correlate -- a qualitative assessment can't produce 6 independent
+    quantitative signals. The lower confidence score and the 'Formula
+    Estimate' badge (see estimate_method) are what communicate that to the
+    user; this function can't fix it with better math.
+    """
     if not cat_scores:
         return []
 
@@ -248,34 +260,43 @@ def _fallback_gap_suggestions(cat_scores):
         {
             'category': 'Lead Generation',
             'metric': 'Monthly Qualified Leads',
-            'score': scores.get('Demand', 2.5),
-            'base': 40,
-            'scale': 22,
-            'target_step': 18,
+            'base': 40, 'scale': 22, 'target_step': 18, 'min_value': 5, 'max_value': 400,
             'priority_if_below': 2.8,
             'recommendation': 'Tighten ICP filters, run weekly campaign reviews, and improve top-of-funnel messaging consistency.',
             'rationale': 'Demand score indicates lead quality/volume opportunity.',
             'higher_is_better': True,
         },
         {
+            'category': 'Product Marketing',
+            'metric': 'Product Qualified Leads',
+            'base': 30, 'scale': 18, 'target_step': 15, 'min_value': 5, 'max_value': 350,
+            'priority_if_below': 2.8,
+            'recommendation': 'Improve free-trial onboarding and add in-app engagement triggers to surface product-qualified signals.',
+            'rationale': 'Demand score indicates in-product engagement and qualification opportunity.',
+            'higher_is_better': True,
+        },
+        {
             'category': 'Sales Efficiency',
             'metric': 'Win Rate',
-            'score': scores.get('Conversion', 2.5),
-            'base': 14,
-            'scale': 7,
-            'target_step': 8,
+            'base': 14, 'scale': 7, 'target_step': 8, 'min_value': 5, 'max_value': 80,
             'priority_if_below': 3.0,
             'recommendation': 'Standardize qualification, tighten discovery scripts, and run deal review coaching sessions.',
             'rationale': 'Conversion performance signals pipeline quality and sales process efficiency.',
             'higher_is_better': True,
         },
         {
+            'category': 'Sales Velocity',
+            'metric': 'Average Deal Size',
+            'base': 8000, 'scale': 5500, 'target_step': 4000, 'min_value': 1000, 'max_value': 60000,
+            'priority_if_below': 3.0,
+            'recommendation': 'Focus on higher-value segments and value-based selling to lift average deal size.',
+            'rationale': 'Conversion performance signals deal quality and pricing/positioning strength.',
+            'higher_is_better': True,
+        },
+        {
             'category': 'Customer Success',
             'metric': 'Net Revenue Retention',
-            'score': scores.get('Delivery', 2.5),
-            'base': 75,
-            'scale': 8,
-            'target_step': 6,
+            'base': 75, 'scale': 8, 'target_step': 6, 'min_value': 50, 'max_value': 140,
             'priority_if_below': 3.2,
             'recommendation': 'Strengthen onboarding milestones, proactive success reviews, and expansion signal tracking.',
             'rationale': 'Delivery maturity drives retention and expansion reliability.',
@@ -284,10 +305,7 @@ def _fallback_gap_suggestions(cat_scores):
         {
             'category': 'Marketing ROI',
             'metric': 'CAC Payback Period',
-            'score': scores.get('Demand', 2.5),
-            'base': 18,
-            'scale': -2.2,
-            'target_step': -2.0,
+            'base': 18, 'scale': -2.2, 'target_step': -2.0, 'min_value': 3, 'max_value': 36,
             'priority_if_below': 2.9,
             'recommendation': 'Reduce low-performing spend, improve conversion quality, and align campaign budgets to top channels.',
             'rationale': 'Acquisition efficiency can improve by optimizing spend-to-revenue cycle time.',
@@ -297,17 +315,21 @@ def _fallback_gap_suggestions(cat_scores):
 
     suggestions = []
     for item in mapped:
-        current = item['base'] + (item['score'] * item['scale'])
+        pillar = GapAnalysisMetric.CATEGORY_PILLAR_MAPPING.get(item['category'])
+        score = scores.get(pillar, 2.5)
+        lo, hi = item['min_value'], item['max_value']
+
+        current = clamp(item['base'] + score * item['scale'], lo, hi)
         target = current + item['target_step']
-
         if item['higher_is_better']:
-            current = round(clamp(current, 1, 400), 1)
-            target = round(clamp(max(target, current + 3), current + 3, 500), 1)
+            target = clamp(max(target, current + abs(item['target_step'])), lo, hi * 1.2)
         else:
-            current = round(clamp(current, 3, 36), 1)
-            target = round(clamp(min(target, current - 0.5), 1, current - 0.5), 1)
+            target = clamp(min(target, current - abs(item['target_step'])), lo * 0.5, hi)
 
-        priority = 'High' if item['score'] < item['priority_if_below'] else 'Medium'
+        current = GapAnalysisMetric.round_metric_value(item['metric'], current)
+        target = GapAnalysisMetric.round_metric_value(item['metric'], target)
+
+        priority = 'High' if score < item['priority_if_below'] else 'Medium'
         confidence = 78 if priority == 'High' else 70
         suggestions.append({
             'category': item['category'],
@@ -371,8 +393,19 @@ def _ai_gap_suggestions_from_assessment(session):
             'overall_score': round(float(overall), 1),
         }
 
+    company_name = session.company_name or 'this company'
+    industry = session.industry or 'an unspecified industry'
+    company_size = session.company_size or 'an unspecified'
+    company_stage = session.get_company_stage_display() if session.company_stage else 'an unspecified'
+
     prompt = f"""
-You are a GTM analyst. Generate 3-5 actionable gap metric suggestions from this assessment.
+You are a GTM analyst estimating rough operating benchmarks for a specific company from its GTM
+readiness assessment. These are directional estimates for the team to sanity-check and refine
+with their own real numbers -- not measured data, so do not overstate precision.
+
+Company: {company_name}, {industry} industry, {company_size} employees, {company_stage}-stage.
+
+Generate 3-5 actionable gap metric suggestions from this assessment.
 
 Rules:
 - Output STRICT JSON only (no markdown, no comments).
@@ -380,7 +413,13 @@ Rules:
 - category must be one of: {allowed_categories}
 - metric must be one of: {allowed_metrics}
 - priority must be one of: {allowed_priorities}
-- confidence must be integer between 50 and 95
+- current/target must be plausible for a company of this size/industry/stage and directionally
+  consistent with the category score (a lower score means further from target). Round to sensible
+  whole-number precision -- do not invent decimal precision you have no grounds for.
+- rationale must cite the SPECIFIC category score or weak-answer text that drove this number
+  (e.g. "Demand scored 2.1/5, driven by 'no lead scoring in place'"), not generic advice.
+- confidence must be an integer between 50 and 95, and should be lower when you're extrapolating
+  loosely from a single category score rather than a specific weak answer.
 - Keep recommendation under 180 chars.
 
 Assessment context:
@@ -422,14 +461,19 @@ Assessment context:
         except (TypeError, ValueError):
             continue
 
-        current = round(max(current, 0), 2)
-        target = round(max(target, 0), 2)
+        current = max(current, 0)
+        target = max(target, 0)
         confidence = max(50, min(95, confidence))
 
         if metric == 'CAC Payback Period' and target >= current:
-            target = round(max(1.0, current - 1.0), 2)
+            target = max(1.0, current - 1.0)
         elif metric != 'CAC Payback Period' and target <= current:
-            target = round(current + max(1.0, current * 0.1), 2)
+            target = current + max(1.0, current * 0.1)
+
+        # Enforce honest precision server-side regardless of what Gemini
+        # actually returned -- never trust AI numeric output blindly.
+        current = GapAnalysisMetric.round_metric_value(metric, current)
+        target = GapAnalysisMetric.round_metric_value(metric, target)
 
         recommendation = (item.get('recommendation') or '').strip()[:180]
         rationale = (item.get('rationale') or '').strip()[:240]
@@ -546,6 +590,8 @@ def _load_pending_gap_suggestions(request, current_workspace):
         calculate_gap_metric_display_properties(pseudo_metric)
         suggestion.gap_percent = pseudo_metric.gap_percent
         suggestion.gap_class = pseudo_metric.gap_class
+        generator = suggestion.source_payload.get('generator') if isinstance(suggestion.source_payload, dict) else None
+        suggestion.is_formula_estimate = generator not in (None, 'gemini')
     return suggestions
 
 
@@ -556,7 +602,15 @@ def _gap_metric_scope_queryset(user, workspace, metric_name):
     return GapAnalysisMetric.objects.filter(workspace__isnull=True, user=user, metric=metric_name)
 
 
-def _upsert_gap_metric_in_scope(*, user, workspace, session, payload, source='AI'):
+def estimate_method_from_generator(generator):
+    """Map a GapAnalysisSuggestion.source_payload['generator'] value to the
+    honest provenance label shown on the accepted metric row: real Gemini
+    output vs. the deterministic fallback formula (any of the 'fallback*'
+    generator variants)."""
+    return 'gemini' if generator == 'gemini' else 'formula'
+
+
+def _upsert_gap_metric_in_scope(*, user, workspace, session, payload, source='AI', estimate_method=''):
     """Upsert one metric per scope+metric and remove stale duplicates if present."""
     metric_name = payload['metric']
     scope_qs = _gap_metric_scope_queryset(user, workspace, metric_name).order_by('-id')
@@ -572,6 +626,7 @@ def _upsert_gap_metric_in_scope(*, user, workspace, session, payload, source='AI
         existing.priority = payload['priority']
         existing.recommendation = payload['recommendation']
         existing.source = source
+        existing.estimate_method = estimate_method
         existing.user = user
         if session:
             existing.session = session
@@ -592,6 +647,7 @@ def _upsert_gap_metric_in_scope(*, user, workspace, session, payload, source='AI
         priority=payload['priority'],
         recommendation=payload['recommendation'],
         source=source,
+        estimate_method=estimate_method,
         session=session,
         workspace=workspace,
         user=user,

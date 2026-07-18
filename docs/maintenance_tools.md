@@ -22,11 +22,6 @@ Seeds the logic that suggests software tools based on assessment gaps.
 -   **Usage:** `python manage.py load_tool_recommendations`
 -   **Mechanism:** Maps specific GTM keywords (e.g., "CRM", "SEO", "Attribution") to tools. If a user scores low in a category where these keywords are present, the tool is suggested.
 
-### KPI Benchmarking (`load_gap_metrics`)
-Seeds the default targets for the Gap Analysis dashboard.
--   **Usage:** `python manage.py load_gap_metrics`
--   **Substance:** Populates the `GapAnalysisMetric` table with industry-standard benchmarks for Win Rate, LTV/CAC, and Sales Velocity.
-
 ### Data Backfills (`backfill_owners`)
 Maintenance tool for transitioning anonymous guest sessions to authenticated workspaces.
 -   **Logic:** Scans `AssessmentSession` records for missing `user` or `workspace` links and attempts to associate them based on the `owner_client_id` historical cookie mapping.

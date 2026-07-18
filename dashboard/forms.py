@@ -60,6 +60,20 @@ class GapAnalysisMetricForm(forms.ModelForm):
                 # Add current metric to choices so it can be displayed for existing records
                 self.fields['metric'].choices = [(metric_value, metric_value)] + list(self.fields['metric'].choices)
 
+    def clean(self):
+        cleaned_data = super().clean()
+        metric = cleaned_data.get('metric')
+        current = cleaned_data.get('current')
+        target = cleaned_data.get('target')
+        if metric and current is not None and target is not None:
+            # Mirrors the AI-path's own direction rule (dashboard/views/helpers.py):
+            # CAC Payback Period is "lower is better", everything else "higher is better".
+            if metric == 'CAC Payback Period' and target >= current:
+                self.add_error('target', "For CAC Payback Period, target should be lower than current (shorter payback is better).")
+            elif metric != 'CAC Payback Period' and target <= current:
+                self.add_error('target', "Target should be higher than current for this metric.")
+        return cleaned_data
+
 
 class GapMeasurementForm(forms.Form):
     value = forms.FloatField(

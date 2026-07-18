@@ -84,6 +84,9 @@
             {% if suggestion.rationale %}
             <p class="mt-1 text-[11px] text-gray-500">Why: {{ suggestion.rationale }}</p>
             {% endif %}
+            {% if suggestion.is_formula_estimate %}
+            <p class="mt-1 text-[11px] text-amber-700">Estimated via formula &mdash; AI was unavailable when this was generated.</p>
+            {% endif %}
 
             <div class="mt-3 flex items-center gap-2">
                 <form id="gap-accept-form-{{ suggestion.id }}"

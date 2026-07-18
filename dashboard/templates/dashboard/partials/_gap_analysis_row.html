@@ -1,7 +1,13 @@
 <tr id="gap-metric-{{ gap.id }}" {% if gap.status == 'closed' %}class="opacity-60"{% endif %}>
     <td class="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{{ gap.category }}</td>
     <td class="px-4 py-3 text-gray-700 whitespace-nowrap">{{ gap.metric }}</td>
-    <td class="px-4 py-3 text-gray-700 whitespace-nowrap">{{ gap.current }}</td>
+    <td class="px-4 py-3 text-gray-700 whitespace-nowrap">
+        {{ gap.current }}
+        {% if gap.estimate_method_label %}
+            <span class="block mt-0.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium {{ gap.estimate_method_class }}"
+                  title="Where this number came from">{{ gap.estimate_method_label }}</span>
+        {% endif %}
+    </td>
     <td class="px-4 py-3 text-gray-700 whitespace-nowrap">{{ gap.target }}</td>
     <td class="px-4 py-3 whitespace-nowrap">
         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ gap.gap_class }}">{{ gap.gap_percent }}</span>
