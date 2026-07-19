@@ -46,6 +46,7 @@
             <canvas id="radar" class="w-full h-full"></canvas>
             {{ labels|json_script:"js-radar-labels" }}
             {{ values|json_script:"js-radar-values" }}
+            {% if comparison %}{{ comparison.previous_radar_values|json_script:"js-radar-previous-values" }}{% endif %}
         </div>
     </div>
 
@@ -98,6 +99,9 @@
     </div>
 </div>
 
+{% if comparison %}
+{% include "gtm/partials/results/score_comparison.html" %}
+{% endif %}
 
 {% if band %}
 <div class="mt-6 sm:mt-8 bg-indigo-600 rounded-lg p-4 sm:p-6 lg:p-8 text-white relative overflow-hidden mx-2 sm:mx-0 reveal">

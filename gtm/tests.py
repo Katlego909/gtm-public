@@ -104,9 +104,12 @@ class ResultsQueryOptimizationTests(TestCase):
 		# of question_count) allowance for the AI credits account lookup
 		# (gtm/ai_credits.py's resolve_account_for_session), whose first-ever
 		# get_or_create for a session's workspace/user costs a few extra
-		# statements (SELECT + SAVEPOINT + INSERT + RELEASE) once.
+		# statements (SELECT + SAVEPOINT + INSERT + RELEASE) once, plus one
+		# more constant query for gtm/score_comparison.py's "is there a prior
+		# assessment to compare against" lookup (see tests_score_comparison.py
+		# for its own dedicated, history-size-independent query-count guard).
 		self.assertLessEqual(
 			len(ctx),
-			35,
+			36,
 			msg=f"Expected bounded query count, got {len(ctx)} queries",
 		)

@@ -184,7 +184,7 @@
         </div>
         
         <!-- Summary Stats -->
-        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
             <div class="bg-white rounded-lg p-4">
                 <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Total Assessments</p>
                 <p class="text-3xl font-bold text-indigo-900">{{ assessment_stats.total }}</p>
@@ -211,6 +211,12 @@
                 <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Improvement</p>
                 <p class="text-3xl font-bold {% if assessment_stats.improvement >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
                     {% if assessment_stats.improvement > 0 %}+{% endif %}{{ assessment_stats.improvement }}
+                </p>
+            </div>
+            <div class="bg-white rounded-lg p-4">
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Since Last Assessment</p>
+                <p class="text-3xl font-bold {% if assessment_stats.since_last_delta is None %}text-gray-400{% elif assessment_stats.since_last_delta >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                    {% if assessment_stats.since_last_delta is None %}—{% else %}{% if assessment_stats.since_last_delta > 0 %}+{% endif %}{{ assessment_stats.since_last_delta }}{% endif %}
                 </p>
             </div>
         </div>

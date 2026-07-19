@@ -251,6 +251,12 @@ def results(request, session_id):
     snap = _save_snapshot(session, cat_scores, overall, band, labels, values)
 
     # -----------------------------
+    # Since-your-last-assessment comparison (None if no qualifying prior session)
+    # -----------------------------
+    from ..score_comparison import build_score_comparison
+    comparison = build_score_comparison(session, current_context=scoring_context)
+
+    # -----------------------------
     # Generate AI insights for low-scoring questions (if not already generated)
     # -----------------------------
     # Prefetch all relevant responses for weakest questions to avoid N+1
@@ -341,6 +347,7 @@ def results(request, session_id):
         "weakest_questions": weakest_questions,
         "recommendations": recommendations,
         "scoring_context": scoring_context,
+        "comparison": comparison,
         "stage_exemption_note": stage_exemption_note,
         "is_htmx": _is_htmx(request),
         "snap": snap,

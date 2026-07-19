@@ -281,7 +281,20 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
                 'improvement': round(improvement, 1),
                 'latest_score': round(all_scores[0], 1) if all_scores else 0,
             }
-            
+
+            # "Since Last Assessment" -- distinct from 'improvement' above
+            # (which is first-ever vs. latest): this is previous-vs-latest,
+            # reusing the same comparison logic as the results page (see
+            # gtm/score_comparison.py). None (not 0) when there's no
+            # qualifying prior assessment, so the template can distinguish
+            # "not enough data yet" from a genuine zero-point change.
+            from gtm.score_comparison import build_score_comparison
+            latest_session = assessment_history[0]['session']
+            since_last_comparison = build_score_comparison(latest_session)
+            assessment_stats['since_last_delta'] = (
+                round(since_last_comparison['overall_delta'], 1) if since_last_comparison else None
+            )
+
             # Prepare trend chart data (reverse to show chronological order)
             score_trend_data = {
                 'labels': [s['created_at'].strftime('%m/%d') for s in reversed(assessment_history)],

@@ -345,26 +345,55 @@
           const existingChart = Chart.getChart(radarCanvas);
           if (existingChart) existingChart.destroy();
 
+          const datasets = [{
+            label: 'Your GTM Performance',
+            data: values,
+            fill: true,
+            backgroundColor: 'rgba(184, 83, 15, 0.2)',
+            borderColor: '#B8530F',
+            borderWidth: 3,
+            pointBackgroundColor: '#B8530F',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            pointRadius: 6,
+            pointHoverRadius: 8,
+            pointHoverBackgroundColor: '#fff',
+            pointHoverBorderColor: '#B8530F',
+            pointHoverBorderWidth: 3
+          }];
+
+          // Optional "last time" overlay dataset -- only present when the
+          // results view found a qualifying prior assessment to compare
+          // against (see gtm/score_comparison.py). Flat, no fill, dashed
+          // border so it reads as a reference line rather than competing
+          // visually with the current (solid, filled) dataset.
+          const previousValuesEl = document.getElementById('js-radar-previous-values');
+          if (previousValuesEl) {
+            const previousValues = JSON.parse(previousValuesEl.textContent);
+            datasets.push({
+              label: 'Last Assessment',
+              data: previousValues,
+              fill: false,
+              backgroundColor: 'rgba(107, 114, 128, 0)',
+              borderColor: '#6B7280',
+              borderWidth: 2,
+              borderDash: [6, 4],
+              pointBackgroundColor: '#6B7280',
+              pointBorderColor: '#fff',
+              pointBorderWidth: 2,
+              pointRadius: 4,
+              pointHoverRadius: 6,
+              pointHoverBackgroundColor: '#fff',
+              pointHoverBorderColor: '#6B7280',
+              pointHoverBorderWidth: 2
+            });
+          }
+
           new Chart(radarCanvas, {
             type: 'radar',
             data: {
               labels: labels,
-              datasets: [{
-                label: 'Your GTM Performance',
-                data: values,
-                fill: true,
-                backgroundColor: 'rgba(184, 83, 15, 0.2)',
-                borderColor: '#B8530F',
-                borderWidth: 3,
-                pointBackgroundColor: '#B8530F',
-                pointBorderColor: '#fff',
-                pointBorderWidth: 2,
-                pointRadius: 6,
-                pointHoverRadius: 8,
-                pointHoverBackgroundColor: '#fff',
-                pointHoverBorderColor: '#B8530F',
-                pointHoverBorderWidth: 3
-              }]
+              datasets: datasets
             },
             options: {
               responsive: true,
@@ -380,17 +409,24 @@
                 }
               },
               plugins: {
-                legend: { display: false },
+                // Only worth showing when there's a second ("Last
+                // Assessment") dataset to distinguish -- a single-series
+                // chart doesn't need a legend for its own label.
+                legend: {
+                  display: datasets.length > 1,
+                  labels: { color: '#374151', font: { size: 12, weight: '600' }, usePointStyle: true, padding: 16 }
+                },
                 tooltip: {
                   enabled: true,
                   backgroundColor: 'rgba(17, 24, 39, 0.95)',
                   padding: 12,
-                  displayColors: false,
+                  displayColors: datasets.length > 1,
                   callbacks: {
                     label: function(context) {
                       const score = context.parsed.r;
                       const percentage = ((score / 5) * 100).toFixed(0);
-                      return [`Score: ${score.toFixed(2)}/5.0`, `Performance: ${percentage}%`];
+                      const prefix = datasets.length > 1 ? `${context.dataset.label}: ` : '';
+                      return [`${prefix}Score: ${score.toFixed(2)}/5.0`, `Performance: ${percentage}%`];
                     }
                   }
                 }

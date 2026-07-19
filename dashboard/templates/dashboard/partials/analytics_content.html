@@ -8,7 +8,7 @@
 
 <div class="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50">
     <!-- KPI Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6 mb-8">
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 md:gap-6 mb-8">
         <div class="bg-white rounded-xl p-5 md:p-6 shadow-sm border border-gray-100">
             <p class="text-xs md:text-sm font-medium text-gray-500 uppercase tracking-wider">Total Assessments</p>
             <p class="text-2xl md:text-3xl font-bold text-gray-900 mt-1">
@@ -34,6 +34,13 @@
             <p class="text-xs md:text-sm font-medium text-gray-500 uppercase tracking-wider">Improvement</p>
             <p class="text-2xl md:text-3xl font-bold {% if assessment_stats and assessment_stats.improvement >= 0 %}text-green-600{% else %}text-red-600{% endif %} mt-1">
                 {% if assessment_stats %}{% if assessment_stats.improvement > 0 %}+{% endif %}{{ assessment_stats.improvement }}{% else %}—{% endif %}
+            </p>
+        </div>
+
+        <div class="bg-white rounded-xl p-5 md:p-6 shadow-sm border border-gray-100">
+            <p class="text-xs md:text-sm font-medium text-gray-500 uppercase tracking-wider">Since Last Assessment</p>
+            <p class="text-2xl md:text-3xl font-bold {% if assessment_stats and assessment_stats.since_last_delta is not None and assessment_stats.since_last_delta >= 0 %}text-green-600{% elif assessment_stats and assessment_stats.since_last_delta is not None %}text-red-600{% else %}text-gray-400{% endif %} mt-1">
+                {% if assessment_stats and assessment_stats.since_last_delta is not None %}{% if assessment_stats.since_last_delta > 0 %}+{% endif %}{{ assessment_stats.since_last_delta }}{% else %}—{% endif %}
             </p>
         </div>
     </div>
