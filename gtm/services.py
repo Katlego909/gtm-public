@@ -12,7 +12,7 @@ from .models import Category, Question, AssessmentSession, Response, Recommendat
 from .utils_logging import log_error
 from .utils import transfer_firmographics_to_snapshot, _client_id
 from .utils_async import run_in_background
-from .ai_services import generate_playbook_with_gemini
+from .ai_services import generate_playbook_with_gemini, _lock_is_held
 
 def _expand_gtm_jargon(text: str) -> str:
     """Replace common GTM acronyms with plain-language expansions for non-specialist users."""
@@ -107,9 +107,14 @@ def _kickoff_playbook_generation(snapshot, session_id=None, account=None):
     if (snapshot.ai_playbook or "").strip():
         return False
 
-    # Skip if already generating, done, or failed
+    # Skip if done or failed. "generating" only counts as in-flight while
+    # its lock is actually held -- if the lock has expired/released, the
+    # thread that set it must have died before reaching its finally block,
+    # so fall through and retry instead of staying stuck forever.
     snap_status = getattr(snapshot, "ai_playbook_status", "pending")
-    if snap_status in ("generating", "done", "failed"):
+    if snap_status in ("done", "failed"):
+        return False
+    if snap_status == "generating" and _lock_is_held(f"gtm:ai:playbook:{snapshot.id}:lock"):
         return False
 
     # Check credits BEFORE spawning the thread -- "no_credits" is
@@ -350,22 +355,46 @@ def _is_session_complete(session: AssessmentSession) -> bool:
     return answered_q == total_q
 
 
+# AI content narrates specific priorities/scores -- if the underlying
+# category breakdown changes (e.g. the user navigates back and edits an
+# earlier answer), it's cleared here rather than left to silently narrate
+# stale numbers. Existing kickoff/polling logic already treats an empty
+# ai_playbook + "pending" status as "needs generation", so no other view
+# code needs to change.
+_AI_STALE_RESET_FIELDS = {
+    "ai_playbook": "",
+    "ai_playbook_status": "pending",
+    "ai_risk_status": "",
+    "ai_financial_summary": "",
+    "ai_competitor_analysis": "",
+}
+
+
 def _save_snapshot(session, cat_scores, overall, band, labels, values):
     with transaction.atomic():
+        new_breakdown = [
+            {"category": c["category"].name, "avg": round(c["avg"], 2)}
+            for c in cat_scores
+        ]
+        existing_breakdown = (
+            ResultSnapshot.objects.filter(session=session)
+            .values_list("category_breakdown", flat=True)
+            .first()
+        )
+        defaults = {
+            "overall": round(overall, 1),
+            "band": band,
+            "band_stage": (band.stage if band else ""),
+            "band_headline": (band.headline if band else ""),
+            "category_breakdown": new_breakdown,
+            "radar_labels": labels,
+            "radar_values": values,
+        }
+        if existing_breakdown is not None and existing_breakdown != new_breakdown:
+            defaults.update(_AI_STALE_RESET_FIELDS)
         snap, created = ResultSnapshot.objects.update_or_create(
             session=session,
-            defaults={
-                "overall": round(overall, 1),
-                "band": band,
-                "band_stage": (band.stage if band else ""),
-                "band_headline": (band.headline if band else ""),
-                "category_breakdown": [
-                    {"category": c["category"].name, "avg": round(c["avg"], 2)}
-                    for c in cat_scores
-                ],
-                "radar_labels": labels,
-                "radar_values": values,
-            }
+            defaults=defaults,
         )
         # Transfer firmographics using the helper
         transfer_firmographics_to_snapshot(session, snap)

@@ -260,8 +260,16 @@ def assessment_step(request, session_id, step: int):
             for q in questions:
                 score = form.cleaned_data[q.id_code]
                 context_note = form.cleaned_data.get(f"{q.id_code}_context_note", "")
+                defaults = {"score": score, "context_note": context_note}
+                prior = existing.get(q.id)
+                if prior is not None and prior.score != score:
+                    # Re-editing an already-answered step: the old AI
+                    # insight narrates the old score, so clear it rather
+                    # than leave it stale next to the new one.
+                    defaults["ai_insight"] = ""
+                    defaults["ai_insight_status"] = "pending"
                 response_instance, created = Response.objects.update_or_create(
-                    session=session, question=q, defaults={"score": score, "context_note": context_note}
+                    session=session, question=q, defaults=defaults
                 )
                 if response_instance.score <= 2:
                     low_score_responses.append(response_instance)

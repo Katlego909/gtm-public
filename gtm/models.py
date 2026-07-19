@@ -7,6 +7,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 from .models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation
 from .models_integrations import WorkspaceIntegration
 from .models_ai_credits import AICreditAccount, AICreditTransaction
+from .models_ai_locks import AIGenerationLock
 
 # AI generation status choices
 AI_STATUS_CHOICES = [
@@ -15,6 +16,12 @@ AI_STATUS_CHOICES = [
     ("done", "Done"),
     ("failed", "Failed"),
     ("no_credits", "AI Credits Exhausted"),
+]
+
+RISK_STATUS_CHOICES = [
+    ("High", "High"),
+    ("Medium", "Medium"),
+    ("Low", "Low"),
 ]
 
 class Category(models.Model):
@@ -339,7 +346,7 @@ class ResultSnapshot(models.Model):
     report_sent = models.BooleanField(default=False)
     ai_playbook = models.TextField(blank=True, default="")
     ai_playbook_status = models.CharField(max_length=12, choices=AI_STATUS_CHOICES, default="pending", db_index=True)
-    ai_risk_status = models.CharField(max_length=20, blank=True, default="")
+    ai_risk_status = models.CharField(max_length=20, choices=RISK_STATUS_CHOICES, blank=True, default="")
     ai_financial_summary = models.TextField(blank=True, default="")
     ai_competitor_analysis = models.TextField(blank=True, default="")
 

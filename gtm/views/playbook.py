@@ -410,7 +410,14 @@ def insight_status(request, session_id, response_id):
     if not (response.ai_insight or "").strip():
         status = getattr(response, 'ai_insight_status', 'pending')
 
-        if status == "pending":
+        # "generating" only counts as in-flight while its lock is actually
+        # held -- if the lock expired/released, the generating thread must
+        # have died before releasing it, so treat this like "pending" and
+        # retry instead of polling a stuck status forever.
+        from ..ai_services import _lock_is_held
+        stuck_generating = status == "generating" and not _lock_is_held(f"gtm:ai:diagnostic:{response.id}:lock")
+
+        if status == "pending" or stuck_generating:
             from ..ai_credits import resolve_account_for_session, can_spend
             if not can_spend(account=resolve_account_for_session(session)).allowed:
                 response.ai_insight_status = "no_credits"
@@ -424,7 +431,7 @@ def insight_status(request, session_id, response_id):
                     generate_diagnostic_insight(r)
 
                 run_in_background(gen_diagnostic_async, response.id, name="diagnostic_insight_poll")
-        # If status is "generating", "failed", or "no_credits", don't spawn another thread
+        # If status is "failed" or "no_credits", don't spawn another thread
 
     return render(request, "gtm/partials/insight_status.html", {
         "session": session,

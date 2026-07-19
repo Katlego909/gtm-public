@@ -9,15 +9,14 @@ Supports commands, queries, and contextual help.
 import logging
 import json
 import re
-import threading
 from collections import Counter
 from typing import Dict, Any, Optional, List, Tuple
-from django.conf import settings
 from django.shortcuts import get_object_or_404
 from .models import AssessmentSession, ResultSnapshot, Response, Question, Category, ActionItem, ChatMessage
 from dashboard.models import Resource
 from .views import _compute_scores, _band_for_score
 from .agent_services import build_execution_plan, review_action_items
+from .utils import guess_upload_mime_type
 from .utils_logging import log_ai_error
 
 logger = logging.getLogger(__name__)
@@ -571,16 +570,11 @@ def _build_session_tools(
 # UNIFIED GENAI CLIENT (GCP VERTEX AI)
 # ================================================================
 try:
-    from google import genai
     from google.genai import types
     GENAI_AVAILABLE = True
 except ImportError:
     GENAI_AVAILABLE = False
     logger.warning("google-genai not available for chat assistant")
-
-# Cached chat client to avoid repeated initialization
-_chat_client = None
-_chat_lock = threading.Lock()
 
 # Import generation config from ai_services
 try:
@@ -590,35 +584,13 @@ except (ImportError, AttributeError):
 
 
 def _get_chat_client():
-    """Returns cached Vertex AI client for chat, initializing once if needed."""
-    global _chat_client
-
-    if not GENAI_AVAILABLE:
-        return None
-
-    project_id = getattr(settings, "GCP_PROJECT_ID", None)
-    if not project_id:
-        return None
-
-    if _chat_client is not None:
-        return _chat_client
-
-    with _chat_lock:
-        if _chat_client is not None:
-            return _chat_client
-
-        location = getattr(settings, "GCP_LOCATION", "us-central1")
-        try:
-            client = genai.Client(
-                vertexai=True,
-                project=project_id,
-                location=location
-            )
-            _chat_client = client
-            return client
-        except Exception as e:
-            log_ai_error("GenAI Chat Client Initialization", e, service="google-genai")
-            return None
+    """Returns the shared Vertex AI client (see ai_services._get_client()).
+    Consolidated onto ai_services' single cached client/lock so the app
+    doesn't maintain two independent genai.Client instances against the
+    same project/location, and so ai_services.cleanup_client() actually
+    releases the client this module uses too."""
+    from .ai_services import _get_client
+    return _get_client()
 
 
 # Base personality/instruction text for the GTM Strategist, factored out as
@@ -1203,7 +1175,7 @@ def handle_general_chat(
                 f.file.open('rb')
                 f_bytes = f.file.read()
                 f.file.close()
-                m_type = "application/pdf" if f.file.name.endswith(".pdf") else "image/png"
+                m_type = guess_upload_mime_type(f.file.name)
                 message_parts.append(types.Part.from_bytes(data=f_bytes, mime_type=m_type))
             except Exception as fe:
                 logger.warning(f"Failed to attach file {f.id} to chat: {fe}")

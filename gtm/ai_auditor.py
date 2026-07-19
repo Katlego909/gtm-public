@@ -11,6 +11,7 @@ import threading
 from django.conf import settings
 from django.utils import timezone
 
+from .utils import guess_upload_mime_type
 from .utils_async import run_in_background
 
 try:
@@ -227,15 +228,7 @@ def perform_gtm_visual_audit(session_file, session_context=None):
         file_bytes = session_file.file.read()
         session_file.file.close()
 
-        filename = session_file.file.name.lower()
-        if filename.endswith(".pdf"):
-            mime_type = "application/pdf"
-        elif filename.endswith(".png"):
-            mime_type = "image/png"
-        elif filename.endswith((".jpg", ".jpeg")):
-            mime_type = "image/jpeg"
-        else:
-            mime_type = "application/octet-stream"
+        mime_type = guess_upload_mime_type(session_file.file.name)
 
     except Exception as e:
         logger.error(f"Failed to read GTMFile for audit: {e}")
@@ -289,15 +282,7 @@ def perform_resource_audit(resource) -> bool:
         file_bytes = resource.file.read()
         resource.file.close()
 
-        filename = resource.file.name.lower()
-        if filename.endswith(".pdf"):
-            mime_type = "application/pdf"
-        elif filename.endswith(".png"):
-            mime_type = "image/png"
-        elif filename.endswith((".jpg", ".jpeg")):
-            mime_type = "image/jpeg"
-        else:
-            mime_type = "application/octet-stream"
+        mime_type = guess_upload_mime_type(resource.file.name)
 
     except Exception as e:
         logger.error(f"Failed to read Resource file for audit: {resource.id} — {e}")

@@ -7,12 +7,11 @@ Falls back to static RecommendationBand content if AI is unavailable.
 """
 
 import logging
-import time
 from django.conf import settings
-from django.core.cache import cache
 from django.utils.html import strip_tags
 
 from .models import ResultSnapshot, RecommendationBand, AssessmentSession, Question, Response
+from . import utils_locks
 from .utils_logging import log_ai_error
 import re
 import json
@@ -60,6 +59,22 @@ def _clean_json_response(text: str) -> str:
     return text.strip()
 
 
+def _normalize_risk_status(value: str) -> str:
+    """Coerce Gemini's risk_status output to exactly High/Medium/Low
+    (case-insensitive match). A malformed-but-present value clamps to
+    "Medium" (neutral) rather than "Low", so a parse failure doesn't
+    silently under-state risk -- a genuinely missing key is a separate
+    call-site decision, not this function's concern."""
+    candidate = (value or "").strip()
+    for valid in ("High", "Medium", "Low"):
+        if candidate.lower() == valid.lower():
+            return valid
+    if candidate:
+        logger.warning(f"Unrecognized ai_risk_status from Gemini: {candidate!r} — defaulting to Medium.")
+        return "Medium"
+    return ""
+
+
 def _is_quota_error(error: Exception) -> bool:
     """Return True when the exception indicates Gemini quota/rate-limit exhaustion."""
     msg = str(error).lower()
@@ -84,24 +99,30 @@ def _extract_retry_delay_seconds(error: Exception) -> int:
 
 
 def _set_quota_cooldown(retry_after_seconds: int):
-    """Set a short global cooldown to prevent quota-storm retry loops."""
+    """Set a short global cooldown to prevent quota-storm retry loops.
+    DB-backed (see gtm/utils_locks.py) rather than cache-backed, so the
+    cooldown is actually visible across Cloud Run instances/processes."""
     cooldown_seconds = min(max(retry_after_seconds, 1), 300)
-    cache.set(
-        AI_QUOTA_COOLDOWN_CACHE_KEY,
-        time.time() + cooldown_seconds,
-        timeout=cooldown_seconds,
-    )
+    utils_locks.set_active_until(AI_QUOTA_COOLDOWN_CACHE_KEY, cooldown_seconds)
 
 
 def _quota_cooldown_active() -> bool:
     """Check if Gemini calls should be skipped temporarily due to recent quota errors."""
-    until_ts = cache.get(AI_QUOTA_COOLDOWN_CACHE_KEY)
-    return bool(until_ts and until_ts > time.time())
+    return utils_locks.is_active(AI_QUOTA_COOLDOWN_CACHE_KEY)
 
 
 def _acquire_lock(lock_key: str, ttl_seconds: int = AI_LOCK_TTL_SECONDS) -> bool:
-    """Acquire a cache lock to avoid duplicate concurrent AI calls."""
-    return cache.add(lock_key, "1", timeout=ttl_seconds)
+    """Acquire a DB-backed lock to avoid duplicate concurrent AI calls
+    across instances (see gtm/utils_locks.py)."""
+    return utils_locks.acquire(lock_key, ttl_seconds)
+
+
+def _lock_is_held(lock_key: str) -> bool:
+    """Read-only peek: is this lock currently held (not expired)? Used to
+    tell a live "generating" status apart from one left behind by a thread
+    that died before reaching its release."""
+    return utils_locks.is_active(lock_key)
+
 
 def _request_budget_available(*, workspace=None, user=None, account=None) -> bool:
     """Per-workspace/per-user AI credit gate (see gtm/ai_credits.py). Fails
@@ -112,8 +133,8 @@ def _request_budget_available(*, workspace=None, user=None, account=None) -> boo
 
 
 def _release_lock(lock_key: str):
-    """Release a previously acquired cache lock."""
-    cache.delete(lock_key)
+    """Release a previously acquired lock."""
+    utils_locks.release(lock_key)
 
 
 # Metadata and monitoring tools
@@ -540,7 +561,7 @@ Use revenue ranges consistent with {revenue}. Do NOT recommend actions — only 
                         AIUsageTracker.log_usage(total_tokens, 'enrichment')
                     record_spend(account, total_tokens, "enrichment", session=snapshot.session)
             except Exception as e:
-                log_ai_error("generate_enrichment_sections:financial", e, {})
+                log_ai_error("generate_enrichment_sections:financial", e, extra={"snapshot_id": snapshot.id})
                 snapshot.ai_financial_summary = ENRICHMENT_UNAVAILABLE
             generated = True
 
@@ -568,7 +589,7 @@ Do NOT recommend actions — only describe competitive risks from the current st
                         AIUsageTracker.log_usage(total_tokens, 'enrichment')
                     record_spend(account, total_tokens, "enrichment", session=snapshot.session)
             except Exception as e:
-                log_ai_error("generate_enrichment_sections:competitor", e, {})
+                log_ai_error("generate_enrichment_sections:competitor", e, extra={"snapshot_id": snapshot.id})
                 snapshot.ai_competitor_analysis = ENRICHMENT_UNAVAILABLE
             generated = True
 
@@ -626,7 +647,7 @@ Playbook:
         if isinstance(tasks, list):
             return [str(t).strip() for t in tasks if isinstance(t, str) and len(t.strip()) <= 220][:n]
     except Exception as e:
-        log_ai_error("extract_tasks_from_playbook", e, {})
+        log_ai_error("extract_tasks_from_playbook", e, extra={"company_name": company_name})
     return []
 
 
@@ -661,7 +682,16 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
     try:
         # ---- 1. Attempt Unified Gemini generation
         client = _get_client()
-        if client and not _quota_cooldown_active() and _request_budget_available(account=account):
+        quota_cooldown = _quota_cooldown_active()
+        no_budget = not _request_budget_available(account=account)
+        # Distinguish "budget exhausted mid-flight" (a race: the outer
+        # kickoff's pre-check passed, but a concurrent request spent the
+        # remaining budget before this attempt ran) from "no client
+        # configured" / "quota cooldown active" -- only the former should
+        # surface as no_credits; the latter two keep the existing
+        # done-with-fallback behavior.
+        credits_exhausted_mid_flight = bool(client) and not quota_cooldown and no_budget
+        if client and not quota_cooldown and not no_budget:
             prompt = _build_prompt(snapshot)
             model_id = "gemini-2.5-flash"
             try:
@@ -676,7 +706,7 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
                         text = _clean_json_response(text)
                         parsed = json.loads(text)
                         final_playbook_text = parsed.get("markdown_playbook", "")
-                        snapshot.ai_risk_status = parsed.get("risk_status", "Low")
+                        snapshot.ai_risk_status = _normalize_risk_status(parsed.get("risk_status", "Low"))
                         snapshot.ai_financial_summary = parsed.get("financial_summary", "")
                         snapshot.ai_competitor_analysis = parsed.get("competitor_analysis", "")
 
@@ -743,7 +773,7 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
 
                         risk_match = re.search(r'["\']?risk_status["\']?\s*:\s*["\']+(.*?)(?=["\']|,)', text, re.IGNORECASE)
                         if risk_match:
-                            snapshot.ai_risk_status = risk_match.group(1).strip().strip('"\'')
+                            snapshot.ai_risk_status = _normalize_risk_status(risk_match.group(1).strip().strip('"\''))
 
                     if final_playbook_text:
                         # Log token usage
@@ -795,7 +825,7 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
             
         # CONSOLIDATED SAVE: Persist the final content once
         snapshot.ai_playbook = final_playbook_text
-        snapshot.ai_playbook_status = "done"
+        snapshot.ai_playbook_status = "no_credits" if credits_exhausted_mid_flight else "done"
         snapshot.save(update_fields=["ai_playbook", "ai_financial_summary", "ai_competitor_analysis", "ai_risk_status", "ai_playbook_status"])
 
         return final_playbook_text
@@ -896,12 +926,21 @@ def generate_diagnostic_insight(response: Response) -> str:
     account = resolve_account_for_session(response.session)
 
     client = _get_client()
-    if not client or _quota_cooldown_active() or not _request_budget_available(account=account):
+    no_budget = not _request_budget_available(account=account)
+    if not client or _quota_cooldown_active() or no_budget:
         logger.warning("GenAI client unavailable for diagnostic insight.")
         fallback = response.question.diagnostic_note or ""
-        if fallback and not response.ai_insight:
-            response.ai_insight = fallback
-            response.save(update_fields=["ai_insight"])
+        if fallback:
+            if not response.ai_insight:
+                response.ai_insight = fallback
+            response.ai_insight_status = "done"
+            response.save(update_fields=["ai_insight", "ai_insight_status"])
+        else:
+            # No static fallback text either -- must not leave status at
+            # "pending", or insight_status's poller spawns a fresh
+            # background thread on every single poll indefinitely.
+            response.ai_insight_status = "no_credits" if no_budget else "failed"
+            response.save(update_fields=["ai_insight_status"])
         return fallback
 
     lock_key = f"gtm:ai:diagnostic:{response.id}:lock"
@@ -944,7 +983,7 @@ def generate_diagnostic_insight(response: Response) -> str:
         except Exception as e:
             if _is_quota_error(e):
                 _set_quota_cooldown(_extract_retry_delay_seconds(e))
-                log_ai_error(
+            log_ai_error(
                 "Diagnostic insight generation",
                 e,
                 service="google-genai",
@@ -952,7 +991,7 @@ def generate_diagnostic_insight(response: Response) -> str:
                 prompt=prompt,
                 extra={"response_id": response.id},
             )
-            
+
             # Fallback to static diagnostic note if AI fails
             if response.question.diagnostic_note:
                 text = response.question.diagnostic_note
