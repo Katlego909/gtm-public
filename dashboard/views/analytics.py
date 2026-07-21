@@ -50,7 +50,7 @@ from gtm.models import (
 from gtm.models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation, WorkspaceActivityEvent
 from gtm.ai_chat import get_suggested_prompts, process_chat_message
 from gtm.decorators import workspace_permission_required, workspace_member_required
-from dashboard.models import Channel, ChannelAnalytics, GapAnalysisMetric, GapAnalysisSuggestion, Resource, Notification, UserSettings
+from dashboard.models import Channel, ChannelAnalytics, GapAnalysisMetric, GapAnalysisSuggestion, Resource, Notification, UserSettings, BetaFeedback
 from dashboard.forms import GapAnalysisMetricForm, ActionItemForm, UserProfileForm, UserSettingsForm
 from dashboard.utils_notifications import send_notification
 from ..forms import GapAnalysisMetricForm, ActionItemForm, UserProfileForm, ResourceForm
@@ -152,11 +152,39 @@ def insight_feedback(request, pk):
     """Receive feedback for an AI insight."""
     if request.method == 'POST':
         feedback = request.POST.get('feedback', '').strip()
-        print(f'Feedback for insight {pk}: {feedback}')
-        
+        if feedback:
+            BetaFeedback.objects.create(
+                user=request.user if request.user.is_authenticated else None,
+                context='insight',
+                reference_id=str(pk),
+                message=feedback,
+                page_url=request.META.get('HTTP_REFERER', '')[:500],
+            )
+
         if request.htmx:
             return HttpResponse('<div class="p-4 bg-green-50 text-green-700 rounded-lg text-center">Thanks for your feedback!</div>')
-            
+
+        return JsonResponse({'status': 'success', 'message': 'Feedback received.'})
+    return JsonResponse({'status': 'error', 'message': 'Invalid request.'}, status=400)
+
+
+@csrf_exempt
+def general_feedback(request):
+    """Site-wide "Give Feedback" widget -- not scoped to one AI insight.
+    Same persistence model as insight_feedback (BetaFeedback), context='general'."""
+    if request.method == 'POST':
+        feedback = request.POST.get('feedback', '').strip()
+        if feedback:
+            BetaFeedback.objects.create(
+                user=request.user if request.user.is_authenticated else None,
+                context='general',
+                message=feedback,
+                page_url=request.POST.get('page_url', '')[:500] or request.META.get('HTTP_REFERER', '')[:500],
+            )
+
+        if request.htmx:
+            return HttpResponse('<div class="p-4 bg-green-50 text-green-700 rounded-lg text-center">Thanks for your feedback!</div>')
+
         return JsonResponse({'status': 'success', 'message': 'Feedback received.'})
     return JsonResponse({'status': 'error', 'message': 'Invalid request.'}, status=400)
 

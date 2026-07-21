@@ -90,5 +90,6 @@ tzdata==2025.2
 uritemplate==4.2.0
 urllib3==2.5.0
 websockets==15.0.1
+sentry-sdk==2.66.0
 
 whitenoise==6.9.0

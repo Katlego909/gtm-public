@@ -73,6 +73,24 @@ class Workspace(models.Model):
             )
             return workspace
 
+    @classmethod
+    def user_at_creation_cap(cls, user) -> bool:
+        """Beta safety net: unrestricted workspace creation means
+        unrestricted AI-credit-account creation too (each new workspace
+        gets its own fresh token budget, see gtm/ai_credits.py::
+        resolve_account) -- shared by every workspace-creation entry point
+        (gtm/views_workspace.py, dashboard/views/pages.py) so the cap can't
+        be bypassed by using a different one. Staff are exempt so the
+        internal team keeps unrestricted workspace creation for testing."""
+        from django.conf import settings
+        if getattr(user, "is_staff", False):
+            return False
+        max_workspaces = getattr(settings, "MAX_WORKSPACES_PER_USER", 1)
+        owned_count = WorkspaceMembership.objects.filter(
+            user=user, role='admin', is_active=True
+        ).count()
+        return owned_count >= max_workspaces
+
     def __str__(self):
         return self.name
 

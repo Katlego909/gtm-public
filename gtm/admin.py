@@ -7,6 +7,7 @@ from .utils_email import send_snapshot_report_email
 from .models import AssessmentSession, ResultSnapshot, RecommendationBand, Category, Question, Response, ActionItem, ToolRecommendation, ChatMessage, WorkspaceChatMessage, AgentDocument
 from .models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation
 from .models_ai_credits import AICreditAccount, AICreditTransaction
+from .models_beta import BetaInviteCode
 from dashboard.models import GapAnalysisMetric
 
 @admin.action(description="Resend report email")
@@ -308,3 +309,28 @@ class AICreditTransactionAdmin(admin.ModelAdmin):
     list_select_related = ('account', 'session', 'actor')
     search_fields = ('account__workspace__name', 'account__user__username')
     date_hierarchy = 'created_at'
+
+
+@admin.action(description="Email invite code to the address on file")
+def email_invite_code(modeladmin, request, queryset):
+    from .utils_email import send_beta_invite_email
+    sent, skipped = 0, 0
+    for invite in queryset:
+        if not invite.email:
+            skipped += 1
+            continue
+        send_beta_invite_email(invite, invite.email, request=request)
+        sent += 1
+    if sent:
+        messages.success(request, f"Sent {sent} invite email(s).")
+    if skipped:
+        messages.warning(request, f"Skipped {skipped} code(s) with no email on file.")
+
+
+@admin.register(BetaInviteCode)
+class BetaInviteCodeAdmin(admin.ModelAdmin):
+    actions = [email_invite_code]
+    list_display = ('code', 'email', 'note', 'is_used', 'used_by', 'created_at', 'expires_at')
+    list_filter = ('created_at',)
+    search_fields = ('code', 'email', 'note', 'used_by__username', 'used_by__email')
+    readonly_fields = ('used_by', 'used_at', 'created_at')

@@ -1,0 +1,50 @@
+{% comment %}
+Site-wide beta feedback widget -- self-contained (own button, own modal,
+own JS) so it can be included unchanged from both gtm/base.html and
+dashboard/base.html without depending on either app's own modal system.
+Positioned bottom-left, clear of the dashboard app's bottom-right agent
+launcher (#global-agent).
+{% endcomment %}
+<div id="beta-feedback-widget" class="fixed bottom-6 left-6 z-[1250]">
+  <button type="button" onclick="document.getElementById('beta-feedback-modal').classList.remove('hidden')"
+          class="bg-gray-900 text-white text-sm font-semibold px-4 py-2.5 rounded-lg border border-gray-900 hover:bg-gray-800 transition">
+    Give Feedback
+  </button>
+</div>
+
+<div id="beta-feedback-modal" class="hidden fixed inset-0 z-[1300]">
+  <div class="fixed inset-0 bg-gray-500 bg-opacity-75" onclick="document.getElementById('beta-feedback-modal').classList.add('hidden')"></div>
+  <div class="min-h-full flex items-center justify-center p-4">
+    <div class="relative bg-white rounded-lg border border-gray-200 w-full max-w-md overflow-hidden">
+      <div class="px-6 py-5 border-b border-gray-100">
+        <h3 class="text-lg font-bold text-gray-900">Give Feedback</h3>
+        <p class="text-sm text-gray-500 mt-1">This is a closed beta &mdash; tell us what's confusing, broken, or missing.</p>
+      </div>
+      <form hx-post="{% url 'general_feedback' %}" hx-target="#beta-feedback-result" hx-swap="innerHTML"
+            hx-on::after-request="if(event.detail.successful){ this.reset(); }">
+        {% csrf_token %}
+        <input type="hidden" name="page_url" value="">
+        <div class="px-6 py-5">
+          <textarea name="feedback" rows="4" required
+                    class="w-full border border-gray-300 rounded-md px-3 py-2 focus:border-gray-500 focus:ring-2 focus:ring-gray-100 transition"
+                    placeholder="What's on your mind?"></textarea>
+          <div id="beta-feedback-result" class="mt-3"></div>
+        </div>
+        <div class="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3">
+          <button type="button" onclick="document.getElementById('beta-feedback-modal').classList.add('hidden')"
+                  class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-lg bg-gray-900 text-white hover:bg-gray-800 transition">Send</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+  (function() {
+    var modal = document.getElementById('beta-feedback-modal');
+    if (modal) {
+      var pageUrlField = modal.querySelector('input[name="page_url"]');
+      if (pageUrlField) pageUrlField.value = window.location.href;
+    }
+  })();
+</script>

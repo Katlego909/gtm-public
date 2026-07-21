@@ -27,6 +27,13 @@ def workspace_create(request):
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
         if name:
+            if Workspace.user_at_creation_cap(request.user):
+                messages.error(
+                    request,
+                    "You've reached the workspace limit for the beta. "
+                    "Contact us at hello@funti3r.xyz if you need another."
+                )
+                return render(request, 'gtm/workspace/create.html')
             workspace = Workspace.create_for_user(name=name, user=request.user)
             messages.success(request, f'Workspace "{name}" created successfully')
             return redirect('workspace:detail', workspace_id=workspace.id)

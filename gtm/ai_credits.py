@@ -23,9 +23,19 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
+from django.conf import settings
 from django.db import transaction
+from django.db.models import Sum
+from django.utils import timezone
 
+from . import utils_locks
 from .models_ai_credits import AICreditAccount, AICreditTransaction
+
+# Once-per-day dedupe key for the global-cap breach alert email (see
+# _maybe_alert_global_cap_exceeded) -- reuses the DB-backed lock primitives
+# built for AI generation locking (gtm/utils_locks.py) purely as a "have we
+# already sent this today" flag, not for mutual exclusion.
+GLOBAL_CAP_ALERT_DEDUPE_KEY = "gtm:ai:global_cap_alert_sent"
 
 
 @dataclass
@@ -67,12 +77,48 @@ def resolve_account_for_session(session, user=None) -> Optional[AICreditAccount]
     return resolve_account(workspace=workspace, user=resolved_user)
 
 
+def _global_daily_spend_exceeded() -> bool:
+    """Aggregate ceiling across every account combined -- AICreditAccount's
+    per-account budgets bound one workspace/user's spend, but nothing bounds
+    the *total* across all of them, and workspace creation was unrestricted
+    (see gtm/views_workspace.py's MAX_WORKSPACES_PER_USER cap for the other
+    half of this fix: how many accounts can exist in the first place).
+    AI_GLOBAL_DAILY_TOKEN_CAP unset/0 means "no global cap" -- opt-in, since
+    existing single-tenant/internal usage shouldn't suddenly start failing.
+    """
+    cap = getattr(settings, "AI_GLOBAL_DAILY_TOKEN_CAP", 0)
+    if not cap:
+        return False
+    start_of_day = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    total = AICreditTransaction.objects.filter(created_at__gte=start_of_day).aggregate(
+        total=Sum("tokens_spent")
+    )["total"] or 0
+    return total >= cap
+
+
+def _maybe_alert_global_cap_exceeded() -> None:
+    """Fire at most one alert email per day when the global cap first trips
+    -- utils_locks.is_active/set_active_until are reused here purely as a
+    24h dedupe flag, not for their usual mutual-exclusion purpose."""
+    if utils_locks.is_active(GLOBAL_CAP_ALERT_DEDUPE_KEY):
+        return
+    utils_locks.set_active_until(GLOBAL_CAP_ALERT_DEDUPE_KEY, 24 * 60 * 60)
+    alert_to = getattr(settings, "BETA_ALERT_EMAIL", "")
+    if not alert_to:
+        return
+    from .utils_email import send_global_ai_cap_alert_email
+    send_global_ai_cap_alert_email(alert_to)
+
+
 def can_spend(*, workspace=None, user=None, account: Optional[AICreditAccount] = None) -> CreditCheck:
     """Read-only pre-flight check -- call BEFORE making a Gemini call (or
     before spawning a background thread that will)."""
     account = account or resolve_account(workspace=workspace, user=user)
     if account is None:
         return CreditCheck(allowed=False, account=None, remaining=0, reset_at=None, reason="no_identity")
+    if _global_daily_spend_exceeded():
+        _maybe_alert_global_cap_exceeded()
+        return CreditCheck(allowed=False, account=account, remaining=0, reset_at=None, reason="global_cap")
     remaining, reset_at = account.remaining_tokens()
     return CreditCheck(
         allowed=remaining > 0, account=account, remaining=remaining, reset_at=reset_at,

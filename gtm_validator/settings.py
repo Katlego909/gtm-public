@@ -23,6 +23,21 @@ DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1", "yes")
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,gtm-validator-601175512678.us-west1.run.app").split(",")
 
+# Error tracking (optional -- only active when SENTRY_DSN is set; safe to
+# leave sentry-sdk installed with no DSN configured, e.g. local dev/CI).
+# Initialized early since this is otherwise zero-effort/zero-code-elsewhere:
+# DjangoIntegration auto-enables once sentry_sdk.init() runs in a process
+# where django is importable, no explicit integration wiring needed.
+SENTRY_DSN = os.getenv("SENTRY_DSN", "").strip()
+if SENTRY_DSN:
+    import sentry_sdk
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        environment=os.getenv("ENVIRONMENT", "development"),
+        traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
+        send_default_pii=False,
+    )
+
 # Application definition
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -179,7 +194,26 @@ EMAIL_SUBJECT_PREFIX = "[Funti3r GTM] "
 
 GTM_REPORT_INTERNAL_TO = ["gtm-reports@funti3r.xyz"]
 EMAIL_REDIRECT_TO = os.getenv("EMAIL_REDIRECT_TO", "").strip()
-    
+
+# Beta cost/access safety net (see gtm/ai_credits.py, gtm/views_workspace.py).
+# AI_GLOBAL_DAILY_TOKEN_CAP unset/0 = no global ceiling (opt-in, so existing
+# single-tenant usage doesn't suddenly start failing).
+AI_GLOBAL_DAILY_TOKEN_CAP = int(os.getenv("AI_GLOBAL_DAILY_TOKEN_CAP", "0") or 0)
+BETA_ALERT_EMAIL = os.getenv("BETA_ALERT_EMAIL", "").strip()
+MAX_WORKSPACES_PER_USER = int(os.getenv("MAX_WORKSPACES_PER_USER", "1") or 1)
+
+# Zero-new-dependency fallback for unhandled 500s: Django's own
+# AdminEmailHandler is already attached to the "django" logger by
+# DEFAULT_LOGGING (confirmed -- our custom LOGGING dict below doesn't
+# override the "django" logger, and disable_existing_loggers=False leaves
+# it in place); it only actually sends anything once ADMINS is non-empty
+# and DEBUG=False (AdminEmailHandler's own require_debug_false filter).
+# Reuses BETA_ALERT_EMAIL rather than a separate setting -- one place to
+# configure "who hears about beta problems."
+if BETA_ALERT_EMAIL:
+    ADMINS = [("Beta Alerts", BETA_ALERT_EMAIL)]
+    MANAGERS = ADMINS
+
 GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "")
 GCP_LOCATION = os.getenv("GCP_LOCATION", "us-central1")
 GOOGLE_APPLICATION_CREDENTIALS = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "")
@@ -224,6 +258,10 @@ AUTHENTICATION_BACKENDS = [
 LOGIN_REDIRECT_URL = 'gtm:landing'
 LOGOUT_REDIRECT_URL = 'gtm:landing'
 ACCOUNT_LOGOUT_REDIRECT_URL = 'gtm:landing'
+# Closed-beta gate: adds a required invite-code field to allauth's stock
+# signup form (see gtm/forms_beta.py). Remove this line to reopen public
+# signup once the beta is over.
+ACCOUNT_SIGNUP_FORM_CLASS = 'gtm.forms_beta.BetaInviteSignupForm'
 
 # CSRF validation handled via standard token validation for same-origin requests
 CSRF_TRUSTED_ORIGINS = [

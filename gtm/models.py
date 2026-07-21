@@ -8,6 +8,7 @@ from .models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitatio
 from .models_integrations import WorkspaceIntegration
 from .models_ai_credits import AICreditAccount, AICreditTransaction
 from .models_ai_locks import AIGenerationLock
+from .models_beta import BetaInviteCode
 
 # AI generation status choices
 AI_STATUS_CHOICES = [

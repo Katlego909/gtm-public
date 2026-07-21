@@ -142,6 +142,63 @@ def send_workspace_invitation_email(invitation, request=None):
     msg.send(fail_silently=False)
 
 
+def send_beta_invite_email(invite_code, to_email, request=None):
+    """
+    Sends a closed-beta invite code + signup link to a prospective tester.
+    Mirrors send_workspace_invitation_email's pattern (HTML+text templates,
+    SITE_BASE_URL fallback for building the link without a request).
+    """
+    from django.urls import reverse
+
+    signup_path = f"{reverse('account_signup')}?code={invite_code.code}"
+    if request:
+        signup_url = request.build_absolute_uri(signup_path)
+    else:
+        base_url = getattr(settings, "SITE_BASE_URL", "http://127.0.0.1:8000")
+        signup_url = base_url + signup_path
+
+    context = {
+        'invite_code': invite_code.code,
+        'signup_url': signup_url,
+    }
+
+    subject = "You're invited to the Funti3r GTM Validator beta"
+    html_body = render_to_string("emails/beta_invite.html", context)
+    text_body = render_to_string("emails/beta_invite.txt", context)
+
+    if not text_body.strip():
+        text_body = strip_tags(html_body)
+
+    msg = EmailMultiAlternatives(
+        subject=subject,
+        body=text_body,
+        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+        to=[to_email],
+    )
+    msg.attach_alternative(html_body, "text/html")
+    msg.send(fail_silently=False)
+
+
+def send_global_ai_cap_alert_email(to_email):
+    """Plain-text operator alert when gtm/ai_credits.py's global daily AI
+    spend ceiling trips -- deliberately no HTML/branding, this is an
+    internal ops signal, not tester-facing. Deduped to once/day by the
+    caller (gtm/ai_credits.py::_maybe_alert_global_cap_exceeded)."""
+    from django.core.mail import send_mail
+    send_mail(
+        subject="[GTM Validator] Global AI daily spend cap reached",
+        message=(
+            "The global AI_GLOBAL_DAILY_TOKEN_CAP has been reached today. "
+            "New AI generation requests are being blocked app-wide until the "
+            "daily period rolls over. Check the AI Credit Transactions admin "
+            "list to see which accounts are driving usage."
+        ),
+        from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
+        recipient_list=[to_email],
+        fail_silently=True,
+    )
+
+
 def send_notification_email(recipient, title, message, link=""):
     """
     Sends a generic notification email for any Notification (task update,

@@ -59,3 +59,4 @@ from .actions import (
 )
 from .profile import history, logout_view, profile
 from .legal import contact, privacy_policy, terms_of_service
+from .beta_cohort import beta_cohort

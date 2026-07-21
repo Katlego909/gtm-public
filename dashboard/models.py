@@ -385,3 +385,28 @@ class UserSettings(models.Model):
 
     def __str__(self):
         return f"Settings for {self.user.username}"
+
+
+class BetaFeedback(models.Model):
+    """Real persistence for beta-tester feedback -- replaces the old
+    insight_feedback view, which used to print() and discard input.
+    'insight' rows carry a reference_id (the Response pk the feedback was
+    about); 'general' rows (the site-wide "Give Feedback" widget) don't."""
+    CONTEXT_CHOICES = [
+        ('insight', 'AI Insight'),
+        ('general', 'General'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='beta_feedback')
+    context = models.CharField(max_length=10, choices=CONTEXT_CHOICES, default='general')
+    reference_id = models.CharField(max_length=40, blank=True, default="")
+    message = models.TextField()
+    page_url = models.CharField(max_length=500, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        who = self.user.username if self.user_id else "anonymous"
+        return f"{self.get_context_display()} feedback from {who} ({self.created_at:%Y-%m-%d})"

@@ -141,7 +141,13 @@ def create_workspace_dashboard(request):
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
         is_onboarding = request.POST.get('onboarding') == 'true'
-        
+
+        if name and Workspace.user_at_creation_cap(request.user):
+            template = 'dashboard/partials/onboarding_overlay.html' if is_onboarding else 'dashboard/partials/workspace_create_modal.html'
+            return render(request, template, {
+                'error': "You've reached the workspace limit for the beta. Contact us at hello@funti3r.xyz if you need another.",
+            })
+
         if name:
             workspace = Workspace.create_for_user(name=name, user=request.user)
             # On success, trigger dashboard refresh or close modal via HTMX

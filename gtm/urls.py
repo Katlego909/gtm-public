@@ -56,4 +56,7 @@ urlpatterns = [
     # Workspace management
     path("workspace/", include('gtm.urls_workspace')),
 
+    # Beta operator view (staff-only)
+    path("beta/cohort/", views.beta_cohort, name="beta_cohort"),
+
 ]

@@ -31,6 +31,7 @@ urlpatterns = [
     path('kpi/pending_items/', views.kpi_pending_items, name='kpi_pending_items'),
     path('insight/<int:pk>/export/<str:fmt>/', views.insight_export, name='insight_export'),
     path('insight/<int:pk>/feedback/', views.insight_feedback, name='insight_feedback'),
+    path('feedback/', views.general_feedback, name='general_feedback'),
 
     # Gap Analysis Metric CRUD URLs
     path('gap-metric/add/', views.add_edit_gap_metric, name='add_gap_metric'),
