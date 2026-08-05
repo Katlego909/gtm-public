@@ -1,33 +1,60 @@
-<div class="space-y-4">
-    <div class="p-4 rounded-xl bg-yellow-50 border border-yellow-100 flex gap-3">
-        <div class="mt-1 w-2 h-2 rounded-full bg-yellow-500 flex-shrink-0"></div>
-        <div>
-            <h4 class="text-sm font-bold text-gray-900">Pending Reviews</h4>
-            <p class="text-xs text-gray-600 mt-1 leading-relaxed">You have <span id="sidebar-pending-count">{{ pending_items }}</span> items waiting.</p>
+{% load humanize %}
+<div class="space-y-6">
+    {% if ai_credits_budget %}
+    <div class="rounded-lg border {% if ai_credits_low %}border-amber-200 bg-amber-50{% else %}border-gray-200 bg-gray-50{% endif %} px-3 py-2.5">
+        <div class="flex items-center justify-between mb-2">
+            <p class="text-xs font-bold {% if ai_credits_low %}text-amber-700{% else %}text-gray-900{% endif %}">AI credits</p>
+            <p class="text-xs {% if ai_credits_low %}text-amber-700{% else %}text-gray-500{% endif %}">{{ ai_credits_used|intcomma }} of {{ ai_credits_budget|intcomma }} used</p>
         </div>
+        <div class="h-1.5 w-full rounded-full bg-gray-200 overflow-hidden">
+            <div class="h-full rounded-full {% if ai_credits_low %}bg-amber-500{% else %}bg-indigo-600{% endif %}"
+                 style="width: {{ ai_credits_percent_used }}%"></div>
+        </div>
+        {% if ai_credits_low %}
+        <p class="text-[11px] text-amber-600 mt-1.5">Running low &mdash; resets {{ ai_credits_reset_at|timeuntil }} from now.</p>
+        {% endif %}
     </div>
+    {% endif %}
 
-    <div class="p-4 rounded-xl bg-indigo-50 border border-indigo-100">
-        <div class="flex items-center justify-between mb-3">
-            <h4 class="text-sm font-bold text-gray-900">Recent Activity</h4>
+    {% if pending_items %}
+    <div class="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
+        <span class="h-2 w-2 rounded-full bg-amber-500 flex-shrink-0"></span>
+        <p class="text-xs text-gray-700">
+            <span class="font-bold text-gray-900">{{ pending_items }}</span>
+            pending review{{ pending_items|pluralize }}
+        </p>
+    </div>
+    {% endif %}
+
+    <div>
+        <div class="flex items-center justify-between pb-2 mb-2 border-b border-gray-200">
+            <h4 class="text-xs font-bold text-gray-900 uppercase tracking-wide">Recent Activity</h4>
             {% if sidebar_workspace %}
-                <span class="text-[11px] font-medium text-indigo-600">{{ sidebar_workspace.name }}</span>
+                <span class="text-[11px] font-medium text-gray-400 truncate max-w-[9rem]">{{ sidebar_workspace.name }}</span>
             {% endif %}
         </div>
 
         {% if sidebar_recent_activity %}
-            <div class="space-y-3 max-h-[440px] overflow-y-auto pr-1">
+            <div class="divide-y divide-gray-100 max-h-[440px] overflow-y-auto -mx-1">
                 {% for event in sidebar_recent_activity %}
-                <div class="rounded-lg bg-white border border-indigo-100 p-3">
-                    <p class="text-xs text-gray-700 leading-relaxed">{{ event.summary }}</p>
-                    <p class="text-[11px] text-gray-500 mt-1">{{ event.created_at|timesince }} ago</p>
+                <div class="flex items-start gap-2.5 px-1 py-3 hover:bg-gray-50 rounded-md transition-colors">
+                    <span class="mt-1.5 h-1.5 w-1.5 rounded-full flex-shrink-0
+                        {% if 'deleted' in event.event_type %}bg-red-500
+                        {% elif 'created' in event.event_type %}bg-green-500
+                        {% elif 'moved' in event.event_type %}bg-indigo-500
+                        {% elif 'comment' in event.event_type %}bg-blue-500
+                        {% else %}bg-gray-400{% endif %}"></span>
+                    <div class="min-w-0">
+                        <p class="text-xs text-gray-700 leading-snug break-words">{{ event.summary }}</p>
+                        <p class="text-[11px] text-gray-400 mt-1">{{ event.created_at|timesince }} ago</p>
+                    </div>
                 </div>
                 {% endfor %}
             </div>
         {% elif sidebar_workspace %}
-            <p class="text-xs text-gray-500">No activity yet for this workspace.</p>
+            <p class="text-xs text-gray-500 pt-2">No activity yet for this workspace.</p>
         {% else %}
-            <p class="text-xs text-gray-500">Select a workspace to see team activity.</p>
+            <p class="text-xs text-gray-500 pt-2">Select a workspace to see team activity.</p>
         {% endif %}
     </div>
 </div>

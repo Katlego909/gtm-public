@@ -13,7 +13,7 @@ module.exports = {
     extend: {
       fontFamily: {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'Noto Sans', 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol'],
-        heading: ['Inter', 'ui-sans-serif', 'system-ui'],
+        heading: ['Geoform', 'ui-sans-serif', 'system-ui'],
       },
       colors: {
         // Neutral SaaS palette (tweak to taste)

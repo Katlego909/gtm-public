@@ -4,7 +4,7 @@ This guide is designed for business leaders and non-technical stakeholders. It e
 
 ---
 
-## 🏗️ The Pillars of Strategic Maturity
+## The Pillars of Strategic Maturity
 The GTM Validator doesn't just "calculate a score." it measures the **Integrity** of your growth engine across three core pillars:
 
 ### 1. The Diagnostic: "Weighted Reality"
@@ -24,7 +24,7 @@ Self-reporting is often biased. To solve this, you can upload evidence—like yo
 
 ---
 
-## 🛤️ The Strategic Journey
+## The Strategic Journey
 How a raw idea becomes an execution plan in the GTM Validator:
 
 1.  **The Pulse Check (15 mins):** Complete the diagnostic. Every answer is saved instantly using "Atomic Persistence," so you never lose your progress.
@@ -34,7 +34,7 @@ How a raw idea becomes an execution plan in the GTM Validator:
 
 ---
 
-## 🛡️ Protecting Your Strategy: Security & Isolation
+## Protecting Your Strategy: Security & Isolation
 We treat your GTM strategy as your company's most sensitive asset.
 -   **Soft Isolation:** You can start anonymously as a "Guest." Once you register, the system "handshakes" your guest data safely into your private account.
 -   **Workspace Vaults:** In a collaborative setting, data is locked to your specific workspace. Only your invited team members can see your strategic "Gaps" or "Playbooks."
@@ -42,5 +42,5 @@ We treat your GTM strategy as your company's most sensitive asset.
 
 ---
 
-## 🚀 The Bottom Line
+## The Bottom Line
 The GTM Validator is a **Strategic Operating System**. It helps you diagnose the "Why," writes the "How," and provides the "Workspace" for your team to win. 

@@ -1,7 +1,7 @@
 {% load humanize %}
 <header class="hidden md:flex h-16 bg-white border-b border-gray-200 justify-between items-center px-8 flex-shrink-0">
   <div class="flex items-center gap-6">
-    <h1 class="text-xl font-bold text-gray-800">Strategic Asset Library</h1>
+    <h1 class="text-xl font-bold text-gray-800">Library</h1>
 
     {% if user_workspaces %}
     <div class="flex items-center gap-3">
@@ -25,6 +25,9 @@
   </div>
 
   <div class="flex items-center gap-3">
+    {% include 'dashboard/partials/global_search.html' with instance_id="header" %}
+    {% include 'dashboard/partials/notification_bell.html' with instance_id="header" %}
+    {% if active_tab == 'resources' %}
     <button type="button"
             hx-get="{% url 'add_resource' %}"
             hx-target="#modal-content"
@@ -33,8 +36,28 @@
       <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
       Upload Asset
     </button>
+    {% endif %}
   </div>
 </header>
+
+<div class="px-4 md:px-8 pt-4 bg-white border-b border-gray-200 flex gap-2">
+  <a href="{% url 'asset_library' %}?tab=resources{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
+     hx-get="{% url 'asset_library' %}?tab=resources{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
+     hx-target="#main-content"
+     hx-swap="innerHTML swap:200ms"
+     hx-push-url="true"
+     class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition {% if active_tab == 'resources' %}border-indigo-600 text-indigo-700{% else %}border-transparent text-gray-500 hover:text-gray-700{% endif %}">
+    Resources{% if total_assets %} ({{ total_assets }}){% endif %}
+  </a>
+  <a href="{% url 'asset_library' %}?tab=documents{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
+     hx-get="{% url 'asset_library' %}?tab=documents{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
+     hx-target="#main-content"
+     hx-swap="innerHTML swap:200ms"
+     hx-push-url="true"
+     class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition {% if active_tab == 'documents' %}border-indigo-600 text-indigo-700{% else %}border-transparent text-gray-500 hover:text-gray-700{% endif %}">
+    Documents{% if total_documents %} ({{ total_documents }}){% endif %}
+  </a>
+</div>
 
 <div class="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50 space-y-8">
 
@@ -42,8 +65,105 @@
   <div class="flex flex-col items-center justify-center py-24 bg-white rounded-2xl border-2 border-dashed border-gray-200">
     <svg class="w-14 h-14 text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
     <h3 class="text-lg font-bold text-gray-900">Select a Workspace</h3>
-    <p class="mt-1 text-sm text-gray-500">Choose a workspace above to view your strategic assets.</p>
+    <p class="mt-1 text-sm text-gray-500">Choose a workspace above to view your library.</p>
   </div>
+
+  {% elif active_tab == 'documents' %}
+  {% if document_groups %}
+    {% for group in document_groups %}
+    <div>
+      <h2 class="text-sm font-bold text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+        <span class="w-5 h-0.5 bg-gray-300 inline-block"></span>
+        {{ group.label }}
+        <span class="text-gray-300 font-normal">({{ group.documents|length }})</span>
+      </h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+        {% for doc in group.documents %}
+        <div class="group relative bg-white rounded-2xl border border-gray-200 transition-colors overflow-hidden flex flex-col">
+          <div class="h-1.5 w-full {{ doc.accent_class }}"></div>
+          <div class="p-5 flex flex-col flex-1">
+
+            <div class="flex items-start justify-between gap-3 mb-3">
+              <div class="flex items-start gap-3 min-w-0">
+                <div class="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center {{ doc.badge_class }}">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                </div>
+                <div class="min-w-0">
+                  <h3 class="font-bold text-gray-900 leading-snug group-hover:text-indigo-600 transition-colors">{{ doc.title }}</h3>
+                  <span class="inline-flex items-center gap-1 text-xs font-medium text-gray-500 uppercase tracking-wider mt-1">
+                    {{ doc.get_agent_type_display }}
+                  </span>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                <button type="button"
+                        onclick="openLibraryDocumentEditor('{{ doc.id }}', '{{ current_workspace.id }}')"
+                        class="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                        aria-label="Edit">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                </button>
+                <button type="button"
+                        hx-get="{% url 'document_delete_api' pk=doc.id %}?workspace={{ current_workspace.id }}"
+                        hx-target="#modal-content"
+                        onclick="openModal()"
+                        class="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                        aria-label="Delete">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </div>
+            </div>
+
+            {% if doc.preview %}
+            <p class="text-xs text-gray-500 leading-relaxed mb-3 flex-1">{{ doc.preview }}</p>
+            {% else %}
+            <div class="flex-1"></div>
+            {% endif %}
+
+            {% for action_item in doc.completed_action_items.all %}
+            <a href="{% url 'tasks_board' %}{% if current_workspace %}?workspace={{ current_workspace.id }}{% endif %}"
+               title="Completes this task"
+               class="inline-flex items-start gap-1.5 text-xs text-indigo-600 hover:underline w-fit mb-3">
+              <svg class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+              {{ action_item.note }}
+            </a>
+            {% endfor %}
+
+            <div class="border-t border-gray-100 pt-3 mt-auto flex items-center justify-between gap-2">
+              <span class="text-[11px] text-gray-400">v{{ doc.version }} &middot; {{ doc.updated_at|date:"M d, Y" }}</span>
+              <div class="flex items-center gap-0.5">
+                <a href="{% url 'document_export' pk=doc.id fmt='pdf' %}?workspace={{ current_workspace.id }}" target="_blank"
+                   class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                   title="Export as PDF">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+                  PDF
+                </a>
+                <a href="{% url 'document_export' pk=doc.id fmt='docx' %}?workspace={{ current_workspace.id }}" target="_blank"
+                   class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                   title="Export as Word">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+                  Word
+                </a>
+                <a href="{% url 'document_export' pk=doc.id fmt='md' %}?workspace={{ current_workspace.id }}" target="_blank"
+                   class="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                   title="Export as Markdown">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+                  MD
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+  <div class="flex flex-col items-center justify-center py-24 bg-white rounded-2xl border-2 border-dashed border-gray-200 text-center">
+    <h3 class="text-lg font-bold text-gray-900">No documents yet</h3>
+    <p class="mt-2 text-sm text-gray-500 max-w-sm">Documents any of your agents create or complete for you — client summaries, roadmaps, action item deliverables — will show up here.</p>
+  </div>
+  {% endif %}
 
   {% else %}
   <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -59,14 +179,14 @@
       <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pending Audit</p>
       <p class="text-3xl font-black text-amber-500 mt-1">{{ pending_audits }}</p>
     </div>
-    <div class="bg-gradient-to-br from-indigo-600 to-purple-600 rounded-2xl p-5 shadow-sm text-white flex flex-col justify-between">
+    <div class="bg-indigo-600 rounded-2xl p-5 text-white flex flex-col justify-between">
       <p class="text-xs font-semibold text-indigo-200 uppercase tracking-wider">Powered by</p>
       <p class="text-base font-black mt-1">Gemini Vision</p>
       <p class="text-[11px] text-indigo-200 mt-0.5">Multimodal GTM Auditor</p>
     </div>
   </div>
 
-  <div class="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl p-5 flex items-start gap-4">
+  <div class="bg-indigo-50 border border-indigo-100 rounded-2xl p-5 flex items-start gap-4">
     <div class="p-2.5 bg-indigo-100 text-indigo-600 rounded-xl flex-shrink-0">
       <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
     </div>
@@ -78,6 +198,9 @@
     </div>
   </div>
 
+  <div id="asset-library-dropzone"
+       class="rounded-2xl transition-colors"
+       data-add-url="{% url 'add_resource' %}">
   {% if resources %}
     {# Group by category for display #}
     {% regroup resources by get_category_display as resource_groups %}
@@ -97,24 +220,29 @@
     {% endfor %}
 
   {% else %}
-  <div class="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border-2 border-dashed border-gray-200 text-center">
+  <div id="asset-quick-dropzone"
+       class="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border-2 border-dashed border-gray-200 text-center cursor-pointer transition-colors hover:border-indigo-300"
+       onclick="document.getElementById('asset-quick-file-input').click()">
+    <input type="file" id="asset-quick-file-input" class="sr-only" multiple>
     <div class="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center mb-4 mx-auto">
-      <svg class="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+      <svg class="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v9" />
+      </svg>
     </div>
-    <h3 class="text-lg font-bold text-gray-900">No assets yet</h3>
+    <h3 class="text-lg font-bold text-gray-900">Drop files here or click to browse</h3>
     <p class="mt-2 text-sm text-gray-500 max-w-sm">
-      Upload your first Landing Page, Pitch Deck, or Ad Creative to get an AI-powered GTM readiness audit.
+      Upload your first Landing Page, Pitch Deck, or Ad Creative — any file type, up to 10 MB each — to get an AI-powered GTM readiness audit.
     </p>
     <button type="button"
             hx-get="{% url 'add_resource' %}"
             hx-target="#modal-content"
-            onclick="openModal()"
-            class="mt-6 inline-flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-700 shadow-sm transition-colors">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-      Upload First Asset
+            onclick="event.stopPropagation(); openModal();"
+            class="mt-6 text-sm font-semibold text-indigo-600 hover:text-indigo-800">
+      Or add a link instead →
     </button>
   </div>
   {% endif %}
+  </div>
 
   {% endif %}
 </div>
@@ -132,6 +260,111 @@
 </div>
 
 <script>
+function escapeHtml(str) {
+  return String(str || '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;');
+}
+
+async function openLibraryDocumentEditor(docId, workspaceId) {
+  const modalContent = document.getElementById('modal-content');
+  if (!modalContent || typeof window.openModal !== 'function' || typeof toastui === 'undefined') return;
+  const scopeQs = `?workspace=${workspaceId}`;
+
+  const response = await fetch(`/dashboard/documents/${docId}/${scopeQs}`);
+  const data = await response.json();
+  if (!data.success) return;
+
+  // The shared #modal wrapper caps width at sm:max-w-lg -- too narrow for
+  // a WYSIWYG toolbar. Widen it for this modal only; closeModal() (in
+  // base.html) always resets it back, however this modal gets dismissed.
+  modalContent.parentElement.classList.remove('sm:max-w-lg');
+  modalContent.parentElement.classList.add('sm:max-w-3xl');
+
+  modalContent.innerHTML = `
+    <div class="bg-white rounded-2xl overflow-hidden w-full">
+      <div class="px-6 py-5 border-b border-gray-100">
+        <h3 class="text-lg font-semibold text-gray-900">${escapeHtml(data.title)}</h3>
+        <p class="mt-1 text-xs text-gray-500">Version ${data.version}</p>
+      </div>
+      <div class="px-6 py-4">
+        <div id="document-editor-mount"></div>
+      </div>
+      <div class="px-6 py-4 flex justify-end gap-3 border-t border-gray-100">
+        <button type="button" id="document-edit-cancel" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
+        <button type="button" id="document-edit-save" class="px-4 py-2 rounded-lg bg-indigo-600 text-white text-sm font-semibold hover:bg-indigo-700 transition">Save</button>
+      </div>
+    </div>
+  `;
+
+  const editor = new toastui.Editor({
+    el: document.getElementById('document-editor-mount'),
+    height: '420px',
+    initialEditType: 'wysiwyg',
+    hideModeSwitch: true,
+    initialValue: data.content || ' ',
+  });
+
+  document.getElementById('document-edit-cancel').addEventListener('click', function() {
+    editor.destroy();
+    window.closeModal();
+  }, { once: true });
+
+  document.getElementById('document-edit-save').addEventListener('click', async function() {
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+    const content = editor.getMarkdown();
+    editor.destroy();
+    const saveResponse = await fetch(`/dashboard/documents/${docId}/${scopeQs}`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfToken,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: `content=${encodeURIComponent(content)}`,
+    });
+    const saveData = await saveResponse.json();
+    window.closeModal();
+    if (saveData.success) {
+      htmx.ajax('GET', window.location.pathname + window.location.search, {
+        target: '#main-content',
+        swap: 'innerHTML'
+      });
+    }
+  }, { once: true });
+
+  window.openModal();
+}
+
+async function confirmDeleteLibraryDocument(docId, scopeQs) {
+  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+  try {
+    const response = await fetch(`/dashboard/documents/${docId}/delete/${scopeQs}`, {
+      method: 'POST',
+      headers: { 'X-CSRFToken': csrfToken },
+    });
+    const data = await response.json();
+    window.closeModal();
+    if (data.success) {
+      if (typeof showDashboardToast === 'function') {
+        showDashboardToast(`"${data.title}" deleted.`, 'success');
+      }
+      htmx.ajax('GET', window.location.pathname + window.location.search, {
+        target: '#main-content',
+        swap: 'innerHTML'
+      });
+    } else if (typeof showDashboardToast === 'function') {
+      showDashboardToast(data.error || 'Could not delete document.', 'error');
+    }
+  } catch (error) {
+    window.closeModal();
+    if (typeof showDashboardToast === 'function') {
+      showDashboardToast('Could not delete document.', 'error');
+    }
+  }
+}
+
 function openAuditDetail(resourceId) {
   var previewEl = document.getElementById('audit-preview-' + resourceId);
   var modal = document.getElementById('audit-detail-modal');
@@ -145,4 +378,75 @@ function closeAuditDetail() {
   document.getElementById('audit-detail-modal').classList.add('hidden');
   document.getElementById('audit-detail-body').innerHTML = '';
 }
+
+(function() {
+    var dropzone = document.getElementById('asset-library-dropzone');
+    if (!dropzone) return;
+    var addUrl = dropzone.getAttribute('data-add-url');
+
+    function getCsrfToken() {
+        var value = '; ' + document.cookie;
+        var parts = value.split('; csrftoken=');
+        return parts.length === 2 ? parts.pop().split(';').shift() : '';
+    }
+
+    function refreshView() {
+        htmx.ajax('GET', window.location.pathname + window.location.search, {
+            target: '#main-content',
+            swap: 'innerHTML'
+        });
+    }
+
+    function uploadFile(file) {
+        var fd = new FormData();
+        fd.append('name', file.name.replace(/\.[^/.]+$/, ''));
+        fd.append('resource_type', 'file');
+        fd.append('category', 'other');
+        fd.append('file', file);
+        fd.append('csrfmiddlewaretoken', getCsrfToken());
+        return fetch(addUrl, { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function(r) { return r.ok; })
+            .catch(function() { return false; });
+    }
+
+    function uploadFiles(fileList) {
+        var files = Array.from(fileList || []);
+        if (!files.length) return;
+
+        Promise.all(files.map(uploadFile)).then(function(results) {
+            var failed = results.filter(function(ok) { return !ok; }).length;
+            if (failed) {
+                showDashboardToast(
+                    failed === results.length ? 'Upload failed.' : (failed + ' of ' + results.length + ' uploads failed.'),
+                    'error'
+                );
+            } else {
+                showDashboardToast(results.length > 1 ? 'Assets uploaded.' : 'Asset uploaded.', 'success');
+            }
+            refreshView();
+        });
+    }
+
+    dropzone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        dropzone.classList.add('bg-indigo-50');
+    });
+    dropzone.addEventListener('dragleave', function() {
+        dropzone.classList.remove('bg-indigo-50');
+    });
+    dropzone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        dropzone.classList.remove('bg-indigo-50');
+        uploadFiles(e.dataTransfer.files);
+    });
+
+    // The "click to browse" input lives inside the empty-state block, which
+    // gets replaced on refresh — delegate from the persistent wrapper.
+    dropzone.addEventListener('change', function(e) {
+        if (e.target && e.target.id === 'asset-quick-file-input') {
+            uploadFiles(e.target.files);
+            e.target.value = '';
+        }
+    });
+})();
 </script>

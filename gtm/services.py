@@ -11,7 +11,8 @@ import markdown as md
 from .models import Category, Question, AssessmentSession, Response, RecommendationBand, ResultSnapshot
 from .utils_logging import log_error
 from .utils import transfer_firmographics_to_snapshot, _client_id
-from .ai_services import generate_playbook_with_gemini
+from .utils_async import run_in_background
+from .ai_services import generate_playbook_with_gemini, _lock_is_held
 
 def _expand_gtm_jargon(text: str) -> str:
     """Replace common GTM acronyms with plain-language expansions for non-specialist users."""
@@ -94,16 +95,39 @@ def _build_question_guidance(question: Question) -> dict:
     }
 
 
-def _kickoff_playbook_generation(snapshot, session_id=None):
-    """Kick off non-blocking playbook generation once, guarded against rapid duplicate starts."""
+def _kickoff_playbook_generation(snapshot, session_id=None, account=None):
+    """Kick off non-blocking playbook generation once, guarded against rapid duplicate starts.
+
+    `account` lets a caller that already resolved the session's
+    AICreditAccount (e.g. the results view, which also needs it for the
+    batch-insight check) pass it in and avoid a second get_or_create query;
+    resolved internally when omitted."""
     if not snapshot:
         return False
     if (snapshot.ai_playbook or "").strip():
         return False
 
-    # Skip if already generating, done, or failed
+    # Skip if done or failed. "generating" only counts as in-flight while
+    # its lock is actually held -- if the lock has expired/released, the
+    # thread that set it must have died before reaching its finally block,
+    # so fall through and retry instead of staying stuck forever.
     snap_status = getattr(snapshot, "ai_playbook_status", "pending")
-    if snap_status in ("generating", "done", "failed"):
+    if snap_status in ("done", "failed"):
+        return False
+    if snap_status == "generating" and _lock_is_held(f"gtm:ai:playbook:{snapshot.id}:lock"):
+        return False
+
+    # Check credits BEFORE spawning the thread -- "no_credits" is
+    # deliberately not added to the skip-list above, so a later kickoff
+    # attempt (e.g. the user revisiting the results page after the period
+    # resets) naturally retries instead of getting stuck forever like a
+    # genuine "failed" status would.
+    from .ai_credits import resolve_account_for_session, can_spend
+    if account is None:
+        account = resolve_account_for_session(snapshot.session)
+    if not can_spend(account=account).allowed:
+        snapshot.ai_playbook_status = "no_credits"
+        snapshot.save(update_fields=["ai_playbook_status"])
         return False
 
     kickoff_key = f"gtm:playbook:kickoff:{snapshot.id}"
@@ -111,24 +135,14 @@ def _kickoff_playbook_generation(snapshot, session_id=None):
     if not cache.add(kickoff_key, "1", timeout=20):
         return False
 
-    try:
-        from threading import Thread
+    def generate_async(snapshot_id):
+        fresh_snapshot = ResultSnapshot.objects.filter(id=snapshot_id).first()
+        if not fresh_snapshot or (fresh_snapshot.ai_playbook or "").strip():
+            return
+        generate_playbook_with_gemini(fresh_snapshot)
 
-        def generate_async(snapshot_id, sid):
-            try:
-                fresh_snapshot = ResultSnapshot.objects.filter(id=snapshot_id).first()
-                if not fresh_snapshot or (fresh_snapshot.ai_playbook or "").strip():
-                    return
-                generate_playbook_with_gemini(fresh_snapshot)
-            except Exception as e:
-                log_error("AI Playbook async kickoff", e, {"session_id": str(sid) if sid else ""})
-
-        thread = Thread(target=generate_async, args=(snapshot.id, session_id), daemon=True)
-        thread.start()
-        return True
-    except Exception as e:
-        log_error("AI Playbook thread creation", e, {"session_id": str(session_id) if session_id else ""})
-        return False
+    run_in_background(generate_async, snapshot.id, name=f"playbook_generation:{session_id}")
+    return True
 
 
 def _log_access_denied(request, reason, session_id=None, details=None):
@@ -219,21 +233,52 @@ def _format_band_actions_markdown(markdown_text):
         return mark_safe(actions_md.replace("\n", "<br>"))
 
 
-def _paginated_questions():
-    """Return a list of steps, each = list[Question]. One category per step."""
+# Company-stage → applicable pillars. Deliberately small: any stage not
+# listed here (early_revenue, growth, scale, or "" for unset/legacy sessions)
+# is unrestricted — all pillars apply, identical to pre-stage-feature behavior.
+# Pillar names must match Category.name values loaded by load_gtm_defaults.py.
+STAGE_CATEGORY_APPLICABILITY = {
+    "idea": {"Demand"},
+    "pre_revenue": {"Demand", "Conversion"},
+}
+
+
+def _applicable_categories(session=None):
+    """Categories applicable to a session's company_stage, ordered by id.
+
+    A pre-launch company can't meaningfully answer Conversion (pipeline,
+    win-loss) or Delivery (retention, QBRs) questions, so those pillars —
+    and their steps — are skipped entirely for early stages. `session=None`
+    (or a blank/unrecognized company_stage) returns all categories, matching
+    behavior from before this feature existed.
+    """
+    qs = Category.objects.all().order_by("id")
+    if session is None:
+        return qs
+    stage = getattr(session, "company_stage", "") or ""
+    names = STAGE_CATEGORY_APPLICABILITY.get(stage)
+    return qs.filter(name__in=names) if names else qs
+
+
+def _paginated_questions(session=None):
+    """Return a list of steps, each = list[Question]. One category per step.
+
+    When `session` is given, only pillars applicable to its company_stage
+    are included (see `_applicable_categories`).
+    """
     # Prefetch related questions to avoid N+1 queries when accessing cat.questions.all()
-    categories = Category.objects.all().order_by("id").prefetch_related('questions')
+    categories = _applicable_categories(session).prefetch_related('questions')
     return [list(cat.questions.all().order_by("id"))
             for cat in categories]
 
 
-def _category_step_map():
+def _category_step_map(session=None):
     """Map category id → step number (1-based) for deep-linking to the wizard."""
-    return {cat.id: idx + 1 for idx, cat in enumerate(Category.objects.all().order_by("id"))}    
+    return {cat.id: idx + 1 for idx, cat in enumerate(_applicable_categories(session))}
 
 
 def _first_incomplete_step(session):
-    steps = _paginated_questions()
+    steps = _paginated_questions(session)
     for idx, qs in enumerate(steps, start=1):
         answered = Response.objects.filter(session=session, question__in=qs).count()
         if answered < len(qs):
@@ -244,13 +289,12 @@ def _first_incomplete_step(session):
 def _compute_scores(session: AssessmentSession):
     # 1. Fetch all category weights and map to ID for overall calculation
     all_cats = Category.objects.all().order_by("id")
-    total_w = sum(c.weight for c in all_cats) or 1.0
     cat_weight_map = {c.id: c.weight for c in all_cats}
     cat_name_map = {c.id: c.name for c in all_cats}
 
     # 2. Use a single efficient query to get category-level weighted scores
     #    (Groups responses by category and calculates the weighted average per group)
-    category_results = (
+    category_results = list(
         Response.objects
         .filter(session=session)
         .values('question__category_id')
@@ -261,9 +305,19 @@ def _compute_scores(session: AssessmentSession):
         .order_by('question__category_id')
     )
 
+    # Renormalize across only the categories that actually have responses,
+    # not every category unconditionally. This is a no-op for any session
+    # that answered every pillar (all categories are present either way),
+    # but matters for company-stage-exempted pillars (or a genuinely
+    # incomplete assessment): without it, an idea-stage company answering
+    # only Demand would be capped at Demand's raw weight (40) instead of
+    # being able to reach 100 on that pillar alone.
+    answered_cat_ids = {row['question__category_id'] for row in category_results}
+    total_w = sum(cat_weight_map[cid] for cid in answered_cat_ids if cid in cat_weight_map) or 1.0
+
     cat_scores = []
     overall = 0.0
-    
+
     # Pre-populate with all categories (in case some have no responses)
     scores_by_id = {c.id: {"category": c, "avg": 0.0} for c in all_cats}
 
@@ -291,38 +345,63 @@ def _band_for_score(score):
 
 
 def _is_session_complete(session: AssessmentSession) -> bool:
-    total_q = Question.objects.count()
+    applicable_questions = Question.objects.filter(category__in=_applicable_categories(session))
+    total_q = applicable_questions.count()
     if total_q == 0:
         return False
     answered_q = (Response.objects
-                  .filter(session=session)
+                  .filter(session=session, question__in=applicable_questions)
                   .values("question_id").distinct().count())
     return answered_q == total_q
 
 
+# AI content narrates specific priorities/scores -- if the underlying
+# category breakdown changes (e.g. the user navigates back and edits an
+# earlier answer), it's cleared here rather than left to silently narrate
+# stale numbers. Existing kickoff/polling logic already treats an empty
+# ai_playbook + "pending" status as "needs generation", so no other view
+# code needs to change.
+_AI_STALE_RESET_FIELDS = {
+    "ai_playbook": "",
+    "ai_playbook_status": "pending",
+    "ai_risk_status": "",
+    "ai_financial_summary": "",
+    "ai_competitor_analysis": "",
+}
+
+
 def _save_snapshot(session, cat_scores, overall, band, labels, values):
     with transaction.atomic():
+        new_breakdown = [
+            {"category": c["category"].name, "avg": round(c["avg"], 2)}
+            for c in cat_scores
+        ]
+        existing_breakdown = (
+            ResultSnapshot.objects.filter(session=session)
+            .values_list("category_breakdown", flat=True)
+            .first()
+        )
+        defaults = {
+            "overall": round(overall, 1),
+            "band": band,
+            "band_stage": (band.stage if band else ""),
+            "band_headline": (band.headline if band else ""),
+            "category_breakdown": new_breakdown,
+            "radar_labels": labels,
+            "radar_values": values,
+        }
+        if existing_breakdown is not None and existing_breakdown != new_breakdown:
+            defaults.update(_AI_STALE_RESET_FIELDS)
         snap, created = ResultSnapshot.objects.update_or_create(
             session=session,
-            defaults={
-                "overall": round(overall, 1),
-                "band": band,
-                "band_stage": (band.stage if band else ""),
-                "band_headline": (band.headline if band else ""),
-                "category_breakdown": [
-                    {"category": c["category"].name, "avg": round(c["avg"], 2)}
-                    for c in cat_scores
-                ],
-                "radar_labels": labels,
-                "radar_values": values,
-            }
+            defaults=defaults,
         )
         # Transfer firmographics using the helper
         transfer_firmographics_to_snapshot(session, snap)
         snap.save(update_fields=[
             "company_name", "industry", "website", "contact_name",
             "contact_email", "contact_role", "phone", "company_size",
-            "revenue_range", "country", "crm", "utm_source",
+            "revenue_range", "country", "crm", "company_stage", "utm_source",
             "utm_medium", "utm_campaign", "referrer"
         ]) # Save changes made by transfer_firmographics_to_snapshot
     return snap

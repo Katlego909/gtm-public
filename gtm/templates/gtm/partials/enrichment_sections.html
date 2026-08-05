@@ -16,6 +16,14 @@
       AI-generated estimates based on your company data. Validate with your finance team before making budget decisions.
     </p>
   </div>
+  {% elif fin_no_credits %}
+  <div class="mt-6 mx-8 rounded-xl border border-amber-200 bg-amber-50 px-6 py-5">
+    <h3 class="text-sm font-semibold text-amber-700 mb-2 flex items-center gap-2">
+      <i class="fas fa-battery-empty text-amber-500"></i>
+      Financial Impact Estimates
+    </h3>
+    <p class="text-sm text-amber-600 italic">This workspace has used all of its AI credits for the current period. Once your credits reset, try regenerating your playbook to get financial estimates.</p>
+  </div>
   {% elif fin_failed %}
   <div class="mt-6 mx-8 rounded-xl border border-gray-200 bg-gray-50 px-6 py-5">
     <h3 class="text-sm font-semibold text-gray-500 mb-2 flex items-center gap-2">
@@ -44,6 +52,14 @@
     <div class="text-sm prose prose-slate max-w-none prose-blue">
       {{ comp_html }}
     </div>
+  </div>
+  {% elif comp_no_credits %}
+  <div class="mt-4 mx-8 rounded-xl border border-amber-200 bg-amber-50 px-6 py-5 mb-6">
+    <h3 class="text-sm font-semibold text-amber-700 mb-2 flex items-center gap-2">
+      <i class="fas fa-battery-empty text-amber-500"></i>
+      Competitive Gap Analysis
+    </h3>
+    <p class="text-sm text-amber-600 italic">This workspace has used all of its AI credits for the current period. Once your credits reset, try regenerating your playbook to get a competitive analysis.</p>
   </div>
   {% elif comp_failed %}
   <div class="mt-4 mx-8 rounded-xl border border-gray-200 bg-gray-50 px-6 py-5 mb-6">

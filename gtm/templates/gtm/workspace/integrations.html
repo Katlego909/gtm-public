@@ -1,0 +1,93 @@
+{% extends 'gtm/base.html' %}
+
+{% block title %}Integrations - {{ workspace.name }}{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-indigo-900">Integrations</h1>
+            <p class="text-gray-600">{{ workspace.name }}</p>
+        </div>
+        <a href="{% url 'gtm:workspace:detail' workspace.id %}" class="text-indigo-600 hover:text-indigo-800">
+            ← Back to Workspace
+        </a>
+    </div>
+
+    {% if messages %}
+        <div class="mb-6 space-y-2">
+        {% for message in messages %}
+            <div class="p-4 rounded-lg border {% if message.tags == 'success' %}bg-green-50 border-green-200 text-green-800{% elif message.tags == 'error' %}bg-red-50 border-red-200 text-red-800{% else %}bg-blue-50 border-blue-200 text-blue-800{% endif %}" role="alert">
+                {{ message }}
+            </div>
+        {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="bg-white rounded-xl border border-indigo-100 p-6">
+        <div class="flex justify-between items-start mb-4">
+            <div>
+                <h2 class="text-xl font-semibold text-indigo-900">HubSpot CRM</h2>
+                <p class="text-sm text-gray-600">Lets AI agents look up company context and log GTM findings directly in HubSpot.</p>
+            </div>
+            <span class="text-xs px-3 py-1 rounded-full border
+                {% if integration.status == 'connected' %}bg-green-50 border-green-200 text-green-700
+                {% elif integration.status == 'error' %}bg-red-50 border-red-200 text-red-700
+                {% else %}bg-gray-50 border-gray-200 text-gray-700{% endif %}">
+                {% if integration.status == 'connected' %}Connected
+                {% elif integration.status == 'error' %}Error
+                {% else %}Not Connected{% endif %}
+            </span>
+        </div>
+
+        {% if integration and integration.token_preview %}
+            <div class="mb-4 text-sm text-gray-600 space-y-1">
+                <p>Token ending in <span class="font-mono">•••{{ integration.token_preview }}</span></p>
+                {% if integration.configured_by %}
+                    <p>Configured by {{ integration.configured_by.get_full_name|default:integration.configured_by.username }}</p>
+                {% endif %}
+                {% if integration.last_verified_at %}
+                    <p>Last verified {{ integration.last_verified_at|timesince }} ago</p>
+                {% endif %}
+                {% if integration.status == 'error' and integration.last_error %}
+                    <p class="text-red-600">{{ integration.last_error }}</p>
+                {% endif %}
+            </div>
+
+            <div class="flex gap-3 mb-8">
+                <form method="post" action="{% url 'gtm:workspace:integration_test_hubspot' workspace.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="bg-gray-100 text-gray-800 px-4 py-2 rounded-lg border border-gray-300 hover:bg-gray-200">
+                        Test Connection
+                    </button>
+                </form>
+                <form method="post" action="{% url 'gtm:workspace:integration_disconnect_hubspot' workspace.id %}"
+                      onsubmit="return confirm('Disconnect HubSpot for this workspace? Agents will lose CRM access until reconnected.');">
+                    {% csrf_token %}
+                    <button type="submit" class="bg-white text-red-600 px-4 py-2 rounded-lg border border-red-300 hover:bg-red-50">
+                        Disconnect
+                    </button>
+                </form>
+            </div>
+        {% endif %}
+
+        <form method="post" onsubmit="return confirm('Save this HubSpot token for the workspace?');">
+            {% csrf_token %}
+            <label for="id_token" class="block text-sm font-medium text-gray-700 mb-1">
+                {% if integration and integration.token_preview %}Replace Private App Token{% else %}HubSpot Private App Token{% endif %}
+            </label>
+            <div class="flex gap-3">
+                <input type="password" id="id_token" name="token" required
+                       placeholder="pat-na1-..."
+                       class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                <button type="submit" class="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700">
+                    Save
+                </button>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">
+                Create a Private App in HubSpot with companies-read, notes-write, and tasks-write scopes, then paste its token here.
+            </p>
+        </form>
+    </div>
+</div>
+{% endblock %}

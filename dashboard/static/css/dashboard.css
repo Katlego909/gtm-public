@@ -1,6 +1,7 @@
 body {
     background: #f6f7fb;
     font-family: 'Inter', Arial, sans-serif;
+    color: #262626;
 }
 .dashboard-grid {
     display: grid;
@@ -19,7 +20,7 @@ body {
 .sidebar-logo {
     font-size: 2rem;
     font-weight: 700;
-    color: #6366f1;
+    color: #262626;
     margin-bottom: 40px;
 }
 .sidebar-nav {
@@ -42,23 +43,22 @@ body {
     transition: background 0.2s, color 0.2s;
 }
 .sidebar-link.active, .sidebar-link:hover {
-    background: #eef2ff;
-    color: #6366f1;
+    background: #FFE0AE;
+    color: #262626;
 }
 .sidebar-upgrade {
     margin-top: auto;
     padding: 32px 0;
 }
 .upgrade-btn {
-    background: linear-gradient(90deg, #6366f1 0%, #a5b4fc 100%);
-    color: #fff;
+    background: #FFE0AE;
+    color: #262626;
     border: none;
     border-radius: 8px;
     padding: 10px 28px;
     font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
-    box-shadow: 0 2px 8px rgba(99,102,241,0.08);
     transition: background 0.2s;
 }
 .dashboard-main {
@@ -73,7 +73,7 @@ body {
 .dashboard-header h1 {
     font-size: 2rem;
     font-weight: 700;
-    color: #3730a3;
+    color: #262626;
 }
 .dashboard-search {
     padding: 8px 16px;
@@ -90,8 +90,8 @@ body {
 .dashboard-kpi-card {
     flex: 1;
     background: #fff;
+    border: 1px solid #e5e7eb;
     border-radius: 16px;
-    box-shadow: 0 2px 12px rgba(99,102,241,0.06);
     padding: 32px 24px 24px 24px;
     text-align: center;
     position: relative;
@@ -112,7 +112,7 @@ body {
     color: #1e293b;
     margin-bottom: 4px;
 }
-.kpi-blue { border-top: 4px solid #6366f1; }
+.kpi-blue { border-top: 4px solid #FFE0AE; }
 .kpi-green { border-top: 4px solid #16a34a; }
 .kpi-yellow { border-top: 4px solid #eab308; }
 .dashboard-charts-row {
@@ -123,15 +123,15 @@ body {
 .dashboard-chart-card {
     flex: 1;
     background: #fff;
+    border: 1px solid #e5e7eb;
     border-radius: 16px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     padding: 24px;
     min-width: 320px;
 }
 .dashboard-chart-card h2 {
     font-size: 1.2rem;
     font-weight: 600;
-    color: #3730a3;
+    color: #262626;
     margin-bottom: 18px;
 }
 .dashboard-table {
@@ -162,24 +162,23 @@ body {
     align-items: center;
 }
 .profile-card {
-    background: #eef2ff;
+    background: #E5E5E5;
     border-radius: 16px;
     padding: 24px;
     text-align: center;
     width: 100%;
-    box-shadow: 0 2px 8px rgba(99,102,241,0.08);
 }
 .profile-avatar {
     width: 72px;
     height: 72px;
     border-radius: 50%;
-    background: #6366f1;
+    background: #262626;
     margin: 0 auto 16px auto;
 }
 .profile-info .profile-name {
     font-size: 1.2rem;
     font-weight: 700;
-    color: #3730a3;
+    color: #262626;
 }
 .profile-info .profile-role {
     font-size: 1rem;
@@ -188,18 +187,18 @@ body {
 }
 .profile-info .profile-location {
     font-size: 0.95rem;
-    color: #6366f1;
+    color: #262626;
 }
 .reminders-card {
     background: #fff;
+    border: 1px solid #e5e7eb;
     border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     padding: 18px;
     width: 100%;
 }
 .reminders-card h3 {
     font-size: 1.1rem;
-    color: #3730a3;
+    color: #262626;
     margin-bottom: 12px;
 }
 .reminders-list {
@@ -216,7 +215,7 @@ body {
 }
 .reminders-list li:before {
     content: '•';
-    color: #6366f1;
+    color: #262626;
     position: absolute;
     left: 0;
 }
@@ -253,14 +252,14 @@ body {
 .dashboard-section {
     margin-top: 48px;
     background: #fff;
+    border: 1px solid #e5e7eb;
     border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     padding: 24px;
 }
 .section-title {
     font-size: 1.3rem;
     font-weight: 600;
-    color: #3730a3;
+    color: #262626;
     margin-bottom: 18px;
 }
 .dashboard-table {
@@ -287,13 +286,13 @@ body {
     margin: 40px auto;
     padding: 30px;
     background: #fff;
+    border: 1px solid #e5e7eb;
     border-radius: 16px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.08);
 }
 .dashboard-title {
     font-size: 2.2rem;
     font-weight: 700;
-    color: #3730a3;
+    color: #262626;
     margin-bottom: 24px;
     text-align: left;
 }
@@ -304,17 +303,13 @@ body {
 }
 .kpi-card {
     flex: 1;
-    background: linear-gradient(135deg, #e0e7ff 0%, #f3f4f6 100%);
+    background: #fff;
+    border: 1px solid #e5e7eb;
     border-radius: 16px;
     padding: 32px 24px 24px 24px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
     text-align: center;
-    transition: box-shadow 0.2s;
     position: relative;
     min-width: 220px;
-}
-.kpi-card:hover {
-    box-shadow: 0 8px 32px rgba(55,48,163,0.12);
 }
 .kpi-icon {
     width: 48px;
@@ -327,8 +322,8 @@ body {
     font-size: 2rem;
 }
 .kpi-blue {
-    background: #eef2ff;
-    color: #3730a3;
+    background: #FFE0AE;
+    color: #262626;
 }
 .kpi-green {
     background: #dcfce7;

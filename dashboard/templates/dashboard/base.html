@@ -5,24 +5,39 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}ForgeGTM Dashboard{% endblock %}</title>
-    
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="icon" type="image/png" href="{% static 'images/icon.png' %}">
+
+    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+    <script src="{% static 'js/tailwind-config.js' %}"></script>
     <script src="{% static 'js/chart.js' %}"></script>
     <script src="{% static 'js/dashboard-charts.js' %}" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
-    
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <style>
-        body { font-family: 'Inter', sans-serif; }
 
+    <!-- Document editor (WYSIWYG, markdown-backed) -->
+    <link rel="stylesheet" href="https://uicdn.toast.com/editor/latest/toastui-editor.min.css" />
+    <script src="https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Shared design tokens & component classes -->
+    <link rel="stylesheet" href="{% static 'css/app.css' %}">
+
+    <style>
+        /* Flatten the editor's default elevation to match this app's
+           flat-color, no-shadow/no-gradient visual language. */
+        .toastui-editor-defaultUI { box-shadow: none; border: 1px solid #e5e7eb; }
+        .toastui-editor-popup { box-shadow: none; border: 1px solid #e5e7eb; }
+        .toastui-editor-toolbar { box-shadow: none; border-bottom: 1px solid #e5e7eb; }
+    </style>
+
+    <style>
         .agent-bubble h1,.agent-bubble h2,.agent-bubble h3,.agent-bubble h4 {
             font-weight: 700; color: #1e293b; margin-top: 1.1rem; margin-bottom: 0.35rem; line-height: 1.3;
         }
         .agent-bubble h1 { font-size: 1.05rem; }
         .agent-bubble h2 { font-size: 1rem; }
-        .agent-bubble h3 { font-size: 0.95rem; border-bottom: 1px solid #e0e7ff; padding-bottom: 0.2rem; }
+        .agent-bubble h3 { font-size: 0.95rem; border-bottom: 1px solid #FAE3CE; padding-bottom: 0.2rem; }
         .agent-bubble h4 { font-size: 0.875rem; }
         .agent-bubble p  { margin-bottom: 0.6rem; line-height: 1.55; }
         .agent-bubble ul,.agent-bubble ol { padding-left: 1.4rem; margin-bottom: 0.6rem; }
@@ -30,7 +45,7 @@
         .agent-bubble ol { list-style-type: decimal; }
         .agent-bubble li { margin-bottom: 0.3rem; line-height: 1.5; }
         .agent-bubble strong { font-weight: 600; color: #111827; }
-        .agent-bubble hr { border: none; border-top: 1px solid #e0e7ff; margin: 0.75rem 0; }
+        .agent-bubble hr { border: none; border-top: 1px solid #FAE3CE; margin: 0.75rem 0; }
         .agent-bubble *:first-child { margin-top: 0; }
         .agent-bubble *:last-child  { margin-bottom: 0; }
 
@@ -45,7 +60,7 @@
         .sidebar-collapsed { width: 80px !important; }
         .sidebar-collapsed .sidebar-text { display: none; }
         .sidebar-collapsed .sidebar-logo-text { display: none; }
-        .sidebar-collapsed .upgrade-card { display: none; }
+        .sidebar-collapsed .sidebar-icon-mark { display: block; }
         .sidebar-collapsed nav a { 
             justify-content: center; 
             padding: 1rem 0.5rem;
@@ -73,7 +88,6 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
         
         /* HTMX Transitions */
@@ -171,7 +185,7 @@
 <body class="bg-slate-50 text-slate-800 h-screen w-screen overflow-hidden flex">
 
     <!-- Mobile Navbar -->
-    <nav class="md:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm">
+    <nav class="md:hidden fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200">
         <div class="flex items-center justify-between h-16 px-4">
             <button onclick="toggleSidebar()" class="flex items-center justify-center w-10 h-10 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -179,10 +193,9 @@
                 </svg>
             </button>
             <div class="flex items-center gap-2">
-                <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">FG</div>
-                <span class="text-lg font-bold text-gray-900">Forge<span class="text-indigo-600">GTM</span></span>
+                <img src="{% static 'images/forge_logo.png' %}" alt="ForgeGTM" class="h-9 w-auto object-contain" />
             </div>
-            <div class="w-10"></div> <!-- Spacer for centering -->
+            {% include 'dashboard/partials/notification_bell.html' with instance_id="mobile" %}
         </div>
     </nav>
 
@@ -191,12 +204,12 @@
 
 
 
-    <aside id="sidebar" class="sidebar-transition fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 transform -translate-x-full md:relative md:translate-x-0 shadow-2xl md:shadow-none mt-16 md:mt-0">
+    <aside id="sidebar" class="sidebar-transition fixed inset-y-0 left-0 z-40 w-64 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 transform -translate-x-full md:relative md:translate-x-0 mt-16 md:mt-0">
         
         <div class="sidebar-header h-16 hidden md:flex items-center px-6 border-b border-gray-100 justify-between relative">
             <div class="flex items-center gap-2 text-indigo-600">
-                <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">FG</div>
-                <span class="sidebar-logo-text text-xl font-bold text-gray-900 tracking-tight">Forge<span class="text-indigo-600">GTM</span></span>
+                <img src="{% static 'images/forge_logo.png' %}" alt="ForgeGTM" class="sidebar-logo-text h-8 w-auto object-contain" />
+                <img src="{% static 'images/icon.png' %}" alt="ForgeGTM" class="sidebar-icon-mark hidden h-8 w-8 object-contain" />
             </div>
             <button onclick="toggleDesktopSidebar()" class="collapse-btn text-gray-400 hover:text-gray-600 transition-colors" title="Toggle sidebar">
                 <svg id="collapseIcon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -213,8 +226,8 @@
         </div>
 
         <nav class="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-            <a href="{% url 'gtm:start' %}" 
-               class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+            <a href="{% url 'gtm:start' %}"
+               class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg border border-indigo-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
                title="New Assessment">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
@@ -259,23 +272,33 @@
                hx-target="#main-content"
                hx-push-url="true"
                class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
-               title="Asset Library">
+               title="Library">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
                 </svg>
-                <span class="sidebar-text">Asset Library</span>
-                <span class="ml-auto sidebar-text text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-gradient-to-r from-indigo-500 to-purple-500 text-white tracking-wide">AI</span>
+                <span class="sidebar-text">Library</span>
             </a>
-                <a href="/dashboard/agent/" 
-                    hx-get="/dashboard/agent/" 
-               hx-target="#main-content" 
+                <a href="{% url 'agent_hub' %}"
+                    hx-get="{% url 'agent_hub' %}"
+               hx-target="#main-content"
                hx-push-url="true"
                class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
-               title="Agent">
+               title="Agents">
                 <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
                 </svg>
-                <span class="sidebar-text">Agent</span>
+                <span class="sidebar-text">Agents</span>
+            </a>
+            <a href="{% url 'agent_impact_hub' %}"
+               hx-get="{% url 'agent_impact_hub' %}"
+               hx-target="#main-content"
+               hx-push-url="true"
+               class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+               title="Impact">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <span class="sidebar-text">Impact</span>
             </a>
             <a href="{% url 'analytics' %}"
                hx-get="{% url 'analytics' %}"
@@ -288,6 +311,9 @@
                 </svg>
                 <span class="sidebar-text">Analytics</span>
             </a>
+        </nav>
+
+        <nav class="px-4 py-4 space-y-1 border-t border-gray-100">
             <a href="{% url 'profile' %}"
                hx-get="{% url 'profile' %}"
                hx-target="#main-content"
@@ -313,13 +339,6 @@
             </a>
         </nav>
 
-        <div class="p-4 border-t border-gray-100">
-            <div class="upgrade-card bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl p-4 text-center shadow-lg shadow-indigo-200/50">
-                <p class="text-white font-semibold text-sm mb-1">Upgrade to Pro</p>
-                <p class="text-indigo-100 text-xs mb-3">Get advanced AI analytics.</p>
-                <button class="w-full py-2 bg-white text-indigo-600 text-xs font-bold rounded shadow-sm hover:bg-indigo-50 transition-colors">Upgrade Plan</button>
-            </div>
-        </div>
     </aside>
 
     <main id="main-content" class="flex-1 flex flex-col h-full overflow-hidden relative w-full mt-16 md:mt-0">
@@ -329,27 +348,30 @@
     <!-- Global Agent Widget -->
     <div id="global-agent" class="fixed bottom-6 right-6 z-[1250]">
         <button id="global-agent-launcher" type="button"
-                class="h-14 w-14 rounded-full bg-indigo-600 text-white shadow-xl hover:bg-indigo-700 transition flex items-center justify-center"
-                title="Open GTM Agent">
+                class="h-14 w-14 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 transition flex items-center justify-center"
+                title="Open Charlie · GTM Agent">
             <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
         </button>
 
-        <section id="global-agent-panel" class="hidden mt-3 w-[min(92vw,420px)] h-[min(72vh,620px)] bg-white rounded-2xl border border-gray-200 shadow-2xl overflow-hidden flex flex-col">
-            <header class="px-4 py-3 border-b border-gray-200 bg-gradient-to-r from-indigo-600 to-violet-600 text-white">
+        <section id="global-agent-panel" class="hidden relative mt-3 w-[min(92vw,420px)] h-[min(72vh,620px)] bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col">
+            <div id="global-agent-confirm-overlay" class="hidden absolute inset-0 z-20 bg-black/40 flex items-center justify-center p-4 transition-opacity duration-150 ease-out opacity-0">
+                <div id="global-agent-confirm-content" class="w-full transition-all duration-150 ease-out transform opacity-0 scale-95"></div>
+            </div>
+            <header class="px-4 py-3 bg-gray-900">
                 <div class="flex items-center justify-between gap-3">
                     <div>
-                        <h3 class="font-semibold">GTM Agent</h3>
-                        <p class="text-xs text-indigo-100">Ask anything across tasks, insights, and execution.</p>
+                        <h3 class="font-semibold text-white">Charlie · GTM Agent</h3>
+                        <p class="text-xs text-indigo-200">Ask anything across tasks, insights, and execution.</p>
                     </div>
                     <button id="global-agent-close" type="button" class="h-8 w-8 rounded-lg hover:bg-white/10 transition">
-                        <svg class="w-5 h-5 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        <svg class="w-5 h-5 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                 </div>
                 <div class="mt-3">
-                    <label for="global-agent-session" class="block text-[11px] uppercase tracking-wide text-indigo-100 mb-1">Assessment Context</label>
-                    <select id="global-agent-session" class="w-full rounded-lg border border-indigo-300/50 bg-white/95 text-gray-800 px-3 py-2 text-sm"></select>
+                    <label for="global-agent-session" class="block text-[11px] uppercase tracking-wide text-indigo-200 mb-1">Assessment Context</label>
+                    <select id="global-agent-session" class="w-full rounded-lg border border-indigo-300 bg-white text-gray-800 px-3 py-2 text-sm"></select>
                 </div>
             </header>
 
@@ -359,19 +381,19 @@
 
             <form id="global-agent-form" class="p-3 border-t border-gray-200 bg-white flex gap-2">
                                 <input id="global-agent-files" type="file" class="hidden" multiple accept=".txt,.md,.csv,.json,.log,.xml,.yaml,.yml,.pdf,image/*" />
-                                <button id="global-agent-attach" type="button" class="px-3 py-2.5 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition flex items-center justify-center" aria-label="Attach">
+                                <button id="global-agent-attach" type="button" class="px-3 py-2.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition flex items-center justify-center" aria-label="Attach">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l7.071-7.071a4 4 0 00-5.657-5.657l-7.071 7.07a6 6 0 108.485 8.486L19 13" />
                                     </svg>
                                 </button>
-                                <input id="global-agent-input" type="text" placeholder="Ask the agent anything..." class="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                                <button id="global-agent-send" type="submit" class="px-4 py-2.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition flex items-center justify-center" aria-label="Send">
+                                <input id="global-agent-input" type="text" placeholder="Ask Charlie anything..." class="flex-1 rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                                <button id="global-agent-send" type="submit" class="px-4 py-2.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition flex items-center justify-center" aria-label="Send">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M22 2L11 13" />
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M22 2L15 22L11 13L2 9L22 2Z" />
                                     </svg>
                                 </button>
-                                <button id="global-agent-clear" type="button" class="px-3 py-2.5 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition flex items-center justify-center" aria-label="Clear">
+                                <button id="global-agent-clear" type="button" class="px-3 py-2.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition flex items-center justify-center" aria-label="Clear">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                                     </svg>
@@ -385,7 +407,7 @@
 
     <aside class="w-80 bg-white border-l border-gray-200 flex-shrink-0 hidden xl:flex flex-col">
         <div class="p-6 border-b border-gray-100">
-            <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider">Notifications</h3>
+            <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider">Activity</h3>
         </div>
         <div id="sidebar-notifications-panel"
              class="p-4 overflow-y-auto"
@@ -491,14 +513,54 @@
     });
 
     // Modal functions
+    const MODAL_TRANSITION_MS = 150;
+
     function openModal() {
-        document.getElementById('modal').classList.remove('hidden');
+        const modal = document.getElementById('modal');
+        const backdrop = document.getElementById('modal-backdrop');
+        const panel = document.getElementById('modal-panel');
+        const contentEl = document.getElementById('modal-content');
+
+        modal.classList.remove('hidden');
+        requestAnimationFrame(() => backdrop.classList.remove('opacity-0'));
+
+        const revealPanel = () => {
+            if (modal.classList.contains('hidden')) return; // closed again before content arrived
+            panel.classList.remove('opacity-0', 'scale-95');
+        };
+
+        if (contentEl.innerHTML.trim()) {
+            // Content already set by the caller (e.g. the JS-driven "clear chat"
+            // confirmations) -- reveal now rather than waiting for a swap that
+            // will never happen.
+            requestAnimationFrame(revealPanel);
+        } else {
+            // htmx-driven modal: hold the panel invisible until content has
+            // actually swapped in, so we never flash an empty white box.
+            contentEl.addEventListener('htmx:afterSettle', revealPanel, { once: true });
+        }
     }
     window.openModal = openModal;
 
     function closeModal() {
-        document.getElementById('modal').classList.add('hidden');
-        document.getElementById('modal-content').innerHTML = '';
+        // Some modals (e.g. the document editor) temporarily widen this
+        // wrapper past its default sm:max-w-lg -- always reset it here so
+        // that override can never leak into the next, unrelated modal
+        // regardless of how this one was dismissed (button, backdrop click,
+        // htmx auto-close, etc).
+        const modal = document.getElementById('modal');
+        const backdrop = document.getElementById('modal-backdrop');
+        const panel = document.getElementById('modal-panel');
+
+        backdrop.classList.add('opacity-0');
+        panel.classList.add('opacity-0', 'scale-95');
+        panel.classList.remove('sm:max-w-3xl');
+        panel.classList.add('sm:max-w-lg');
+
+        setTimeout(() => {
+            modal.classList.add('hidden');
+            document.getElementById('modal-content').innerHTML = '';
+        }, MODAL_TRANSITION_MS);
     }
     window.closeModal = closeModal;
 
@@ -531,15 +593,15 @@
         if (!container || !message) return;
 
         const styles = {
-            success: 'border-green-200 bg-green-50 text-green-800',
-            error: 'border-red-200 bg-red-50 text-red-800',
-            warning: 'border-yellow-200 bg-yellow-50 text-yellow-800',
-            info: 'border-blue-200 bg-blue-50 text-blue-800',
+            success: 'app-toast--success',
+            error: 'app-toast--error',
+            warning: 'app-toast--warning',
+            info: 'app-toast--info',
         };
 
         const tone = styles[level] ? level : 'info';
         const toast = document.createElement('div');
-        toast.className = `pointer-events-auto rounded-xl border shadow-lg px-4 py-3 text-sm font-medium transition-all duration-300 opacity-0 translate-y-2 ${styles[tone]}`;
+        toast.className = `app-toast ${styles[tone]} opacity-0 translate-y-2`;
         toast.innerHTML = `<div class="flex items-start gap-3"><span class="flex-1">${message}</span><button type="button" class="text-current/70 hover:text-current">&times;</button></div>`;
 
         const toastButton = toast.querySelector('button');
@@ -633,10 +695,10 @@
                     .replaceAll('&', '&amp;')
                     .replaceAll('<', '&lt;')
                     .replaceAll('>', '&gt;');
-                row.innerHTML = `<div class="bg-gray-900 text-white rounded-2xl rounded-tr-sm px-4 py-2.5 text-sm max-w-[85%] whitespace-pre-wrap">${safe}</div>`;
+                row.innerHTML = `<div class="bg-gray-900 text-white rounded-lg rounded-tr-sm px-4 py-2.5 text-sm max-w-[85%] whitespace-pre-wrap">${safe}</div>`;
             } else {
                 const bubble = document.createElement('div');
-                bubble.className = 'agent-bubble bg-indigo-50 border border-indigo-100 text-gray-700 rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm max-w-[85%]';
+                bubble.className = 'agent-bubble bg-indigo-50 border border-indigo-100 text-gray-700 rounded-lg rounded-tl-sm px-4 py-2.5 text-sm max-w-[85%]';
                 if (responseHtml) {
                     bubble.innerHTML = responseHtml;
                 } else {
@@ -791,41 +853,53 @@
                 return;
             }
 
-            const modalContent = document.getElementById('modal-content');
-            if (!modalContent || typeof window.openModal !== 'function' || typeof window.closeModal !== 'function') {
+            const overlay = document.getElementById('global-agent-confirm-overlay');
+            const overlayContent = document.getElementById('global-agent-confirm-content');
+            if (!overlay || !overlayContent) {
                 const shouldClear = window.confirm('Clear chat history for this assessment context?');
                 if (!shouldClear) return;
                 await executeGlobalAgentClear(sessionId);
                 return;
             }
 
-            modalContent.innerHTML = `
-                <div class="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-                    <div class="px-6 py-5 border-b border-gray-100">
-                        <h3 class="text-lg font-semibold text-gray-900">Clear Chat History</h3>
-                        <p class="mt-2 text-sm text-gray-600">This will remove all messages for this assessment context.</p>
+            overlayContent.innerHTML = `
+                <div class="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-lg">
+                    <div class="px-5 py-4 border-b border-gray-100">
+                        <h3 class="text-base font-semibold text-gray-900">Clear Chat History</h3>
+                        <p class="mt-1.5 text-sm text-gray-600">This will remove all messages for this assessment context.</p>
                     </div>
-                    <div class="px-6 py-4 flex justify-end gap-3">
+                    <div class="px-5 py-3 flex justify-end gap-3">
                         <button type="button" id="global-agent-clear-cancel" class="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition">Cancel</button>
                         <button type="button" id="global-agent-clear-confirm" class="px-4 py-2 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition">Clear Chat</button>
                     </div>
                 </div>
             `;
 
+            const closeOverlay = () => {
+                overlay.classList.add('opacity-0');
+                overlayContent.classList.add('opacity-0', 'scale-95');
+                setTimeout(() => {
+                    overlay.classList.add('hidden');
+                    overlayContent.innerHTML = '';
+                }, MODAL_TRANSITION_MS);
+            };
+
             const cancelBtn = document.getElementById('global-agent-clear-cancel');
             const confirmBtn = document.getElementById('global-agent-clear-confirm');
             if (!cancelBtn || !confirmBtn) return;
 
-            cancelBtn.addEventListener('click', function () {
-                window.closeModal();
-            }, { once: true });
+            cancelBtn.addEventListener('click', closeOverlay, { once: true });
 
             confirmBtn.addEventListener('click', async function () {
-                window.closeModal();
+                closeOverlay();
                 await executeGlobalAgentClear(sessionId);
             }, { once: true });
 
-            window.openModal();
+            overlay.classList.remove('hidden');
+            requestAnimationFrame(() => {
+                overlay.classList.remove('opacity-0');
+                overlayContent.classList.remove('opacity-0', 'scale-95');
+            });
         }
 
         async function executeGlobalAgentClear(sessionId) {
@@ -918,16 +992,18 @@
     </script>
     {% block extra_js %}{% endblock %}
     <!-- HTMX Modal -->
-    <div id="modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div id="modal" class="hidden fixed inset-0 z-[1300] overflow-y-auto">
         <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeModal()"></div>
+            <div id="modal-backdrop" class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity duration-150 ease-out opacity-0" onclick="closeModal()"></div>
 
             <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div id="modal-panel" class="relative inline-block align-bottom bg-white rounded-lg border border-gray-200 text-left overflow-hidden sm:my-8 sm:align-middle sm:max-w-lg sm:w-full transition-all duration-150 ease-out transform opacity-0 scale-95">
                 <div id="modal-content"></div>
             </div>
         </div>
     </div>
+    <script src="{% static 'js/scroll-reveal.js' %}"></script>
+    {% include "gtm/partials/feedback_widget.html" %}
 </body>
 </html>

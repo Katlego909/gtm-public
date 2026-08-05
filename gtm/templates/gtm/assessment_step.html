@@ -13,16 +13,15 @@
     border-radius:0.875rem; background:#fff; color:#374151; cursor:pointer;
     transition:all .2s ease; font-weight:500; text-align:center;
   }
-  .rating-label:hover { 
-    border-color:#818cf8; 
-    background:#eef2ff;
+  .rating-label:hover {
+    border-color:#DD8142;
+    background:#FDF4EC;
   }
   /* Turn label into a selected pill when its radio is checked */
-  .rating-input:checked + .rating-label { 
-    background: #4f46e5;
-    color:#fff; 
-    border-color:#4f46e5;
-    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.24);
+  .rating-input:checked + .rating-label {
+    background: #B8530F;
+    color:#fff;
+    border-color:#B8530F;
   }
   
   @keyframes slideInUp {
@@ -49,21 +48,21 @@
 
   /* ── Delivery AI scoring ── */
   .delivery-dropzone {
-    border: 2px dashed #c7d2fe;
+    border: 2px dashed #F3C79C;
     border-radius: 1rem;
     padding: 2rem;
     text-align: center;
-    background: #f5f3ff;
+    background: #FDF4EC;
     transition: all .2s ease;
     cursor: pointer;
   }
   .delivery-dropzone.drag-over {
-    border-color: #4f46e5;
-    background: #eef2ff;
+    border-color: #B8530F;
+    background: #FDF4EC;
   }
   .ai-result-panel {
-    border-left: 3px solid #818cf8;
-    background: #eef2ff;
+    border-left: 3px solid #DD8142;
+    background: #FDF4EC;
     border-radius: 0 0.5rem 0.5rem 0;
   }
   /* radios look locked but still submit their value */
@@ -73,8 +72,8 @@
     pointer-events: none;
   }
   .rating-group.ai-locked .rating-input:checked + .rating-label {
-    background: #6366f1;
-    border-color: #6366f1;
+    background: #CC6620;
+    border-color: #CC6620;
     opacity: 1;
   }
   .confidence-high   { background: #dcfce7; color: #166534; }
@@ -88,7 +87,7 @@
     <div class="flex items-center justify-between mb-3">
       <div class="flex items-center gap-3">
         <div class="app-icon-badge app-icon-badge--solid h-12 w-12 rounded-xl">
-          <i class="fas fa-clipboard-check text-white text-xl"></i>
+          <i class="fas fa-clipboard-check text-xl"></i>
         </div>
         <div>
           <p class="text-sm font-semibold text-gray-600">Assessment Progress</p>
@@ -121,7 +120,7 @@
       <p class="text-gray-600 flex items-start gap-2">
         <i class="fas fa-info-circle text-indigo-600 mt-1"></i>
         <span>
-          Rate each statement from <strong>1 (No/Poor)</strong> to <strong>5 (Best-in-class)</strong>.
+          Answer each question honestly, then rate your response from <strong>1 (No/Poor)</strong> to <strong>5 (Best-in-class)</strong>.
           <button type="button" class="ml-2 text-indigo-600 hover:text-indigo-800 underline decoration-dotted font-medium" 
                   onclick="openLegendModal()">
             What does 1–5 mean?
@@ -175,7 +174,7 @@
            data-delete-tpl="{{ ai_delete_tpl }}">
         <div class="flex items-center gap-3 mb-4">
           <div class="app-icon-badge app-icon-badge--solid h-10 w-10 rounded-lg shrink-0">
-            <i class="fas fa-robot text-white text-sm"></i>
+            <i class="fas fa-robot text-sm"></i>
           </div>
           <div>
             <h3 class="font-bold text-gray-900">AI-Powered {{ ai_category_label }} Analysis</h3>
@@ -221,10 +220,12 @@
       </div>
       {% endif %}
 
-      {% for field in form %}
-        {% if '_context_note' not in field.name %}
+      {% for row in question_rows %}
         <div class="question-item app-card-soft p-6 transition-colors hover:border-indigo-200">
-          {% with guide=question_guidance|get_item:field.name %}
+          {% with guide=row.guidance field=row.rating_field %}
+          <p class="text-xs font-semibold uppercase tracking-wide mb-2" style="color: var(--accent-600)">
+            Question {{ row.index }} of {{ question_count }}
+          </p>
           <label class="block text-base font-semibold text-gray-800 mb-4">
             <span>{{ field.label }}</span>
           </label>
@@ -376,7 +377,6 @@
           </div>
           {% endwith %}
         </div>
-        {% endif %}
       {% endfor %}
 
       <!-- Navigation Buttons -->
@@ -423,7 +423,7 @@
   <div class="mt-6 app-accent-panel p-6">
     <div class="flex items-start gap-4">
       <div class="app-icon-badge app-icon-badge--solid h-12 w-12 rounded-lg shrink-0">
-        <i class="fas fa-lightbulb text-white text-xl"></i>
+        <i class="fas fa-lightbulb text-xl"></i>
       </div>
       <div>
         <h3 class="font-bold text-gray-900 mb-1">Need Help?</h3>

@@ -1,0 +1,7 @@
+{{ title }}
+
+{{ message }}
+{% if link %}
+View details: {{ link }}
+{% endif %}
+© 2026 {{ brand_name }}. All rights reserved.

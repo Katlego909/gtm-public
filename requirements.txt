@@ -6,11 +6,13 @@ beautifulsoup4==4.14.2
 binaryornot==0.4.4
 cachetools==6.2.1
 certifi==2025.10.5
+cffi==2.1.0
 chardet==5.2.0
 charset-normalizer==3.4.4
 click==8.3.0
 colorama==0.4.6
 cookiecutter==2.6.0
+cryptography==49.0.0
 distro==1.9.0
 dj-database-url==3.1.2
 Django==5.2.7
@@ -58,12 +60,14 @@ protobuf==6.31.1
 psycopg2==2.9.11
 pyasn1==0.6.1
 pyasn1_modules==0.4.2
+pycparser==3.0
 pydantic==2.12.3
 pydantic_core==2.41.4
 Pygments==2.19.2
 pyparsing==3.2.5
 pypdf==5.4.0
 python-dateutil==2.9.0.post0
+python-docx==1.2.0
 python-dotenv==1.1.1
 python-slugify==8.0.4
 PyYAML==6.0.3
@@ -86,5 +90,6 @@ tzdata==2025.2
 uritemplate==4.2.0
 urllib3==2.5.0
 websockets==15.0.1
+sentry-sdk==2.66.0
 
 whitenoise==6.9.0

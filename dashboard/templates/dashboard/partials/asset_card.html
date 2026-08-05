@@ -2,7 +2,7 @@
 
 {% with status=resource.audit_status %}
 <div id="asset-card-{{ resource.id }}"
-     class="group relative bg-white rounded-2xl border border-gray-200 shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col
+     class="group relative bg-white rounded-2xl border border-gray-200 transition-colors overflow-hidden flex flex-col
             {% if status == 'complete' and resource.ai_score_modifier > 0 %}ring-1 ring-emerald-200{% elif status == 'complete' and resource.ai_score_modifier < 0 %}ring-1 ring-rose-200{% endif %}"
      {% if status == 'pending' or status == 'auditing' %}
      hx-get="{% url 'asset_audit_result' resource.id %}{% if current_workspace %}?workspace={{ current_workspace.id }}{% endif %}"
@@ -13,14 +13,20 @@
 
   {% if status == 'complete' %}
     {% if resource.ai_score_modifier > 0 %}
-      <div class="h-1.5 w-full bg-gradient-to-r from-emerald-400 to-teal-400"></div>
+      <div class="h-1.5 w-full bg-emerald-400"></div>
     {% elif resource.ai_score_modifier < 0 %}
-      <div class="h-1.5 w-full bg-gradient-to-r from-rose-400 to-red-400"></div>
+      <div class="h-1.5 w-full bg-rose-400"></div>
     {% else %}
-      <div class="h-1.5 w-full bg-gradient-to-r from-slate-200 to-gray-200"></div>
+      <div class="h-1.5 w-full bg-gray-200"></div>
     {% endif %}
   {% else %}
-    <div class="h-1.5 w-full bg-gradient-to-r from-indigo-200 to-purple-200"></div>
+    <div class="h-1.5 w-full bg-indigo-200"></div>
+  {% endif %}
+
+  {% if resource.is_image %}
+  <a href="{{ resource.file.url }}" target="_blank" class="block h-36 w-full overflow-hidden bg-gray-100 flex-shrink-0">
+    <img src="{{ resource.file.url }}" alt="{{ resource.name }}" class="h-full w-full object-cover">
+  </a>
   {% endif %}
 
   <div class="p-5 flex flex-col flex-1">
@@ -28,9 +34,10 @@
     <div class="flex items-start justify-between gap-3 mb-3">
       <div class="flex items-center gap-3 min-w-0">
 
+        {% if not resource.is_image %}
         {# File type icon #}
         <div class="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center
-          {% if resource.category == 'marketing' %}bg-purple-100 text-purple-600
+          {% if resource.category == 'marketing' %}bg-rose-100 text-rose-600
           {% elif resource.category == 'sales' %}bg-blue-100 text-blue-600
           {% elif resource.category == 'strategy' %}bg-indigo-100 text-indigo-600
           {% elif resource.category == 'product' %}bg-cyan-100 text-cyan-600
@@ -45,6 +52,7 @@
             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.828a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
           {% endif %}
         </div>
+        {% endif %}
 
         <div class="min-w-0">
           <h3 class="font-bold text-gray-900 truncate group-hover:text-indigo-600 transition-colors">{{ resource.name }}</h3>
@@ -115,6 +123,22 @@
             <p class="text-sm font-semibold text-indigo-700">Auditing asset…</p>
             <p class="text-xs text-gray-400">Gemini is reviewing your asset. This takes ~15 seconds.</p>
           </div>
+        </div>
+
+      {% elif status == 'no_credits' %}
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 text-amber-600">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span class="text-xs font-medium">AI credits exhausted for today</span>
+          </div>
+          {% if resource.resource_type == 'file' %}
+            <button hx-post="{% url 'trigger_asset_audit' resource.id %}{% if current_workspace %}?workspace={{ current_workspace.id }}{% endif %}"
+                    hx-target="#asset-card-{{ resource.id }}"
+                    hx-swap="outerHTML"
+                    class="text-xs font-semibold text-indigo-600 hover:text-indigo-800 transition-colors">
+              Retry →
+            </button>
+          {% endif %}
         </div>
 
       {% elif status == 'failed' %}

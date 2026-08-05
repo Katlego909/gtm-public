@@ -73,6 +73,24 @@ class Workspace(models.Model):
             )
             return workspace
 
+    @classmethod
+    def user_at_creation_cap(cls, user) -> bool:
+        """Beta safety net: unrestricted workspace creation means
+        unrestricted AI-credit-account creation too (each new workspace
+        gets its own fresh token budget, see gtm/ai_credits.py::
+        resolve_account) -- shared by every workspace-creation entry point
+        (gtm/views_workspace.py, dashboard/views/pages.py) so the cap can't
+        be bypassed by using a different one. Staff are exempt so the
+        internal team keeps unrestricted workspace creation for testing."""
+        from django.conf import settings
+        if getattr(user, "is_staff", False):
+            return False
+        max_workspaces = getattr(settings, "MAX_WORKSPACES_PER_USER", 1)
+        owned_count = WorkspaceMembership.objects.filter(
+            user=user, role='admin', is_active=True
+        ).count()
+        return owned_count >= max_workspaces
+
     def __str__(self):
         return self.name
 
@@ -113,19 +131,34 @@ class WorkspaceMembership(models.Model):
         return f"{self.user.username} - {self.workspace.name} ({self.role})"
     
     @property
-    def is_funti3r_team(self):
-        """Check if user is Funti3r team member"""
-        return self.role == 'funti3r_consultant'
-    
-    @property 
     def can_invite_users(self):
         """Check if user can invite others to workspace"""
-        return self.role in ['admin', 'funti3r_consultant']
+        return self.role in ['admin', 'manager', 'funti3r_consultant']
     
     @property
     def can_assign_tasks(self):
         """Check if user can assign tasks to others"""
         return self.role in ['admin', 'manager', 'funti3r_consultant']
+
+    @property
+    def can_manage_integrations(self):
+        """Check if user can configure/revoke workspace integrations (CRM credentials, etc.)"""
+        return self.role in ['admin', 'funti3r_consultant']
+
+    @property
+    def can_edit_workspace(self):
+        """Check if user can edit workspace details (name, industry, company size, website)"""
+        return self.role in ['admin', 'funti3r_consultant']
+
+    @property
+    def can_delete_workspace(self):
+        """Check if user can delete (deactivate) the workspace"""
+        return self.role == 'admin'
+
+    @property
+    def can_manage_ai_credits(self):
+        """Check if user can view/adjust this workspace's AI credit budget."""
+        return self.role in ['admin', 'funti3r_consultant']
 
 
 class WorkspaceInvitation(models.Model):
@@ -175,6 +208,7 @@ class WorkspaceActivityEvent(models.Model):
         ('resource_created', 'Resource created'),
         ('resource_updated', 'Resource updated'),
         ('resource_deleted', 'Resource deleted'),
+        ('client_summary_generated', 'Client summary generated'),
     ]
 
     workspace = models.ForeignKey(

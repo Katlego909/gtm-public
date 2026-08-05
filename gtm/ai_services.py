@@ -7,12 +7,11 @@ Falls back to static RecommendationBand content if AI is unavailable.
 """
 
 import logging
-import time
 from django.conf import settings
-from django.core.cache import cache
 from django.utils.html import strip_tags
 
 from .models import ResultSnapshot, RecommendationBand, AssessmentSession, Question, Response
+from . import utils_locks
 from .utils_logging import log_ai_error
 import re
 import json
@@ -60,6 +59,22 @@ def _clean_json_response(text: str) -> str:
     return text.strip()
 
 
+def _normalize_risk_status(value: str) -> str:
+    """Coerce Gemini's risk_status output to exactly High/Medium/Low
+    (case-insensitive match). A malformed-but-present value clamps to
+    "Medium" (neutral) rather than "Low", so a parse failure doesn't
+    silently under-state risk -- a genuinely missing key is a separate
+    call-site decision, not this function's concern."""
+    candidate = (value or "").strip()
+    for valid in ("High", "Medium", "Low"):
+        if candidate.lower() == valid.lower():
+            return valid
+    if candidate:
+        logger.warning(f"Unrecognized ai_risk_status from Gemini: {candidate!r} — defaulting to Medium.")
+        return "Medium"
+    return ""
+
+
 def _is_quota_error(error: Exception) -> bool:
     """Return True when the exception indicates Gemini quota/rate-limit exhaustion."""
     msg = str(error).lower()
@@ -84,33 +99,42 @@ def _extract_retry_delay_seconds(error: Exception) -> int:
 
 
 def _set_quota_cooldown(retry_after_seconds: int):
-    """Set a short global cooldown to prevent quota-storm retry loops."""
+    """Set a short global cooldown to prevent quota-storm retry loops.
+    DB-backed (see gtm/utils_locks.py) rather than cache-backed, so the
+    cooldown is actually visible across Cloud Run instances/processes."""
     cooldown_seconds = min(max(retry_after_seconds, 1), 300)
-    cache.set(
-        AI_QUOTA_COOLDOWN_CACHE_KEY,
-        time.time() + cooldown_seconds,
-        timeout=cooldown_seconds,
-    )
+    utils_locks.set_active_until(AI_QUOTA_COOLDOWN_CACHE_KEY, cooldown_seconds)
 
 
 def _quota_cooldown_active() -> bool:
     """Check if Gemini calls should be skipped temporarily due to recent quota errors."""
-    until_ts = cache.get(AI_QUOTA_COOLDOWN_CACHE_KEY)
-    return bool(until_ts and until_ts > time.time())
+    return utils_locks.is_active(AI_QUOTA_COOLDOWN_CACHE_KEY)
 
 
 def _acquire_lock(lock_key: str, ttl_seconds: int = AI_LOCK_TTL_SECONDS) -> bool:
-    """Acquire a cache lock to avoid duplicate concurrent AI calls."""
-    return cache.add(lock_key, "1", timeout=ttl_seconds)
+    """Acquire a DB-backed lock to avoid duplicate concurrent AI calls
+    across instances (see gtm/utils_locks.py)."""
+    return utils_locks.acquire(lock_key, ttl_seconds)
 
-def _request_budget_available() -> bool:
-    """Vertex AI enterprise quota is much higher; using more relaxed budget."""
-    return True # Removed strict 4 RPM gate for Vertex AI
+
+def _lock_is_held(lock_key: str) -> bool:
+    """Read-only peek: is this lock currently held (not expired)? Used to
+    tell a live "generating" status apart from one left behind by a thread
+    that died before reaching its release."""
+    return utils_locks.is_active(lock_key)
+
+
+def _request_budget_available(*, workspace=None, user=None, account=None) -> bool:
+    """Per-workspace/per-user AI credit gate (see gtm/ai_credits.py). Fails
+    closed: if no identity is resolvable, returns False rather than
+    silently allowing unmetered spend."""
+    from .ai_credits import can_spend
+    return can_spend(workspace=workspace, user=user, account=account).allowed
 
 
 def _release_lock(lock_key: str):
-    """Release a previously acquired cache lock."""
-    cache.delete(lock_key)
+    """Release a previously acquired lock."""
+    utils_locks.release(lock_key)
 
 
 # Metadata and monitoring tools
@@ -130,7 +154,7 @@ def _normalize_ai_playbook_markdown(playbook_text: str) -> str:
 
     src = playbook_text.strip()
 
-    # 🛠️ JSON DETECTION (Last Line of Defense)
+    # JSON DETECTION (Last Line of Defense)
     # If the text looks like it might contain a JSON object with our key
     if "markdown_playbook" in src:
         try:
@@ -150,16 +174,16 @@ def _normalize_ai_playbook_markdown(playbook_text: str) -> str:
     # Ensure literal \n from LLM/JSON artifacts are converted to real newlines
     src = src.replace('\\n', '\n').replace('\\"', '"').replace("\r\n", "\n").strip()
 
-    # 1️⃣ Convert inline " * " separators into proper bullet lines
+    # 1. Convert inline " * " separators into proper bullet lines
     src = re.sub(r"\s\*\s+", "\n- ", src)
 
-    # 2️⃣ Make "Week X:" style lines into Markdown headings for consistency
+    # 2. Make "Week X:" style lines into Markdown headings for consistency
     src = re.sub(r"(?m)^(Week\s+\d+:[^\n]*)$", r"### \1", src)
 
-    # 3️⃣ Add blank lines before list, numbered, and heading items for proper block rendering
+    # 3. Add blank lines before list, numbered, and heading items for proper block rendering
     src = re.sub(r"(?m)(?<!\n)\n(?=(?:- |\d+\. |#{1,6}\s))", "\n\n", src)
 
-    # 4️⃣ Clean up extra spaces/newlines
+    # 4. Clean up extra spaces/newlines
     src = re.sub(r"[ \t]+\n", "\n", src)
     src = re.sub(r"\n{3,}", "\n\n", src)
 
@@ -472,6 +496,9 @@ Respond ONLY with a valid raw JSON object (no markdown code fences). Use these e
 # A non-empty value stops the HTMX polling loop; the view/template detect it
 # and render a graceful "unavailable" message instead of the content or spinner.
 ENRICHMENT_UNAVAILABLE = "__unavailable__"
+# Distinct sentinel for the AI-credits-exhausted case, so the view/template
+# can show "you're out of credits" instead of implying the AI itself broke.
+ENRICHMENT_NO_CREDITS = "__no_credits__"
 
 
 def generate_enrichment_sections(snapshot: ResultSnapshot) -> bool:
@@ -483,8 +510,17 @@ def generate_enrichment_sections(snapshot: ResultSnapshot) -> bool:
     if snapshot.ai_financial_summary and snapshot.ai_competitor_analysis:
         return False
 
+    from .ai_credits import resolve_account_for_session, record_spend
+    account = resolve_account_for_session(snapshot.session)
+
     client = _get_client()
     if not client or _quota_cooldown_active():
+        return False
+
+    if not _request_budget_available(account=account):
+        snapshot.ai_financial_summary = snapshot.ai_financial_summary or ENRICHMENT_NO_CREDITS
+        snapshot.ai_competitor_analysis = snapshot.ai_competitor_analysis or ENRICHMENT_NO_CREDITS
+        snapshot.save(update_fields=["ai_financial_summary", "ai_competitor_analysis"])
         return False
 
     lock_key = f"gtm:ai:enrichment:{snapshot.id}:lock"
@@ -519,8 +555,13 @@ Use revenue ranges consistent with {revenue}. Do NOT recommend actions — only 
                     config=_FAST_CONFIG,
                 )
                 snapshot.ai_financial_summary = (resp.text or "").strip() or ENRICHMENT_UNAVAILABLE
+                if hasattr(resp, "usage_metadata"):
+                    total_tokens = resp.usage_metadata.total_token_count
+                    if MONITORING_AVAILABLE:
+                        AIUsageTracker.log_usage(total_tokens, 'enrichment')
+                    record_spend(account, total_tokens, "enrichment", session=snapshot.session)
             except Exception as e:
-                log_ai_error("generate_enrichment_sections:financial", e, {})
+                log_ai_error("generate_enrichment_sections:financial", e, extra={"snapshot_id": snapshot.id})
                 snapshot.ai_financial_summary = ENRICHMENT_UNAVAILABLE
             generated = True
 
@@ -542,8 +583,13 @@ Do NOT recommend actions — only describe competitive risks from the current st
                     config=_FAST_CONFIG,
                 )
                 snapshot.ai_competitor_analysis = (resp.text or "").strip() or ENRICHMENT_UNAVAILABLE
+                if hasattr(resp, "usage_metadata"):
+                    total_tokens = resp.usage_metadata.total_token_count
+                    if MONITORING_AVAILABLE:
+                        AIUsageTracker.log_usage(total_tokens, 'enrichment')
+                    record_spend(account, total_tokens, "enrichment", session=snapshot.session)
             except Exception as e:
-                log_ai_error("generate_enrichment_sections:competitor", e, {})
+                log_ai_error("generate_enrichment_sections:competitor", e, extra={"snapshot_id": snapshot.id})
                 snapshot.ai_competitor_analysis = ENRICHMENT_UNAVAILABLE
             generated = True
 
@@ -554,13 +600,15 @@ Do NOT recommend actions — only describe competitive risks from the current st
         _release_lock(lock_key)
 
 
-def extract_tasks_from_playbook(playbook_text: str, company_name: str, n: int = 4) -> list[str]:
+def extract_tasks_from_playbook(playbook_text: str, company_name: str, n: int = 4, *, account=None) -> list[str]:
     """
     Ask Gemini to extract n short actionable tasks from an existing AI playbook.
-    Returns a list of task strings (each <= 220 chars). Returns [] on any failure.
+    Returns a list of task strings (each <= 220 chars). Returns [] on any failure
+    (including a blocked AI-credits check -- the playbook() view already has a
+    graceful quick-win-sentence fallback for an empty result).
     """
     client = _get_client()
-    if not client or not playbook_text:
+    if not client or not playbook_text or _quota_cooldown_active() or not _request_budget_available(account=account):
         return []
 
     prompt = f"""You are extracting action items from a GTM playbook for {company_name}.
@@ -590,10 +638,16 @@ Playbook:
         raw = (response.text or "").strip()
         raw = _clean_json_response(raw)
         tasks = json.loads(raw)
+        if hasattr(response, "usage_metadata"):
+            total_tokens = response.usage_metadata.total_token_count
+            if MONITORING_AVAILABLE:
+                AIUsageTracker.log_usage(total_tokens, 'extract_tasks')
+            from .ai_credits import record_spend
+            record_spend(account, total_tokens, "extract_tasks")
         if isinstance(tasks, list):
             return [str(t).strip() for t in tasks if isinstance(t, str) and len(t.strip()) <= 220][:n]
     except Exception as e:
-        log_ai_error("extract_tasks_from_playbook", e, {})
+        log_ai_error("extract_tasks_from_playbook", e, extra={"company_name": company_name})
     return []
 
 
@@ -613,6 +667,9 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
     snapshot.ai_financial_summary = ""
     snapshot.ai_competitor_analysis = ""
 
+    from .ai_credits import resolve_account_for_session, record_spend
+    account = resolve_account_for_session(snapshot.session)
+
     # Avoid duplicate concurrent generation for the same snapshot.
     playbook_lock_key = f"gtm:ai:playbook:{snapshot.id}:lock"
     if not _acquire_lock(playbook_lock_key):
@@ -623,9 +680,18 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
     snapshot.save(update_fields=["ai_playbook_status"])
 
     try:
-        # ---- 1️⃣ Attempt Unified Gemini generation
+        # ---- 1. Attempt Unified Gemini generation
         client = _get_client()
-        if client and not _quota_cooldown_active() and _request_budget_available():
+        quota_cooldown = _quota_cooldown_active()
+        no_budget = not _request_budget_available(account=account)
+        # Distinguish "budget exhausted mid-flight" (a race: the outer
+        # kickoff's pre-check passed, but a concurrent request spent the
+        # remaining budget before this attempt ran) from "no client
+        # configured" / "quota cooldown active" -- only the former should
+        # surface as no_credits; the latter two keep the existing
+        # done-with-fallback behavior.
+        credits_exhausted_mid_flight = bool(client) and not quota_cooldown and no_budget
+        if client and not quota_cooldown and not no_budget:
             prompt = _build_prompt(snapshot)
             model_id = "gemini-2.5-flash"
             try:
@@ -640,7 +706,7 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
                         text = _clean_json_response(text)
                         parsed = json.loads(text)
                         final_playbook_text = parsed.get("markdown_playbook", "")
-                        snapshot.ai_risk_status = parsed.get("risk_status", "Low")
+                        snapshot.ai_risk_status = _normalize_risk_status(parsed.get("risk_status", "Low"))
                         snapshot.ai_financial_summary = parsed.get("financial_summary", "")
                         snapshot.ai_competitor_analysis = parsed.get("competitor_analysis", "")
 
@@ -661,7 +727,7 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
                                     defaults={'rationale': f"Recommended learning topic based on AI analysis"}
                                 )
                     except Exception as json_err:
-                        # 🚨 REPORT RESCUE: If JSON fails, manually extract the playbook content
+                        # REPORT RESCUE: If JSON fails, manually extract the playbook content
                         logger.error(f"Failed to parse JSON for {snapshot.company_name}: {json_err}. Rescuing playbook text.")
 
                         # Try multiple strategies to extract markdown content from malformed JSON
@@ -707,7 +773,7 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
 
                         risk_match = re.search(r'["\']?risk_status["\']?\s*:\s*["\']+(.*?)(?=["\']|,)', text, re.IGNORECASE)
                         if risk_match:
-                            snapshot.ai_risk_status = risk_match.group(1).strip().strip('"\'')
+                            snapshot.ai_risk_status = _normalize_risk_status(risk_match.group(1).strip().strip('"\''))
 
                     if final_playbook_text:
                         # Log token usage
@@ -715,14 +781,15 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
                             usage = response.usage_metadata
                             total_tokens = usage.total_token_count
                             logger.info(
-                                f"✅ AI playbook generated for {snapshot.company_name} | "
+                                f"AI playbook generated for {snapshot.company_name} | "
                                 f"Tokens: {usage.prompt_token_count} input + {usage.candidates_token_count} output = {total_tokens} total"
                             )
                             # Track usage against quotas
                             if MONITORING_AVAILABLE:
                                 AIUsageTracker.log_usage(total_tokens, 'playbook')
+                            record_spend(account, total_tokens, "playbook", session=snapshot.session)
                         else:
-                            logger.info(f"✅ AI playbook generated for {snapshot.company_name}")
+                            logger.info(f"AI playbook generated for {snapshot.company_name}")
             except Exception as e:
                 if _is_quota_error(e):
                     _set_quota_cooldown(_extract_retry_delay_seconds(e))
@@ -735,9 +802,9 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
                     extra={"snapshot_id": snapshot.id},
                 )
 
-        # ---- 2️⃣ Fallback to static recommendation (only if AI failed or was disabled)
+        # ---- Fallback to static recommendation (only if AI failed or was disabled)
         if not final_playbook_text:
-            logger.warning("⚠️ Falling back to static RecommendationBand playbook.")
+            logger.warning("Falling back to static RecommendationBand playbook.")
             
             # Use snapshot.band first, or look it up if it's missing (safer)
             band = snapshot.band
@@ -749,16 +816,16 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
             if band and band.actions_markdown:
                 final_playbook_text = strip_tags(band.actions_markdown)
 
-        # ---- 3️⃣ Final generic fallback (if no content was found at all)
+        # ---- 3. Final generic fallback (if no content was found at all)
         if not final_playbook_text:
             final_playbook_text = (
                 "No AI-generated playbook available yet.\n\n"
                 "We recommend focusing on your lowest-rated GTM categories first."
             )
             
-        # 🌟 CONSOLIDATED SAVE: Persist the final content once
+        # CONSOLIDATED SAVE: Persist the final content once
         snapshot.ai_playbook = final_playbook_text
-        snapshot.ai_playbook_status = "done"
+        snapshot.ai_playbook_status = "no_credits" if credits_exhausted_mid_flight else "done"
         snapshot.save(update_fields=["ai_playbook", "ai_financial_summary", "ai_competitor_analysis", "ai_risk_status", "ai_playbook_status"])
 
         return final_playbook_text
@@ -781,7 +848,7 @@ _IMPERATIVE_VERBS = re.compile(
     r'Invest|Hire|Align|Map|Identify|Document|Introduce|Address|Fix|Resolve|Update|Upgrade|'
     r'Integrate|Configure|Run|Execute|Measure|Monitor|Optimize|Streamline|Formalize|Standardize|'
     r'Initiate|Activate|Assign|Appoint|Engage|Reach|Contact|Request|Ask|Trigger|Add|Remove|'
-    r'Consolidate|Restructure|Revisit|Revisit|Explore|Trial|Test|Pilot|Roll)\b',
+    r'Consolidate|Restructure|Revisit|Explore|Trial|Test|Pilot|Roll)\b',
     re.IGNORECASE,
 )
 
@@ -853,15 +920,27 @@ def generate_diagnostic_insight(response: Response) -> str:
     
     # Generate for all scores in weakest_questions now to ensure AI Insights are always present
     # if response.score > 3:
-    #    return "" 
-        
+    #    return ""
+
+    from .ai_credits import resolve_account_for_session, record_spend
+    account = resolve_account_for_session(response.session)
+
     client = _get_client()
-    if not client or _quota_cooldown_active() or not _request_budget_available():
+    no_budget = not _request_budget_available(account=account)
+    if not client or _quota_cooldown_active() or no_budget:
         logger.warning("GenAI client unavailable for diagnostic insight.")
         fallback = response.question.diagnostic_note or ""
-        if fallback and not response.ai_insight:
-            response.ai_insight = fallback
-            response.save(update_fields=["ai_insight"])
+        if fallback:
+            if not response.ai_insight:
+                response.ai_insight = fallback
+            response.ai_insight_status = "done"
+            response.save(update_fields=["ai_insight", "ai_insight_status"])
+        else:
+            # No static fallback text either -- must not leave status at
+            # "pending", or insight_status's poller spawns a fresh
+            # background thread on every single poll indefinitely.
+            response.ai_insight_status = "no_credits" if no_budget else "failed"
+            response.save(update_fields=["ai_insight_status"])
         return fallback
 
     lock_key = f"gtm:ai:diagnostic:{response.id}:lock"
@@ -886,7 +965,7 @@ def generate_diagnostic_insight(response: Response) -> str:
             text = _strip_imperative_sentences(ai_response.text.strip())
 
             if text:
-                # 🌟 Save the insight directly to the Response object
+                # Save the insight directly to the Response object
                 response.ai_insight = text
                 response.ai_insight_status = "done"
                 response.save(update_fields=["ai_insight", "ai_insight_status"])
@@ -897,13 +976,14 @@ def generate_diagnostic_insight(response: Response) -> str:
                     total_tokens = usage.total_token_count
                     if MONITORING_AVAILABLE:
                         AIUsageTracker.log_usage(total_tokens, 'diagnostic')
+                    record_spend(account, total_tokens, "diagnostic", session=response.session)
                 
-                logger.info(f"✅ Diagnostic insight generated for {response.question.id_code}")
+                logger.info(f"Diagnostic insight generated for {response.question.id_code}")
                 
         except Exception as e:
             if _is_quota_error(e):
                 _set_quota_cooldown(_extract_retry_delay_seconds(e))
-                log_ai_error(
+            log_ai_error(
                 "Diagnostic insight generation",
                 e,
                 service="google-genai",
@@ -911,14 +991,14 @@ def generate_diagnostic_insight(response: Response) -> str:
                 prompt=prompt,
                 extra={"response_id": response.id},
             )
-            
+
             # Fallback to static diagnostic note if AI fails
             if response.question.diagnostic_note:
                 text = response.question.diagnostic_note
                 response.ai_insight = text
                 response.ai_insight_status = "done"
                 response.save(update_fields=["ai_insight", "ai_insight_status"])
-                logger.info(f"📝 Using static diagnostic for {response.question.id_code}")
+                logger.info(f"Using static diagnostic for {response.question.id_code}")
             else:
                 response.ai_insight_status = "failed"
                 response.save(update_fields=["ai_insight_status"])
@@ -937,8 +1017,11 @@ def generate_diagnostic_insights_batch(responses: list) -> dict:
     if not responses:
         return {}
 
+    from .ai_credits import resolve_account_for_session, record_spend
+    account = resolve_account_for_session(responses[0].session)
+
     client = _get_client()
-    if not client or _quota_cooldown_active() or not _request_budget_available():
+    if not client or _quota_cooldown_active() or not _request_budget_available(account=account):
         logger.warning("GenAI client unavailable for batch diagnostic insight.")
         return {}
 
@@ -1037,8 +1120,11 @@ Do not include markdown code blocks or extra text. Return only the raw JSON obje
                     resp.ai_insight_status = "failed"
                     resp.save(update_fields=["ai_insight_status"])
 
-        if hasattr(ai_response, 'usage_metadata') and MONITORING_AVAILABLE:
-            AIUsageTracker.log_usage(ai_response.usage_metadata.total_token_count, 'diagnostic_batch')
+        if hasattr(ai_response, 'usage_metadata'):
+            total_tokens = ai_response.usage_metadata.total_token_count
+            if MONITORING_AVAILABLE:
+                AIUsageTracker.log_usage(total_tokens, 'diagnostic_batch')
+            record_spend(account, total_tokens, "diagnostic_batch", session=responses[0].session)
 
         logger.info(f"Batch diagnostic insights generated for {len(results)}/{len(responses)} responses.")
         return results
@@ -1133,7 +1219,7 @@ def _fallback_rewrite_context_note(note_text: str, mode: str) -> str:
     return cleaned[0].upper() + cleaned[1:]
 
 
-def rewrite_context_note_with_ai(note_text: str, question_text: str = "", mode: str = "rewrite") -> str:
+def rewrite_context_note_with_ai(note_text: str, question_text: str = "", mode: str = "rewrite", *, session=None) -> str:
     """Summarize or rewrite user context notes for clearer assessment inputs."""
     mode = (mode or "rewrite").strip().lower()
     if mode not in {"rewrite", "summarize", "specific"}:
@@ -1143,8 +1229,11 @@ def rewrite_context_note_with_ai(note_text: str, question_text: str = "", mode: 
     if not source:
         return ""
 
+    from .ai_credits import resolve_account_for_session, record_spend
+    account = resolve_account_for_session(session)
+
     client = _get_client()
-    if not client or _quota_cooldown_active() or not _request_budget_available():
+    if not client or _quota_cooldown_active() or not _request_budget_available(account=account):
         return _fallback_rewrite_context_note(source, mode)
 
     model_id = "gemini-2.5-flash"
@@ -1178,6 +1267,11 @@ User note:
             config=_FAST_CONFIG,
         )
         text = (getattr(response, "text", "") or "").strip()
+        if hasattr(response, "usage_metadata"):
+            total_tokens = response.usage_metadata.total_token_count
+            if MONITORING_AVAILABLE:
+                AIUsageTracker.log_usage(total_tokens, 'context_note_rewrite')
+            record_spend(account, total_tokens, "context_note_rewrite", session=session)
         if not text:
             return _fallback_rewrite_context_note(source, mode)
         text = re.sub(r"\s+", " ", text)

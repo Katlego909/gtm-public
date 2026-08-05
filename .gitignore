@@ -27,12 +27,15 @@ node_modules/
 # Documentation & product files
 ForgeGTM_*.docx
 ForgeGTM_*.pdf
+*.pptx
 FORGEGTM_*.md
 MENTOR_GUIDE.md
 ONBOARDING_ROADMAP.md
 START_HERE.md
 THE_5_PROJECTS_SIMPLE.md
 WHAT_IS_GTM_VALIDATOR.md
+CLAUDE.md
+intern_data_science_projects.md
 
 # LibreOffice lock files
 .~lock.*
@@ -52,3 +55,6 @@ keys/service-account.json
 
 # Test files
 test_documents/
+
+# Playwright MCP debugging artifacts (screenshots, page snapshots)
+.playwright-mcp/

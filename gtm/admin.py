@@ -4,8 +4,10 @@ from django.urls import reverse
 from django.utils.html import format_html
 from django.contrib import messages
 from .utils_email import send_snapshot_report_email
-from .models import AssessmentSession, ResultSnapshot, RecommendationBand, Category, Question, Response, ActionItem, ToolRecommendation, ChatMessage
+from .models import AssessmentSession, ResultSnapshot, RecommendationBand, Category, Question, Response, ActionItem, ToolRecommendation, ChatMessage, WorkspaceChatMessage, AgentDocument
 from .models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation
+from .models_ai_credits import AICreditAccount, AICreditTransaction
+from .models_beta import BetaInviteCode
 from dashboard.models import GapAnalysisMetric
 
 @admin.action(description="Resend report email")
@@ -82,7 +84,7 @@ class ResultSnapshotAdmin(admin.ModelAdmin):
             "classes": ("collapse",),
             "fields": ("category_breakdown", "radar_labels", "radar_values"),
         }),
-        # ✅ NEW SECTION
+        # New section
         ("AI Output", {
             "classes": ("collapse",),  # optional — remove if you want always visible
             "fields": ("ai_playbook",),
@@ -190,6 +192,29 @@ class ChatMessageAdmin(admin.ModelAdmin):
         return obj.message[:60] + "..." if len(obj.message) > 60 else obj.message
     message_preview.short_description = "Message"
 
+
+@admin.register(WorkspaceChatMessage)
+class WorkspaceChatMessageAdmin(admin.ModelAdmin):
+    list_display = ("workspace", "agent_type", "message_preview", "intent", "created_at")
+    list_filter = ("agent_type", "intent", "created_at")
+    search_fields = ("message", "response", "workspace__name")
+    readonly_fields = ("created_at",)
+    ordering = ("-created_at",)
+
+    def message_preview(self, obj):
+        return obj.message[:60] + "..." if len(obj.message) > 60 else obj.message
+    message_preview.short_description = "Message"
+
+
+@admin.register(AgentDocument)
+class AgentDocumentAdmin(admin.ModelAdmin):
+    list_display = ("title", "agent_type", "doc_type", "version", "workspace", "updated_at")
+    list_filter = ("agent_type", "doc_type", "created_at")
+    search_fields = ("title", "content", "workspace__name")
+    readonly_fields = ("created_at", "updated_at")
+    ordering = ("-updated_at",)
+
+
 @admin.register(GapAnalysisMetric)
 class GapAnalysisMetricAdmin(admin.ModelAdmin):
     list_display = ('metric', 'category', 'current', 'target', 'priority')
@@ -254,3 +279,58 @@ class WorkspaceInvitationAdmin(admin.ModelAdmin):
             return format_html('<span style="color:red;">Expired</span>')
         return format_html('<span style="color:orange;">Pending</span>')
     status.short_description = 'Status'
+
+
+@admin.action(description="Reset current period (clear usage now)")
+def reset_credit_period(modeladmin, request, queryset):
+    from django.utils import timezone
+    count = queryset.update(tokens_used=0, period_started_at=timezone.now())
+    messages.success(request, f"Reset the current period for {count} account(s).")
+
+
+@admin.register(AICreditAccount)
+class AICreditAccountAdmin(admin.ModelAdmin):
+    actions = [reset_credit_period]
+    list_display = ('__str__', 'period_length', 'token_budget', 'tokens_used', 'period_started_at', 'updated_at')
+    list_filter = ('period_length',)
+    list_select_related = ('workspace', 'user')
+    search_fields = ('workspace__name', 'user__username', 'user__email')
+    readonly_fields = ('id', 'tokens_used', 'period_started_at', 'created_at', 'updated_at')
+    # token_budget and period_length stay editable -- this is the manual
+    # adjustment surface for v1 (no self-serve UI): raise token_budget to
+    # grant more headroom, or use the "Reset current period" action to
+    # zero out tokens_used immediately.
+
+
+@admin.register(AICreditTransaction)
+class AICreditTransactionAdmin(admin.ModelAdmin):
+    list_display = ('account', 'feature', 'tokens_spent', 'session', 'actor', 'created_at')
+    list_filter = ('feature', 'created_at')
+    list_select_related = ('account', 'session', 'actor')
+    search_fields = ('account__workspace__name', 'account__user__username')
+    date_hierarchy = 'created_at'
+
+
+@admin.action(description="Email invite code to the address on file")
+def email_invite_code(modeladmin, request, queryset):
+    from .utils_email import send_beta_invite_email
+    sent, skipped = 0, 0
+    for invite in queryset:
+        if not invite.email:
+            skipped += 1
+            continue
+        send_beta_invite_email(invite, invite.email, request=request)
+        sent += 1
+    if sent:
+        messages.success(request, f"Sent {sent} invite email(s).")
+    if skipped:
+        messages.warning(request, f"Skipped {skipped} code(s) with no email on file.")
+
+
+@admin.register(BetaInviteCode)
+class BetaInviteCodeAdmin(admin.ModelAdmin):
+    actions = [email_invite_code]
+    list_display = ('code', 'email', 'note', 'is_used', 'used_by', 'created_at', 'expires_at')
+    list_filter = ('created_at',)
+    search_fields = ('code', 'email', 'note', 'used_by__username', 'used_by__email')
+    readonly_fields = ('used_by', 'used_at', 'created_at')

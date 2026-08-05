@@ -1,221 +1,46 @@
-{% comment %} {% load static tailwind_tags %} {% endcomment %}
+{% load static %}
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Funti3r GTM Validator</title>
+  <link rel="icon" type="image/png" href="{% static 'images/icon.png' %}">
 
-  <!-- ✅ Tailwind CDN -->
+  <!-- Tailwind CDN + shared design-scale config -->
   <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+  <script src="{% static 'js/tailwind-config.js' %}"></script>
 
-  <!-- ✅ HTMX for SPA-like behavior -->
-  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  <!-- HTMX for SPA-like behavior -->
+  <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <script>
     document.body.addEventListener('htmx:configRequest', (event) => {
         event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
     });
   </script>
 
-  <!-- ✅ Chart.js for radar charts -->
+  <!-- Chart.js for radar charts -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- ✅ Google Fonts: Inter -->
+  <!-- Google Fonts: Inter -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
-  <!-- ✅ Global font styles -->
-  <style>
-    :root {
-      --font-body: 'Inter', sans-serif;
-      --font-heading: 'Inter', sans-serif;
-      --accent-50: #eef2ff;
-      --accent-100: #e0e7ff;
-      --accent-200: #c7d2fe;
-      --accent-300: #a5b4fc;
-      --accent-400: #818cf8;
-      --accent-500: #6366f1;
-      --accent-600: #4f46e5;
-      --accent-700: #4338ca;
-      --accent-800: #3730a3;
-      --accent-900: #312e81;
-    }
-
-    body {
-      font-family: var(--font-body);
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-
-    h1, h2, h3, h4, h5, h6 {
-      font-family: var(--font-heading);
-      letter-spacing: -0.02em;
-    }
-
-    .app-shell {
-      max-width: 72rem;
-      margin: 0 auto;
-    }
-
-    .app-page-header {
-      margin-bottom: 2rem;
-    }
-
-    .app-page-title {
-      font-size: 2.25rem;
-      line-height: 1.15;
-      font-weight: 700;
-      color: var(--accent-600);
-    }
-
-    .app-page-subtitle {
-      margin-top: 0.5rem;
-      font-size: 1rem;
-      line-height: 1.6;
-      color: #6b7280;
-    }
-
-    .app-card {
-      background: #ffffff;
-      border: 1px solid #f3f4f6;
-      border-radius: 1rem;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
-    }
-
-    .app-card-soft {
-      background: #f9fafb;
-      border: 1px solid #e5e7eb;
-      border-radius: 1rem;
-    }
-
-    .app-accent-panel {
-      background: #eef2ff;
-      border: 1px solid #e0e7ff;
-      border-radius: 1rem;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
-    }
-
-    .app-section-header {
-      display: flex;
-      align-items: center;
-      gap: 0.875rem;
-      margin-bottom: 1.25rem;
-    }
-
-    .app-icon-badge {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 2.5rem;
-      height: 2.5rem;
-      border-radius: 0.75rem;
-      background: var(--accent-100);
-      color: var(--accent-600);
-    }
-
-    .app-icon-badge--solid {
-      background: var(--accent-600);
-      color: #ffffff;
-    }
-
-    .app-primary-button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.625rem;
-      border-radius: 0.75rem;
-      background: var(--accent-600);
-      color: #ffffff;
-      font-weight: 500;
-      transition: background-color 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, color 0.2s ease;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
-    }
-
-    .app-primary-button:hover {
-      background: var(--accent-700);
-    }
-
-    .app-secondary-button {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.625rem;
-      border-radius: 0.75rem;
-      border: 1px solid #d1d5db;
-      background: #ffffff;
-      color: #374151;
-      font-weight: 500;
-      transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
-    }
-
-    .app-secondary-button:hover {
-      background: #f9fafb;
-      border-color: var(--accent-500);
-      color: var(--accent-600);
-    }
-
-    .app-input,
-    .app-select,
-    .app-textarea {
-      width: 100%;
-      border: 1px solid #d1d5db;
-      border-radius: 0.75rem;
-      background: #ffffff;
-      color: #111827;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
-    }
-
-    .app-input,
-    .app-select {
-      padding: 0.875rem 1rem;
-    }
-
-    .app-textarea {
-      padding: 0.875rem 1rem;
-      min-height: 7rem;
-      resize: vertical;
-    }
-
-    .app-input:focus,
-    .app-select:focus,
-    .app-textarea:focus {
-      outline: none;
-      border-color: var(--accent-400);
-      box-shadow: 0 0 0 4px rgba(227, 220, 251, 0.75);
-    }
-
-    .app-muted-note {
-      border: 1px solid var(--accent-100);
-      background: rgba(238, 242, 255, 0.75);
-      border-radius: 1rem;
-    }
-
-    .app-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.375rem;
-      padding: 0.35rem 0.75rem;
-      border-radius: 9999px;
-      font-size: 0.75rem;
-      font-weight: 600;
-    }
-
-  </style>
-
-  {% comment %} {% tailwind_css %} {% endcomment %}
+  <!-- Shared design tokens & component classes -->
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
 </head>
 <body class="bg-slate-50 text-gray-900">
   <!-- Modern Navigation Bar -->
-  <nav class="sticky top-0 z-50 bg-white/90 backdrop-blur-lg border-b border-gray-200 shadow-sm">
+  {% block header %}
+  <nav class="sticky top-0 z-50 bg-white border-b border-gray-200">
     <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
       <!-- Logo -->
+      {% block logo %}
       <a href="{% url 'gtm:landing' %}" class="flex items-center gap-2 hover:opacity-80 transition" hx-boost="false">
-        <div class="h-10 w-10 bg-indigo-600 rounded-xl flex items-center justify-center">
-          <span class="text-white font-bold text-xl">F</span>
-        </div>
-        <span class="text-xl font-bold text-indigo-600">Funti3r GTM</span>
+        <img src="{% static 'images/forge_logo.png' %}" alt="ForgeGTM" class="h-9 w-auto object-contain" />
       </a>
+      {% endblock %}
       
       <!-- Desktop Navigation -->
       <div class="hidden md:flex items-center gap-6">
@@ -241,9 +66,11 @@
         {% endif %}
         
         {% if user.is_authenticated %}
+          {% include 'dashboard/partials/notification_bell.html' %}
+
           <!-- Authenticated User Menu -->
-          <div class="relative group">
-            <button class="flex items-center gap-2 text-gray-700 hover:text-indigo-600 transition font-medium">
+          <div class="relative js-dropdown-trigger" id="user-menu" data-panel="user-menu-panel">
+            <button type="button" onclick="toggleDropdownPanel('user-menu-panel')" class="flex items-center gap-2 text-gray-700 hover:text-indigo-600 transition font-medium">
               <div class="h-8 w-8 bg-indigo-600 rounded-full flex items-center justify-center">
                 <span class="text-white text-sm font-semibold">{{ user.username|slice:":1"|upper }}</span>
               </div>
@@ -253,14 +80,14 @@
               </svg>
             </button>
             <!-- Dropdown Menu -->
-            <div class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-200 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+            <div id="user-menu-panel" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-lg border border-gray-200 z-50">
               <a href="{% url 'gtm:profile' %}" 
                  hx-get="{% url 'gtm:profile' %}" 
                  hx-target="#main-content" 
                  hx-select="#main-content"
                  hx-swap="innerHTML swap:200ms" 
                  hx-push-url="true"
-                 class="block px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition rounded-t-xl">
+                 class="block px-4 py-3 text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition rounded-t-lg">
                 <i class="fas fa-user mr-2"></i>Profile
               </a>
               <a href="{% url 'gtm:workspace:list' %}" 
@@ -282,31 +109,36 @@
                 <i class="fas fa-plus-circle mr-2"></i>New Assessment
               </a>
               <hr class="border-gray-200">
-              <a href="{% url 'gtm:logout' %}" class="block px-4 py-3 text-red-600 hover:bg-red-50 transition rounded-b-xl">
+              <a href="{% url 'gtm:logout' %}" class="block px-4 py-3 text-red-600 hover:bg-red-50 transition rounded-b-lg">
                 <i class="fas fa-sign-out-alt mr-2"></i>Logout
               </a>
             </div>
           </div>
         {% else %}
           <!-- Guest User Actions -->
-          <a href="{% url 'account_login' %}" 
-             hx-get="{% url 'account_login' %}" 
-             hx-target="#main-content" 
-             hx-select="#main-content"
-             hx-swap="innerHTML swap:200ms" 
-             hx-push-url="true"
-             class="px-5 py-2.5 rounded-xl font-semibold border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition">
-            Login
-          </a>
-          <a href="{% url 'gtm:start' %}" 
-             hx-get="{% url 'gtm:start' %}" 
-             hx-target="#main-content" 
-             hx-select="#main-content"
-             hx-swap="innerHTML swap:200ms" 
-             hx-push-url="true"
-             class="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-indigo-700 hover:shadow-lg transition transform hover:scale-105">
-            Start Free →
-          </a>
+          <div class="flex items-center gap-2.5">
+            <a href="{% url 'account_login' %}"
+               hx-get="{% url 'account_login' %}"
+               hx-target="#main-content"
+               hx-select="#main-content"
+               hx-swap="innerHTML swap:200ms"
+               hx-push-url="true"
+               class="px-5 py-2 rounded-lg text-sm font-semibold border border-gray-300 text-gray-800 hover:bg-gray-50 transition">
+              Login
+            </a>
+            <a href="{% url 'gtm:start' %}"
+               hx-get="{% url 'gtm:start' %}"
+               hx-target="#main-content"
+               hx-select="#main-content"
+               hx-swap="innerHTML swap:200ms"
+               hx-push-url="true"
+               class="inline-flex items-center gap-1.5 bg-gray-900 text-white pl-5 pr-4 py-2 rounded-lg text-sm font-semibold hover:bg-gray-800 transition">
+              Start Free
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+              </svg>
+            </a>
+          </div>
         {% endif %}
       </div>
 
@@ -381,7 +213,7 @@
              hx-select="#main-content"
              hx-swap="innerHTML swap:200ms" 
              hx-push-url="true"
-             class="block px-4 py-3 text-center rounded-lg font-semibold border-2 border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition">
+             class="block px-4 py-3 text-center rounded-lg font-semibold border border-indigo-600 text-indigo-600 hover:bg-indigo-50 transition">
             Login
           </a>
           <a href="{% url 'gtm:start' %}" 
@@ -390,13 +222,14 @@
              hx-select="#main-content"
              hx-swap="innerHTML swap:200ms" 
              hx-push-url="true"
-             class="block px-4 py-3 bg-indigo-600 text-white text-center rounded-lg font-semibold hover:bg-indigo-700 hover:shadow-lg transition">
-            Start Free Assessment →
+             class="block px-4 py-3 bg-indigo-600 text-white text-center rounded-lg font-semibold hover:bg-indigo-700 transition">
+            Start assessment
           </a>
         {% endif %}
       </div>
     </div>
   </nav>
+  {% endblock %}
 
   <!-- Mobile Menu Script -->
   <script>
@@ -421,7 +254,7 @@
       <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
           <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onclick="closeModal()"></div>
           <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-          <div class="inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+          <div class="relative inline-block align-bottom bg-white rounded-lg border border-gray-200 text-left overflow-hidden sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
               <div id="modal-content"></div>
           </div>
       </div>
@@ -433,13 +266,15 @@
     </div>
   </main>
 
+  {% block full_width_footer %}{% endblock %}
+
   <!-- Global Toast Notifications -->
   <div id="app-toast-container" class="fixed top-24 right-4 z-[1100] flex flex-col gap-3 w-[min(92vw,380px)] pointer-events-none"></div>
 
   <!-- Global Confirm Modal -->
-  <div id="app-confirm-backdrop" class="hidden fixed inset-0 z-[1050] bg-black/50 backdrop-blur-sm">
+  <div id="app-confirm-backdrop" class="hidden fixed inset-0 z-[1050] bg-black/50">
     <div class="min-h-full flex items-center justify-center p-4">
-      <div class="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-md overflow-hidden">
+      <div class="bg-white rounded-lg border border-gray-200 w-full max-w-md overflow-hidden">
         <div class="px-6 py-5 border-b border-gray-100">
           <h3 class="text-lg font-bold text-gray-900">Confirm Action</h3>
         </div>
@@ -454,31 +289,13 @@
     </div>
   </div>
 
-  <!-- HTMX Loading Indicator -->
-  <style>
-    .htmx-indicator {
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      display: none;
-      z-index: 9999;
-    }
-    .htmx-request .htmx-indicator {
-      display: block;
-    }
-    .htmx-swapping {
-      opacity: 0;
-      transition: opacity 200ms ease-out;
-    }
-  </style>
-  
+  <!-- HTMX Loading Indicator (styles live in app.css) -->
   <div class="htmx-indicator">
-    <div class="bg-white rounded-xl shadow-2xl p-8 flex flex-col items-center gap-4">
+    <div class="bg-white rounded-lg border border-gray-200 p-8 flex flex-col items-center gap-4">
       <div class="animate-spin rounded-full h-12 w-12 border-4 border-indigo-200 border-t-indigo-600"></div>
       <div class="text-center">
-        <p class="text-gray-900 font-bold text-lg">Processing...</p>
-        <p class="text-gray-600 text-sm mt-1">Generating your personalized GTM insights</p>
+        <p class="text-gray-900 font-bold text-lg">Working&hellip;</p>
+        <p class="text-gray-600 text-sm mt-1">This can take a few seconds.</p>
       </div>
     </div>
   </div>
@@ -528,26 +345,55 @@
           const existingChart = Chart.getChart(radarCanvas);
           if (existingChart) existingChart.destroy();
 
+          const datasets = [{
+            label: 'Your GTM Performance',
+            data: values,
+            fill: true,
+            backgroundColor: 'rgba(184, 83, 15, 0.2)',
+            borderColor: '#B8530F',
+            borderWidth: 3,
+            pointBackgroundColor: '#B8530F',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            pointRadius: 6,
+            pointHoverRadius: 8,
+            pointHoverBackgroundColor: '#fff',
+            pointHoverBorderColor: '#B8530F',
+            pointHoverBorderWidth: 3
+          }];
+
+          // Optional "last time" overlay dataset -- only present when the
+          // results view found a qualifying prior assessment to compare
+          // against (see gtm/score_comparison.py). Flat, no fill, dashed
+          // border so it reads as a reference line rather than competing
+          // visually with the current (solid, filled) dataset.
+          const previousValuesEl = document.getElementById('js-radar-previous-values');
+          if (previousValuesEl) {
+            const previousValues = JSON.parse(previousValuesEl.textContent);
+            datasets.push({
+              label: 'Last Assessment',
+              data: previousValues,
+              fill: false,
+              backgroundColor: 'rgba(107, 114, 128, 0)',
+              borderColor: '#6B7280',
+              borderWidth: 2,
+              borderDash: [6, 4],
+              pointBackgroundColor: '#6B7280',
+              pointBorderColor: '#fff',
+              pointBorderWidth: 2,
+              pointRadius: 4,
+              pointHoverRadius: 6,
+              pointHoverBackgroundColor: '#fff',
+              pointHoverBorderColor: '#6B7280',
+              pointHoverBorderWidth: 2
+            });
+          }
+
           new Chart(radarCanvas, {
             type: 'radar',
             data: {
               labels: labels,
-              datasets: [{
-                label: 'Your GTM Performance',
-                data: values,
-                fill: true,
-                backgroundColor: 'rgba(79, 70, 229, 0.2)',
-                borderColor: '#4F46E5',
-                borderWidth: 3,
-                pointBackgroundColor: '#4F46E5',
-                pointBorderColor: '#fff',
-                pointBorderWidth: 2,
-                pointRadius: 6,
-                pointHoverRadius: 8,
-                pointHoverBackgroundColor: '#fff',
-                pointHoverBorderColor: '#4F46E5',
-                pointHoverBorderWidth: 3
-              }]
+              datasets: datasets
             },
             options: {
               responsive: true,
@@ -563,17 +409,24 @@
                 }
               },
               plugins: {
-                legend: { display: false },
+                // Only worth showing when there's a second ("Last
+                // Assessment") dataset to distinguish -- a single-series
+                // chart doesn't need a legend for its own label.
+                legend: {
+                  display: datasets.length > 1,
+                  labels: { color: '#374151', font: { size: 12, weight: '600' }, usePointStyle: true, padding: 16 }
+                },
                 tooltip: {
                   enabled: true,
                   backgroundColor: 'rgba(17, 24, 39, 0.95)',
                   padding: 12,
-                  displayColors: false,
+                  displayColors: datasets.length > 1,
                   callbacks: {
                     label: function(context) {
                       const score = context.parsed.r;
                       const percentage = ((score / 5) * 100).toFixed(0);
-                      return [`Score: ${score.toFixed(2)}/5.0`, `Performance: ${percentage}%`];
+                      const prefix = datasets.length > 1 ? `${context.dataset.label}: ` : '';
+                      return [`${prefix}Score: ${score.toFixed(2)}/5.0`, `Performance: ${percentage}%`];
                     }
                   }
                 }
@@ -586,9 +439,15 @@
     }
 
     function animateProgressRing() {
+      // finalValue/w are read from immutable data-* attributes (set once at
+      // server-render time), not the element's current style/attribute --
+      // this function is re-invoked on every htmx:afterSwap page-wide
+      // (including unrelated polling widgets on this same page), so reading
+      // "current" state would race: a second invocation landing mid-animation
+      // would capture the temporary 0% and permanently lock it in.
       const progressRing = document.getElementById('progressRing');
       if (progressRing) {
-        const finalValue = progressRing.getAttribute('stroke-dasharray').split(',')[0];
+        const finalValue = progressRing.dataset.final;
         progressRing.setAttribute('stroke-dasharray', '0, 100');
         progressRing.style.transition = 'none';
         setTimeout(() => {
@@ -598,7 +457,7 @@
       }
 
       document.querySelectorAll('.h-3.rounded-full.transition-all').forEach((bar, index) => {
-        const w = bar.style.width;
+        const w = (bar.dataset.pct || '0') + '%';
         bar.style.width = '0%';
         setTimeout(() => {
           bar.style.transition = 'width 1.2s ease-out';
@@ -684,14 +543,19 @@
         if (!list) return;
         list.innerHTML = '';
         let anyComplete = false;
+        let anyFailed = false;
+        const STATUS_HTML = {
+          uploaded:  '<i class="fas fa-clock text-gray-400"></i> Uploaded',
+          analyzing: '<i class="fas fa-spinner fa-spin text-indigo-400"></i> Analyzing…',
+          complete:  '<i class="fas fa-check-circle text-green-500"></i> Ready',
+          failed:    '<i class="fas fa-exclamation-circle text-red-500"></i> Analysis failed',
+        };
         docs.forEach(doc => {
-          const ready = doc.analysis_status === 'complete';
-          if (ready) anyComplete = true;
-          const statusHtml = ready
-            ? '<i class="fas fa-check-circle text-green-500"></i> Ready'
-            : '<i class="fas fa-spinner fa-spin text-indigo-400"></i> Processing…';
+          if (doc.analysis_status === 'complete') anyComplete = true;
+          if (doc.analysis_status === 'failed') anyFailed = true;
+          const statusHtml = STATUS_HTML[doc.analysis_status] || STATUS_HTML.uploaded;
           const div = document.createElement('div');
-          div.className = 'flex items-center gap-3 bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm';
+          div.className = 'flex items-center gap-3 bg-white border border-gray-200 rounded-lg px-4 py-2.5 text-sm';
           div.innerHTML = `
             <i class="fas fa-file-alt text-gray-400 shrink-0"></i>
             <span class="flex-1 truncate font-medium text-gray-800" title="${esc(doc.original_filename)}">${esc(doc.original_filename)}</span>
@@ -710,7 +574,9 @@
           d => d.analysis_status === 'complete' && d.analysis_result && Object.keys(d.analysis_result || {}).length > 0
         );
 
-        if (!hasValidAnalysis) {
+        const status = document.getElementById('analyzeStatus');
+
+        if (!hasValidAnalysis && !anyFailed) {
           // No valid analysis (new file added, file deleted, or never analysed yet).
           // Clear any panels that may be visible from a previous run or server render.
           document.querySelectorAll('.ai-result-panel').forEach(el => el.classList.add('hidden'));
@@ -718,17 +584,31 @@
           document.getElementById('analysisDoneBadge')?.classList.add('hidden');
           analysisComplete = false;
           if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = ''; submitBtn.style.pointerEvents = ''; }
-        } else if (anyComplete && !analysisComplete && !analysisInProgress) {
-          // Valid analysis found on first load — restore panels from stored results.
+        } else if (anyComplete && !analysisComplete) {
+          // Analysis just completed (either detected live via polling, or on first
+          // load) — restore panels from stored results and release the button/status
+          // that runDeliveryAnalysis put into a "working" state.
           analysisComplete = true;
+          analysisInProgress = false;
+          if (analyzeBtn) analyzeBtn.disabled = false;
+          if (status) status.classList.add('hidden');
           if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = ''; submitBtn.style.pointerEvents = ''; }
           const savedDoc = docs.find(d => d.analysis_result && Object.keys(d.analysis_result || {}).length > 0);
           if (savedDoc) {
             applyDeliveryScores(savedDoc.analysis_result);
             document.getElementById('analysisDoneBadge')?.classList.remove('hidden');
           }
+        } else if (anyFailed && !anyComplete && analysisInProgress) {
+          // Analysis failed in the background -- surface it and let the user retry.
+          analysisInProgress = false;
+          if (analyzeBtn) analyzeBtn.disabled = false;
+          if (status) {
+            status.textContent = 'Analysis failed. Please try again.';
+            status.className = 'text-sm text-red-600';
+            status.classList.remove('hidden');
+          }
         }
-        if (docs.some(d => d.analysis_status === 'uploaded')) {
+        if (docs.some(d => d.analysis_status === 'uploaded' || d.analysis_status === 'analyzing')) {
           setTimeout(() => { if (_aiPollGen === myGen) loadDeliveryDocs(); }, 3500);
         }
       }
@@ -769,14 +649,11 @@
             btn.disabled = false;
             return;
           }
-          applyDeliveryScores(data.scores);
-          analysisComplete   = true;
-          analysisInProgress = false;
-          btn.disabled = false;
-          status.classList.add('hidden');
-          document.getElementById('analysisDoneBadge')?.classList.remove('hidden');
-          const submitBtn = document.getElementById('submitBtn');
-          if (submitBtn) { submitBtn.disabled = false; submitBtn.style.opacity = ''; submitBtn.style.pointerEvents = ''; }
+          // Analysis now runs in the background — the request only acknowledges
+          // that it started. renderDeliveryFileList's polling loop picks up the
+          // 'analyzing' -> 'complete'/'failed' transition and applies the scores
+          // (or surfaces the failure) once it actually finishes.
+          loadDeliveryDocs();
         } catch (err) {
           status.textContent = 'Connection error — please try again.';
           status.className = 'text-sm text-red-600';
@@ -854,10 +731,10 @@
       let confirmCallback = null;
 
       const toneClasses = {
-        success: 'border-green-200 bg-green-50 text-green-800',
-        error: 'border-red-200 bg-red-50 text-red-800',
-        warning: 'border-yellow-200 bg-yellow-50 text-yellow-800',
-        info: 'border-blue-200 bg-blue-50 text-blue-800',
+        success: 'app-toast--success',
+        error: 'app-toast--error',
+        warning: 'app-toast--warning',
+        info: 'app-toast--info',
       };
 
       function normalizeLevel(level) {
@@ -871,7 +748,7 @@
         const tone = normalizeLevel(level);
 
         const toast = document.createElement('div');
-        toast.className = `pointer-events-auto rounded-xl border shadow-lg px-4 py-3 text-sm font-medium transition-all duration-300 opacity-0 translate-y-2 ${toneClasses[tone]}`;
+        toast.className = `app-toast ${toneClasses[tone]} opacity-0 translate-y-2`;
         toast.innerHTML = `<div class="flex items-start gap-3"><span class="flex-1">${message}</span><button type="button" class="text-current/70 hover:text-current">&times;</button></div>`;
 
         const toastButton = toast.querySelector('button');
@@ -963,5 +840,7 @@
       window.showAppConfirm = openConfirm;
     })();
   </script>
+  <script src="{% static 'js/scroll-reveal.js' %}"></script>
+  {% include "gtm/partials/feedback_widget.html" %}
 </body>
 </html>

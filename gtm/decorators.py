@@ -59,48 +59,8 @@ def workspace_permission_required(permission_name, workspace_param='workspace_id
                         'message': f'You need {permission_name.replace("_", " ")} permission to perform this action.'
                     })
                 return JsonResponse({'error': 'Permission denied'}, status=403)
-                return HttpResponseForbidden("You don't have permission for this action")
             
             # Add workspace context to request
-            request.workspace = workspace
-            request.membership = membership
-            
-            return view_func(request, *args, **kwargs)
-        
-        return _wrapped_view
-    return decorator
-
-
-def workspace_admin_required(workspace_param='workspace_id'):
-    """Shortcut decorator for admin-only actions."""
-    def decorator(view_func):
-        @wraps(view_func)
-        @login_required
-        def _wrapped_view(request, *args, **kwargs):
-            # Get workspace ID
-            if workspace_param == 'session':
-                workspace_id = request.session.get('current_workspace_id')
-            else:
-                workspace_id = kwargs.get(workspace_param) or request.GET.get('workspace')
-            
-            if not workspace_id:
-                return HttpResponseForbidden("No workspace specified")
-            
-            # Check admin access
-            try:
-                workspace = Workspace.objects.get(id=workspace_id)
-                membership = WorkspaceMembership.objects.get(
-                    user=request.user,
-                    workspace=workspace,
-                    is_active=True,
-                    role__in=['admin', 'funti3r_consultant']
-                )
-            except (Workspace.DoesNotExist, WorkspaceMembership.DoesNotExist):
-                if request.headers.get('HX-Request'):
-                    return JsonResponse({'error': 'Admin access required'}, status=403)
-                return HttpResponseForbidden("Admin access required")
-            
-            # Add context to request
             request.workspace = workspace
             request.membership = membership
             

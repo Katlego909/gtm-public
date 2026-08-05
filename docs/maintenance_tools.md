@@ -8,7 +8,7 @@ This document provides a comprehensive guide to the command-line tools, deployme
 
 The platform includes several custom management commands located in `gtm/management/commands/`. These commands are **idempotent** and safe to run multiple times in any environment.
 
-### 🏗️ Framework Initialization (`load_gtm_defaults`)
+### Framework Initialization (`load_gtm_defaults`)
 The most critical command for environment setup. It populates the core diagnostic framework.
 -   **Usage:** `python manage.py load_gtm_defaults [--dry-run]`
 -   **Substance:**
@@ -17,17 +17,12 @@ The most critical command for environment setup. It populates the core diagnosti
     -   **Bands:** Defines the 5 maturity stages (e.g., "Foundation", "Scale") and their default strategic advice.
     -   **Logic:** Uses `update_or_create` to ensure wording updates are applied without duplicating records.
 
-### 🔌 Software Matchmaking (`load_tool_recommendations`)
+### Software Matchmaking (`load_tool_recommendations`)
 Seeds the logic that suggests software tools based on assessment gaps.
 -   **Usage:** `python manage.py load_tool_recommendations`
 -   **Mechanism:** Maps specific GTM keywords (e.g., "CRM", "SEO", "Attribution") to tools. If a user scores low in a category where these keywords are present, the tool is suggested.
 
-### 📊 KPI Benchmarking (`load_gap_metrics`)
-Seeds the default targets for the Gap Analysis dashboard.
--   **Usage:** `python manage.py load_gap_metrics`
--   **Substance:** Populates the `GapAnalysisMetric` table with industry-standard benchmarks for Win Rate, LTV/CAC, and Sales Velocity.
-
-### 🛠️ Data Backfills (`backfill_owners`)
+### Data Backfills (`backfill_owners`)
 Maintenance tool for transitioning anonymous guest sessions to authenticated workspaces.
 -   **Logic:** Scans `AssessmentSession` records for missing `user` or `workspace` links and attempts to associate them based on the `owner_client_id` historical cookie mapping.
 

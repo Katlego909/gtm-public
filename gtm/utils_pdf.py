@@ -1,17 +1,56 @@
 # gtm/utils_pdf.py
 import re
 from io import BytesIO
+from django.contrib.staticfiles import finders
 from django.http import HttpResponse
 from django.utils.html import strip_tags
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
 from reportlab.lib import colors
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak,
     ListFlowable, ListItem
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 import markdown as mdlib
+
+# Brand constants -- matches theme/static/css/app.css's --accent ramp
+# (the same burnt-copper accent already used everywhere else: web UI, emails).
+ACCENT = "#B8530F"       # --accent-600
+ACCENT_LIGHT = "#FDF4EC"  # --accent-50
+ACCENT_DARK = "#5C2B10"   # --accent-900
+
+_LOGO_PATH = finders.find("images/forge_logo.png")
+
+# Body text always stays Helvetica (safe, always available). Headings use the
+# brand's custom "Geoform" font when it can be embedded; if registration
+# fails for any reason, headings simply stay Helvetica-Bold in the brand
+# color -- a font-loading problem should never break PDF generation.
+_HEADING_FONT = "Helvetica-Bold"
+_HEADING_FONT_REGULAR = "Helvetica"
+
+
+def _register_fonts():
+    global _HEADING_FONT, _HEADING_FONT_REGULAR
+    try:
+        bold_path = finders.find("fonts/geoform/Geoform-Bold.otf")
+        regular_path = finders.find("fonts/geoform/Geoform.otf")
+        if bold_path:
+            pdfmetrics.registerFont(TTFont("Geoform-Bold", bold_path))
+            _HEADING_FONT = "Geoform-Bold"
+        if regular_path:
+            pdfmetrics.registerFont(TTFont("Geoform", regular_path))
+            _HEADING_FONT_REGULAR = "Geoform"
+    except Exception:
+        # CFF-outline .otf files aren't always embeddable via ReportLab's
+        # TrueType-oriented font parser -- fall back silently to Helvetica.
+        _HEADING_FONT = "Helvetica-Bold"
+        _HEADING_FONT_REGULAR = "Helvetica"
+
+
+_register_fonts()
 
 
 def _clean_md(text: str) -> str:
@@ -25,6 +64,16 @@ def _trunc(text: str, max_len: int = 160) -> str:
     if len(text) <= max_len:
         return text
     return text[:max_len].rsplit(' ', 1)[0] + '…'
+
+
+def _slugify_filename_part(text: str, fallback: str = "untitled", max_len: int = None) -> str:
+    """Filesystem-safe filename fragment: strip non-word/space/hyphen chars,
+    collapse whitespace to underscores, optionally truncate."""
+    slug = re.sub(r'[^\w\s-]', '', text or fallback).strip()
+    slug = re.sub(r'[\s]+', '_', slug).strip('_') or fallback
+    if max_len and len(slug) > max_len:
+        slug = slug[:max_len].rstrip('_')
+    return slug
 
 
 def _parse_playbook_priorities(ai_md: str) -> list:
@@ -47,18 +96,45 @@ def _parse_playbook_priorities(ai_md: str) -> list:
 
 
 def _header_footer(canvas, doc):
-    # Top brand bar + title
     canvas.saveState()
     w, h = A4
-    canvas.setFillColor(colors.HexColor("#1E3A8A"))
-    canvas.rect(0, h - 1.0 * cm, w, 1.0 * cm, fill=True, stroke=False)
-    canvas.setFillColor(colors.white)
-    canvas.setFont("Helvetica-Bold", 10)
-    canvas.drawString(2 * cm, h - 0.6 * cm, "Funti3r GTM Validator — Report")
-    # Footer page number
-    canvas.setFillColor(colors.HexColor("#475569"))
+
+    # Header: logo top-left, muted title top-right, slim accent rule beneath
+    if _LOGO_PATH:
+        try:
+            # Native asset is 936x190 (~4.93:1) -- fix height, derive width so
+            # it never distorts regardless of that ratio changing later.
+            logo_h = 0.7 * cm
+            logo_w = logo_h * (936 / 190)
+            canvas.drawImage(
+                _LOGO_PATH, 2 * cm, h - 1.5 * cm, width=logo_w, height=logo_h,
+                preserveAspectRatio=True, mask="auto",
+            )
+        except Exception:
+            canvas.setFillColor(colors.HexColor(ACCENT_DARK))
+            canvas.setFont("Helvetica-Bold", 11)
+            canvas.drawString(2 * cm, h - 1.15 * cm, "Funti3r GTM Validator")
+    else:
+        canvas.setFillColor(colors.HexColor(ACCENT_DARK))
+        canvas.setFont("Helvetica-Bold", 11)
+        canvas.drawString(2 * cm, h - 1.15 * cm, "Funti3r GTM Validator")
+
+    canvas.setFillColor(colors.HexColor("#94A3B8"))
     canvas.setFont("Helvetica", 9)
-    canvas.drawRightString(w - 2 * cm, 0.8 * cm, f"Page {doc.page}")
+    canvas.drawRightString(w - 2 * cm, h - 1.1 * cm, "GTM Assessment Report")
+
+    canvas.setStrokeColor(colors.HexColor(ACCENT))
+    canvas.setLineWidth(1.5)
+    canvas.line(2 * cm, h - 1.7 * cm, w - 2 * cm, h - 1.7 * cm)
+
+    # Footer: thin accent rule, page number, brand wordmark
+    canvas.setStrokeColor(colors.HexColor(ACCENT_LIGHT))
+    canvas.setLineWidth(1)
+    canvas.line(2 * cm, 1.1 * cm, w - 2 * cm, 1.1 * cm)
+    canvas.setFillColor(colors.HexColor("#94A3B8"))
+    canvas.setFont("Helvetica", 8.5)
+    canvas.drawString(2 * cm, 0.7 * cm, "Funti3r GTM Validator")
+    canvas.drawRightString(w - 2 * cm, 0.7 * cm, f"Page {doc.page}")
     canvas.restoreState()
 
 
@@ -193,41 +269,26 @@ def _md_to_flowables(text: str, styles, avail_width: float) -> list:
     return flow
 
 
-def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
-    """
-    Build a professional, multi-page PDF (with the AI Playbook + 30-Day plan)
-    using built-in Helvetica fonts for maximum compatibility.
-    Returns an HttpResponse ready to send.
-    """
-    buffer = BytesIO()
-
-    doc = SimpleDocTemplate(
-        buffer,
-        pagesize=A4,
-        leftMargin=2 * cm,
-        rightMargin=2 * cm,
-        topMargin=2 * cm,
-        bottomMargin=2 * cm,
-    )
-
+def _build_report_styles():
+    """Shared ParagraphStyle set for all reportlab-based PDF exports (full report + single insight)."""
     styles = getSampleStyleSheet()
     styles.add(ParagraphStyle(
         name="H1",
-        fontName="Helvetica-Bold",
+        fontName=_HEADING_FONT,
         fontSize=20,
         leading=26,
         spaceAfter=14,
         spaceBefore=8,
-        textColor=colors.HexColor("#1E40AF"),
+        textColor=colors.HexColor(ACCENT_DARK),
     ))
     styles.add(ParagraphStyle(
         name="H2",
-        fontName="Helvetica-Bold",
+        fontName=_HEADING_FONT,
         fontSize=14,
         leading=20,
         spaceAfter=8,
         spaceBefore=6,
-        textColor=colors.HexColor("#1E3A8A"),
+        textColor=colors.HexColor(ACCENT),
     ))
     styles.add(ParagraphStyle(
         name="Body",
@@ -249,7 +310,7 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
         textColor=colors.HexColor("#6B7280"),
         backColor=colors.HexColor("#F9FAFB"),
     ))
-    
+
     styles.add(ParagraphStyle(
         name="List",
         parent=styles["Body"],
@@ -257,7 +318,7 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
         spaceBefore=2,
         spaceAfter=6,
     ))
-    
+
     styles.add(ParagraphStyle(
         name="Highlight",
         fontName="Helvetica-Bold",
@@ -266,6 +327,27 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
         spaceAfter=6,
         textColor=colors.HexColor("#DC2626"),
     ))
+    return styles
+
+
+def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
+    """
+    Build a professional, multi-page PDF (with the AI Playbook + 30-Day plan)
+    using built-in Helvetica fonts for maximum compatibility.
+    Returns an HttpResponse ready to send.
+    """
+    buffer = BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=2 * cm,
+        rightMargin=2 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm,
+    )
+
+    styles = _build_report_styles()
 
     content = []
 
@@ -322,7 +404,7 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
     
     cat_table = Table(cat_data, colWidths=[10*cm, 3*cm, 4*cm])
     cat_table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E3A8A")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(ACCENT)),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -357,7 +439,7 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
         # Fallback to band actions if AI text not present
         ai_md = band.actions_markdown
 
-    # ✅ Normalize BEFORE converting to flowables
+    # Normalize BEFORE converting to flowables
     if ai_md.strip():
         ai_md = _normalize_ai_markdown(ai_md)
         content.append(Paragraph(
@@ -413,9 +495,12 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
         content.append(Spacer(1, 0.4 * cm))
 
     if comp_md:
+        # Slate rather than a second blue -- the brand system is a single
+        # accent ramp (burnt copper), so this box is differentiated from the
+        # green Financial box by neutral tone, not a competing accent color.
         content.append(_boxed_section(
             "Competitive Gap Analysis", comp_md,
-            bg_hex="#EFF6FF", border_hex="#BFDBFE", title_hex="#1E3A8A",
+            bg_hex="#F8FAFC", border_hex="#E2E8F0", title_hex="#334155",
         ))
         content.append(Spacer(1, 0.5 * cm))
 
@@ -430,8 +515,7 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
     def P(txt): return Paragraph(strip_tags(txt), styles["Body"])
     def PBold(txt): return Paragraph(f"<b>{strip_tags(txt)}</b>", styles["Body"])
 
-    _week_hex = ["#1E40AF", "#7C3AED", "#059669"]
-    _week_bg  = [colors.HexColor("#EFF6FF"), colors.white, colors.HexColor("#F5F3FF")]
+    _week_hex = [ACCENT, "#7C3AED", "#059669"]
 
     priorities = _parse_playbook_priorities(ai_md)
 
@@ -475,7 +559,7 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
     ])
 
     # Alternating row backgrounds (dynamic row count)
-    _row_bg_cycle = [colors.HexColor("#EFF6FF"), colors.white, colors.HexColor("#F5F3FF"), colors.white]
+    _row_bg_cycle = [colors.HexColor(ACCENT_LIGHT), colors.white, colors.HexColor("#F5F3FF"), colors.white]
     _row_bg_cmds = [
         ("BACKGROUND", (0, r), (-1, r), _row_bg_cycle[(r - 1) % len(_row_bg_cycle)])
         for r in range(1, len(table_data))
@@ -493,7 +577,7 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
         hAlign="LEFT",
     )
     table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1E40AF")),
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(ACCENT)),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("FONTSIZE", (0, 0), (-1, 0), 11),
@@ -509,22 +593,21 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
         ("TOPPADDING", (0, 1), (-1, -1), 10),
         ("BOTTOMPADDING", (0, 1), (-1, -1), 12),
         ("GRID", (0, 0), (-1, -1), 0.75, colors.HexColor("#CBD5E1")),
-        ("LINEBELOW", (0, 0), (-1, 0), 1.5, colors.HexColor("#1E3A8A")),
+        ("LINEBELOW", (0, 0), (-1, 0), 1.5, colors.HexColor(ACCENT_DARK)),
         ("BOX", (0, 0), (-1, -1), 1, colors.HexColor("#94A3B8")),
         *_row_bg_cmds,
     ]))
     content.append(table)
     content.append(Spacer(1, 0.6 * cm))
     
-    # Enhanced tip with icon-like styling
     content.append(Paragraph(
-        "💡 <b>Implementation Tip:</b> Focus on completing one week fully before moving to the next. "
+        "<b>Implementation Tip:</b> Focus on completing one week fully before moving to the next. "
         "Small, consistent improvements compound into significant growth over time.",
         styles["Quote"]
     ))
     content.append(Spacer(1, 0.4 * cm))
     content.append(Paragraph(
-        "📊 <b>Tracking Advice:</b> Review progress weekly and adjust tactics based on what's working. "
+        "<b>Tracking Advice:</b> Review progress weekly and adjust tactics based on what's working. "
         "Document wins and lessons learned to build institutional knowledge.",
         styles["Quote"]
     ))
@@ -536,8 +619,62 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
     buffer.close()
 
     resp = HttpResponse(content_type="application/pdf")
-    _company_slug = re.sub(r'[^\w\s-]', '', session.company_name or "company").strip()
-    _company_slug = re.sub(r'[\s]+', '_', _company_slug)
+    _company_slug = _slugify_filename_part(session.company_name, fallback="company")
     resp["Content-Disposition"] = f'attachment; filename=\"{_company_slug}_AI_playbook_report_ForgeGTM.pdf\"'
+    resp.write(pdf)
+    return resp
+
+
+def render_insight_pdf_response(*, company_name, ai_playbook_md, doc_title=None, doc_type_label=None, doc_date=None):
+    """
+    Build a short, single-insight PDF (one AI-generated playbook, not the full
+    multi-section assessment report). Reuses the same styles/header/footer and
+    markdown pipeline as render_gtm_report_pdf_response for visual parity.
+
+    doc_title/doc_type_label/doc_date are optional -- when supplied (by the
+    AgentDocument export flow) they make the filename distinct per document
+    instead of colliding on company_name alone; when omitted (the original
+    ResultSnapshot insight-export caller) the filename falls back to its
+    original "_insight_" shape, just with a date appended.
+    """
+    buffer = BytesIO()
+
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=2 * cm,
+        rightMargin=2 * cm,
+        topMargin=2 * cm,
+        bottomMargin=2 * cm,
+    )
+
+    styles = _build_report_styles()
+
+    content = [
+        Spacer(1, 0.5 * cm),
+        Paragraph("Funti3r GTM Validator", styles["H1"]),
+        Paragraph(f"{company_name or 'Company'} — AI Insight", styles["H2"]),
+        Spacer(1, 0.4 * cm),
+    ]
+
+    normalized = _normalize_ai_markdown(ai_playbook_md or "")
+    content.extend(_md_to_flowables(normalized, styles, doc.width))
+
+    doc.build(content, onFirstPage=_header_footer, onLaterPages=_header_footer)
+
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    resp = HttpResponse(content_type="application/pdf")
+    _company_slug = _slugify_filename_part(company_name, fallback="company")
+    _parts = [_company_slug]
+    if doc_title:
+        _parts.append(_slugify_filename_part(doc_title, fallback="document", max_len=50))
+    _parts.append(_slugify_filename_part(doc_type_label, fallback="insight") if doc_type_label else "insight")
+    if doc_date:
+        _parts.append(doc_date.strftime("%Y%m%d"))
+    _parts.append("ForgeGTM")
+    _filename = "_".join(_parts) + ".pdf"
+    resp["Content-Disposition"] = f'attachment; filename="{_filename}"'
     resp.write(pdf)
     return resp

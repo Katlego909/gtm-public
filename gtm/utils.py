@@ -1,11 +1,19 @@
 from .models import AssessmentSession, ResultSnapshot
 import datetime
+import mimetypes
 from django.utils import timezone
 from django.conf import settings
 
 def _client_id(request):
     """Extract client ID from cookie for anonymous user tracking."""
     return request.COOKIES.get("gtm_client", "")
+
+def guess_upload_mime_type(filename: str) -> str:
+    """Best-effort MIME type for a stored upload's Gemini Part.from_bytes()
+    call. Extension-based since GTMFile/Resource don't persist a
+    content-type at upload time."""
+    guessed, _ = mimetypes.guess_type(filename or "")
+    return (guessed or "application/octet-stream").lower()
 
 def transfer_firmographics_to_snapshot(session: AssessmentSession, snapshot: ResultSnapshot):
     """
@@ -15,7 +23,7 @@ def transfer_firmographics_to_snapshot(session: AssessmentSession, snapshot: Res
     firmographic_fields = [
         "company_name", "industry", "website", "contact_name",
         "contact_email", "contact_role", "phone", "company_size",
-        "revenue_range", "country", "crm", "utm_source",
+        "revenue_range", "country", "crm", "company_stage", "utm_source",
         "utm_medium", "utm_campaign", "referrer"
     ]
     

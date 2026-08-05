@@ -1,11 +1,12 @@
+<p class="text-xs text-gray-500 mt-1">Current/Target figures are AI estimates inferred from your assessment scores, not measured business metrics.</p>
 <div id="gap-analysis-table" class="overflow-x-auto mt-4">
     <table class="min-w-full text-left border-collapse">
         <thead class="bg-gray-50 text-gray-500 text-xs uppercase font-semibold">
             <tr>
                 <th class="px-4 py-3 whitespace-nowrap">Category</th>
                 <th class="px-4 py-3 whitespace-nowrap">Metric</th>
-                <th class="px-4 py-3 whitespace-nowrap">Current</th>
-                <th class="px-4 py-3 whitespace-nowrap">Target</th>
+                <th class="px-4 py-3 whitespace-nowrap">Current (Est.)</th>
+                <th class="px-4 py-3 whitespace-nowrap">Target (Est.)</th>
                 <th class="px-4 py-3 whitespace-nowrap">Gap</th>
                 <th class="px-4 py-3 whitespace-nowrap">Priority</th>
                 <th class="px-4 py-3 whitespace-nowrap">Recommendation</th>
@@ -26,3 +27,30 @@
         </tbody>
     </table>
 </div>
+<script>
+    // This table wrapper is overflow-x-auto, which per the CSS overflow spec
+    // implicitly clips overflow-y too -- a plain `absolute` dropdown panel
+    // for a row's "More actions" menu gets cut off instead of floating over
+    // the page. Fixed positioning computed from the trigger's actual screen
+    // position escapes that clipping entirely. Reuses the .js-dropdown-trigger
+    // / data-panel outside-click-to-close behavior already defined globally
+    // (see notification_bell.html) -- only the open/position logic differs.
+    function toggleGapActionsMenu(triggerEl, panelId) {
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+        const isHidden = panel.classList.contains('hidden');
+        document.querySelectorAll('[id^="gap-actions-menu-"]').forEach(function (p) {
+            if (p !== panel) p.classList.add('hidden');
+        });
+        if (isHidden) {
+            const rect = triggerEl.getBoundingClientRect();
+            panel.style.position = 'fixed';
+            panel.style.top = (rect.bottom + 4) + 'px';
+            panel.style.right = (window.innerWidth - rect.right) + 'px';
+            panel.style.left = 'auto';
+            panel.classList.remove('hidden');
+        } else {
+            panel.classList.add('hidden');
+        }
+    }
+</script>

@@ -1,18 +1,19 @@
 <div class="p-6">
     <h2 class="text-2xl font-bold text-gray-900 mb-4">{{ title }}</h2>
-    <form hx-post="{% if instance %}{% url 'edit_resource' instance.id %}{% else %}{% url 'add_resource' %}{% endif %}"
+    <form id="resource-form"
+          hx-post="{% if instance %}{% url 'edit_resource' instance.id %}{% else %}{% url 'add_resource' %}{% endif %}"
           hx-target="#main-content"
           hx-swap="innerHTML"
           hx-encoding="multipart/form-data"
           class="space-y-4">
         {% csrf_token %}
-        
-        <div>
+
+        <div id="name-field-container">
             <label class="block text-sm font-medium text-gray-700 mb-1">Resource Name</label>
             {{ form.name }}
             {{ form.name.errors }}
         </div>
-        
+
         <div class="grid grid-cols-2 gap-4">
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Type</label>
@@ -25,50 +26,159 @@
                 {{ form.category.errors }}
             </div>
         </div>
-        
+
         <div id="file-field-container" class="{% if form.resource_type.value == 'link' %}hidden{% endif %}">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Upload File</label>
-            {{ form.file }}
+            <label class="block text-sm font-medium text-gray-700 mb-1">Upload File(s)</label>
+            <div id="resource-modal-dropzone"
+                 data-add-url="{% url 'add_resource' %}"
+                 class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer transition-colors hover:border-indigo-300"
+                 onclick="document.getElementById('resource-modal-file-input').click()">
+                <input type="file" id="resource-modal-file-input" class="sr-only" multiple>
+                <p class="text-sm font-medium text-gray-700">Drop files here or click to browse</p>
+                <p class="text-xs text-gray-500 mt-1">Drop multiple files at once — each becomes its own resource.</p>
+            </div>
+            <div id="resource-modal-file-status" class="mt-2 text-xs text-gray-500 hidden"></div>
             {{ form.file.errors }}
         </div>
-        
+
         <div id="url-field-container" class="{% if form.resource_type.value == 'file' or not form.resource_type.value %}hidden{% endif %}">
             <label class="block text-sm font-medium text-gray-700 mb-1">Link URL</label>
             {{ form.url }}
             {{ form.url.errors }}
         </div>
-        
-        <div>
+
+        <div id="description-field-container">
             <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
             {{ form.description }}
             {{ form.description.errors }}
         </div>
-        
+
         <div class="flex justify-end gap-3 pt-4">
-            <button type="button" onclick="closeModal()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancel</button>
-            <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 shadow-sm">Save Resource</button>
+            <button type="button" id="resource-form-cancel-btn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50">Cancel</button>
+            <button type="submit" id="resource-form-save-btn" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-md hover:bg-indigo-700 shadow-sm">Save Resource</button>
         </div>
     </form>
 </div>
 
 <script>
+(function() {
+    function closeAnyResourceModal() {
+        var hubOverlay = document.getElementById('hub-modal-overlay');
+        if (hubOverlay && !hubOverlay.classList.contains('hidden') && typeof window.closeHubModal === 'function') {
+            window.closeHubModal();
+        } else if (typeof window.closeModal === 'function') {
+            window.closeModal();
+        }
+    }
+    window.closeAnyResourceModal = closeAnyResourceModal;
+
+    function refreshCurrentView() {
+        htmx.ajax('GET', window.location.pathname + window.location.search, {
+            target: '#main-content',
+            swap: 'innerHTML'
+        });
+    }
+
     function toggleResourceFields(value) {
-        const fileContainer = document.getElementById('file-field-container');
-        const urlContainer = document.getElementById('url-field-container');
-        
+        var fileContainer = document.getElementById('file-field-container');
+        var urlContainer = document.getElementById('url-field-container');
+        var nameContainer = document.getElementById('name-field-container');
+        var descContainer = document.getElementById('description-field-container');
+        var saveBtn = document.getElementById('resource-form-save-btn');
+
         if (value === 'file') {
             fileContainer.classList.remove('hidden');
             urlContainer.classList.add('hidden');
+            // Files are uploaded (and named/described automatically) the moment
+            // they're dropped or selected, so the manual form fields don't apply.
+            nameContainer.classList.add('hidden');
+            descContainer.classList.add('hidden');
+            saveBtn.classList.add('hidden');
         } else {
             fileContainer.classList.add('hidden');
             urlContainer.classList.remove('hidden');
+            nameContainer.classList.remove('hidden');
+            descContainer.classList.remove('hidden');
+            saveBtn.classList.remove('hidden');
         }
     }
-    
-    // Auto-close modal after successful HTMX swap
-    document.body.addEventListener('htmx:afterOnLoad', function(evt) {
-        if (evt.detail.target.id === 'resource-grid') {
-            closeModal();
-        }
+    window.toggleResourceFields = toggleResourceFields;
+    toggleResourceFields(document.getElementById('id_resource_type').value);
+
+    document.getElementById('resource-form-cancel-btn').addEventListener('click', closeAnyResourceModal);
+
+    // ---- Drag-and-drop / multi-file upload for the File Upload type ----
+    var dropzone = document.getElementById('resource-modal-dropzone');
+    var fileInput = document.getElementById('resource-modal-file-input');
+    var statusEl = document.getElementById('resource-modal-file-status');
+    var addUrl = dropzone.getAttribute('data-add-url');
+    var csrf = document.querySelector('#resource-form [name=csrfmiddlewaretoken]').value;
+
+    function setStatus(text) {
+        statusEl.textContent = text;
+        statusEl.classList.toggle('hidden', !text);
+    }
+
+    function uploadFile(file) {
+        var fd = new FormData();
+        fd.append('name', file.name.replace(/\.[^/.]+$/, ''));
+        fd.append('resource_type', 'file');
+        fd.append('category', document.getElementById('id_category').value);
+        fd.append('file', file);
+        fd.append('csrfmiddlewaretoken', csrf);
+        return fetch(addUrl, { method: 'POST', body: fd, credentials: 'same-origin' })
+            .then(function(r) { return r.ok; })
+            .catch(function() { return false; });
+    }
+
+    function uploadFiles(fileList) {
+        var files = Array.from(fileList || []);
+        if (!files.length) return;
+
+        setStatus('Uploading ' + files.length + ' file' + (files.length > 1 ? 's' : '') + '...');
+        dropzone.classList.add('pointer-events-none', 'opacity-60');
+
+        Promise.all(files.map(uploadFile)).then(function(results) {
+            var failed = results.filter(function(ok) { return !ok; }).length;
+            dropzone.classList.remove('pointer-events-none', 'opacity-60');
+            setStatus('');
+
+            if (typeof showDashboardToast === 'function') {
+                if (failed) {
+                    showDashboardToast(
+                        failed === results.length ? 'Upload failed.' : (failed + ' of ' + results.length + ' uploads failed.'),
+                        'error'
+                    );
+                } else {
+                    showDashboardToast(results.length > 1 ? 'Assets uploaded.' : 'Asset uploaded.', 'success');
+                }
+            }
+            closeAnyResourceModal();
+            refreshCurrentView();
+        });
+    }
+
+    dropzone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        dropzone.classList.add('border-indigo-400', 'bg-indigo-50');
     });
+    dropzone.addEventListener('dragleave', function() {
+        dropzone.classList.remove('border-indigo-400', 'bg-indigo-50');
+    });
+    dropzone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        dropzone.classList.remove('border-indigo-400', 'bg-indigo-50');
+        uploadFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener('change', function(e) {
+        uploadFiles(e.target.files);
+        e.target.value = '';
+    });
+
+    // Auto-close modal after a successful link-type save (full-page swap).
+    // Scoped to the form element itself so it never outlives this modal instance.
+    document.getElementById('resource-form').addEventListener('htmx:afterRequest', function(evt) {
+        if (evt.detail.successful) closeAnyResourceModal();
+    });
+})();
 </script>

@@ -22,7 +22,7 @@ QUESTION_TASK_PATTERNS = [
     (r"onboarding|get started|welcome", "Document onboarding steps, assign owners, and send a consistent welcome sequence."),
     (r"win|lose deals|win/loss", "Track win-loss reasons monthly and review one conversion fix with the team."),
     (r"reply|response|follow up|lead", "Set a lead response SLA and review compliance every week."),
-    (r"qualif|fit questions|budget|decision maker", "Create a standard qualification checklist for every sales conversation."),
+    (r"qualify|fit questions|budget|decision maker", "Create a standard qualification checklist for every sales conversation."),
     (r"content|newsletter|outreach|marketing", "Commit to one weekly marketing motion and measure leads generated from it."),
     (r"testimonial|case stud", "Collect one recent customer proof point and add it to sales materials."),
     (r"renewal|retention|loyalty", "Define one retention touchpoint and assign ownership for customer follow-up."),
@@ -110,7 +110,7 @@ def build_execution_plan(
         if len(suggested_items) >= limit:
             break
 
-    # 🔹 ADDED: Integrate AI Resource Recommendations as Action Items
+    # Integrate AI Resource Recommendations as Action Items
     from dashboard.models import AIResourceRecommendation
     resource_recs = AIResourceRecommendation.objects.filter(session=session).select_related('resource')[:2]
     for rec in resource_recs:
@@ -127,16 +127,18 @@ def build_execution_plan(
 
     if persist:
         for item in suggested_items:
-            created_items.append(
-                ActionItem.objects.create(
-                    session=session,
-                    workspace=session.workspace,
-                    question=item["question"],
-                    note=item["note"],
-                    created_by=actor if getattr(actor, "is_authenticated", False) else session.user,
-                    due_date=item["due_date"],
-                )
+            created_item, was_created = ActionItem.objects.create_deduped(
+                session=session,
+                workspace=session.workspace,
+                question=item["question"],
+                note=item["note"],
+                created_by=actor if getattr(actor, "is_authenticated", False) else session.user,
+                due_date=item["due_date"],
             )
+            if was_created:
+                created_items.append(created_item)
+            else:
+                skipped_items.append(item["note"])
 
     top_categories = sorted(cat_scores, key=lambda row: row["avg"])[:3]
 

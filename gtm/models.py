@@ -5,6 +5,10 @@ from django.core.serializers.json import DjangoJSONEncoder
 
 # Import workspace models so Django can find them
 from .models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation
+from .models_integrations import WorkspaceIntegration
+from .models_ai_credits import AICreditAccount, AICreditTransaction
+from .models_ai_locks import AIGenerationLock
+from .models_beta import BetaInviteCode
 
 # AI generation status choices
 AI_STATUS_CHOICES = [
@@ -12,6 +16,13 @@ AI_STATUS_CHOICES = [
     ("generating", "Generating"),
     ("done", "Done"),
     ("failed", "Failed"),
+    ("no_credits", "AI Credits Exhausted"),
+]
+
+RISK_STATUS_CHOICES = [
+    ("High", "High"),
+    ("Medium", "Medium"),
+    ("Low", "Low"),
 ]
 
 class Category(models.Model):
@@ -35,6 +46,14 @@ class Question(models.Model):
     input_options = models.JSONField(default=list, blank=True, encoder=DjangoJSONEncoder)
     input_option_labels = models.JSONField(default=dict, blank=True, encoder=DjangoJSONEncoder)
     def __str__(self): return f"{self.id_code} – {self.text[:60]}"
+
+COMPANY_STAGE_CHOICES = [
+    ("idea", "Idea / Pre-launch"),
+    ("pre_revenue", "Early Stage / Pre-Revenue"),
+    ("early_revenue", "Early Revenue"),
+    ("growth", "Growth"),
+    ("scale", "Scale / Mature"),
+]
 
 class AssessmentSession(models.Model):
     uuid = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -60,7 +79,7 @@ class AssessmentSession(models.Model):
     company_name = models.CharField(max_length=120, blank=True, default="")
     industry = models.CharField(max_length=120, blank=True, default="")
 
-    # 🔹 New firmographic + contact fields
+    # New firmographic + contact fields
     website = models.URLField(blank=True, default="")
     contact_name = models.CharField(max_length=120, blank=True, default="")
     contact_email = models.EmailField(blank=True, default="")
@@ -75,6 +94,11 @@ class AssessmentSession(models.Model):
     )
     country = models.CharField(max_length=80, blank=True, default="")
     crm = models.CharField(max_length=80, blank=True, default="")  # HubSpot, SFDC, etc.
+
+    # Company lifecycle stage. Blank = unset/legacy → treated as "all pillars
+    # apply" (today's behavior). Drives which assessment pillars are shown
+    # and scored — see STAGE_CATEGORY_APPLICABILITY in services.py.
+    company_stage = models.CharField(max_length=20, choices=COMPANY_STAGE_CHOICES, blank=True, default="")
 
     # Acquisition / attribution
     utm_source = models.CharField(max_length=80, blank=True, default="")
@@ -118,9 +142,40 @@ class RecommendationBand(models.Model):
 
     def __str__(self): return f"{self.stage} ({self.min_score}-{self.max_score})"
 
+class ActionItemManager(models.Manager):
+    def create_deduped(self, *, note, session=None, workspace=None, **extra):
+        """Create an ActionItem unless one with the same normalized note already
+        exists in the same scope (session, else workspace, else creator).
+        Race-safe: relies on get_or_create's own atomic-insert + IntegrityError
+        retry against the DB constraints in ActionItem.Meta, not an in-memory
+        check. Returns (item, created); never raises on a duplicate."""
+        note = (note or "").strip()
+        if not note:
+            return None, False
+        note_key = note.lower()
+        if session is not None:
+            lookup = {"session": session, "note_key": note_key}
+        elif workspace is not None:
+            lookup = {"session": None, "workspace": workspace, "note_key": note_key}
+        else:
+            lookup = {"session": None, "workspace": None, "created_by": extra.get("created_by"), "note_key": note_key}
+        defaults = {"note": note, "workspace": workspace, **extra}
+        for key in lookup:
+            defaults.pop(key, None)
+        return self.get_or_create(defaults=defaults, **lookup)
+
+
 class ActionItem(models.Model):
     STATUS_CHOICES = [("todo","To do"),("doing","In progress"),("done","Done")]
-    
+    AGENT_TYPE_CHOICES = [
+        ("gtm_strategist", "Charlie · GTM Strategist"),
+        ("portfolio", "Nora · Portfolio Agent"),
+        ("resource", "Theo · Resource Agent"),
+        ("insights", "Milo · Insights Agent"),
+    ]
+
+    objects = ActionItemManager()
+
     id = models.AutoField(primary_key=True)
     session = models.ForeignKey(AssessmentSession, on_delete=models.CASCADE, related_name="actions", null=True, blank=True)
     question = models.ForeignKey(Question, on_delete=models.CASCADE, null=True, blank=True)
@@ -150,12 +205,73 @@ class ActionItem(models.Model):
         null=True, blank=True,
         related_name="assigned_action_items"
     )
-    
+
+    assigned_agent_type = models.CharField(
+        max_length=20, choices=AGENT_TYPE_CHOICES, null=True, blank=True,
+        help_text="Which AI agent (if any) this task has been routed to for autonomous completion.",
+    )
+
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default="todo")
     due_date = models.DateField(null=True, blank=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    deliverable_document = models.ForeignKey(
+        'AgentDocument',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="completed_action_items",
+        help_text="The concrete artifact an AI agent produced to complete this task, if any.",
+    )
+
+    gap_metric = models.ForeignKey(
+        'dashboard.GapAnalysisMetric',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="action_items",
+        help_text="The gap this task was generated to help close, if any.",
+    )
+
+    CRM_SYNC_STATUS_CHOICES = [
+        ("not_synced", "Not Synced"),
+        ("synced", "Synced"),
+        ("error", "Error"),
+    ]
+    crm_sync_status = models.CharField(max_length=20, choices=CRM_SYNC_STATUS_CHOICES, default="not_synced")
+    external_crm_task_id = models.CharField(
+        max_length=64, blank=True, default="",
+        help_text="ID of the corresponding task in the connected CRM (e.g. HubSpot), if pushed there.",
+    )
+    crm_synced_at = models.DateTimeField(null=True, blank=True)
+
+    note_key = models.CharField(
+        max_length=240, editable=False, blank=True, default="",
+        help_text="Normalized (trimmed, lowercased) note text, used to enforce no-duplicate-tasks constraints.",
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["session", "note_key"],
+                condition=models.Q(session__isnull=False),
+                name="unique_actionitem_note_per_session",
+            ),
+            models.UniqueConstraint(
+                fields=["workspace", "note_key"],
+                condition=models.Q(session__isnull=True, workspace__isnull=False),
+                name="unique_actionitem_note_per_workspace",
+            ),
+            models.UniqueConstraint(
+                fields=["created_by", "note_key"],
+                condition=models.Q(session__isnull=True, workspace__isnull=True),
+                name="unique_actionitem_note_per_creator_unscoped",
+            ),
+        ]
+
+    def save(self, *args, **kwargs):
+        self.note_key = (self.note or "").strip().lower()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.note[:50]
@@ -170,6 +286,13 @@ class ActionItemComment(models.Model):
     text = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    duration_ms = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Wall-clock time for the AI completion turn that produced this comment, if any."
+    )
+    prompt_token_count = models.PositiveIntegerField(null=True, blank=True)
+    candidates_token_count = models.PositiveIntegerField(null=True, blank=True)
 
     class Meta:
         ordering = ['created_at']
@@ -216,6 +339,7 @@ class ResultSnapshot(models.Model):
     revenue_range  = models.CharField(max_length=20,  blank=True, default="")
     country        = models.CharField(max_length=80,  blank=True, default="")
     crm            = models.CharField(max_length=80,  blank=True, default="")
+    company_stage  = models.CharField(max_length=20,  blank=True, default="")
     utm_source     = models.CharField(max_length=80,  blank=True, default="")
     utm_medium     = models.CharField(max_length=80,  blank=True, default="")
     utm_campaign   = models.CharField(max_length=120, blank=True, default="")
@@ -223,12 +347,33 @@ class ResultSnapshot(models.Model):
     report_sent = models.BooleanField(default=False)
     ai_playbook = models.TextField(blank=True, default="")
     ai_playbook_status = models.CharField(max_length=12, choices=AI_STATUS_CHOICES, default="pending", db_index=True)
-    ai_risk_status = models.CharField(max_length=20, blank=True, default="")
+    ai_risk_status = models.CharField(max_length=20, choices=RISK_STATUS_CHOICES, blank=True, default="")
     ai_financial_summary = models.TextField(blank=True, default="")
     ai_competitor_analysis = models.TextField(blank=True, default="")
 
     def __str__(self):
         return f"Snapshot for {self.session.uuid} – {self.overall}/100"
+
+
+class AIScoringExample(models.Model):
+    """A real Gemini scoring outcome, captured for reuse as a fallback signal
+    when Gemini is unavailable (quota/network/credentials failure).
+
+    Deliberately stores only an embedding of the evidence passage plus the
+    score/confidence Gemini assigned to it — never the raw evidence text,
+    Gemini's reasoning text, or anything identifying the company/session —
+    so this corpus can be safely shared and queried across companies without
+    leaking one company's document content into another's fallback results.
+    """
+    question_id_code = models.CharField(max_length=10, db_index=True)
+    evidence_embedding = models.JSONField(encoder=DjangoJSONEncoder)  # 384-dim MiniLM vector
+    score = models.PositiveSmallIntegerField()
+    confidence = models.CharField(max_length=10, blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    def __str__(self):
+        return f"{self.question_id_code}: {self.score} ({self.confidence or 'n/a'})"
+
 
 class ChatMessage(models.Model):
     """Store chat conversation history for AI assistant"""
@@ -243,17 +388,124 @@ class ChatMessage(models.Model):
         null=True,
         blank=True
     )
-    message = models.TextField()  
-    response = models.TextField()  
+    message = models.TextField()
+    response = models.TextField()
     attachments = models.JSONField(default=list, blank=True)
-    intent = models.CharField(max_length=50, blank=True)  
+    task_refs = models.JSONField(default=list, blank=True)
+    document_refs = models.JSONField(default=list, blank=True)
+    intent = models.CharField(max_length=50, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         ordering = ['created_at']
-    
+
     def __str__(self):
         return f"Chat {self.session.uuid} at {self.created_at}"
+
+
+class WorkspaceChatMessage(models.Model):
+    """Chat history for the workspace-scoped agents (portfolio, resource,
+    insights). Kept separate from ChatMessage, which is hard-tied to a
+    single AssessmentSession."""
+
+    AGENT_TYPE_CHOICES = [
+        ("portfolio", "Portfolio Agent"),
+        ("resource", "Resource Agent"),
+        ("insights", "Insights Agent"),
+    ]
+
+    workspace = models.ForeignKey(
+        Workspace,
+        on_delete=models.CASCADE,
+        related_name="agent_chat_messages",
+    )
+    session = models.ForeignKey(
+        AssessmentSession,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="workspace_agent_chat_messages",
+    )
+    agent_type = models.CharField(max_length=20, choices=AGENT_TYPE_CHOICES, db_index=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    message = models.TextField()
+    response = models.TextField()
+    attachments = models.JSONField(default=list, blank=True)
+    task_refs = models.JSONField(default=list, blank=True)
+    document_refs = models.JSONField(default=list, blank=True)
+    intent = models.CharField(max_length=50, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['workspace', 'agent_type', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.get_agent_type_display()} chat in workspace {self.workspace_id} at {self.created_at}"
+
+
+class AgentDocument(models.Model):
+    """A document created and editable by any of the 4 GTM agents. Content
+    is stored as markdown text (never a FileField -- this app's default
+    storage is local filesystem, which doesn't persist across Cloud Run
+    instances/restarts) and rendered to PDF/Word/Markdown on export."""
+
+    DOC_TYPE_CHOICES = [
+        ("client_summary", "Client Summary"),
+        ("action_plan", "Action Plan"),
+        ("roadmap", "Roadmap"),
+        ("resource_brief", "Resource Brief"),
+        ("action_item_deliverable", "Action Item Deliverable"),
+        ("other", "Other"),
+    ]
+    AGENT_TYPE_CHOICES = [
+        ("gtm_strategist", "GTM Strategist"),
+        ("portfolio", "Portfolio Agent"),
+        ("resource", "Resource Agent"),
+        ("insights", "Insights Agent"),
+    ]
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    workspace = models.ForeignKey(
+        Workspace,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="agent_documents",
+    )
+    session = models.ForeignKey(
+        AssessmentSession,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="agent_documents",
+    )
+    agent_type = models.CharField(max_length=20, choices=AGENT_TYPE_CHOICES)
+    doc_type = models.CharField(max_length=30, choices=DOC_TYPE_CHOICES, default="other")
+    title = models.CharField(max_length=200)
+    content = models.TextField()
+    version = models.PositiveIntegerField(default=1)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def __str__(self):
+        return f"{self.title} (v{self.version})"
 
 
 class GTMFile(models.Model):
@@ -276,11 +528,12 @@ class GTMFile(models.Model):
         ('auditing', 'Auditing…'),
         ('complete', 'Audit Complete'),
         ('failed', 'Audit Failed'),
+        ('no_credits', 'AI Credits Exhausted'),
     ]
-    
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     session = models.ForeignKey(
-        AssessmentSession, 
+        AssessmentSession,
         on_delete=models.CASCADE, 
         related_name="evidence_files",
         null=True, blank=True,
@@ -306,7 +559,7 @@ class GTMFile(models.Model):
         max_length=10, choices=AUDIT_STATUS_CHOICES, default='none'
     )
     
-    # 🤖 AI STRATEGIC AUDIT
+    # AI STRATEGIC AUDIT
     ai_audit_notes = models.TextField(
         blank=True, 
         default="",
@@ -340,6 +593,7 @@ class DeliveryDocument(models.Model):
         ('analyzing', 'Analyzing'),
         ('complete', 'Analysis Complete'),
         ('failed', 'Analysis Failed'),
+        ('no_credits', 'AI Credits Exhausted'),
     ]
 
     FILE_TYPE_CHOICES = [
@@ -391,6 +645,7 @@ class CategoryDocument(models.Model):
         ('analyzing', 'Analyzing'),
         ('complete', 'Analysis Complete'),
         ('failed', 'Analysis Failed'),
+        ('no_credits', 'AI Credits Exhausted'),
     ]
 
     FILE_TYPE_CHOICES = [

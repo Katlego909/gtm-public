@@ -27,12 +27,22 @@
         </div>
 
         <div class="flex items-center gap-4">
+            {% include 'dashboard/partials/global_search.html' with instance_id="header" %}
+            {% include 'dashboard/partials/notification_bell.html' with instance_id="header" %}
             {% if current_workspace %}
                 <button id="hub-invite-btn"
                     data-invite-url="{% url 'invite_to_workspace' current_workspace.id %}"
                     class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
                     Invite Member
+                </button>
+            {% endif %}
+            {% if current_workspace and user_can_edit_workspace %}
+                <button id="hub-settings-btn"
+                    data-settings-url="{% url 'edit_workspace' current_workspace.id %}"
+                    class="px-4 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    Settings
                 </button>
             {% endif %}
             <button id="hub-create-ws-btn"
@@ -103,27 +113,91 @@
                 </div>
             </div>
 
-            <!-- Resource Library Section -->
+            <!-- Integrations -->
+            {% if user_can_manage_integrations %}
+            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                        <span class="inline-block bg-orange-100 text-orange-600 rounded-full p-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        </span>
+                        Integrations
+                    </h3>
+                    <span class="text-xs px-3 py-1 rounded-full border
+                        {% if hubspot_integration.status == 'connected' %}bg-green-50 border-green-200 text-green-700
+                        {% elif hubspot_integration.status == 'error' %}bg-red-50 border-red-200 text-red-700
+                        {% else %}bg-gray-50 border-gray-200 text-gray-700{% endif %}">
+                        {% if hubspot_integration.status == 'connected' %}Connected
+                        {% elif hubspot_integration.status == 'error' %}Error
+                        {% else %}Not Connected{% endif %}
+                    </span>
+                </div>
+                <p class="text-sm text-gray-500 mb-4">HubSpot CRM &mdash; lets AI agents look up company context and log GTM findings directly in HubSpot.</p>
+
+                {% if hubspot_integration.token_preview %}
+                    <div class="text-sm text-gray-600 space-y-1 mb-4">
+                        <p>Token ending in <span class="font-mono">&bull;&bull;&bull;{{ hubspot_integration.token_preview }}</span></p>
+                        {% if hubspot_integration.last_verified_at %}
+                            <p>Last verified {{ hubspot_integration.last_verified_at|timesince }} ago</p>
+                        {% endif %}
+                        {% if hubspot_integration.status == 'error' and hubspot_integration.last_error %}
+                            <p class="text-red-600">{{ hubspot_integration.last_error }}</p>
+                        {% endif %}
+                    </div>
+                    <div class="flex gap-3 mb-4">
+                        <form hx-post="{% url 'workspace_hub' %}?workspace={{ current_workspace.id }}" hx-target="#main-content" hx-swap="innerHTML">
+                            {% csrf_token %}
+                            <input type="hidden" name="integration_action" value="test_hubspot">
+                            <button type="submit" class="px-4 py-2 text-sm font-medium bg-gray-100 text-gray-800 rounded-lg border border-gray-300 hover:bg-gray-200">
+                                Test Connection
+                            </button>
+                        </form>
+                        <form hx-post="{% url 'workspace_hub' %}?workspace={{ current_workspace.id }}" hx-target="#main-content" hx-swap="innerHTML"
+                              onsubmit="return confirm('Disconnect HubSpot for this workspace? Agents will lose CRM access until reconnected.');">
+                            {% csrf_token %}
+                            <input type="hidden" name="integration_action" value="disconnect_hubspot">
+                            <button type="submit" class="px-4 py-2 text-sm font-medium bg-white text-red-600 rounded-lg border border-red-300 hover:bg-red-50">
+                                Disconnect
+                            </button>
+                        </form>
+                    </div>
+                {% endif %}
+
+                <form hx-post="{% url 'workspace_hub' %}?workspace={{ current_workspace.id }}" hx-target="#main-content" hx-swap="innerHTML"
+                      onsubmit="return confirm('Save this HubSpot token for the workspace?');" class="flex gap-3">
+                    {% csrf_token %}
+                    <input type="hidden" name="integration_action" value="save_hubspot">
+                    <input type="password" name="token" required placeholder="pat-na1-..."
+                           class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm transition-colors flex-shrink-0">
+                        {% if hubspot_integration.token_preview %}Replace Token{% else %}Save{% endif %}
+                    </button>
+                </form>
+            </div>
+            {% endif %}
+
+            <!-- Library link (Resources + Documents now live on one unified page) -->
             <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
                         <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
                             <span class="inline-block bg-blue-100 text-blue-600 rounded-full p-2">
                                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
                             </span>
-                            Resource Library
+                            Library
                         </h3>
-                        <p class="text-sm text-gray-500 mt-1">Shared documents, sales decks, and planning links</p>
+                        <p class="text-sm text-gray-500 mt-1">Shared resources, sales decks, planning links, and AI-authored documents</p>
                     </div>
-                    <button type="button"
-                            id="hub-add-resource-btn"
-                            data-resource-url="{% url 'add_resource' %}"
-                            class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm transition-colors flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-                        Add Asset
-                    </button>
+                    <a href="{% url 'asset_library' %}{% if current_workspace %}?workspace={{ current_workspace.id }}{% endif %}"
+                       hx-get="{% url 'asset_library' %}{% if current_workspace %}?workspace={{ current_workspace.id }}{% endif %}"
+                       hx-target="#main-content"
+                       hx-swap="innerHTML swap:200ms"
+                       hx-push-url="true"
+                       class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm transition-colors flex items-center gap-2">
+                        Open Library
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                    </a>
                 </div>
-                {% include 'dashboard/partials/resource_list.html' %}
             </div>
 
         {% else %}
@@ -141,30 +215,49 @@
 </div>
 
 <div id="hub-modal-overlay" class="hidden fixed inset-0 z-[9999] flex items-center justify-center p-4">
-    <div class="absolute inset-0 bg-gray-900 bg-opacity-60" onclick="closeHubModal()"></div>
-    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-md z-10 overflow-hidden">
+    <div id="hub-modal-backdrop" class="absolute inset-0 bg-gray-900 bg-opacity-60 transition-opacity duration-150 ease-out opacity-0" onclick="closeHubModal()"></div>
+    <div id="hub-modal-panel" class="relative bg-white rounded-2xl border border-gray-200 w-full max-w-md z-10 overflow-hidden transition-all duration-150 ease-out transform opacity-0 scale-95">
         <div id="hub-modal-content"></div>
     </div>
 </div>
 
 <script>
 (function() {
+    var HUB_MODAL_TRANSITION_MS = 150;
+
     // ---- Modal helpers ----
     function openHubModal() {
         document.getElementById('hub-modal-overlay').classList.remove('hidden');
+        requestAnimationFrame(function() {
+            document.getElementById('hub-modal-backdrop').classList.remove('opacity-0');
+        });
     }
     function closeHubModal() {
-        document.getElementById('hub-modal-overlay').classList.add('hidden');
-        document.getElementById('hub-modal-content').innerHTML = '';
+        var overlay = document.getElementById('hub-modal-overlay');
+        var backdrop = document.getElementById('hub-modal-backdrop');
+        var panel = document.getElementById('hub-modal-panel');
+        backdrop.classList.add('opacity-0');
+        panel.classList.add('opacity-0', 'scale-95');
+        setTimeout(function() {
+            overlay.classList.add('hidden');
+            document.getElementById('hub-modal-content').innerHTML = '';
+        }, HUB_MODAL_TRANSITION_MS);
     }
     window.openHubModal  = openHubModal;
     window.closeHubModal = closeHubModal;
 
     function loadIntoModal(url) {
         openHubModal();
+        var overlay = document.getElementById('hub-modal-overlay');
+        var panel = document.getElementById('hub-modal-panel');
         htmx.ajax('GET', url, {
             target: '#hub-modal-content',
             swap: 'innerHTML'
+        }).then(function() {
+            if (overlay.classList.contains('hidden')) return; // closed again before content arrived
+            requestAnimationFrame(function() {
+                panel.classList.remove('opacity-0', 'scale-95');
+            });
         });
     }
 
@@ -175,6 +268,7 @@
         btn.addEventListener('click', function() {
             var url = btn.getAttribute('data-invite-url') ||
                       btn.getAttribute('data-create-url') ||
+                      btn.getAttribute('data-settings-url') ||
                       btn.getAttribute('data-resource-url');
             if (url) loadIntoModal(url);
         });
@@ -182,7 +276,7 @@
     wireBtn('hub-invite-btn');
     wireBtn('hub-create-ws-btn');
     wireBtn('hub-create-ws-btn-empty');
-    wireBtn('hub-add-resource-btn');
+    wireBtn('hub-settings-btn');
 
     // ---- Prevent the global base.html afterRequest from closing OUR modal ----
     // (base.html checks for #modal, we use #hub-modal-overlay, so no conflict)

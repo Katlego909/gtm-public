@@ -2,7 +2,7 @@
 
 > **Project Mission:** To provide startups with a "Data-Driven Second Opinion" on their Go-To-Market strategy, bridging the gap between qualitative maturity and quantitative growth.
 
-## 🌟 The Core Value Proposition
+## The Core Value Proposition
 
 The GTM Validator isn't just a survey tool; it's a **Maturity Operating System**. It solves the three most common problems for scaling companies:
 
@@ -12,7 +12,7 @@ The GTM Validator isn't just a survey tool; it's a **Maturity Operating System**
 
 ---
 
-## 🛠️ The Tech Stack Vision
+## The Tech Stack Vision
 
 We chose a "Modern Monolith" architecture to ensure maximum speed of delivery and zero friction between the AI and the Database.
 
@@ -23,13 +23,13 @@ We chose a "Modern Monolith" architecture to ensure maximum speed of delivery an
 
 ---
 
-## 🚀 Key Innovation: The "Vision-to-Scoring" Bridge
+## Key Innovation: The "Vision-to-Scoring" Bridge
 
 One of the project's unique architectural features is the **Automated Auditor**. In most platforms, the user self-reports their score. In GTM Validator, the user uploads their **Strategic Evidence**, and the AI Auditor calculates a **Score Modifier** (-3 to +3) that adjusts their maturity rating based on actual asset quality.
 
 ---
 
-## 🗺️ Documentation Roadmap
+## Documentation Roadmap
 
 This documentation is designed to serve as a **Single Source of Truth** for three distinct audiences:
 

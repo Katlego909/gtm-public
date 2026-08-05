@@ -11,6 +11,9 @@ import threading
 from django.conf import settings
 from django.utils import timezone
 
+from .utils import guess_upload_mime_type
+from .utils_async import run_in_background
+
 try:
     from google import genai
     from google.genai import types
@@ -20,11 +23,32 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Import generation config from ai_services
+# Import generation config + shared quota-cooldown circuit breaker from ai_services
 try:
     from .ai_services import _PLAYBOOK_CONFIG
 except (ImportError, AttributeError):
     _PLAYBOOK_CONFIG = None
+
+try:
+    from .ai_services import (
+        _is_quota_error, _extract_retry_delay_seconds,
+        _set_quota_cooldown, _quota_cooldown_active,
+        _request_budget_available, MONITORING_AVAILABLE,
+    )
+except (ImportError, AttributeError):
+    def _is_quota_error(exc): return False
+    def _extract_retry_delay_seconds(exc): return 60
+    def _set_quota_cooldown(seconds): pass
+    def _quota_cooldown_active(): return False
+    def _request_budget_available(**kwargs): return True
+    MONITORING_AVAILABLE = False
+
+try:
+    from .utils_ai_monitoring import AIUsageTracker
+except ImportError:
+    pass
+
+from .ai_credits import resolve_account, resolve_account_for_session, record_spend
 
 # Cached auditor client to avoid repeated initialization
 _auditor_client = None
@@ -130,7 +154,8 @@ def _extract_summary(audit_text: str, max_len: int = 300) -> str:
 
 # ─── Core audit function ──────────────────────────────────────────────────────
 
-def _run_multimodal_audit(file_bytes: bytes, mime_type: str, asset_name: str, session_context: str = "") -> str:
+def _run_multimodal_audit(file_bytes: bytes, mime_type: str, asset_name: str, session_context: str = "", *,
+                           account=None, feature: str = "evidence_audit", session=None) -> str:
     """
     Core multimodal audit. Sends file bytes + prompt to Gemini and returns raw text.
     """
@@ -138,8 +163,14 @@ def _run_multimodal_audit(file_bytes: bytes, mime_type: str, asset_name: str, se
     if not client:
         logger.error("Auditor client unavailable for audit.")
         return ""
+    if _quota_cooldown_active():
+        logger.warning("Gemini quota cooldown active — skipping audit for %s", asset_name)
+        return ""
+    if not _request_budget_available(account=account):
+        logger.warning("AI credits exhausted — skipping audit for %s", asset_name)
+        return ""
 
-    audit_prompt = f"""You are the 'GTM Strategic Auditor'. 
+    audit_prompt = f"""You are the 'GTM Strategic Auditor'.
 Perform a professional strategic critique of this {asset_name}.
 
 CONTEXT FROM GTM ASSESSMENT:
@@ -172,8 +203,15 @@ REPORT FORMAT:
             ],
             config=_PLAYBOOK_CONFIG,
         )
+        if hasattr(response, "usage_metadata"):
+            total_tokens = response.usage_metadata.total_token_count
+            if MONITORING_AVAILABLE:
+                AIUsageTracker.log_usage(total_tokens, feature)
+            record_spend(account, total_tokens, feature, session=session)
         return response.text or ""
     except Exception as e:
+        if _is_quota_error(e):
+            _set_quota_cooldown(_extract_retry_delay_seconds(e))
         logger.error(f"Multimodal Audit API call failed: {e}")
         return ""
 
@@ -190,30 +228,36 @@ def perform_gtm_visual_audit(session_file, session_context=None):
         file_bytes = session_file.file.read()
         session_file.file.close()
 
-        filename = session_file.file.name.lower()
-        if filename.endswith(".pdf"):
-            mime_type = "application/pdf"
-        elif filename.endswith(".png"):
-            mime_type = "image/png"
-        elif filename.endswith((".jpg", ".jpeg")):
-            mime_type = "image/jpeg"
-        else:
-            mime_type = "application/octet-stream"
+        mime_type = guess_upload_mime_type(session_file.file.name)
 
     except Exception as e:
         logger.error(f"Failed to read GTMFile for audit: {e}")
         return "ERROR: Could not read the evidence file."
 
+    # GTMFile has its own nullable `workspace` FK (workspace-level evidence
+    # in the Asset Library may have no session at all) -- don't assume
+    # session_file.session exists.
+    session_user = session_file.session.user if session_file.session else None
+    account = resolve_account(workspace=session_file.workspace, user=session_user) \
+        or resolve_account_for_session(session_file.session)
+    if not _request_budget_available(account=account):
+        session_file.audit_status = 'no_credits'
+        session_file.save(update_fields=['audit_status'])
+        return "AI credits exhausted for this period."
+
     asset_name = session_file.get_file_type_display()
-    audit_text = _run_multimodal_audit(file_bytes, mime_type, asset_name, session_context or "")
-    
+    audit_text = _run_multimodal_audit(
+        file_bytes, mime_type, asset_name, session_context or "",
+        account=account, feature="evidence_audit", session=session_file.session,
+    )
+
     if audit_text:
         session_file.ai_audit_notes = audit_text
         session_file.ai_audit_score_modifier = _extract_score_modifier(audit_text)
         session_file.audit_status = 'complete'
     else:
         session_file.audit_status = 'failed'
-    
+
     session_file.save()
     return audit_text or "Audit could not be completed."
 
@@ -238,19 +282,17 @@ def perform_resource_audit(resource) -> bool:
         file_bytes = resource.file.read()
         resource.file.close()
 
-        filename = resource.file.name.lower()
-        if filename.endswith(".pdf"):
-            mime_type = "application/pdf"
-        elif filename.endswith(".png"):
-            mime_type = "image/png"
-        elif filename.endswith((".jpg", ".jpeg")):
-            mime_type = "image/jpeg"
-        else:
-            mime_type = "application/octet-stream"
+        mime_type = guess_upload_mime_type(resource.file.name)
 
     except Exception as e:
         logger.error(f"Failed to read Resource file for audit: {resource.id} — {e}")
         resource.audit_status = 'failed'
+        resource.save(update_fields=['audit_status'])
+        return False
+
+    account = resolve_account(workspace=resource.workspace)
+    if not _request_budget_available(account=account):
+        resource.audit_status = 'no_credits'
         resource.save(update_fields=['audit_status'])
         return False
 
@@ -261,9 +303,12 @@ def perform_resource_audit(resource) -> bool:
         f"Description: {resource.description or 'N/A'}\n"
         f"Workspace: {resource.workspace.name if resource.workspace else 'Unknown'}\n"
     )
-    
+
     asset_name = resource.get_category_display()
-    audit_text = _run_multimodal_audit(file_bytes, mime_type, asset_name, session_context)
+    audit_text = _run_multimodal_audit(
+        file_bytes, mime_type, asset_name, session_context,
+        account=account, feature="resource_audit",
+    )
 
     from django.utils import timezone
     if audit_text:
@@ -297,35 +342,29 @@ def audit_resource_async(resource_id):
     marks it as 'auditing', runs the audit, then saves the result.
     """
     def _run():
+        # Import inside thread to avoid circular import issues
+        from dashboard.models import Resource
         try:
-            # Import inside thread to avoid circular import issues
-            from dashboard.models import Resource
             resource = Resource.objects.get(pk=resource_id)
             resource.audit_status = 'auditing'
             resource.save(update_fields=['audit_status'])
             perform_resource_audit(resource)
         except Exception as e:
             logger.error(f"audit_resource_async failed for {resource_id}: {e}")
-            try:
-                from dashboard.models import Resource
-                Resource.objects.filter(pk=resource_id).update(audit_status='failed')
-            except Exception:
-                pass
+            Resource.objects.filter(pk=resource_id).update(audit_status='failed')
 
-    thread = threading.Thread(target=_run, daemon=True)
-    thread.start()
-    return thread
+    return run_in_background(_run, name="audit_resource")
 
 
 def audit_strategic_evidence_async(gtm_file_id):
     """Background-thread-safe wrapper for performing a GTMFile audit."""
     def _run():
+        from gtm.models import GTMFile
         try:
-            from gtm.models import GTMFile
             session_file = GTMFile.objects.get(pk=gtm_file_id)
             session_file.audit_status = 'auditing'
             session_file.save(update_fields=['audit_status'])
-            
+
             # Get context from session if available
             context = None
             if session_file.session:
@@ -336,12 +375,6 @@ def audit_strategic_evidence_async(gtm_file_id):
             perform_gtm_visual_audit(session_file, session_context=context)
         except Exception as e:
             logger.error(f"audit_strategic_evidence_async failed for {gtm_file_id}: {e}")
-            try:
-                from gtm.models import GTMFile
-                GTMFile.objects.filter(pk=gtm_file_id).update(audit_status='failed')
-            except Exception:
-                pass
+            GTMFile.objects.filter(pk=gtm_file_id).update(audit_status='failed')
 
-    thread = threading.Thread(target=_run, daemon=True)
-    thread.start()
-    return thread
+    return run_in_background(_run, name="audit_strategic_evidence")

@@ -1,0 +1,27 @@
+<div class="app-card p-4 sm:p-6 lg:p-8 reveal reveal-delay-2">
+    <!-- Header with icon -->
+    <div class="app-section-header mb-4 sm:mb-6 pb-4 sm:pb-5 border-b border-gray-200">
+        <div class="app-icon-badge app-icon-badge--solid flex-shrink-0">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        </div>
+        <div>
+            <h4 class="text-2xl font-bold text-gray-900 mb-1">Top Strengths</h4>
+            <p class="text-sm text-gray-600">Your highest-performing categories</p>
+        </div>
+    </div>
+    <ul class="space-y-4">
+        {% for c in strengths_categories %}
+            <li class="p-3 bg-gray-50 rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div class="font-medium text-indigo-700 break-words">{{ c.category.name }}</div>
+                    <div class="text-sm text-gray-700 font-medium shrink-0">{{ c.avg|floatformat:2 }}/5</div>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Performing well &mdash; maintain the rigor in this area.</p>
+            </li>
+        {% empty %}
+            <li class="text-gray-500 text-sm">No clear strengths yet.</li>
+        {% endfor %}
+    </ul>
+</div>

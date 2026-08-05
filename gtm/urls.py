@@ -22,6 +22,7 @@ urlpatterns = [
     path("download/<uuid:session_id>/", views.download_report_pdf, name="download"),
     path("history/", views.history, name="history"),
     path("cancel/<uuid:session_id>/", views.cancel_assessment, name="cancel_assessment"),
+    path("delete/<uuid:session_id>/", views.delete_assessment, name="delete_assessment"),
     
     path("actions/add/<uuid:session_id>/", views.action_add, name="action_add"),
     path("actions/toggle/<int:action_id>/", views.action_toggle, name="action_toggle"),
@@ -46,8 +47,16 @@ urlpatterns = [
     # User Profile & Auth
     path("profile/", views.profile, name="profile"),
     path("logout/", views.logout_view, name="logout"),
+
+    # Legal / public pages
+    path("privacy/", views.privacy_policy, name="privacy"),
+    path("terms/", views.terms_of_service, name="terms"),
+    path("contact/", views.contact, name="contact"),
     
     # Workspace management
     path("workspace/", include('gtm.urls_workspace')),
+
+    # Beta operator view (staff-only)
+    path("beta/cohort/", views.beta_cohort, name="beta_cohort"),
 
 ]

@@ -69,6 +69,17 @@ QUESTION_META: dict[str, dict] = {
 #
 # Patterns are evaluated in order; multiple can fire simultaneously.
 # ---------------------------------------------------------------------------
+
+def _answered_pillars(pillar_avgs: dict) -> list[float]:
+    """Averages for pillars that actually have answers (avg > 0).
+
+    Used to gate the all-pillar catch-all patterns: without this, an empty/
+    unanswered assessment (every average 0) makes ``all(...)`` over an empty
+    sequence return True, firing both the "all low" and "all high" patterns at once.
+    """
+    return [v for v in pillar_avgs.values() if v > 0]
+
+
 _PATTERNS: list[dict] = [
     # ── Cross-pillar catch-alls (check first so they can be overridden) ─────
     {
@@ -86,7 +97,7 @@ _PATTERNS: list[dict] = [
             "(2) define 3 qualification questions for every lead, "
             "(3) create a 5-step onboarding checklist for new customers."
         ),
-        "trigger": lambda _, p: all(v < 2.5 for v in p.values() if v > 0),
+        "trigger": lambda _, p: bool(_answered_pillars(p)) and all(v < 2.5 for v in _answered_pillars(p)),
     },
     {
         "name": "SCALING_READY",
@@ -103,7 +114,7 @@ _PATTERNS: list[dict] = [
             "before diversifying. Build a systematic referral or advocacy programme "
             "from your healthiest customer segment."
         ),
-        "trigger": lambda _, p: all(v >= 3.5 for v in p.values() if v > 0),
+        "trigger": lambda _, p: bool(_answered_pillars(p)) and all(v >= 3.5 for v in _answered_pillars(p)),
     },
 
     # ── Demand patterns ──────────────────────────────────────────────────────
@@ -378,9 +389,17 @@ def build_recommendation_context(question_scores: dict[str, int]) -> dict:
     patterns      = detect_patterns(question_scores, pillar_avgs)
     top_3         = opportunities[:3]
 
+    # Renormalize by the weight of only the answered pillars (mirrors the
+    # identical fix in services._compute_scores) — otherwise a company whose
+    # unanswered/stage-exempt pillars are simply absent from question_scores
+    # would have its max possible current_overall capped at the answered
+    # pillars' raw weight instead of being able to reach 100.
+    answered_weight = sum(
+        PILLAR_WEIGHTS[p] for p in PILLAR_WEIGHTS if pillar_avgs[p] > 0
+    ) or 1.0
     current_overall = round(
         sum(
-            (pillar_avgs[p] / 5.0) * PILLAR_WEIGHTS[p] * 100
+            (pillar_avgs[p] / 5.0) * (PILLAR_WEIGHTS[p] / answered_weight) * 100
             for p in PILLAR_WEIGHTS
             if pillar_avgs[p] > 0
         ),

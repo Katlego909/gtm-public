@@ -1,0 +1,37 @@
+{% extends "gtm/base.html" %}
+{% block content %}
+
+<div class="app-shell max-w-4xl">
+  <div class="app-page-header">
+    <h1 class="app-page-title">Terms of Service</h1>
+    <p class="app-page-subtitle">Last updated {% now "F Y" %}</p>
+  </div>
+
+  <div class="prose prose-slate max-w-3xl">
+    <p>These terms cover your use of Funti3r GTM Validator. By using the app, you agree to them.</p>
+
+    <h2>Using the assessment</h2>
+    <p>The assessment, scores, and playbooks are provided for informational purposes to help you evaluate your go-to-market readiness. They're not a guarantee of business outcomes, and you're responsible for how you act on the recommendations.</p>
+
+    <h2>Your content</h2>
+    <p>You retain ownership of any information and documents you submit. By uploading them, you confirm you have the right to share that content and to have it analyzed by our AI services as described in our <a href="{% url 'gtm:privacy' %}">Privacy Policy</a>.</p>
+
+    <h2>No warranty</h2>
+    <p>The service is provided "as is," without warranties of any kind. We work to keep scoring accurate and the app available, but we don't guarantee uninterrupted or error-free operation.</p>
+
+    <h2>Accounts</h2>
+    <p>If you create an account, you're responsible for keeping your login credentials secure. We may suspend accounts used in ways that violate these terms.</p>
+
+    <h2>Changes</h2>
+    <p>We may update these terms from time to time. Continued use of the app after changes means you accept the updated terms.</p>
+
+    <h2>Contact</h2>
+    <p>Questions about these terms can be sent via our <a href="{% url 'gtm:contact' %}">Contact page</a>.</p>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block full_width_footer %}
+{% include "gtm/partials/marketing_footer.html" %}
+{% endblock %}

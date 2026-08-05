@@ -1,0 +1,89 @@
+{# Since Your Last Assessment -- shown only when a qualifying prior assessment exists #}
+<div class="app-card p-4 sm:p-6 lg:p-8 mt-6 sm:mt-8 reveal">
+  <div class="app-section-header mb-4 sm:mb-6 pb-4 sm:pb-5 border-b border-gray-200">
+    <div class="app-icon-badge bg-indigo-50 text-indigo-600 flex-shrink-0">
+      <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/>
+      </svg>
+    </div>
+    <div>
+      <h3 class="text-2xl font-bold text-gray-900 mb-1">Since Your Last Assessment</h3>
+      <p class="text-sm text-gray-600">Compared to your assessment on {{ comparison.previous_created_at|date:"M d, Y" }}</p>
+    </div>
+  </div>
+
+  <div class="grid sm:grid-cols-2 gap-4 sm:gap-6">
+    <div>
+      <div class="flex items-center gap-3 mb-4">
+        <span class="text-3xl font-extrabold text-gray-900">{{ comparison.overall_delta|floatformat:1 }}</span>
+        <span class="text-sm font-semibold px-2.5 py-1 rounded-full
+          {% if comparison.overall_delta > 0 %}bg-green-50 text-green-700 border border-green-200
+          {% elif comparison.overall_delta < 0 %}bg-red-50 text-red-700 border border-red-200
+          {% else %}bg-gray-50 text-gray-600 border border-gray-200{% endif %}">
+          {% if comparison.overall_delta > 0 %}Up{% elif comparison.overall_delta < 0 %}Down{% else %}Unchanged{% endif %}
+          from {{ comparison.previous_overall|floatformat:0 }}/100
+        </span>
+      </div>
+
+      {% if comparison.band_changed %}
+      <p class="text-sm text-gray-700 mb-4">
+        Stage moved from <span class="font-semibold">{{ comparison.previous_band_stage }}</span>
+        to <span class="font-semibold">{{ band.stage }}</span>.
+      </p>
+      {% endif %}
+
+      <ul class="space-y-2">
+        {% for row in comparison.category_deltas %}
+        <li class="flex items-center justify-between text-sm border border-gray-200 rounded-lg px-3 py-2">
+          <span class="text-gray-700 font-medium">{{ row.category }}</span>
+          {% if row.delta is not None %}
+          <span class="font-semibold
+            {% if row.delta > 0 %}text-green-700{% elif row.delta < 0 %}text-red-700{% else %}text-gray-500{% endif %}">
+            {{ row.previous|floatformat:2 }} &rarr; {{ row.current|floatformat:2 }}
+            ({{ row.delta|floatformat:2 }})
+          </span>
+          {% elif row.current is not None %}
+          <span class="text-gray-500 text-xs font-medium">Newly scored this time</span>
+          {% else %}
+          <span class="text-gray-500 text-xs font-medium">Not scored this time</span>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="space-y-4">
+      <div>
+        <h4 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">Resolved since last time</h4>
+        {% if comparison.resolved_patterns %}
+        <ul class="space-y-2">
+          {% for pat in comparison.resolved_patterns %}
+          <li class="flex items-center gap-2 text-sm p-2.5 rounded-lg border border-green-200 bg-green-50">
+            <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-green-600 text-white">Resolved</span>
+            <span class="text-gray-800">{{ pat.headline }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-gray-500">None resolved since last time.</p>
+        {% endif %}
+      </div>
+
+      <div>
+        <h4 class="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2">New since last time</h4>
+        {% if comparison.newly_triggered_patterns %}
+        <ul class="space-y-2">
+          {% for pat in comparison.newly_triggered_patterns %}
+          <li class="flex items-center gap-2 text-sm p-2.5 rounded-lg border border-amber-200 bg-amber-50">
+            <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500 text-white">New</span>
+            <span class="text-gray-800">{{ pat.headline }}</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-gray-500">No new patterns detected.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>

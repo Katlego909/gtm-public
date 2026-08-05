@@ -10,8 +10,36 @@ from gtm.ai_chat import get_suggested_prompts
 def _md(text):
     return markdown.markdown(text)
 
+
+def _build_assessment_history_export_rows(sessions_qs):
+    """Build full (unbounded) assessment-history rows for CSV export.
+
+    Prefers the cached ResultSnapshot over recomputing scores -- mirrors the
+    approach gtm/views/profile.py's `history` view already uses -- and only
+    falls back to _compute_scores for completed sessions that were never
+    viewed on the results page yet (so no snapshot exists).
+    """
+    rows = []
+    for session in sessions_qs:
+        snap = getattr(session, 'snapshot', None)
+        if snap:
+            overall = snap.overall
+            band_stage = snap.band_stage or 'Unknown'
+        else:
+            _, overall = _compute_scores(session)
+            band = _band_for_score(overall)
+            band_stage = band.stage if band else 'Unknown'
+        rows.append({
+            'company_name': session.company_name or 'Unnamed',
+            'industry': session.industry or 'N/A',
+            'overall_score': round(overall, 1),
+            'band_stage': band_stage,
+            'created_at': session.created_at,
+        })
+    return rows
+
 def get_dashboard_context(request, current_workspace, user_workspaces, agent_session_id):
-    from dashboard.views import _collect_recent_action_feed, _load_pending_gap_suggestions
+    from dashboard.views import _load_pending_gap_suggestions
     from dashboard.utils import calculate_gap_metric_display_properties
     # Filter data by workspace if selected
     if current_workspace:
@@ -150,18 +178,49 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
     top_doing = action_items_qs.filter(status='doing').order_by('due_date')
     top_done = action_items_qs.filter(status='done').order_by('-created_at')
 
-    # Tool recommendations: only show if there are assessments in workspace
-    if assessments_qs.exists():
-        top_tools_qs = ToolRecommendation.objects.all()[:5]
-        top_tools = []
-        for tool in top_tools_qs:
-            if tool.tools:
-                tool.tools_list = [t.strip().lower().title() for t in tool.tools.split(',')]
+    # Tool recommendations: matched to this workspace's weakest-scoring
+    # categories from its latest completed assessment, mirroring the
+    # weak-category matching already used on the Results page
+    # (gtm/views/results.py) rather than showing arbitrary rows.
+    top_tool_groups = []
+    latest_snapshot = ResultSnapshot.objects.filter(
+        session__in=assessments_qs, session__is_completed=True
+    ).order_by('-created_at').first()
+
+    if latest_snapshot and latest_snapshot.category_breakdown:
+        # Only genuinely weak categories (avg < 75, the same "Improving"
+        # threshold used for the severity badge below) -- ranking bottom-N
+        # regardless of value would surface a category as "recommended" even
+        # when everything is already scoring well.
+        categories_sorted = sorted(latest_snapshot.category_breakdown, key=lambda c: c.get('avg', 0))
+        weak_entries = [c for c in categories_sorted if (c.get('avg', 0) / 5 * 100) < 75][:3]
+        weak_names = [c.get('category') for c in weak_entries if c.get('category')]
+
+        tools_by_category_name = {}
+        for tool in ToolRecommendation.objects.filter(category__name__in=weak_names).select_related('category'):
+            tool.tools_list = [t.strip().lower().title() for t in tool.tools.split(',')] if tool.tools else []
+            tools_by_category_name.setdefault(tool.category.name, []).append(tool)
+
+        for entry in weak_entries:
+            name = entry.get('category')
+            tools = tools_by_category_name.get(name)
+            if not tools:
+                continue
+            avg = entry.get('avg', 0)
+            avg_pct = avg / 5 * 100
+            if avg_pct < 50:
+                severity_class, severity_label = 'bg-red-100 text-red-500', 'Needs Attention'
+            elif avg_pct < 75:
+                severity_class, severity_label = 'bg-yellow-100 text-yellow-700', 'Improving'
             else:
-                tool.tools_list = []
-            top_tools.append(tool)
-    else:
-        top_tools = []
+                severity_class, severity_label = 'bg-green-100 text-green-700', 'Strong'
+            top_tool_groups.append({
+                'category_name': name,
+                'score': round(avg, 1),
+                'severity_class': severity_class,
+                'severity_label': severity_label,
+                'tools': tools,
+            })
 
     # Insights (from ResultSnapshot.ai_playbook) - WORKSPACE-SCOPED
     if current_workspace:
@@ -177,18 +236,6 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
     for insight in insights_qs:
         insight.playbook_html = markdown.markdown(insight.ai_playbook or "")
         insights.append(insight)
-
-    # Recent chat messages - WORKSPACE-SCOPED
-    if current_workspace:
-        recent_chats_qs = ChatMessage.objects.filter(
-            session__workspace=current_workspace
-        )
-    else:
-        recent_chats_qs = ChatMessage.objects.filter(
-            session__user=request.user
-        ) if request.user.is_authenticated else ChatMessage.objects.none()
-
-    recent_agent_actions = _collect_recent_action_feed(request, current_workspace, max_items=6)
 
     # GTM Assessment History & Trends (workspace-scoped)
     assessment_history = []
@@ -234,7 +281,20 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
                 'improvement': round(improvement, 1),
                 'latest_score': round(all_scores[0], 1) if all_scores else 0,
             }
-            
+
+            # "Since Last Assessment" -- distinct from 'improvement' above
+            # (which is first-ever vs. latest): this is previous-vs-latest,
+            # reusing the same comparison logic as the results page (see
+            # gtm/score_comparison.py). None (not 0) when there's no
+            # qualifying prior assessment, so the template can distinguish
+            # "not enough data yet" from a genuine zero-point change.
+            from gtm.score_comparison import build_score_comparison
+            latest_session = assessment_history[0]['session']
+            since_last_comparison = build_score_comparison(latest_session)
+            assessment_stats['since_last_delta'] = (
+                round(since_last_comparison['overall_delta'], 1) if since_last_comparison else None
+            )
+
             # Prepare trend chart data (reverse to show chronological order)
             score_trend_data = {
                 'labels': [s['created_at'].strftime('%m/%d') for s in reversed(assessment_history)],
@@ -323,15 +383,22 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
     if latest_completed_gap_session:
         ai_resource_recommendations = list(latest_completed_gap_session.ai_resource_matches.all().select_related('resource'))
 
-    for metric in gap_analysis:
-        calculate_gap_metric_display_properties(metric)
+    # Deferred import: dashboard.views.helpers imports this module at load time.
+    from dashboard.views.helpers import prepare_gap_metrics_for_display
+    gap_analysis = prepare_gap_metrics_for_display(
+        gap_analysis,
+        current_workspace,
+        request.user if request.user.is_authenticated else None,
+    )
 
     gap_suggestions = _load_pending_gap_suggestions(request, current_workspace) if request.user.is_authenticated else []
 
     if current_workspace:
         gap_report_url = f"{reverse('gap_report')}?workspace={current_workspace.id}"
+        assessment_history_export_url = f"{reverse('assessment_history_export', args=['csv'])}?workspace={current_workspace.id}"
     else:
         gap_report_url = reverse('gap_report')
+        assessment_history_export_url = reverse('assessment_history_export', args=['csv'])
 
     context = {
         'total_sessions': total_sessions,
@@ -351,10 +418,11 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
         'sessions_per_day': sessions_per_day,
         'days_labels': days_labels,
         'status_breakdown': status_breakdown,
-        'top_tools': top_tools,
+        'top_tool_groups': top_tool_groups,
         'insights': insights,
-        'recent_agent_actions': recent_agent_actions,
         'weekly_activity': weekly_activity,
+        'items_created_per_day': [d['items_created'] for d in weekly_activity],
+        'items_completed_per_day': [d['items_completed'] for d in weekly_activity],
         'validator_results': validator_results,
         'channel_data': channel_data,
         'gap_analysis': gap_analysis,
@@ -363,6 +431,7 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
         'latest_score_risk': latest_score_risk,
         'ai_resource_recommendations': ai_resource_recommendations,
         'gap_report_url': gap_report_url,
+        'assessment_history_export_url': assessment_history_export_url,
         'assessment_history': assessment_history,
         'assessment_stats': assessment_stats,
         'score_trend_data': score_trend_data,

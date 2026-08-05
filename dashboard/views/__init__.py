@@ -1,0 +1,97 @@
+"""Public surface of the dashboard views package.
+
+The former monolithic views.py is split into domain modules; this module
+re-exports every view so ``from . import views`` / ``views.<name>`` call sites
+(urls.py) keep working unchanged.
+"""
+
+# Private helpers historically imported from dashboard.views by other modules
+# (dashboard.analytics imports these at function level).
+from .helpers import _load_pending_gap_suggestions
+
+from .gap_analysis import (
+    accept_gap_suggestion,
+    add_edit_gap_metric,
+    delete_gap_metric,
+    gap_analysis_table,
+    gap_report,
+    generate_action_items_for_gap,
+    generate_gap_suggestions,
+    get_gap_metric_row,
+    log_gap_measurement,
+    refresh_gap_analysis_table,
+    refresh_gap_suggestions,
+    reject_gap_suggestion,
+    reopen_gap_metric,
+    resolve_gap_metric,
+)
+from .resources import (
+    add_edit_resource,
+    asset_audit_result,
+    asset_library,
+    delete_resource,
+    refresh_resources,
+    trigger_asset_audit,
+)
+from .analytics import (
+    analytics,
+    assessment_history_export,
+    general_feedback,
+    insight_export,
+    insight_feedback,
+    kpi_completed_items,
+    kpi_pending_items,
+    kpi_total_sessions,
+)
+from .hub import (
+    agent_hub,
+    agent_impact_hub,
+    dashboard,
+    tasks_board,
+    workspace_hub,
+)
+from .agent_api import (
+    dashboard_agent_api,
+    dashboard_agent_clear_api,
+    dashboard_agent_context_api,
+)
+from .workspace_agent_api import (
+    dashboard_agent_insights_refresh,
+    dashboard_agent_insights_status,
+    dashboard_team_agent_api,
+    dashboard_workspace_agent_api,
+    dashboard_workspace_agent_clear_api,
+    dashboard_workspace_agent_context_api,
+    document_delete_api,
+    document_edit_api,
+    document_export,
+    document_list_api,
+)
+from .actions import (
+    add_action_item_comment,
+    add_edit_action_item,
+    assign_action_item,
+    complete_action_item_ai,
+    complete_action_item_ai_status,
+    delete_action_item,
+    delete_action_item_comment,
+    move_action_item,
+    refresh_action_items,
+    unassign_action_item,
+)
+from .pages import (
+    create_workspace_dashboard,
+    delete_workspace,
+    edit_workspace,
+    invite_to_workspace,
+    notifications_panel,
+    profile,
+    settings_view,
+)
+from .notifications import (
+    notification_dropdown,
+    notification_mark_read,
+    notification_unread_count,
+    notifications_mark_all_read,
+)
+from .search import global_search

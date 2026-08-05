@@ -1,0 +1,14 @@
+You're invited to the Funti3r GTM Validator closed beta.
+
+What to expect:
+- A short assessment covering your Demand, Conversion, and Delivery motion
+- An instant score with a personalized, AI-written playbook
+- This is a beta -- things may be rough around the edges, and we'd love to hear what you think
+
+Your invite code: {{ invite_code }}
+
+Create your account: {{ signup_url }}
+
+Questions or feedback any time -- just reply to this email or reach us at hello@funti3r.xyz.
+
+© 2026 Funti3r GTM. All rights reserved.

@@ -1,0 +1,40 @@
+{% load static %}
+<!-- Shared marketing footer — included on the landing page and the public
+     Privacy / Terms / Contact pages so visitors can always navigate back out. -->
+<footer class="bg-slate-50 border-t border-gray-200">
+  <div class="max-w-7xl mx-auto px-6 py-16">
+    <div class="grid md:grid-cols-4 gap-10">
+      <div class="md:col-span-2">
+        <a href="{% url 'gtm:landing' %}" class="flex items-center gap-2 hover:opacity-80 transition w-fit">
+          <img src="{% static 'images/forge_logo.png' %}" alt="ForgeGTM" class="h-9 w-auto object-contain" />
+        </a>
+        <p class="mt-4 text-sm text-gray-500 max-w-sm leading-relaxed">
+          A structured go-to-market readiness assessment covering Demand, Conversion, and Delivery &mdash; with a scored report and a 30-day action plan.
+        </p>
+      </div>
+
+      <div>
+        <h3 class="text-sm font-semibold text-gray-900 mb-4">Product</h3>
+        <ul class="space-y-3 text-sm">
+          <li><a href="{% url 'gtm:landing' %}#features" class="text-gray-500 hover:text-indigo-600 transition">Features</a></li>
+          <li><a href="{% url 'gtm:landing' %}#how-it-works" class="text-gray-500 hover:text-indigo-600 transition">How It Works</a></li>
+          <li><a href="{% url 'gtm:landing' %}#faq" class="text-gray-500 hover:text-indigo-600 transition">FAQ</a></li>
+          <li><a href="{% url 'gtm:start' %}" class="text-gray-500 hover:text-indigo-600 transition">Start Assessment</a></li>
+        </ul>
+      </div>
+
+      <div>
+        <h3 class="text-sm font-semibold text-gray-900 mb-4">Company</h3>
+        <ul class="space-y-3 text-sm">
+          <li><a href="{% url 'gtm:privacy' %}" class="text-gray-500 hover:text-indigo-600 transition">Privacy Policy</a></li>
+          <li><a href="{% url 'gtm:terms' %}" class="text-gray-500 hover:text-indigo-600 transition">Terms of Service</a></li>
+          <li><a href="{% url 'gtm:contact' %}" class="text-gray-500 hover:text-indigo-600 transition">Contact</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="mt-12 pt-8 border-t border-gray-200">
+      <p class="text-sm text-gray-400">&copy; {% now "Y" %} Funti3r GTM Validator. All rights reserved.</p>
+    </div>
+  </div>
+</footer>

@@ -48,15 +48,15 @@ def _extract_pdf_text(file_bytes: bytes) -> str:
     return '\n'.join(text_parts).strip()[:AGENT_ATTACHMENT_TEXT_LIMIT]
 
 
-def _extract_pdf_text_with_ai(file_bytes: bytes) -> str:
+def _extract_pdf_text_with_ai(file_bytes: bytes, *, account=None) -> str:
     """Fallback PDF text extraction through Vertex AI when parser extraction is unavailable."""
     try:
-        from gtm.ai_services import _get_client
+        from gtm.ai_services import _get_client, _quota_cooldown_active, _request_budget_available, MONITORING_AVAILABLE
     except Exception:
         return ''
 
     client = _get_client()
-    if not client:
+    if not client or _quota_cooldown_active() or not _request_budget_available(account=account):
         return ''
 
     try:
@@ -70,22 +70,29 @@ def _extract_pdf_text_with_ai(file_bytes: bytes) -> str:
                 },
             ]
         )
+        if hasattr(response, "usage_metadata"):
+            total_tokens = response.usage_metadata.total_token_count
+            if MONITORING_AVAILABLE:
+                from gtm.utils_ai_monitoring import AIUsageTracker
+                AIUsageTracker.log_usage(total_tokens, 'document_ocr')
+            from gtm.ai_credits import record_spend
+            record_spend(account, total_tokens, "document_ocr")
         extracted = (getattr(response, 'text', '') or '').strip()
         return extracted[:AGENT_ATTACHMENT_TEXT_LIMIT]
     except Exception:
         return ''
 
 
-def _extract_image_text_with_ai(file_bytes: bytes) -> str:
+def _extract_image_text_with_ai(file_bytes: bytes, *, account=None) -> str:
     """Use Vertex AI vision to OCR meaningful text from image attachments."""
     try:
         from PIL import Image
-        from gtm.ai_services import _get_client
+        from gtm.ai_services import _get_client, _quota_cooldown_active, _request_budget_available, MONITORING_AVAILABLE
     except Exception:
         return ''
 
     client = _get_client()
-    if not client:
+    if not client or _quota_cooldown_active() or not _request_budget_available(account=account):
         return ''
 
     try:
@@ -100,13 +107,20 @@ def _extract_image_text_with_ai(file_bytes: bytes) -> str:
                 image,
             ]
         )
+        if hasattr(response, "usage_metadata"):
+            total_tokens = response.usage_metadata.total_token_count
+            if MONITORING_AVAILABLE:
+                from gtm.utils_ai_monitoring import AIUsageTracker
+                AIUsageTracker.log_usage(total_tokens, 'document_ocr')
+            from gtm.ai_credits import record_spend
+            record_spend(account, total_tokens, "document_ocr")
         extracted = (getattr(response, 'text', '') or '').strip()
         return extracted[:AGENT_ATTACHMENT_TEXT_LIMIT]
     except Exception:
         return ''
 
 
-def _extract_attachment_text(uploaded_file, file_bytes: bytes) -> Tuple[str, str]:
+def _extract_attachment_text(uploaded_file, file_bytes: bytes, *, account=None) -> Tuple[str, str]:
     """Return extracted text and extraction status for an uploaded attachment."""
     suffix = Path(uploaded_file.name or '').suffix.lower()
     content_type = _normalize_content_type(uploaded_file)
@@ -119,13 +133,13 @@ def _extract_attachment_text(uploaded_file, file_bytes: bytes) -> Tuple[str, str
         pdf_text = _extract_pdf_text(file_bytes)
         if pdf_text:
             return pdf_text, 'pdf_extracted'
-        pdf_text_ai = _extract_pdf_text_with_ai(file_bytes)
+        pdf_text_ai = _extract_pdf_text_with_ai(file_bytes, account=account)
         if pdf_text_ai:
             return pdf_text_ai, 'pdf_ai_extracted'
         return '', 'pdf_parse_unavailable'
 
     if suffix in AGENT_IMAGE_EXTENSIONS or content_type.startswith('image/'):
-        image_text = _extract_image_text_with_ai(file_bytes)
+        image_text = _extract_image_text_with_ai(file_bytes, account=account)
         if image_text:
             return image_text, 'image_ocr_extracted'
         return '', 'image_ocr_unavailable'
@@ -144,7 +158,7 @@ def _save_agent_attachment(uploaded_file, file_bytes: bytes) -> Tuple[str, str]:
     return saved_path, file_url
 
 
-def _process_agent_attachments(uploaded_files) -> Tuple[List[Dict[str, Any]], str, List[str]]:
+def _process_agent_attachments(uploaded_files, *, account=None) -> Tuple[List[Dict[str, Any]], str, List[str]]:
     """Validate, persist, and extract text context from uploaded files."""
     attachments: List[Dict[str, Any]] = []
     context_parts: List[str] = []
@@ -174,7 +188,7 @@ def _process_agent_attachments(uploaded_files) -> Tuple[List[Dict[str, Any]], st
             warnings.append(f"Empty file skipped: {file_name}")
             continue
 
-        extracted_text, extraction_status = _extract_attachment_text(uploaded_file, file_bytes)
+        extracted_text, extraction_status = _extract_attachment_text(uploaded_file, file_bytes, account=account)
         saved_path, file_url = _save_agent_attachment(uploaded_file, file_bytes)
 
         excerpt = extracted_text[:AGENT_ATTACHMENT_EXCERPT_LIMIT] if extracted_text else ''

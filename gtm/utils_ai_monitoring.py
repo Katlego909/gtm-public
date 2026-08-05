@@ -65,10 +65,10 @@ class AIUsageTracker:
         
         # Check if approaching limits
         if minute_requests >= FREE_TIER_LIMITS['requests_per_minute'] * 0.8:
-            logger.warning(f"⚠️ Approaching minute request limit: {minute_requests}/15")
-        
+            logger.warning(f"Approaching minute request limit: {minute_requests}/15")
+
         if day_requests >= FREE_TIER_LIMITS['requests_per_day'] * 0.8:
-            logger.warning(f"⚠️ Approaching daily request limit: {day_requests}/1500")
+            logger.warning(f"Approaching daily request limit: {day_requests}/1500")
         
         return {
             'minute': {'requests': minute_requests, 'tokens': minute_tokens},
