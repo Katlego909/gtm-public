@@ -16,24 +16,20 @@ steps:
       - 'gcr.io/$PROJECT_ID/gtm-validator:$SHORT_SHA'
 
   # Deploy to Cloud Run
-  - name: 'gcr.io/cloud-builders/gke-deploy'
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
     args:
-      - run
-      - --filename=.
-      - --image=gcr.io/$PROJECT_ID/gtm-validator:$SHORT_SHA
-      - --location=us-central1
-      - --config=clouddeploy.yaml
-
-  # Alternative: Direct Cloud Run deployment (uncomment to use instead)
-  # - name: 'gcr.io/cloud-builders/run'
-  #   args:
-  #     - 'deploy'
-  #     - 'gtm-validator'
-  #     - '--image=gcr.io/$PROJECT_ID/gtm-validator:$SHORT_SHA'
-  #     - '--region=us-central1'
-  #     - '--platform=managed'
-  #     - '--allow-unauthenticated'
-  #     - '--set-env-vars=GCP_PROJECT_ID=$PROJECT_ID'
+      - 'run'
+      - 'deploy'
+      - 'gtm-validator'
+      - '--image=gcr.io/$PROJECT_ID/gtm-validator:$SHORT_SHA'
+      - '--region=us-west1'
+      - '--platform=managed'
+      - '--allow-unauthenticated'
+      - '--service-account=forge-177@$PROJECT_ID.iam.gserviceaccount.com'
+      - '--add-cloudsql-instances=$PROJECT_ID:us-west1:gtm-db-v2'
+      - '--set-env-vars=GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,GCS_BUCKET_NAME=forge-497716-gtm-media'
+      - '--update-secrets=DB_PASSWORD=DB_PASSWORD:latest,DJANGO_SECRET_KEY=DJANGO_SECRET_KEY:latest'
 
 images:
   - 'gcr.io/$PROJECT_ID/gtm-validator:$SHORT_SHA'

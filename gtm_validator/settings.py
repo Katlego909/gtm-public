@@ -129,6 +129,8 @@ if os.getenv("ENVIRONMENT") == "production" or os.getenv("DATABASE_URL"):
             "PASSWORD": os.getenv("DB_PASSWORD", ""),
             "HOST": "/cloudsql/forge-497716:us-west1:gtm-db-v2",
             "PORT": "",
+            "CONN_MAX_AGE": 60,
+            "CONN_HEALTH_CHECKS": True,
         }
     }
 else:
@@ -159,8 +161,12 @@ STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Modern Django 4.2+ / 5.x configuration for WhiteNoise static storage
+GS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "")
+
 STORAGES = {
     "default": {
+        "BACKEND": "storages.backends.gcloud.GoogleCloudStorage",
+    } if GS_BUCKET_NAME else {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
     },
     "staticfiles": {
@@ -168,7 +174,8 @@ STORAGES = {
     },
 }
 
-# Media files (Uploads)
+# Media files (Uploads) - served from Cloud Storage in production when
+# GCS_BUCKET_NAME is set; falls back to local disk for local dev.
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
