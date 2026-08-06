@@ -165,10 +165,15 @@ GS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "")
 # Evidence documents are business-confidential, so the bucket stays private
 # and access happens via short-lived signed URLs. Cloud Run has no service
 # account key file to sign with directly, so signing goes through the IAM
-# Credentials API against the attached service account instead.
+# Credentials API (signBlob) against the attached service account instead.
+# GS_IAM_SIGN_BLOB requires django-storages >= 1.14.6; GS_SA_EMAIL tells the
+# signBlob call which service account to sign as (the one Cloud Run runs as).
 GS_DEFAULT_ACL = None
 GS_QUERYSTRING_AUTH = True
 GS_IAM_SIGN_BLOB = True
+GS_SA_EMAIL = os.getenv(
+    "GS_SA_EMAIL", "forge-177@forge-497716.iam.gserviceaccount.com"
+)
 GS_EXPIRATION = 3600  # signed URL lifetime, seconds
 
 STORAGES = {
