@@ -28,8 +28,17 @@ steps:
       - '--allow-unauthenticated'
       - '--service-account=forge-177@$PROJECT_ID.iam.gserviceaccount.com'
       - '--add-cloudsql-instances=$PROJECT_ID:us-west1:gtm-db-v2'
-      - '--set-env-vars=GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,GCS_BUCKET_NAME=forge-497716-gtm-media'
+      - '--set-env-vars=GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,DEBUG=False,GCS_BUCKET_NAME=forge-497716-gtm-media'
       - '--update-secrets=DB_PASSWORD=DB_PASSWORD:latest,DJANGO_SECRET_KEY=DJANGO_SECRET_KEY:latest'
+      # 2Gi is required, not optional: the app imports spaCy/sentence-transformers/
+      # scikit-learn at startup and 4 gunicorn workers exceed 512Mi (the default),
+      # which OOM-kills the container in a restart loop. Do not lower without also
+      # reducing --workers in docker-entrypoint.sh.
+      - '--memory=2Gi'
+      - '--cpu=2'
+      - '--min-instances=0'
+      - '--max-instances=4'
+      - '--timeout=120'
 
 images:
   - 'gcr.io/$PROJECT_ID/gtm-validator:$SHORT_SHA'
