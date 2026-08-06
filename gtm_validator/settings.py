@@ -162,6 +162,14 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Modern Django 4.2+ / 5.x configuration for WhiteNoise static storage
 GS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "")
+# Evidence documents are business-confidential, so the bucket stays private
+# and access happens via short-lived signed URLs. Cloud Run has no service
+# account key file to sign with directly, so signing goes through the IAM
+# Credentials API against the attached service account instead.
+GS_DEFAULT_ACL = None
+GS_QUERYSTRING_AUTH = True
+GS_IAM_SIGN_BLOB = True
+GS_EXPIRATION = 3600  # signed URL lifetime, seconds
 
 STORAGES = {
     "default": {
