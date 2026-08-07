@@ -208,12 +208,25 @@ else:
     EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
     EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
 
+# Brand shown in emails (subjects, headers, footers). Central so a rename is
+# one edit rather than scattered string literals across templates/helpers.
+BRAND_NAME = "ForgeGTM"
+
+# Absolute base URL for links in emails sent without a request object
+# (notifications, snapshot reports). Must be the real public URL in prod --
+# the old localhost fallback produced dead links. Override via env when the
+# custom domain lands.
+SITE_BASE_URL = os.getenv(
+    "SITE_BASE_URL", "https://gtm-validator-601175512678.us-west1.run.app"
+)
+BRAND_URL = os.getenv("BRAND_URL", SITE_BASE_URL)
+
 DEFAULT_FROM_EMAIL = os.getenv(
     "DEFAULT_FROM_EMAIL",
-    f"Funti3r GTM <{os.getenv('EMAIL_HOST_USER', 'noreply@funti3r.xyz')}>"
+    f"{BRAND_NAME} <{os.getenv('EMAIL_HOST_USER', 'noreply@funti3r.xyz')}>"
 )
 SERVER_EMAIL = os.getenv("SERVER_EMAIL", os.getenv("EMAIL_HOST_USER", "noreply@funti3r.xyz"))
-EMAIL_SUBJECT_PREFIX = "[Funti3r GTM] "
+EMAIL_SUBJECT_PREFIX = f"[{BRAND_NAME}] "
 
 GTM_REPORT_INTERNAL_TO = ["gtm-reports@funti3r.xyz"]
 EMAIL_REDIRECT_TO = os.getenv("EMAIL_REDIRECT_TO", "").strip()

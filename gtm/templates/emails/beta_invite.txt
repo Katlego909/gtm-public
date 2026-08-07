@@ -1,4 +1,4 @@
-You're invited to the Funti3r GTM Validator closed beta.
+You're invited to the ForgeGTM closed beta.
 
 What to expect:
 - A short assessment covering your Demand, Conversion, and Delivery motion
@@ -11,4 +11,4 @@ Create your account: {{ signup_url }}
 
 Questions or feedback any time -- just reply to this email or reach us at hello@funti3r.xyz.
 
-© 2026 Funti3r GTM. All rights reserved.
+© 2026 ForgeGTM. All rights reserved.

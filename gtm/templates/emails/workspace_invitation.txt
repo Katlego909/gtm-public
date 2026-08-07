@@ -6,4 +6,4 @@ Invited by: {{ inviter_name }}
 
 This invitation expires in 7 days. If you didn't expect this email, you can safely ignore it.
 
-© 2026 Funti3r GTM. All rights reserved.
+© 2026 ForgeGTM. All rights reserved.

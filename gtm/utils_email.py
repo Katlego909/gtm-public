@@ -71,9 +71,8 @@ def send_snapshot_report_email(snapshot):
         "pdf_download_url": base_url + reverse('gtm:download', args=[session.uuid]),
         
         # Branding
-        "brand_name": "Funti3r GTM Validator",
-        "brand_url": "https://funti3r.xyz",
-        "logo_url": "https://funti3r.xyz/static/brand/funti3r-logo.png",
+        "brand_name": getattr(settings, "BRAND_NAME", "ForgeGTM"),
+        "brand_url": getattr(settings, "BRAND_URL", base_url),
         "preheader": f"Your GTM score: {floatformat(snapshot.overall, 0)}/100 • {snapshot.band.stage if snapshot.band else 'Assessment Complete'} • Download your playbook now!",
     }
 
@@ -122,10 +121,10 @@ def send_workspace_invitation_email(invitation, request=None):
         'inviter_name': inviter_name,
         'invite_url': invite_url,
         'role': invitation.role.replace('_', ' '),
-        'brand_name': "Funti3r GTM Validator",
+        'brand_name': getattr(settings, "BRAND_NAME", "ForgeGTM"),
     }
-    
-    subject = f"You've been invited to join {workspace.name} on Funti3r"
+
+    subject = f"You've been invited to join {workspace.name} on {getattr(settings, 'BRAND_NAME', 'ForgeGTM')}"
     html_body = render_to_string("emails/workspace_invitation.html", context)
     text_body = render_to_string("emails/workspace_invitation.txt", context)
     
@@ -162,7 +161,7 @@ def send_beta_invite_email(invite_code, to_email, request=None):
         'signup_url': signup_url,
     }
 
-    subject = "You're invited to the Funti3r GTM Validator beta"
+    subject = f"You're invited to the {getattr(settings, 'BRAND_NAME', 'ForgeGTM')} beta"
     html_body = render_to_string("emails/beta_invite.html", context)
     text_body = render_to_string("emails/beta_invite.txt", context)
 
@@ -213,7 +212,7 @@ def send_notification_email(recipient, title, message, link=""):
         'title': title,
         'message': message,
         'link': absolute_link,
-        'brand_name': "Funti3r GTM Validator",
+        'brand_name': getattr(settings, "BRAND_NAME", "ForgeGTM"),
     }
 
     subject = title
