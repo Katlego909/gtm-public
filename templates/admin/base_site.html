@@ -1,0 +1,13 @@
+{% extends "admin/base.html" %}
+
+{% block title %}{{ title }} | ForgeGTM admin{% endblock %}
+
+{% block branding %}
+<h1 id="site-name"><a href="{% url 'admin:index' %}">ForgeGTM administration</a></h1>
+{% endblock %}
+
+{% block nav-global %}
+<div style="float:right; padding:0 12px; line-height:1.4;">
+  <a href="{% url 'admin:beta_ops' %}" style="color:#fff; font-weight:600;">Beta Ops Dashboard</a>
+</div>
+{% endblock %}

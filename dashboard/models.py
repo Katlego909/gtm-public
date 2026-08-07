@@ -402,6 +402,10 @@ class BetaFeedback(models.Model):
     reference_id = models.CharField(max_length=40, blank=True, default="")
     message = models.TextField()
     page_url = models.CharField(max_length=500, blank=True, default="")
+    reviewed = models.BooleanField(
+        default=False,
+        help_text="Triage flag for beta ops -- set once someone has read/actioned this.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

@@ -1,0 +1,45 @@
+{% extends "admin/base_site.html" %}
+
+{% block content_title %}<h1>Beta Ops Dashboard</h1>{% endblock %}
+
+{% block content %}
+<div style="max-width:1040px;">
+
+  <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:12px; margin:8px 0 28px;">
+    {% for label, value, sub in tiles %}
+      <div style="border:1px solid #dcdcdc; background:#fff; padding:14px 16px;">
+        <div style="font-size:12px; text-transform:uppercase; letter-spacing:.03em; color:#6b7280;">{{ label }}</div>
+        <div style="font-size:26px; font-weight:700; color:#111827; margin-top:4px;">{{ value }}</div>
+        {% if sub %}<div style="font-size:12px; color:#9ca3af; margin-top:2px;">{{ sub }}</div>{% endif %}
+      </div>
+    {% endfor %}
+  </div>
+
+  <h2 style="border-bottom:1px solid #dcdcdc; padding-bottom:6px;">Top token spenders (current period)</h2>
+  <table style="width:100%; border-collapse:collapse; margin-top:8px;">
+    <thead>
+      <tr style="text-align:left; color:#6b7280;">
+        <th style="padding:6px 8px; border-bottom:1px solid #dcdcdc;">Account</th>
+        <th style="padding:6px 8px; border-bottom:1px solid #dcdcdc;">Tokens used</th>
+        <th style="padding:6px 8px; border-bottom:1px solid #dcdcdc;">Budget</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for acc in top_spenders %}
+        <tr>
+          <td style="padding:6px 8px; border-bottom:1px solid #eee;">{{ acc }}</td>
+          <td style="padding:6px 8px; border-bottom:1px solid #eee;">{{ acc.tokens_used }}</td>
+          <td style="padding:6px 8px; border-bottom:1px solid #eee;">{{ acc.token_budget }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="3" style="padding:8px; color:#9ca3af;">No AI usage recorded yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <p style="margin-top:20px;">
+    <a href="{% url 'admin:index' %}">&larr; Back to admin home</a>
+  </p>
+
+</div>
+{% endblock %}

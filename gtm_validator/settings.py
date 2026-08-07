@@ -99,7 +99,10 @@ ROOT_URLCONF = "gtm_validator.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        # Project-level dir is searched before app dirs, so admin template
+        # overrides here win over django.contrib.admin's (which is listed
+        # earlier in INSTALLED_APPS).
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [

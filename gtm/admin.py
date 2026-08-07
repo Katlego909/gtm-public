@@ -1,14 +1,22 @@
 # admin.py
 from django.contrib import admin
-from django.urls import reverse
-from django.utils.html import format_html
+from django.urls import reverse, path
+from django.shortcuts import redirect
+from django.utils import timezone
+from django.utils.html import format_html, format_html_join
 from django.contrib import messages
+from django.db.models import Q, F, Sum, Count
+from django.contrib.auth import get_user_model
+from django.contrib.auth.admin import UserAdmin as DjangoUserAdmin
 from .utils_email import send_snapshot_report_email
 from .models import AssessmentSession, ResultSnapshot, RecommendationBand, Category, Question, Response, ActionItem, ToolRecommendation, ChatMessage, WorkspaceChatMessage, AgentDocument
 from .models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation
 from .models_ai_credits import AICreditAccount, AICreditTransaction
+from .models_ai_locks import AIGenerationLock
 from .models_beta import BetaInviteCode
-from dashboard.models import GapAnalysisMetric
+from dashboard.models import GapAnalysisMetric, BetaFeedback
+
+User = get_user_model()
 
 @admin.action(description="Resend report email")
 def resend_report(modeladmin, request, queryset):
@@ -149,11 +157,42 @@ class ResultSnapshotInline(admin.StackedInline):
         }),
     )
 
+@admin.action(description="Reset stuck AI generation (clear locks)")
+def reset_stuck_ai(modeladmin, request, queryset):
+    """Clear leftover AI generation locks for the selected sessions.
+
+    Locks are keyed by snapshot id (playbook/enrichment) and response id
+    (diagnostic) -- see gtm/ai_services.py -- so map each session to those
+    ids and delete any matching lock rows, freeing the content to regenerate.
+    """
+    total = 0
+    for session in queryset:
+        ids = []
+        snap = getattr(session, "snapshot", None)
+        if snap:
+            ids.append(str(snap.id))
+        ids += [str(pk) for pk in session.responses.values_list("id", flat=True)]
+        if not ids:
+            continue
+        q = Q()
+        for i in ids:
+            q |= Q(lock_key__icontains=i)
+        deleted, _ = AIGenerationLock.objects.filter(q).delete()
+        total += deleted
+    messages.success(
+        request,
+        f"Cleared {total} stuck AI generation lock(s) across {queryset.count()} session(s).",
+    )
+
+
 @admin.register(AssessmentSession)
 class AssessmentSessionAdmin(admin.ModelAdmin):
-    list_display = ("company_name", "industry", "is_completed", "created_at", "snapshot_link")
-    search_fields = ("company_name", "industry", "uuid")
+    actions = [reset_stuck_ai]
+    list_display = ("company_name", "industry", "user", "is_completed", "created_at", "snapshot_link")
+    list_filter = ("is_completed", "created_at")
+    search_fields = ("company_name", "industry", "uuid", "user__username", "user__email")
     ordering = ("-created_at",)
+    raw_id_fields = ("user", "workspace")
 
     inlines = (ResultSnapshotInline,)
 
@@ -288,14 +327,46 @@ def reset_credit_period(modeladmin, request, queryset):
     messages.success(request, f"Reset the current period for {count} account(s).")
 
 
+class HighUsageFilter(admin.SimpleListFilter):
+    """Spot accounts that are running low on their token budget this period."""
+    title = "usage level"
+    parameter_name = "usage_level"
+
+    def lookups(self, request, model_admin):
+        return (("high", ">= 80% used"), ("exhausted", "Exhausted (100%)"))
+
+    def queryset(self, request, qs):
+        value = self.value()
+        if value == "high":
+            return qs.filter(tokens_used__gte=F("token_budget") * 0.8)
+        if value == "exhausted":
+            return qs.filter(tokens_used__gte=F("token_budget"))
+        return qs
+
+
 @admin.register(AICreditAccount)
 class AICreditAccountAdmin(admin.ModelAdmin):
     actions = [reset_credit_period]
-    list_display = ('__str__', 'period_length', 'token_budget', 'tokens_used', 'period_started_at', 'updated_at')
-    list_filter = ('period_length',)
+    list_display = ('__str__', 'period_length', 'usage_display', 'remaining_display', 'period_started_at', 'updated_at')
+    list_filter = (HighUsageFilter, 'period_length')
     list_select_related = ('workspace', 'user')
     search_fields = ('workspace__name', 'user__username', 'user__email')
     readonly_fields = ('id', 'tokens_used', 'period_started_at', 'created_at', 'updated_at')
+
+    def usage_display(self, obj):
+        budget = obj.token_budget or 0
+        used = obj.tokens_used or 0
+        pct = round(used / budget * 100) if budget else 0
+        color = "#b91c1c" if pct >= 80 else ("#b45309" if pct >= 50 else "#15803d")
+        return format_html(
+            '<span style="color:{};">{} / {} ({}%)</span>',
+            color, f"{used:,}", f"{budget:,}", pct,
+        )
+    usage_display.short_description = "Usage (period)"
+
+    def remaining_display(self, obj):
+        return f"{max(0, (obj.token_budget or 0) - (obj.tokens_used or 0)):,}"
+    remaining_display.short_description = "Remaining"
     # token_budget and period_length stay editable -- this is the manual
     # adjustment surface for v1 (no self-serve UI): raise token_budget to
     # grant more headroom, or use the "Reset current period" action to
@@ -327,10 +398,181 @@ def email_invite_code(modeladmin, request, queryset):
         messages.warning(request, f"Skipped {skipped} code(s) with no email on file.")
 
 
+class RedemptionStatusFilter(admin.SimpleListFilter):
+    """Filter invite codes by unused / used / expired-and-unused."""
+    title = "redemption status"
+    parameter_name = "redemption"
+
+    def lookups(self, request, model_admin):
+        return (("unused", "Unused"), ("used", "Used"), ("expired", "Expired (unused)"))
+
+    def queryset(self, request, qs):
+        now = timezone.now()
+        value = self.value()
+        if value == "used":
+            return qs.filter(used_by__isnull=False)
+        if value == "unused":
+            return qs.filter(used_by__isnull=True).filter(
+                Q(expires_at__isnull=True) | Q(expires_at__gt=now)
+            )
+        if value == "expired":
+            return qs.filter(used_by__isnull=True, expires_at__isnull=False, expires_at__lte=now)
+        return qs
+
+
 @admin.register(BetaInviteCode)
 class BetaInviteCodeAdmin(admin.ModelAdmin):
     actions = [email_invite_code]
-    list_display = ('code', 'email', 'note', 'is_used', 'used_by', 'created_at', 'expires_at')
-    list_filter = ('created_at',)
+    change_list_template = "admin/gtm/betainvitecode/change_list.html"
+    list_display = ('code', 'email', 'note', 'status_badge', 'used_by', 'created_at', 'expires_at')
+    list_filter = (RedemptionStatusFilter, 'created_at')
     search_fields = ('code', 'email', 'note', 'used_by__username', 'used_by__email')
     readonly_fields = ('used_by', 'used_at', 'created_at')
+
+    def status_badge(self, obj):
+        if obj.is_used:
+            return format_html('<span style="color:#6b7280;">Used</span>')
+        if obj.is_expired:
+            return format_html('<span style="color:#b91c1c;">Expired</span>')
+        return format_html('<span style="color:#15803d;font-weight:600;">Unused</span>')
+    status_badge.short_description = "Status"
+
+    def get_urls(self):
+        urls = super().get_urls()
+        extra = [
+            path(
+                "generate/",
+                self.admin_site.admin_view(self.generate_codes_view),
+                name="gtm_betainvitecode_generate",
+            ),
+        ]
+        return extra + urls
+
+    def generate_codes_view(self, request):
+        """One-click bulk generation from the changelist toolbar (?count=N)."""
+        try:
+            count = max(1, min(100, int(request.GET.get("count", 5))))
+        except (TypeError, ValueError):
+            count = 5
+        created = [BetaInviteCode.objects.create(note="Generated from admin") for _ in range(count)]
+        self.message_user(
+            request,
+            f"Generated {len(created)} invite code(s): " + ", ".join(c.code for c in created),
+            level=messages.SUCCESS,
+        )
+        return redirect(reverse("admin:gtm_betainvitecode_changelist"))
+
+
+# ── AI generation locks (support: clear stuck generation) ─────────
+
+@admin.register(AIGenerationLock)
+class AIGenerationLockAdmin(admin.ModelAdmin):
+    list_display = ("lock_key", "expires_at", "is_expired", "created_at")
+    search_fields = ("lock_key",)
+    ordering = ("-created_at",)
+    readonly_fields = ("created_at", "updated_at")
+
+    def is_expired(self, obj):
+        return obj.expires_at <= timezone.now()
+    is_expired.boolean = True
+    is_expired.short_description = "Expired"
+
+
+# ── User admin: tester activity at a glance (support/moderation) ──
+
+try:
+    admin.site.unregister(User)
+except admin.sites.NotRegistered:
+    pass
+
+
+@admin.register(User)
+class CustomUserAdmin(DjangoUserAdmin):
+    list_display = (
+        "username", "email", "is_active", "is_staff",
+        "date_joined", "assessment_count", "workspaces",
+    )
+    list_filter = DjangoUserAdmin.list_filter + ("date_joined",)
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(
+            _assessment_count=Count("gtm_sessions", distinct=True)
+        )
+
+    def assessment_count(self, obj):
+        return obj._assessment_count
+    assessment_count.short_description = "Assessments"
+    assessment_count.admin_order_field = "_assessment_count"
+
+    def workspaces(self, obj):
+        memberships = (
+            WorkspaceMembership.objects
+            .filter(user=obj, is_active=True)
+            .select_related("workspace")
+        )
+        if not memberships:
+            return "—"
+        return format_html_join(
+            ", ", '<a href="{}">{}</a>',
+            (
+                (reverse("admin:gtm_workspace_change", args=[m.workspace_id]), m.workspace.name)
+                for m in memberships
+            ),
+        )
+    workspaces.short_description = "Workspaces"
+
+
+# ── Beta Ops Dashboard (aggregate view at /admin/beta-ops/) ───────
+
+def beta_ops_dashboard(request):
+    """Read-only at-a-glance view of the beta: signups, invite codes,
+    workspaces, assessments, and Vertex AI token spend."""
+    from datetime import timedelta
+
+    now = timezone.now()
+    today = now.date()
+    week_ago = now - timedelta(days=7)
+
+    assessments_total = AssessmentSession.objects.count()
+    assessments_done = AssessmentSession.objects.filter(is_completed=True).count()
+
+    tiles = [
+        ("Total users", f"{User.objects.count():,}", ""),
+        ("Signups today", f"{User.objects.filter(date_joined__date=today).count():,}", ""),
+        ("Signups (7d)", f"{User.objects.filter(date_joined__gte=week_ago).count():,}", ""),
+        ("Invite codes used", f"{BetaInviteCode.objects.filter(used_by__isnull=False).count():,}", ""),
+        ("Invite codes unused", f"{BetaInviteCode.objects.filter(used_by__isnull=True).count():,}", ""),
+        ("Active workspaces", f"{Workspace.objects.filter(is_active=True).count():,}", ""),
+        ("Assessments completed", f"{assessments_done:,}", f"of {assessments_total:,} total"),
+        ("Vertex AI tokens spent", f"{AICreditTransaction.objects.aggregate(t=Sum('tokens_spent'))['t'] or 0:,}", "all time"),
+        ("Feedback (7d)", f"{BetaFeedback.objects.filter(created_at__gte=week_ago).count():,}", ""),
+        ("Feedback unreviewed", f"{BetaFeedback.objects.filter(reviewed=False).count():,}", ""),
+    ]
+
+    top_spenders = list(
+        AICreditAccount.objects
+        .select_related("workspace", "user")
+        .order_by("-tokens_used")[:5]
+    )
+
+    context = {
+        **admin.site.each_context(request),
+        "title": "Beta Ops Dashboard",
+        "tiles": tiles,
+        "top_spenders": top_spenders,
+    }
+    from django.shortcuts import render
+    return render(request, "admin/beta_ops.html", context)
+
+
+# Register the custom page on the default admin site without replacing it.
+_django_admin_get_urls = admin.site.get_urls
+
+
+def _get_urls_with_beta_ops():
+    return [
+        path("beta-ops/", admin.site.admin_view(beta_ops_dashboard), name="beta_ops"),
+    ] + _django_admin_get_urls()
+
+
+admin.site.get_urls = _get_urls_with_beta_ops
