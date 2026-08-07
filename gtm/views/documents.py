@@ -148,13 +148,13 @@ def upload_delivery_document(request, session_id):
     )
 
     def _extract_in_background(doc_id, ftype):
-        from ..delivery_analyzer import extract_text_from_path
+        from ..delivery_analyzer import extract_text_from_field
         from ..ai_services import _get_client
         from ..ai_credits import resolve_account_for_session
         d = DeliveryDocument.objects.get(id=doc_id)
         client = _get_client() if ftype == 'image' else None
         account = resolve_account_for_session(d.session)
-        text = extract_text_from_path(d.file.path, ftype, client, "gemini-2.5-flash", account=account)
+        text = extract_text_from_field(d.file, ftype, client, "gemini-2.5-flash", account=account)
         d.extracted_text = text
         d.save(update_fields=['extracted_text'])
 
@@ -309,13 +309,13 @@ def upload_category_document(request, session_id, category):
     ).exclude(id=doc.id).update(analysis_result={})
 
     def _extract_in_background(doc_id, ftype):
-        from ..delivery_analyzer import extract_text_from_path
+        from ..delivery_analyzer import extract_text_from_field
         from ..ai_services import _get_client
         from ..ai_credits import resolve_account_for_session
         d = CategoryDocument.objects.get(id=doc_id)
         client = _get_client() if ftype == 'image' else None
         account = resolve_account_for_session(d.session)
-        text = extract_text_from_path(d.file.path, ftype, client, "gemini-2.5-flash", account=account)
+        text = extract_text_from_field(d.file, ftype, client, "gemini-2.5-flash", account=account)
         d.extracted_text = text
         d.save(update_fields=['extracted_text'])
 

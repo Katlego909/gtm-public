@@ -397,6 +397,37 @@ def extract_text_from_path(file_path: str, file_type: str,
     return text[:_TEXT_LIMIT_PER_DOC]
 
 
+def extract_text_from_field(file_field, file_type: str,
+                            client=None, model_id: str = "", *, account=None) -> str:
+    """Backend-agnostic wrapper around extract_text_from_path.
+
+    The format parsers need a real local filesystem path, but on cloud storage
+    (GCS) FieldFile.path raises NotImplementedError("...doesn't support absolute
+    paths"). Copy the stored file to a NamedTemporaryFile first so extraction
+    works on any storage backend (local disk or GCS).
+    """
+    import os
+    import tempfile
+
+    suffix = os.path.splitext(file_field.name)[1]
+    file_field.open('rb')
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            for chunk in file_field.chunks():
+                tmp.write(chunk)
+            tmp_path = tmp.name
+    finally:
+        file_field.close()
+
+    try:
+        return extract_text_from_path(tmp_path, file_type, client, model_id, account=account)
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+
+
 # ---------------------------------------------------------------------------
 # Stage 2A — TF-IDF keyword ranking (scikit-learn)
 # ---------------------------------------------------------------------------
