@@ -366,11 +366,12 @@ class Notification(models.Model):
 class UserSettings(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='settings')
 
-    # Email notifications
+    # Email notifications (all default on -- users opt out per-type)
     email_task_assigned = models.BooleanField(default=True)
     email_task_completed = models.BooleanField(default=True)
     email_workspace_invite = models.BooleanField(default=True)
-    email_ai_insights = models.BooleanField(default=False)
+    email_ai_insights = models.BooleanField(default=True)
+    email_system = models.BooleanField(default=True)
 
     # In-app notifications
     inapp_task_assigned = models.BooleanField(default=True)

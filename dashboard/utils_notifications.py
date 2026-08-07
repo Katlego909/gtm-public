@@ -4,14 +4,22 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 
 # Maps a Notification.notification_type to the UserSettings fields that gate
-# in-app creation and email delivery for it. Types with no entry (e.g. 'system')
-# are always created in-app and never emailed.
+# in-app creation and email delivery for it. A None in-app field means the
+# in-app row is always created (only email is gated). Types with no entry at
+# all fall through to the 'system' defaults below.
 PREFERENCE_MAP = {
     'task': ('inapp_task_assigned', 'email_task_assigned'),
     'task_status': ('inapp_task_completed', 'email_task_completed'),
     'invite': ('inapp_workspace_activity', 'email_workspace_invite'),
     'ai_report': ('inapp_ai_insights', 'email_ai_insights'),
+    # System / uncategorised events: always shown in-app, emailed unless the
+    # user opts out. This is also the fallback for any unmapped type, so every
+    # notification-worthy event delivers by email by default.
+    'system': (None, 'email_system'),
 }
+
+# Fallback for any notification_type not explicitly listed above.
+_DEFAULT_PREFERENCE = PREFERENCE_MAP['system']
 
 
 def send_notification(recipient, title, message, notification_type='system', level='info', sender=None, workspace=None, link=""):
@@ -25,7 +33,7 @@ def send_notification(recipient, title, message, notification_type='system', lev
     if not recipient or not recipient.is_authenticated:
         return None
 
-    inapp_field, email_field = PREFERENCE_MAP.get(notification_type, (None, None))
+    inapp_field, email_field = PREFERENCE_MAP.get(notification_type, _DEFAULT_PREFERENCE)
 
     settings, _ = UserSettings.objects.get_or_create(user=recipient)
 

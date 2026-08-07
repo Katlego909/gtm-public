@@ -65,11 +65,20 @@ class SendNotificationPreferenceTests(TestCase):
         send_notification(self.recipient, "Hi", "A message", notification_type='task')
         self.assertEqual(len(mail.outbox), 0)
 
-    def test_system_type_has_no_gate(self):
+    def test_system_type_always_inapp_and_emails_by_default(self):
         settings_row, _ = UserSettings.objects.get_or_create(user=self.recipient)
-        # No inapp/email fields exist for 'system' -- it should always create
-        # the in-app row and never email regardless of other toggles.
+        # 'system' has no in-app gate (row always created) and now emails by
+        # default, gated by email_system -- part of email-for-everything.
         send_notification(self.recipient, "Welcome", "You're in", notification_type='system')
+        self.assertEqual(Notification.objects.filter(recipient=self.recipient).count(), 1)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_system_email_can_be_opted_out(self):
+        settings_row, _ = UserSettings.objects.get_or_create(user=self.recipient)
+        settings_row.email_system = False
+        settings_row.save()
+        send_notification(self.recipient, "Welcome", "You're in", notification_type='system')
+        # Still shown in-app, but no email once opted out.
         self.assertEqual(Notification.objects.filter(recipient=self.recipient).count(), 1)
         self.assertEqual(len(mail.outbox), 0)
 
