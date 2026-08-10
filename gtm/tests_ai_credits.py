@@ -67,6 +67,19 @@ class PeriodRolloverTests(TestCase):
         _start, ends_at = account.current_period_bounds()
         self.assertGreater(ends_at, timezone.now() + timedelta(days=3))
 
+    def test_monthly_period_bounds(self):
+        account = AICreditAccount.objects.create(
+            workspace=self.workspace, token_budget=1000, tokens_used=0,
+            period_length=AICreditAccount.PERIOD_MONTHLY,
+            period_started_at=timezone.now() - timedelta(days=10),
+        )
+        # 30-day period started 10 days ago -> ~20 days of runway left, and
+        # no rollover yet (still within the current period).
+        _start, ends_at = account.current_period_bounds()
+        self.assertGreater(ends_at, timezone.now() + timedelta(days=19))
+        account.roll_period_if_needed()
+        self.assertEqual(account.tokens_used, 0)
+
 
 class RecordSpendTests(TestCase):
     def setUp(self):
@@ -92,7 +105,9 @@ class RecordSpendTests(TestCase):
         self.assertEqual(self.account.tokens_used, 0)
 
     def test_record_spend_rolls_period_before_debiting(self):
-        self.account.period_started_at = timezone.now() - timedelta(days=5)
+        # 40 days back so the default monthly (30-day) period has lapsed and
+        # rolls forward before the new spend is applied.
+        self.account.period_started_at = timezone.now() - timedelta(days=40)
         self.account.tokens_used = 999
         self.account.save()
 
@@ -283,3 +298,47 @@ class ExhaustedBudgetAsyncPathTests(TestCase):
         mock_run.assert_not_called()
         self.snapshot.refresh_from_db()
         self.assertEqual(self.snapshot.ai_playbook_status, "no_credits")
+
+
+class TierAndCreditUnitTests(TestCase):
+    """Pricing tiers (budget presets) and the credit display unit."""
+
+    def setUp(self):
+        self.workspace = Workspace.objects.create(name="Tier Co")
+        self.user = User.objects.create_user(username="dave", password="pw")
+
+    def test_budget_for_tier_mapping(self):
+        self.assertEqual(
+            AICreditAccount.budget_for_tier(AICreditAccount.TIER_FREE), 250_000
+        )
+        self.assertEqual(
+            AICreditAccount.budget_for_tier(AICreditAccount.TIER_PRO), 2_500_000
+        )
+        self.assertEqual(
+            AICreditAccount.budget_for_tier(AICreditAccount.TIER_SCALE), 10_000_000
+        )
+
+    def test_budget_for_tier_unknown_falls_back_to_free(self):
+        self.assertEqual(
+            AICreditAccount.budget_for_tier("nonexistent"),
+            AICreditAccount.budget_for_tier(AICreditAccount.TIER_FREE),
+        )
+
+    def test_tokens_to_credits_conversion(self):
+        self.assertEqual(AICreditAccount.tokens_to_credits(250_000), 250)
+        self.assertEqual(AICreditAccount.tokens_to_credits(0), 0)
+        self.assertEqual(AICreditAccount.tokens_to_credits(None), 0)
+        # Rounds to whole credits (1,234 tokens -> ~1 credit).
+        self.assertEqual(AICreditAccount.tokens_to_credits(1_234), 1)
+        self.assertEqual(AICreditAccount.tokens_to_credits(1_500), 2)
+
+    def test_resolved_workspace_account_defaults_to_free_tier(self):
+        account = resolve_account(workspace=self.workspace)
+        self.assertEqual(account.tier, AICreditAccount.TIER_FREE)
+        self.assertEqual(account.token_budget, AICreditAccount.DEFAULT_WORKSPACE_TOKEN_BUDGET)
+        self.assertEqual(account.period_length, AICreditAccount.PERIOD_MONTHLY)
+
+    def test_resolved_personal_account_defaults_to_free_tier_personal_budget(self):
+        account = resolve_account(user=self.user)
+        self.assertEqual(account.tier, AICreditAccount.TIER_FREE)
+        self.assertEqual(account.token_budget, AICreditAccount.DEFAULT_PERSONAL_TOKEN_BUDGET)

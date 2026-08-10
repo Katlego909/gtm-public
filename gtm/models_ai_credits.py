@@ -33,10 +33,51 @@ class AICreditAccount(models.Model):
 
     PERIOD_DAILY = "daily"
     PERIOD_WEEKLY = "weekly"
-    PERIOD_CHOICES = [(PERIOD_DAILY, "Daily"), (PERIOD_WEEKLY, "Weekly")]
+    PERIOD_MONTHLY = "monthly"
+    PERIOD_CHOICES = [
+        (PERIOD_DAILY, "Daily"),
+        (PERIOD_WEEKLY, "Weekly"),
+        (PERIOD_MONTHLY, "Monthly"),
+    ]
 
-    DEFAULT_WORKSPACE_TOKEN_BUDGET = 500_000
+    # Pricing tiers. AI credits are (for now) the only thing that varies per
+    # tier -- a tier is just a monthly token-budget preset. There is no
+    # billing/self-serve upgrade yet: a tier is applied manually in Django
+    # admin (see gtm/admin.py). token_budget stays the source of truth the
+    # enforcement layer (gtm/ai_credits.py) reads; the tier only seeds it.
+    TIER_FREE = "free"
+    TIER_PRO = "pro"
+    TIER_SCALE = "scale"
+    TIER_CHOICES = [
+        (TIER_FREE, "Free"),
+        (TIER_PRO, "Pro"),
+        (TIER_SCALE, "Scale"),
+    ]
+    # Monthly Gemini prompt+output token allowance per tier. Tunable.
+    TIER_MONTHLY_TOKEN_BUDGET = {
+        TIER_FREE: 250_000,
+        TIER_PRO: 2_500_000,
+        TIER_SCALE: 10_000_000,
+    }
+
+    # User-facing "credits" are a friendlier unit than raw tokens: 1 credit =
+    # 1,000 tokens. Internally everything (token_budget, tokens_used, the
+    # spend math) stays in tokens -- credits are a display-only conversion.
+    TOKENS_PER_CREDIT = 1000
+
+    DEFAULT_WORKSPACE_TOKEN_BUDGET = TIER_MONTHLY_TOKEN_BUDGET[TIER_FREE]
     DEFAULT_PERSONAL_TOKEN_BUDGET = 100_000
+
+    @classmethod
+    def budget_for_tier(cls, tier):
+        """Monthly token budget for a tier, falling back to the free tier for
+        an unknown value."""
+        return cls.TIER_MONTHLY_TOKEN_BUDGET.get(tier, cls.TIER_MONTHLY_TOKEN_BUDGET[cls.TIER_FREE])
+
+    @staticmethod
+    def tokens_to_credits(tokens):
+        """Display-only conversion from raw tokens to whole credits."""
+        return round((tokens or 0) / AICreditAccount.TOKENS_PER_CREDIT)
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     workspace = models.OneToOneField(
@@ -48,10 +89,14 @@ class AICreditAccount(models.Model):
         related_name="ai_credit_account",
     )
 
-    period_length = models.CharField(max_length=10, choices=PERIOD_CHOICES, default=PERIOD_DAILY)
+    tier = models.CharField(
+        max_length=16, choices=TIER_CHOICES, default=TIER_FREE,
+        help_text="Pricing tier. Seeds token_budget on creation; change it to re-grant a preset budget.",
+    )
+    period_length = models.CharField(max_length=10, choices=PERIOD_CHOICES, default=PERIOD_MONTHLY)
     token_budget = models.PositiveIntegerField(
         default=DEFAULT_WORKSPACE_TOKEN_BUDGET,
-        help_text="Total Gemini prompt+output tokens allowed per period.",
+        help_text="Total Gemini prompt+output tokens allowed per period. Source of truth for enforcement; can be overridden independently of the tier.",
     )
     tokens_used = models.PositiveIntegerField(default=0)
     period_started_at = models.DateTimeField(default=timezone.now)
@@ -79,7 +124,17 @@ class AICreditAccount(models.Model):
         return f"AI credits: {owner}"
 
     def _period_timedelta(self):
-        return timedelta(days=1) if self.period_length == self.PERIOD_DAILY else timedelta(days=7)
+        # "Monthly" is a fixed 30-day rolling window, not a calendar month.
+        # current_period_bounds()'s lazy rollover uses integer division of
+        # elapsed time by this duration, which only works for a fixed-length
+        # period. A true calendar month (variable length, resets on the 1st)
+        # would need that method rewritten and is only worth it once there's
+        # a billing anchor date -- there is no billing yet.
+        if self.period_length == self.PERIOD_DAILY:
+            return timedelta(days=1)
+        if self.period_length == self.PERIOD_MONTHLY:
+            return timedelta(days=30)
+        return timedelta(days=7)
 
     def current_period_bounds(self, at=None):
         """Non-mutating: returns (effective_period_started_at, period_ends_at)

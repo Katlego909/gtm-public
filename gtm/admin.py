@@ -347,8 +347,8 @@ class HighUsageFilter(admin.SimpleListFilter):
 @admin.register(AICreditAccount)
 class AICreditAccountAdmin(admin.ModelAdmin):
     actions = [reset_credit_period]
-    list_display = ('__str__', 'period_length', 'usage_display', 'remaining_display', 'period_started_at', 'updated_at')
-    list_filter = (HighUsageFilter, 'period_length')
+    list_display = ('__str__', 'tier', 'period_length', 'usage_display', 'remaining_display', 'period_started_at', 'updated_at')
+    list_filter = (HighUsageFilter, 'tier', 'period_length')
     list_select_related = ('workspace', 'user')
     search_fields = ('workspace__name', 'user__username', 'user__email')
     readonly_fields = ('id', 'tokens_used', 'period_started_at', 'created_at', 'updated_at')
@@ -358,19 +358,24 @@ class AICreditAccountAdmin(admin.ModelAdmin):
         used = obj.tokens_used or 0
         pct = round(used / budget * 100) if budget else 0
         color = "#b91c1c" if pct >= 80 else ("#b45309" if pct >= 50 else "#15803d")
+        # Raw tokens are primary here (this is the operator surface that tunes
+        # token_budget in tokens); the credit equivalent is shown alongside.
         return format_html(
-            '<span style="color:{};">{} / {} ({}%)</span>',
+            '<span style="color:{};">{} / {} tokens ({}%) &middot; {} / {} credits</span>',
             color, f"{used:,}", f"{budget:,}", pct,
+            f"{AICreditAccount.tokens_to_credits(used):,}",
+            f"{AICreditAccount.tokens_to_credits(budget):,}",
         )
     usage_display.short_description = "Usage (period)"
 
     def remaining_display(self, obj):
-        return f"{max(0, (obj.token_budget or 0) - (obj.tokens_used or 0)):,}"
+        remaining = max(0, (obj.token_budget or 0) - (obj.tokens_used or 0))
+        return f"{remaining:,} tokens ({AICreditAccount.tokens_to_credits(remaining):,} credits)"
     remaining_display.short_description = "Remaining"
-    # token_budget and period_length stay editable -- this is the manual
-    # adjustment surface for v1 (no self-serve UI): raise token_budget to
-    # grant more headroom, or use the "Reset current period" action to
-    # zero out tokens_used immediately.
+    # tier, token_budget and period_length stay editable -- this is the manual
+    # adjustment surface for v1 (no self-serve UI): change tier to re-grant a
+    # preset budget, raise token_budget for a one-off override, or use the
+    # "Reset current period" action to zero out tokens_used immediately.
 
 
 @admin.register(AICreditTransaction)

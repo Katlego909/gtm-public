@@ -49,6 +49,7 @@ urlpatterns = [
     path("logout/", views.logout_view, name="logout"),
 
     # Legal / public pages
+    path("pricing/", views.pricing, name="pricing"),
     path("privacy/", views.privacy_policy, name="privacy"),
     path("terms/", views.terms_of_service, name="terms"),
     path("contact/", views.contact, name="contact"),

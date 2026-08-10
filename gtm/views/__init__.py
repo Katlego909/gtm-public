@@ -58,5 +58,5 @@ from .actions import (
     delete_assessment,
 )
 from .profile import history, logout_view, profile
-from .legal import contact, privacy_policy, terms_of_service
+from .legal import contact, pricing, privacy_policy, terms_of_service
 from .beta_cohort import beta_cohort

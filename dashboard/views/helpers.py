@@ -183,15 +183,22 @@ def _build_sidebar_notifications_context(request, current_workspace):
     ai_credits_low = False
     if current_workspace:
         from gtm.ai_credits import can_spend
+        from gtm.models_ai_credits import AICreditAccount
         credit_check = can_spend(workspace=current_workspace)
         if credit_check.account is not None:
-            ai_credits_remaining = credit_check.remaining
-            ai_credits_budget = credit_check.account.token_budget
+            # Percentages/low-balance are computed from raw tokens for
+            # accuracy; the displayed numbers are converted to the friendlier
+            # credit unit (1 credit = 1,000 tokens).
+            budget_tokens = credit_check.account.token_budget
+            remaining_tokens = credit_check.remaining
+            used_tokens = max(budget_tokens - remaining_tokens, 0)
             ai_credits_reset_at = credit_check.reset_at
-            ai_credits_used = max(ai_credits_budget - ai_credits_remaining, 0)
-            ai_credits_low = ai_credits_budget > 0 and (ai_credits_remaining / ai_credits_budget) < 0.1
-            if ai_credits_budget > 0:
-                ai_credits_percent_used = min(round(ai_credits_used / ai_credits_budget * 100), 100)
+            ai_credits_low = budget_tokens > 0 and (remaining_tokens / budget_tokens) < 0.1
+            if budget_tokens > 0:
+                ai_credits_percent_used = min(round(used_tokens / budget_tokens * 100), 100)
+            ai_credits_budget = AICreditAccount.tokens_to_credits(budget_tokens)
+            ai_credits_remaining = AICreditAccount.tokens_to_credits(remaining_tokens)
+            ai_credits_used = AICreditAccount.tokens_to_credits(used_tokens)
 
     return {
         'pending_items': pending_items,

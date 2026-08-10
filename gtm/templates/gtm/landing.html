@@ -28,6 +28,7 @@
     <div class="hidden md:flex items-center gap-7">
       <a href="#features" class="text-sm text-gray-700 hover:text-gray-900 transition font-medium">Features</a>
       <a href="#how-it-works" class="text-sm text-gray-700 hover:text-gray-900 transition font-medium">How It Works</a>
+      <a href="{% url 'gtm:pricing' %}" class="text-sm text-gray-700 hover:text-gray-900 transition font-medium">Pricing</a>
       {% if user.is_authenticated %}
         <a href="{% url 'gtm:history' %}" class="text-sm text-gray-700 hover:text-gray-900 transition font-medium">My Assessments</a>
       {% endif %}
@@ -84,6 +85,9 @@
       </a>
       <a href="#how-it-works" class="block px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition font-medium">
         How It Works
+      </a>
+      <a href="{% url 'gtm:pricing' %}" class="block px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition font-medium">
+        Pricing
       </a>
       {% if user.is_authenticated %}
         <a href="{% url 'gtm:history' %}" class="block px-4 py-3 text-gray-700 hover:bg-gray-50 rounded-lg transition font-medium">

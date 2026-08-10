@@ -1,0 +1,172 @@
+{% extends "gtm/base.html" %}
+{% load humanize %}
+{% block content %}
+
+<div class="app-shell">
+
+  <!-- Header -->
+  <div class="app-page-header text-center">
+    <span class="app-badge app-badge--accent mb-4">Simple, credit-based pricing</span>
+    <h1 class="app-page-title">Pricing</h1>
+    <p class="app-page-subtitle max-w-2xl mx-auto">
+      Every plan includes the full product. The only thing that changes is how many
+      AI credits you get each month &mdash; so you can start free and scale up when you need more.
+    </p>
+  </div>
+
+  <!-- Plan cards -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch">
+    {% for tier in tiers %}
+    <div class="app-card p-8 flex flex-col relative"
+         {% if tier.highlight %}style="border:2px solid var(--accent-600);"{% endif %}>
+
+      {% if tier.highlight %}
+      <span class="app-badge app-badge--accent absolute -top-3 left-1/2 -translate-x-1/2">Most popular</span>
+      {% endif %}
+
+      <h2 class="text-lg font-bold text-gray-900">{{ tier.name }}</h2>
+      <p class="text-sm text-gray-500 mt-1 leading-relaxed min-h-[2.5rem]">{{ tier.tagline }}</p>
+
+      <!-- Price -->
+      <div class="mt-6 flex items-baseline gap-1">
+        <span class="text-4xl font-extrabold tracking-tight text-gray-900">${{ tier.price }}</span>
+        <span class="text-sm font-medium text-gray-500">/ month</span>
+      </div>
+
+      <!-- Credit allowance (the differentiator) -->
+      <div class="mt-5 app-card-soft px-4 py-3">
+        <p class="text-2xl font-bold text-gray-900">{{ tier.credits|intcomma }}</p>
+        <p class="text-xs font-medium text-gray-500 uppercase tracking-wide">AI credits / month</p>
+      </div>
+
+      <!-- CTA -->
+      <div class="mt-6">
+        {% if tier.cta == 'start' %}
+          <a href="{% url 'gtm:start' %}" class="app-primary-button w-full px-5 py-3 text-sm">
+            Start free
+          </a>
+        {% else %}
+          <a href="mailto:hello@funti3r.xyz?subject=Join the {{ tier.name }} waitlist"
+             class="app-secondary-button w-full px-5 py-3 text-sm">
+            Join the {{ tier.name }} waitlist
+          </a>
+        {% endif %}
+      </div>
+
+      <p class="text-[11px] text-gray-400 mt-3 text-center">
+        {% if tier.cta == 'start' %}No card required.{% else %}Billing isn&rsquo;t live yet &mdash; we&rsquo;ll email you first.{% endif %}
+      </p>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Every plan includes -->
+  <div class="app-card p-8 mt-8">
+    <div class="app-section-header">
+      <span class="app-icon-badge"><i class="fas fa-box-open"></i></span>
+      <h2 class="text-lg font-bold text-gray-900">Every plan includes</h2>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-3">
+      <div class="flex items-start gap-2.5">
+        <i class="fas fa-check text-green-600 mt-1 shrink-0"></i>
+        <span class="text-sm text-gray-700">The 18-question assessment across Demand, Conversion &amp; Delivery</span>
+      </div>
+      <div class="flex items-start gap-2.5">
+        <i class="fas fa-check text-green-600 mt-1 shrink-0"></i>
+        <span class="text-sm text-gray-700">Deterministic 0&ndash;100 scoring and named GTM failure-pattern detection</span>
+      </div>
+      <div class="flex items-start gap-2.5">
+        <i class="fas fa-check text-green-600 mt-1 shrink-0"></i>
+        <span class="text-sm text-gray-700">AI-written playbook and industry-specific insights</span>
+      </div>
+      <div class="flex items-start gap-2.5">
+        <i class="fas fa-check text-green-600 mt-1 shrink-0"></i>
+        <span class="text-sm text-gray-700">A prioritised 30-day action plan</span>
+      </div>
+      <div class="flex items-start gap-2.5">
+        <i class="fas fa-check text-green-600 mt-1 shrink-0"></i>
+        <span class="text-sm text-gray-700">Document evidence upload (CSV, Excel, PDF, Word, images) scored by AI</span>
+      </div>
+      <div class="flex items-start gap-2.5">
+        <i class="fas fa-check text-green-600 mt-1 shrink-0"></i>
+        <span class="text-sm text-gray-700">Downloadable PDF report</span>
+      </div>
+      <div class="flex items-start gap-2.5">
+        <i class="fas fa-check text-green-600 mt-1 shrink-0"></i>
+        <span class="text-sm text-gray-700">Team workspaces and collaboration</span>
+      </div>
+      <div class="flex items-start gap-2.5">
+        <i class="fas fa-check text-green-600 mt-1 shrink-0"></i>
+        <span class="text-sm text-gray-700">AI agents and the gap-analysis dashboard</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- How credits work -->
+  <div class="app-card p-8 mt-6">
+    <div class="app-section-header">
+      <span class="app-icon-badge"><i class="fas fa-coins"></i></span>
+      <h2 class="text-lg font-bold text-gray-900">How credits work</h2>
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div>
+        <p class="text-sm font-semibold text-gray-900 mb-1">What a credit is</p>
+        <p class="text-sm text-gray-600 leading-relaxed">
+          One credit is {{ tokens_per_credit|intcomma }} units of AI processing. Most actions cost only
+          a few credits &mdash; a full playbook is roughly a handful, a chat message even less.
+        </p>
+      </div>
+      <div>
+        <p class="text-sm font-semibold text-gray-900 mb-1">What uses them</p>
+        <p class="text-sm text-gray-600 leading-relaxed">
+          Only AI features: the playbook, diagnostic insights, document analysis, enrichment, and
+          chatting with the GTM strategist or agents. Scoring, the assessment and PDF export are always free.
+        </p>
+      </div>
+      <div>
+        <p class="text-sm font-semibold text-gray-900 mb-1">If you run out</p>
+        <p class="text-sm text-gray-600 leading-relaxed">
+          Nothing breaks. AI features pause until your allowance resets at the start of the next month,
+          and the app falls back to its deterministic scoring and static recommendations in the meantime.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAQ -->
+  <div class="mt-10">
+    <h2 class="text-lg font-bold text-gray-900 mb-4 text-center">Frequently asked</h2>
+    <div class="max-w-3xl mx-auto space-y-3">
+      <div class="app-card p-5">
+        <p class="text-sm font-semibold text-gray-900">Do unused credits roll over?</p>
+        <p class="text-sm text-gray-600 mt-1 leading-relaxed">No &mdash; your allowance refreshes at the start of each monthly period.</p>
+      </div>
+      <div class="app-card p-5">
+        <p class="text-sm font-semibold text-gray-900">Are credits per person or per team?</p>
+        <p class="text-sm text-gray-600 mt-1 leading-relaxed">Per workspace. Everyone collaborating in a workspace draws from the same monthly pool.</p>
+      </div>
+      <div class="app-card p-5">
+        <p class="text-sm font-semibold text-gray-900">Can I change plans later?</p>
+        <p class="text-sm text-gray-600 mt-1 leading-relaxed">
+          Yes. Self-serve billing is on the way &mdash; for now, <a href="{% url 'gtm:contact' %}" class="text-indigo-600 hover:text-indigo-700 font-medium">get in touch</a>
+          and we&rsquo;ll move your workspace onto the right plan.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom CTA -->
+  <div class="text-center mt-12">
+    <p class="text-sm text-gray-500 mb-3">Start with the free plan &mdash; no card, no commitment.</p>
+    <a href="{% url 'gtm:start' %}" class="app-primary-button px-6 py-3 text-base inline-flex">
+      Start your free assessment
+    </a>
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block full_width_footer %}
+{% include "gtm/partials/marketing_footer.html" %}
+{% endblock %}

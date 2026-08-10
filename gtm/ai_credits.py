@@ -54,13 +54,21 @@ def resolve_account(*, workspace=None, user=None) -> Optional[AICreditAccount]:
     if workspace is not None:
         account, _ = AICreditAccount.objects.get_or_create(
             workspace=workspace,
-            defaults={"token_budget": AICreditAccount.DEFAULT_WORKSPACE_TOKEN_BUDGET},
+            defaults={
+                "tier": AICreditAccount.TIER_FREE,
+                "token_budget": AICreditAccount.DEFAULT_WORKSPACE_TOKEN_BUDGET,
+            },
         )
         return account
     if user is not None and getattr(user, "is_authenticated", False):
+        # Personal (no-workspace) pool is the free-tier fallback, with a
+        # smaller allowance than a workspace's free budget.
         account, _ = AICreditAccount.objects.get_or_create(
             user=user,
-            defaults={"token_budget": AICreditAccount.DEFAULT_PERSONAL_TOKEN_BUDGET},
+            defaults={
+                "tier": AICreditAccount.TIER_FREE,
+                "token_budget": AICreditAccount.DEFAULT_PERSONAL_TOKEN_BUDGET,
+            },
         )
         return account
     return None

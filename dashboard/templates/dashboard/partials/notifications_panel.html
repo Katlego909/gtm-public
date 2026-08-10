@@ -4,7 +4,7 @@
     <div class="rounded-lg border {% if ai_credits_low %}border-amber-200 bg-amber-50{% else %}border-gray-200 bg-gray-50{% endif %} px-3 py-2.5">
         <div class="flex items-center justify-between mb-2">
             <p class="text-xs font-bold {% if ai_credits_low %}text-amber-700{% else %}text-gray-900{% endif %}">AI credits</p>
-            <p class="text-xs {% if ai_credits_low %}text-amber-700{% else %}text-gray-500{% endif %}">{{ ai_credits_used|intcomma }} of {{ ai_credits_budget|intcomma }} used</p>
+            <p class="text-xs {% if ai_credits_low %}text-amber-700{% else %}text-gray-500{% endif %}">{{ ai_credits_used|intcomma }} of {{ ai_credits_budget|intcomma }} credits used</p>
         </div>
         <div class="h-1.5 w-full rounded-full bg-gray-200 overflow-hidden">
             <div class="h-full rounded-full {% if ai_credits_low %}bg-amber-500{% else %}bg-indigo-600{% endif %}"
