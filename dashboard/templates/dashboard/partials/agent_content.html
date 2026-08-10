@@ -1090,7 +1090,10 @@ function initWorkspaceAgent() {
     }
 }
 
-const TEAM_AGENT_LABELS = JSON.parse(document.getElementById('agent-display-labels').textContent);
+// var (not const): this partial's <script> re-executes on every HTMX swap into
+// #main-content, and a top-level const would throw "already been declared" on the
+// second run, aborting the whole script.
+var TEAM_AGENT_LABELS = JSON.parse(document.getElementById('agent-display-labels').textContent);
 
 function appendTeamAgentMessage(message, isUser, responseHtml, agentType, documentRefs) {
     const container = document.getElementById('team-agent-messages');
@@ -1282,12 +1285,20 @@ function initTeamAgent() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', initDashboardAgent);
-document.addEventListener('htmx:afterSwap', initDashboardAgent);
-document.addEventListener('DOMContentLoaded', initWorkspaceAgent);
-document.addEventListener('htmx:afterSwap', initWorkspaceAgent);
-document.addEventListener('DOMContentLoaded', initTeamAgent);
-document.addEventListener('htmx:afterSwap', initTeamAgent);
+// Bind the document-level listeners only once. Because this script re-runs on
+// each HTMX swap, registering them unconditionally would stack duplicate
+// listeners on every navigation to this page.
+if (!window.__agentContentListenersBound) {
+    window.__agentContentListenersBound = true;
+    document.addEventListener('DOMContentLoaded', initDashboardAgent);
+    document.addEventListener('htmx:afterSwap', initDashboardAgent);
+    document.addEventListener('DOMContentLoaded', initWorkspaceAgent);
+    document.addEventListener('htmx:afterSwap', initWorkspaceAgent);
+    document.addEventListener('DOMContentLoaded', initTeamAgent);
+    document.addEventListener('htmx:afterSwap', initTeamAgent);
+}
+// Init the current DOM immediately (each initXxx is idempotent via a
+// dataset.initialized guard, so calling on every run is safe).
 initDashboardAgent();
 initWorkspaceAgent();
 initTeamAgent();
