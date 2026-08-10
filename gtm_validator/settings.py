@@ -21,7 +21,7 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-c=&nz9k*2q%_@ft=n_+
 # Default to True for local dev safety; explicitly set DEBUG=False in production
 DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1", "yes")
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,gtm-validator-601175512678.us-west1.run.app").split(",")
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,forge.funti3r.xyz,gtm-validator-601175512678.us-west1.run.app").split(",")
 
 # Error tracking (optional -- only active when SENTRY_DSN is set; safe to
 # leave sentry-sdk installed with no DSN configured, e.g. local dev/CI).
@@ -301,6 +301,7 @@ ACCOUNT_SIGNUP_FORM_CLASS = 'gtm.forms_beta.BetaInviteSignupForm'
 
 # CSRF validation handled via standard token validation for same-origin requests
 CSRF_TRUSTED_ORIGINS = [
+    "https://forge.funti3r.xyz",
     "https://gtm-validator-601175512678.us-west1.run.app",
     "http://localhost:8000",
 ]
