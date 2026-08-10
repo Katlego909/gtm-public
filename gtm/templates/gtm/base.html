@@ -14,8 +14,19 @@
   <!-- HTMX for SPA-like behavior -->
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <script>
-    document.body.addEventListener('htmx:configRequest', (event) => {
-        event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+    // Bind to `document` (not `document.body`, which is null while this runs in
+    // <head>) and read the csrftoken cookie -- mirrors dashboard/base.html.
+    // gtm-app mutations are all forms carrying the hidden csrf field, so this is
+    // defensive coverage for any future bare-element hx-post on a gtm page.
+    document.addEventListener('htmx:configRequest', function (evt) {
+      if (evt.detail.verb !== 'get') {
+        const csrfToken = document.cookie.split('; ')
+          .find(row => row.startsWith('csrftoken='))
+          ?.split('=')[1];
+        if (csrfToken) {
+          evt.detail.headers['X-CSRFToken'] = csrfToken;
+        }
+      }
     });
   </script>
 
