@@ -412,7 +412,6 @@
         <div id="sidebar-notifications-panel"
              class="p-4 overflow-y-auto"
              hx-get="{% url 'notifications_panel' %}"
-             hx-include="#workspace-selector"
              hx-trigger="load, refreshNotifications from:body"
              hx-swap="innerHTML">
             <div class="text-xs text-gray-500">Loading notifications...</div>
