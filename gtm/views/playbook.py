@@ -284,7 +284,7 @@ def playbook(request, session_id):
     # what actually guarantee no duplicate rows; the lock below is just a cost-saving
     # fast path so two racing requests don't both pay for a Gemini extraction call.
     if scoring_context and not session.actions.exists():
-        _autopop_lock_key = f"gtm:actionitem:autopopulate:{session.id}:lock"
+        _autopop_lock_key = f"gtm:actionitem:autopopulate:{session.pk}:lock"
         if _acquire_lock(_autopop_lock_key, ttl_seconds=60):
             try:
                 from ..ai_services import extract_tasks_from_playbook
