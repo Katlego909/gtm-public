@@ -1,3 +1,10 @@
+# Run the build as the dedicated forge service account (already has
+# storage.admin, cloudsql.client, secretmanager.secretAccessor, editor) rather
+# than the broad default compute SA. Requires options.logging below to be set
+# to CLOUD_LOGGING_ONLY (a user-specified build SA cannot use the default logs
+# bucket).
+serviceAccount: 'projects/forge-497716/serviceAccounts/forge-177@forge-497716.iam.gserviceaccount.com'
+
 steps:
   # Build the Docker image
   - name: 'gcr.io/cloud-builders/docker'
