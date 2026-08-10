@@ -8,7 +8,7 @@
 
 <div class="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50">
     <!-- KPI Summary Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 md:gap-6 mb-8">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 md:gap-6 mb-8">
         <div class="bg-white rounded-xl p-5 md:p-6 shadow-sm border border-gray-100">
             <p class="text-xs md:text-sm font-medium text-gray-500 uppercase tracking-wider">Total Assessments</p>
             <p class="text-2xl md:text-3xl font-bold text-gray-900 mt-1">
@@ -82,28 +82,30 @@
                 Export CSV
             </a>
         </div>
-        <table class="w-full">
-            <thead class="bg-gray-50 border-b border-gray-200">
-                <tr>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Company</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Industry</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Score</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Stage</th>
-                    <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Date</th>
-                </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-200">
-                {% for assessment in assessment_history %}
-                <tr class="hover:bg-gray-50 transition-colors">
-                    <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ assessment.company_name }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-600">{{ assessment.industry|default:"N/A" }}</td>
-                    <td class="px-4 py-3 text-sm font-bold text-indigo-900">{{ assessment.overall_score }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-600">{{ assessment.band_stage }}</td>
-                    <td class="px-4 py-3 text-sm text-gray-500">{{ assessment.created_at|date:"M d, Y" }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div class="overflow-x-auto">
+            <table class="w-full min-w-[640px]">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">Company</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">Industry</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">Score</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">Stage</th>
+                        <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">Date</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for assessment in assessment_history %}
+                    <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-4 py-3 text-sm font-medium text-gray-900">{{ assessment.company_name }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600">{{ assessment.industry|default:"N/A" }}</td>
+                        <td class="px-4 py-3 text-sm font-bold text-indigo-900">{{ assessment.overall_score }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600">{{ assessment.band_stage }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">{{ assessment.created_at|date:"M d, Y" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
     {% endif %}
 
@@ -217,9 +219,19 @@ function initAnalyticsCharts() {
         return;
     }
 
+    // Re-init guard: this initializer can run more than once (DOMContentLoaded +
+    // readyState fallback, and HTMX swaps in the dashboard shell). Destroy any
+    // chart already bound to a canvas before reusing it.
+    const destroyExisting = (canvas) => {
+        if (!canvas) return;
+        const prev = Chart.getChart(canvas);
+        if (prev) prev.destroy();
+    };
+
     // Weekly Activity Chart
     const ctxWeekly = document.getElementById('weeklyActivityAnalyticsChart');
     if (ctxWeekly) {
+        destroyExisting(ctxWeekly);
         const hasData = (chartData.items_created_per_day && chartData.items_created_per_day.some(v => v > 0))
             || (chartData.items_completed_per_day && chartData.items_completed_per_day.some(v => v > 0));
         const createdData = hasData ? chartData.items_created_per_day : [0, 0, 1, 0, 0, 0, 0];
@@ -261,6 +273,7 @@ function initAnalyticsCharts() {
     // Status Breakdown Donut
     const ctxStatus = document.getElementById('statusDonutAnalyticsChart');
     if (ctxStatus) {
+        destroyExisting(ctxStatus);
         const completed = parseInt(document.getElementById('js-completed-items')?.textContent || '0');
         const pending = parseInt(document.getElementById('js-pending-items')?.textContent || '0');
         const hasData = completed > 0 || pending > 0;
@@ -293,6 +306,7 @@ function initAnalyticsCharts() {
     if (chartData.score_trend_data.scores && chartData.score_trend_data.scores.length > 1) {
         const ctxTrend = document.getElementById('scoreTrendAnalyticsChart');
         if (ctxTrend) {
+            destroyExisting(ctxTrend);
             new Chart(ctxTrend.getContext('2d'), {
                 type: 'line',
                 data: {

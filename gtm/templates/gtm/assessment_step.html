@@ -108,7 +108,7 @@
   </div>
 
   <!-- Main Content Card -->
-  <div class="app-card p-8 md:p-10">
+  <div class="app-card p-5 sm:p-8 md:p-10">
     <!-- Category Header -->
     <div class="mb-8 pb-6 border-b border-gray-200">
       <div class="flex items-center gap-3 mb-3">
@@ -261,7 +261,7 @@
           {% endif %}
 
           {% with ai_prefill=prefilled_analysis|get_item:field.name %}
-          <div class="grid w-full grid-cols-5 gap-3 rating-group{% if ai_prefill %} ai-locked{% endif %}" id="rating-group-{{ field.name }}">
+          <div class="grid w-full grid-cols-5 gap-1.5 sm:gap-3 rating-group{% if ai_prefill %} ai-locked{% endif %}" id="rating-group-{{ field.name }}">
             {% for i in "12345" %}
               <input
                 class="rating-input sr-only"
@@ -279,7 +279,7 @@
 
           <!-- Rating Guide -->
           <div class="mt-3">
-            <div class="grid w-full grid-cols-5 gap-3 text-xs text-gray-600">
+            <div class="grid w-full grid-cols-5 gap-1.5 sm:gap-3 text-[10px] sm:text-xs text-gray-600 leading-tight">
               <div class="text-center">
                 <span class="block text-gray-500">Poor</span>
               </div>
