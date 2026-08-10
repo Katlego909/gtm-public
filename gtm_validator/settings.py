@@ -294,6 +294,13 @@ AUTHENTICATION_BACKENDS = [
 LOGIN_REDIRECT_URL = 'gtm:landing'
 LOGOUT_REDIRECT_URL = 'gtm:landing'
 ACCOUNT_LOGOUT_REDIRECT_URL = 'gtm:landing'
+# Keep users signed in after they close the browser. Sessions are stored
+# entirely in a signed cookie (SESSION_ENGINE=signed_cookies), so without this
+# allauth's default (ACCOUNT_SESSION_REMEMBER=None) ties persistence to the
+# login form's "Remember me" checkbox — unchecked meant set_expiry(0), i.e. a
+# browser-session cookie that vanished on browser close. True always persists
+# for SESSION_COOKIE_AGE (Django default: 2 weeks).
+ACCOUNT_SESSION_REMEMBER = True
 # Closed-beta gate: adds a required invite-code field to allauth's stock
 # signup form (see gtm/forms_beta.py). Remove this line to reopen public
 # signup once the beta is over.
