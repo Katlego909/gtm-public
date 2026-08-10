@@ -273,7 +273,7 @@ class AgentActionToolsTests(TestCase):
             result = tools["log_insight_to_crm"]("acme.com", "Weak ICP definition detected.")
         self.assertIn("Logged a note", result)
         self.assertIn("Acme Inc", result)
-        fake_client.create_note.assert_called_once_with("123", "[GTM Validator AI] Weak ICP definition detected.")
+        fake_client.create_note.assert_called_once_with("123", "[ForgeGTM AI] Weak ICP definition detected.")
 
     def test_log_insight_to_crm_without_connection_returns_setup_hint(self):
         tools = self._tools()

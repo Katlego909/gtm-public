@@ -345,7 +345,7 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
             company = client.find_company(company_identifier)
             if company is None:
                 return f"I couldn't find a single HubSpot company matching '{company_identifier}' -- try a more specific name or domain."
-            client.create_note(company['id'], f"[GTM Validator AI] {summary}")
+            client.create_note(company['id'], f"[ForgeGTM AI] {summary}")
         except HubSpotAPIError as exc:
             return f"HubSpot write failed: {exc}"
         company_name = company.get('properties', {}).get('name', company_identifier)
@@ -375,7 +375,7 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
             return error
 
         subject = item.note[:100]
-        body = f"GTM follow-up from Funti3r GTM Validator: {item.note}"
+        body = f"GTM follow-up from ForgeGTM: {item.note}"
         try:
             company = client.find_company(company_identifier)
             if company is None:

@@ -47,7 +47,7 @@ def render_insight_docx_response(*, company_name, ai_playbook_md, doc_title=None
         except Exception:
             pass
 
-    title = doc.add_heading("Funti3r GTM Validator", level=0)
+    title = doc.add_heading("ForgeGTM", level=0)
     for run in title.runs:
         run.font.color.rgb = _ACCENT_DARK_RGB
 

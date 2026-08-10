@@ -185,7 +185,7 @@ def send_global_ai_cap_alert_email(to_email):
     caller (gtm/ai_credits.py::_maybe_alert_global_cap_exceeded)."""
     from django.core.mail import send_mail
     send_mail(
-        subject="[GTM Validator] Global AI daily spend cap reached",
+        subject="[ForgeGTM] Global AI daily spend cap reached",
         message=(
             "The global AI_GLOBAL_DAILY_TOKEN_CAP has been reached today. "
             "New AI generation requests are being blocked app-wide until the "

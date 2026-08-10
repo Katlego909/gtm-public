@@ -113,11 +113,11 @@ def _header_footer(canvas, doc):
         except Exception:
             canvas.setFillColor(colors.HexColor(ACCENT_DARK))
             canvas.setFont("Helvetica-Bold", 11)
-            canvas.drawString(2 * cm, h - 1.15 * cm, "Funti3r GTM Validator")
+            canvas.drawString(2 * cm, h - 1.15 * cm, "ForgeGTM")
     else:
         canvas.setFillColor(colors.HexColor(ACCENT_DARK))
         canvas.setFont("Helvetica-Bold", 11)
-        canvas.drawString(2 * cm, h - 1.15 * cm, "Funti3r GTM Validator")
+        canvas.drawString(2 * cm, h - 1.15 * cm, "ForgeGTM")
 
     canvas.setFillColor(colors.HexColor("#94A3B8"))
     canvas.setFont("Helvetica", 9)
@@ -133,7 +133,7 @@ def _header_footer(canvas, doc):
     canvas.line(2 * cm, 1.1 * cm, w - 2 * cm, 1.1 * cm)
     canvas.setFillColor(colors.HexColor("#94A3B8"))
     canvas.setFont("Helvetica", 8.5)
-    canvas.drawString(2 * cm, 0.7 * cm, "Funti3r GTM Validator")
+    canvas.drawString(2 * cm, 0.7 * cm, "ForgeGTM")
     canvas.drawRightString(w - 2 * cm, 0.7 * cm, f"Page {doc.page}")
     canvas.restoreState()
 
@@ -353,7 +353,7 @@ def render_gtm_report_pdf_response(*, session, cat_scores, overall, band):
 
     # ── Cover / Summary with improved layout
     content.append(Spacer(1, 0.5 * cm))
-    content.append(Paragraph("Funti3r GTM Validator", styles["H1"]))
+    content.append(Paragraph("ForgeGTM", styles["H1"]))
     content.append(Paragraph("Assessment Report", styles["H2"]))
     content.append(Spacer(1, 0.8 * cm))
     
@@ -652,7 +652,7 @@ def render_insight_pdf_response(*, company_name, ai_playbook_md, doc_title=None,
 
     content = [
         Spacer(1, 0.5 * cm),
-        Paragraph("Funti3r GTM Validator", styles["H1"]),
+        Paragraph("ForgeGTM", styles["H1"]),
         Paragraph(f"{company_name or 'Company'} — AI Insight", styles["H2"]),
         Spacer(1, 0.4 * cm),
     ]
