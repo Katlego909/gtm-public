@@ -15,6 +15,26 @@ steps:
       - 'push'
       - 'gcr.io/$PROJECT_ID/gtm-validator:$SHORT_SHA'
 
+  # Apply DB migrations against Cloud SQL BEFORE routing traffic to the new
+  # revision. exec-wrapper starts the Cloud SQL Auth Proxy for the -s instance
+  # (creating the /cloudsql/... socket the app connects through) and runs
+  # `migrate` inside the freshly built image. Runs as the Cloud Build SA, which
+  # needs roles/cloudsql.client + roles/secretmanager.secretAccessor(DB_PASSWORD).
+  # If this step fails the build aborts and the deploy step never runs, so prod
+  # is never served against an unmigrated schema.
+  - name: 'gcr.io/google-appengine/exec-wrapper'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        /buildstep/execute.sh \
+          -i gcr.io/$PROJECT_ID/gtm-validator:$SHORT_SHA \
+          -s $PROJECT_ID:us-west1:gtm-db-v2 \
+          -e ENVIRONMENT=production \
+          -e DB_PASSWORD="$$DB_PASSWORD" \
+          -- python manage.py migrate --noinput
+    secretEnv: ['DB_PASSWORD']
+
   # Deploy to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
@@ -47,6 +67,11 @@ steps:
       - '--min-instances=0'
       - '--max-instances=4'
       - '--timeout=120'
+
+availableSecrets:
+  secretManager:
+    - versionName: projects/$PROJECT_ID/secrets/DB_PASSWORD/versions/latest
+      env: 'DB_PASSWORD'
 
 images:
   - 'gcr.io/$PROJECT_ID/gtm-validator:$SHORT_SHA'
