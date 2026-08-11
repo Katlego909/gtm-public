@@ -387,20 +387,30 @@ class AICreditTransactionAdmin(admin.ModelAdmin):
     date_hierarchy = 'created_at'
 
 
-@admin.action(description="Email invite code to the address on file")
+@admin.action(description="Resend invite email (even if already sent)")
 def email_invite_code(modeladmin, request, queryset):
-    from .utils_email import send_beta_invite_email
-    sent, skipped = 0, 0
+    """Force-send, unlike the save-time auto-send which fires once per address.
+
+    Each row is isolated in its own try/except: one dead address in a batch used
+    to raise straight out of the action and 500 the whole run, losing the sends
+    that had already succeeded.
+    """
+    sent, skipped, failed = 0, 0, []
     for invite in queryset:
         if not invite.email:
             skipped += 1
             continue
-        send_beta_invite_email(invite, invite.email, request=request)
-        sent += 1
+        try:
+            invite.send_invite_email(request=request)
+            sent += 1
+        except Exception as exc:  # noqa: BLE001 - one bad address must not abort the batch
+            failed.append(f"{invite.code} ({invite.email}): {exc}")
     if sent:
         messages.success(request, f"Sent {sent} invite email(s).")
     if skipped:
         messages.warning(request, f"Skipped {skipped} code(s) with no email on file.")
+    if failed:
+        messages.error(request, f"Failed to send {len(failed)}: " + "; ".join(failed))
 
 
 class RedemptionStatusFilter(admin.SimpleListFilter):
@@ -429,10 +439,44 @@ class RedemptionStatusFilter(admin.SimpleListFilter):
 class BetaInviteCodeAdmin(admin.ModelAdmin):
     actions = [email_invite_code]
     change_list_template = "admin/gtm/betainvitecode/change_list.html"
-    list_display = ('code', 'email', 'note', 'status_badge', 'used_by', 'created_at', 'expires_at')
-    list_filter = (RedemptionStatusFilter, 'created_at')
+    list_display = ('code', 'email', 'note', 'status_badge', 'sent_at', 'used_by', 'created_at', 'expires_at')
+    # EmptyFieldListFilter on sent_at gives a free Yes/No "has it been emailed?"
+    # filter -- the answer to "who is still waiting on an invite?"
+    list_filter = (RedemptionStatusFilter, ('sent_at', admin.EmptyFieldListFilter), 'created_at')
     search_fields = ('code', 'email', 'note', 'used_by__username', 'used_by__email')
-    readonly_fields = ('used_by', 'used_at', 'created_at')
+    readonly_fields = ('used_by', 'used_at', 'created_at', 'sent_at', 'created_by')
+
+    def save_model(self, request, obj, form, change):
+        """Save, then email the invite when there's a fresh address to send to.
+
+        Sends when an email is present and either it has never been sent or the
+        address itself just changed. That covers a code generated blank by the
+        "Generate N codes" toolbar and later given an address, and re-sends when a
+        typo'd address is corrected -- while editing a note or expiry on an
+        already-sent code stays quiet.
+
+        Kept synchronous rather than using utils_async.run_in_background: at one
+        invite per save, telling the operator whether it actually left the building
+        is worth more than the ~1s of SMTP latency.
+        """
+        if not change and obj.created_by_id is None:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
+
+        address_changed = bool(form and 'email' in getattr(form, 'changed_data', ()))
+        if not obj.email or (obj.is_sent and not address_changed):
+            return
+
+        try:
+            obj.send_invite_email(request=request)
+            messages.success(request, f"Invite code {obj.code} emailed to {obj.email}.")
+        except Exception as exc:  # noqa: BLE001 - the row must survive an SMTP outage
+            messages.error(
+                request,
+                f"Code {obj.code} was saved, but the invite email to {obj.email} "
+                f"failed: {exc}. Fix the mail configuration, then use the "
+                f'"Resend invite email" action.',
+            )
 
     def status_badge(self, obj):
         if obj.is_used:

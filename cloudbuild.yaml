@@ -55,8 +55,20 @@ steps:
       - '--allow-unauthenticated'
       - '--service-account=forge-177@$PROJECT_ID.iam.gserviceaccount.com'
       - '--add-cloudsql-instances=$PROJECT_ID:us-west1:gtm-db-v2'
-      - '--set-env-vars=GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,DEBUG=False,GCS_BUCKET_NAME=forge-497716-gtm-media'
-      - '--update-secrets=DB_PASSWORD=DB_PASSWORD:latest,DJANGO_SECRET_KEY=DJANGO_SECRET_KEY:latest'
+      # SITE_BASE_URL must live on this line, not a flag of its own:
+      # --set-env-vars REPLACES the whole plain-env-var set on every deploy. It
+      # backs absolute links in emails sent without a request object (the
+      # generate_beta_invite_codes command), which otherwise fall back to the
+      # raw run.app URL from settings.py.
+      - '--set-env-vars=GCP_PROJECT_ID=$PROJECT_ID,ENVIRONMENT=production,DEBUG=False,GCS_BUCKET_NAME=forge-497716-gtm-media,SITE_BASE_URL=https://forge.funti3r.xyz'
+      # EMAIL_HOST_USER is held as a secret only to keep the address out of this
+      # public repo -- it is the Gmail account whose app password is
+      # EMAIL_HOST_PASSWORD. BOTH are required for any outbound mail: with
+      # EMAIL_HOST_USER empty, Django's SMTP backend skips login() entirely and
+      # Gmail rejects the unauthenticated send. EMAIL_HOST_PASSWORD was attached
+      # to the service by hand and is listed here so the config is reproducible;
+      # --update-secrets merges, so naming an already-attached secret is safe.
+      - '--update-secrets=DB_PASSWORD=DB_PASSWORD:latest,DJANGO_SECRET_KEY=DJANGO_SECRET_KEY:latest,EMAIL_HOST_USER=EMAIL_HOST_USER:latest,EMAIL_HOST_PASSWORD=EMAIL_HOST_PASSWORD:latest'
       # 4Gi is required, not optional: the app loads spaCy/sentence-transformers/
       # scikit-learn NLP models for document analysis on top of the gunicorn
       # workers; this OOMs at 2Gi. Do not lower.

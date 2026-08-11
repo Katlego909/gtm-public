@@ -146,6 +146,9 @@ def send_beta_invite_email(invite_code, to_email, request=None):
     Sends a closed-beta invite code + signup link to a prospective tester.
     Mirrors send_workspace_invitation_email's pattern (HTML+text templates,
     SITE_BASE_URL fallback for building the link without a request).
+
+    Honours EMAIL_REDIRECT_TO like send_snapshot_report_email does, so a staging
+    deploy pointed at the production database can't mail real prospects.
     """
     from django.urls import reverse
 
@@ -168,11 +171,13 @@ def send_beta_invite_email(invite_code, to_email, request=None):
     if not text_body.strip():
         text_body = strip_tags(html_body)
 
+    redirect = getattr(settings, "EMAIL_REDIRECT_TO", "")
+
     msg = EmailMultiAlternatives(
         subject=subject,
         body=text_body,
         from_email=getattr(settings, "DEFAULT_FROM_EMAIL", None),
-        to=[to_email],
+        to=[redirect or to_email],
     )
     msg.attach_alternative(html_body, "text/html")
     msg.send(fail_silently=False)

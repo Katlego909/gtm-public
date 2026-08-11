@@ -30,6 +30,12 @@ class BetaInviteCode(models.Model):
         related_name="beta_codes_created",
     )
     created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When the invite email was last sent to the address above. Blank = "
+                  "never sent. Doubles as the send-once latch: saving a code in the "
+                  "admin only auto-sends while this is blank (or when `email` changes).",
+    )
     expires_at = models.DateTimeField(null=True, blank=True, help_text="Blank = never expires.")
     used_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
@@ -52,3 +58,25 @@ class BetaInviteCode(models.Model):
     def is_expired(self) -> bool:
         from django.utils import timezone
         return bool(self.expires_at and self.expires_at <= timezone.now())
+
+    @property
+    def is_sent(self) -> bool:
+        return self.sent_at is not None
+
+    def send_invite_email(self, request=None):
+        """Email this code to `self.email` and record the send.
+
+        Sending and stamping live together here so the three callers -- the admin
+        save, the admin resend action, and generate_beta_invite_codes -- cannot
+        drift on what "sent" means.
+
+        Deliberately does not swallow exceptions: `sent_at` stays untouched when
+        SMTP fails, so the send is retryable and callers decide how to report the
+        failure (the admin turns it into a message rather than a 500).
+        """
+        from django.utils import timezone
+        from .utils_email import send_beta_invite_email
+
+        send_beta_invite_email(self, self.email, request=request)
+        self.sent_at = timezone.now()
+        self.save(update_fields=["sent_at"])

@@ -27,8 +27,7 @@ class Command(BaseCommand):
         codes = [BetaInviteCode.objects.create(note=note, email=email) for _ in range(count)]
 
         if email:
-            from gtm.utils_email import send_beta_invite_email
-            send_beta_invite_email(codes[0], email)
+            codes[0].send_invite_email()
             self.stdout.write(self.style.SUCCESS(f"Generated and emailed code {codes[0].code} to {email}"))
         else:
             for invite in codes:
