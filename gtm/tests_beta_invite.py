@@ -70,6 +70,26 @@ class BetaInviteSignupTests(TestCase):
         response = self.client.get(reverse("account_signup") + "?code=ABC12345")
         self.assertContains(response, 'value="ABC12345"')
 
+    def test_invite_code_input_tag_is_well_formed(self):
+        """A multi-line {# #} is not a Django comment -- it renders as literal
+        text. One inside this input tag shipped a broken field to production:
+        the browser parsed the comment words as attributes, a bare `value` among
+        them won over the real one, and the box submitted empty every time.
+        Asserting on 'value="..."' alone did not catch it, since that substring
+        was still present in the malformed tag."""
+        response = self.client.get(reverse("account_signup") + "?code=ABC12345")
+        html = response.content.decode()
+
+        self.assertNotIn("{#", html)
+        self.assertNotIn("{%", html)
+
+        start = html.index('<input type="text"\n               name="invite_code"')
+        tag = html[start:html.index(">", start) + 1]
+        # No stray prose between the attributes, and exactly one value=.
+        self.assertEqual(tag.count("value="), 1)
+        self.assertIn('value="ABC12345"', tag)
+        self.assertIn('name="invite_code"', tag)
+
     def test_rejected_signup_keeps_the_code_in_the_field(self):
         """A validation error elsewhere shouldn't make the user re-type the code."""
         invite = BetaInviteCode.objects.create()

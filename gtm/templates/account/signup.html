@@ -60,6 +60,15 @@
       {% endif %}
 
       <!-- Beta Invite Code Field -->
+      {% comment %}
+        The value takes the submitted value first, so a validation error
+        elsewhere on the form doesn't blank the code and force the user to
+        re-type it, then falls back to ?code= for the link in the invite email.
+        firstof rather than the default filter: an absent ?code= raises
+        VariableDoesNotExist when it is a filter argument. Keep this comment
+        outside the input tag -- {# #} is single-line only, so a multi-line one
+        renders as literal text into the tag and breaks the field.
+      {% endcomment %}
       <div>
         <label for="id_invite_code" class="block text-sm font-semibold text-gray-700 mb-2">{% trans "Beta invite code" %}</label>
         <input type="text"
@@ -67,11 +76,6 @@
                id="id_invite_code"
                placeholder="Enter your invite code"
                autocomplete="off"
-               {# Bound value first, so a validation error elsewhere on the form
-                  doesn't blank the code and force the user to re-type it. Falls
-                  back to ?code= for the link in the invite email. firstof, not
-                  the default filter: an absent ?code= raises VariableDoesNotExist
-                  when it's a filter argument. #}
                value="{% firstof form.invite_code.value request.GET.code '' %}"
                required
                class="w-full border border-gray-300 rounded-md px-4 py-3 focus:border-gray-500 focus:ring-2 focus:ring-gray-100 transition">
