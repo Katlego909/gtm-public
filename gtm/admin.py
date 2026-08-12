@@ -413,6 +413,26 @@ def email_invite_code(modeladmin, request, queryset):
         messages.error(request, f"Failed to send {len(failed)}: " + "; ".join(failed))
 
 
+@admin.action(description="Release code (clear redemption, make reusable)")
+def release_invite_code(modeladmin, request, queryset):
+    """Hand a spent code back to the pool.
+
+    used_by/used_at are readonly_fields, so there was no way to undo a
+    redemption from the admin at all. That mattered when a signup crashed after
+    burning the code but before finishing: the invite was consumed by an account
+    that never came into existence, and the only fix was a shell. Also covers the
+    ordinary case of a tester who needs to re-run signup.
+
+    Leaves the user account alone -- delete that separately if it exists.
+    """
+    released = queryset.filter(used_by__isnull=False).update(used_by=None, used_at=None)
+    if released:
+        messages.success(request, f"Released {released} code(s) back to unused.")
+    unchanged = queryset.count() - released
+    if unchanged:
+        messages.warning(request, f"{unchanged} selected code(s) were already unused.")
+
+
 class RedemptionStatusFilter(admin.SimpleListFilter):
     """Filter invite codes by unused / used / expired-and-unused."""
     title = "redemption status"
@@ -437,7 +457,7 @@ class RedemptionStatusFilter(admin.SimpleListFilter):
 
 @admin.register(BetaInviteCode)
 class BetaInviteCodeAdmin(admin.ModelAdmin):
-    actions = [email_invite_code]
+    actions = [email_invite_code, release_invite_code]
     change_list_template = "admin/gtm/betainvitecode/change_list.html"
     list_display = ('code', 'email', 'note', 'status_badge', 'sent_at', 'used_by', 'created_at', 'expires_at')
     # EmptyFieldListFilter on sent_at gives a free Yes/No "has it been emailed?"

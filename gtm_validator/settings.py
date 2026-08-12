@@ -305,6 +305,17 @@ ACCOUNT_SESSION_REMEMBER = True
 # signup form (see gtm/forms_beta.py). Remove this line to reopen public
 # signup once the beta is over.
 ACCOUNT_SIGNUP_FORM_CLASS = 'gtm.forms_beta.BetaInviteSignupForm'
+# allauth defaults this to "optional", which sends a verification email from
+# *inside* the signup POST (EmailVerificationStage.handle) through an unguarded
+# msg.send(). That makes SMTP a hard dependency of registration: one rejected
+# send and the whole signup 500s, after the user row and the invite redemption
+# have already committed. Nothing in this app reads EmailAddress.verified, and
+# an invite code is issued to a specific address already, so verification buys
+# nothing here and costs us the signup flow.
+ACCOUNT_EMAIL_VERIFICATION = "none"
+# Belt and braces for the auth flows that still send mail (password reset):
+# failures are logged, never raised. See gtm/adapters.py.
+ACCOUNT_ADAPTER = 'gtm.adapters.ForgeAccountAdapter'
 
 # CSRF validation handled via standard token validation for same-origin requests
 CSRF_TRUSTED_ORIGINS = [

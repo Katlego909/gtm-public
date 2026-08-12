@@ -26,7 +26,14 @@ class BetaInviteSignupForm(forms.Form):
     def clean_invite_code(self):
         raw = self.cleaned_data["invite_code"].strip().upper()
         try:
-            invite = BetaInviteCode.objects.get(code=raw)
+            # Lock the row for the rest of the request. The signup view runs
+            # inside a transaction (see gtm_validator/urls.py), so two people
+            # submitting the same code are serialized here: the second blocks
+            # until the first commits, then reads used_by and gets the clean
+            # "already been used" error below. Without the lock both would pass
+            # this check and both would redeem the code. No-op on SQLite, which
+            # has no row-level locking -- production is Postgres.
+            invite = BetaInviteCode.objects.select_for_update().get(code=raw)
         except BetaInviteCode.DoesNotExist:
             raise forms.ValidationError(
                 "This beta is invite-only and that code wasn't recognized. "
@@ -44,6 +51,11 @@ class BetaInviteSignupForm(forms.Form):
         return raw
 
     def signup(self, request, user):
+        # Runs inside the same transaction (and so the same row lock) as
+        # clean_invite_code. If anything later in signup raises, this redemption
+        # rolls back with it and the code stays claimable -- it used to survive
+        # the crash, so the retry hit "already been used" and the invite was
+        # spent for good.
         invite = self._invite
         invite.used_by = user
         invite.used_at = timezone.now()

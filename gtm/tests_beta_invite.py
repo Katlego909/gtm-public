@@ -70,6 +70,65 @@ class BetaInviteSignupTests(TestCase):
         response = self.client.get(reverse("account_signup") + "?code=ABC12345")
         self.assertContains(response, 'value="ABC12345"')
 
+    def test_rejected_signup_keeps_the_code_in_the_field(self):
+        """A validation error elsewhere shouldn't make the user re-type the code."""
+        invite = BetaInviteCode.objects.create()
+        response = self.client.post(
+            reverse("account_signup"),
+            self._signup_payload(invite_code=invite.code) | {"password2": "mismatched-passw0rd!"},
+        )
+        self.assertContains(response, f'value="{invite.code}"', status_code=200)
+
+    def test_signup_sends_no_email(self):
+        """ACCOUNT_EMAIL_VERIFICATION='none' keeps SMTP out of the request path."""
+        invite = BetaInviteCode.objects.create()
+        self.client.post(reverse("account_signup"), self._signup_payload(invite_code=invite.code))
+
+        self.assertTrue(User.objects.filter(username="newtester").exists())
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_signup_survives_a_dead_mail_server(self):
+        """The production 500: allauth's default verification email is sent from
+        inside the signup POST through an unguarded msg.send(), so a broken SMTP
+        config took registration down with it."""
+        invite = BetaInviteCode.objects.create()
+        with patch(
+            "django.core.mail.EmailMessage.send", side_effect=Exception("SMTP down")
+        ):
+            response = self.client.post(
+                reverse("account_signup"), self._signup_payload(invite_code=invite.code)
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(User.objects.filter(username="newtester").exists())
+        invite.refresh_from_db()
+        self.assertTrue(invite.is_used)
+
+    def test_a_crash_mid_signup_does_not_burn_the_code(self):
+        """The redemption used to commit before the crash, so the retry hit
+        "already been used" and the invite was gone for good."""
+        invite = BetaInviteCode.objects.create()
+        with patch(
+            "allauth.account.forms.setup_user_email", side_effect=RuntimeError("boom")
+        ):
+            with self.assertRaises(RuntimeError):
+                self.client.post(
+                    reverse("account_signup"), self._signup_payload(invite_code=invite.code)
+                )
+
+        invite.refresh_from_db()
+        self.assertFalse(invite.is_used)
+        self.assertIsNone(invite.used_by)
+        self.assertFalse(User.objects.filter(username="newtester").exists())
+
+        # ...and the code still works on the next attempt.
+        response = self.client.post(
+            reverse("account_signup"), self._signup_payload(invite_code=invite.code)
+        )
+        self.assertEqual(response.status_code, 302)
+        invite.refresh_from_db()
+        self.assertTrue(invite.is_used)
+
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class BetaInviteAdminEmailTests(TestCase):
@@ -173,7 +232,13 @@ class BetaInviteAdminEmailTests(TestCase):
     def test_resend_action_forces_a_second_send(self):
         self.client.post(self.add_url, self._form_payload(email="jane@acme.com"))
         invite = BetaInviteCode.objects.get(code="TESTCODE")
-        first_sent_at = invite.sent_at
+        # Backdate the first stamp instead of comparing two live timestamps.
+        # Both requests can finish inside a single clock tick -- the system clock
+        # here has ~15ms granularity -- and then the re-stamped sent_at compares
+        # equal to the original and a strict assertGreater fails despite the
+        # resend having worked.
+        first_sent_at = timezone.now() - timedelta(hours=1)
+        BetaInviteCode.objects.filter(pk=invite.pk).update(sent_at=first_sent_at)
 
         self.client.post(
             self.changelist_url,
@@ -208,3 +273,18 @@ class BetaInviteAdminEmailTests(TestCase):
 
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ["staging-catchall@example.com"])
+
+    def test_release_action_returns_a_used_code_to_the_pool(self):
+        """used_by/used_at are readonly, so this action is the only way back."""
+        tester = User.objects.create_user(username="tester", email="t@example.com", password="x")
+        invite = BetaInviteCode.objects.create(used_by=tester, used_at=timezone.now())
+
+        self.client.post(
+            self.changelist_url,
+            {"action": "release_invite_code", "_selected_action": [str(invite.pk)]},
+        )
+
+        invite.refresh_from_db()
+        self.assertFalse(invite.is_used)
+        self.assertIsNone(invite.used_by)
+        self.assertIsNone(invite.used_at)

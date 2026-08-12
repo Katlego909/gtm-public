@@ -67,7 +67,12 @@
                id="id_invite_code"
                placeholder="Enter your invite code"
                autocomplete="off"
-               value="{{ request.GET.code|default:'' }}"
+               {# Bound value first, so a validation error elsewhere on the form
+                  doesn't blank the code and force the user to re-type it. Falls
+                  back to ?code= for the link in the invite email. firstof, not
+                  the default filter: an absent ?code= raises VariableDoesNotExist
+                  when it's a filter argument. #}
+               value="{% firstof form.invite_code.value request.GET.code '' %}"
                required
                class="w-full border border-gray-300 rounded-md px-4 py-3 focus:border-gray-500 focus:ring-2 focus:ring-gray-100 transition">
         {% if form.invite_code.errors %}
