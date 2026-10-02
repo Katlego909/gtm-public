@@ -46,6 +46,7 @@
                 </button>
             {% endif %}
             <button id="hub-create-ws-btn"
+                data-inline-template="hub-create-ws-template"
                 data-create-url="{% url 'create_workspace_dashboard' %}"
                 class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
@@ -205,7 +206,8 @@
                 <h3 class="text-lg font-bold text-gray-900">No Workspace Selected</h3>
                 <p class="text-gray-500 mt-2">Select or create a workspace to manage your team and resources.</p>
                 <button id="hub-create-ws-btn-empty"
-                    data-create-url="{% url 'create_workspace_dashboard' %}"
+                    data-inline-template="hub-create-ws-template"
+                data-create-url="{% url 'create_workspace_dashboard' %}"
                     class="mt-6 px-6 py-3 bg-indigo-600 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-700 transition">
                     Create First Workspace
                 </button>
@@ -213,6 +215,15 @@
         {% endif %}
     </div>
 </div>
+
+{% comment %}
+  The create-workspace form is entirely static -- its GET view runs zero queries
+  and returns exactly this markup. Shipping it with the page turns a ~400ms round
+  trip into an instant open. The POST still goes to the server.
+  {% comment %} and not {# #}: the latter is single-line only, so a multi-line
+  one renders as literal text into the page.
+{% endcomment %}
+<template id="hub-create-ws-template">{% include 'dashboard/partials/workspace_create_modal.html' %}</template>
 
 <div id="hub-modal-overlay" class="hidden fixed inset-0 z-[9999] flex items-center justify-center p-4">
     <div id="hub-modal-backdrop" class="absolute inset-0 bg-gray-900 bg-opacity-60 transition-opacity duration-150 ease-out opacity-0" onclick="closeHubModal()"></div>
@@ -250,15 +261,48 @@
         openHubModal();
         var overlay = document.getElementById('hub-modal-overlay');
         var panel = document.getElementById('hub-modal-panel');
+        var content = document.getElementById('hub-modal-content');
+
+        // Reveal the panel on the click frame, standing on a skeleton, rather
+        // than waiting out the fetch. The server is a ~400ms round trip away, so
+        // waiting meant a backdrop over nothing for half a second -- and if the
+        // request failed, .then() never ran and the panel never appeared at all.
+        content.innerHTML = (typeof window.modalSkeleton === 'function')
+            ? window.modalSkeleton()
+            : '<div data-modal-skeleton class="px-6 py-6"><div class="h-4 w-2/3 bg-gray-100 rounded animate-pulse"></div></div>';
+        requestAnimationFrame(function() {
+            if (overlay.classList.contains('hidden')) return; // closed again in the same frame
+            panel.classList.remove('opacity-0', 'scale-95');
+        });
+
         htmx.ajax('GET', url, {
             target: '#hub-modal-content',
             swap: 'innerHTML'
-        }).then(function() {
-            if (overlay.classList.contains('hidden')) return; // closed again before content arrived
-            requestAnimationFrame(function() {
-                panel.classList.remove('opacity-0', 'scale-95');
-            });
+        }).catch(function() {
+            if (overlay.classList.contains('hidden')) return;
+            content.innerHTML = (typeof window.modalError === 'function')
+                ? window.modalError("We couldn't reach the server. Please try again.", 'closeHubModal()')
+                : '<div class="px-6 py-6 text-sm text-gray-600">Something went wrong. Please try again.</div>';
         });
+    }
+
+    // Open straight from markup already on the page -- no request at all.
+    function openHubModalFromTemplate(templateId) {
+        var tpl = document.getElementById(templateId);
+        if (!tpl) return false;
+        var content = document.getElementById('hub-modal-content');
+        var panel = document.getElementById('hub-modal-panel');
+
+        content.innerHTML = tpl.innerHTML;
+        // innerHTML does not register htmx attributes, so the form's hx-post
+        // would silently do nothing without this.
+        if (window.htmx) htmx.process(content);
+
+        openHubModal();
+        requestAnimationFrame(function() {
+            panel.classList.remove('opacity-0', 'scale-95');
+        });
+        return true;
     }
 
     // ---- Wire buttons ----
@@ -266,6 +310,12 @@
         var btn = document.getElementById(id);
         if (!btn) return;
         btn.addEventListener('click', function() {
+            var inlineTemplate = btn.getAttribute('data-inline-template');
+            // Falls through to the fetch if the template is missing, so a
+            // renaming mistake degrades to the old behaviour instead of a
+            // dead button.
+            if (inlineTemplate && openHubModalFromTemplate(inlineTemplate)) return;
+
             var url = btn.getAttribute('data-invite-url') ||
                       btn.getAttribute('data-create-url') ||
                       btn.getAttribute('data-settings-url') ||
