@@ -66,15 +66,15 @@
     {% endif %}
     
     <div class="mt-3 pt-2 border-t border-gray-50 flex flex-col gap-1">
-        <div class="flex items-center justify-between gap-2 text-xs text-gray-500">
-            <span class="flex items-center gap-1" title="Due Date">
+        <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-xs text-gray-500">
+            <span class="flex items-center gap-1 whitespace-nowrap" title="Due Date">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
                 {% if item.due_date %}<span{% if item.is_overdue %} class="text-red-700 font-medium"{% endif %}>{{ item.due_date|date:"M d" }}</span>{% else %}No date{% endif %}
                 {% if item.is_overdue %}<span class="ml-1 px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-700 font-medium">Overdue</span>{% endif %}
             </span>
-            <div class="flex items-center gap-0.5">
+            <div class="ml-auto flex items-center gap-0.5">
                 {% if current_workspace and team_members %}
                     <!-- Assignment dropdown -->
                     <div class="relative">
@@ -202,8 +202,8 @@
         <form hx-post="{% url 'add_action_item_comment' item.id %}" hx-target="#action-items-container" class="flex items-center gap-2">
             {% csrf_token %}
             <input type="text" name="text" maxlength="500" placeholder="Add comment..."
-                   class="flex-1 text-xs rounded-lg border border-gray-300 px-2 py-1.5 focus:border-indigo-500 focus:ring-indigo-500" />
-            <button type="submit" class="text-xs px-2 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition">Post</button>
+                   class="flex-1 min-w-0 text-xs rounded-lg border border-gray-300 px-2 py-1.5 focus:border-indigo-500 focus:ring-indigo-500" />
+            <button type="submit" class="flex-shrink-0 text-xs px-2 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 transition">Post</button>
         </form>
     </div>
 </div>
