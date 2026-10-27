@@ -40,6 +40,17 @@ def _compute_scores(session):
     overall += (cat_avg / 5.0) * (cat_weight / total_global_weight) * 100.0
 ```
 
+### Opportunity points (Priority Opportunities)
+`gtm/scoring_engine.py::compute_opportunity_scores` says how many overall points each answered question would add if it rose to 5/5. It uses the same normalization as the overall score: only answered pillars, and only answered questions within each pillar, count.
+
+```
+opportunity = (5 − score) × (question_weight / W_p) × (pillar_weight / A) × 20
+```
+
+`W_p` is the summed weight of the answered questions in that question's pillar. `A` is the summed weight of the answered pillars. The relationship is linear, so the opportunities always add up to `100 − overall`, including for stage-exempt or partial assessments. That sum is the "pts still available overall" figure.
+
+The top three are ranked purely by points. Ties go to the weaker pillar, then the lower current score, then the question code. Seed order never decides a tie.
+
 ---
 
 ## 2. The Analytics Engine: Execution Velocity

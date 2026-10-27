@@ -315,39 +315,92 @@ def compute_pillar_avgs(question_scores: dict[str, int]) -> dict[str, float]:
     }
 
 
-def compute_opportunity_scores(question_scores: dict[str, int]) -> list[dict]:
+def compute_overall(question_scores: dict[str, int]) -> float:
     """
-    For each answered question, compute how many overall score points are gained
-    if it improves from its current score to the maximum (5).
+    Overall 0-100 score, renormalized by the weight of only the answered
+    pillars. Mirrors services._compute_scores (the DB-side copy) -- without
+    the renormalization a company whose unanswered/stage-exempt pillars are
+    absent from question_scores would be capped at the answered pillars' raw
+    weight instead of being able to reach 100.
+    """
+    pillar_avgs = compute_pillar_avgs(question_scores)
+    answered_weight = sum(
+        PILLAR_WEIGHTS[p] for p in PILLAR_WEIGHTS if pillar_avgs[p] > 0
+    ) or 1.0
+    return round(
+        sum(
+            (pillar_avgs[p] / 5.0) * (PILLAR_WEIGHTS[p] / answered_weight) * 100
+            for p in PILLAR_WEIGHTS
+            if pillar_avgs[p] > 0
+        ),
+        1,
+    )
+
+
+def compute_opportunity_scores(
+    question_scores: dict[str, int],
+    pillar_avgs: dict[str, float] | None = None,
+) -> list[dict]:
+    """
+    For each answered question, how many overall score points are gained if it
+    improves from its current score to the maximum (5).
 
     Formula derivation
     ------------------
-    overall = Σ_pillars [ (pillar_avg / 5) × pillar_weight × 100 ]
+    overall = Σ_answered pillars [ (pillar_avg / 5) × (pillar_weight / A) × 100 ]
+    pillar_avg = Σ_answered q [ score × q_weight ] / W_p
 
-    Since intra-pillar weights sum to 1.0, a single question's marginal contribution
-    when its score increases by Δ is:
+    where A is the summed weight of the answered pillars and W_p the summed
+    weight of the answered questions in pillar p -- the same normalization
+    compute_overall and services._compute_scores apply. Raising one question
+    by Δ therefore moves the overall score by exactly:
 
-        Δ_overall = Δ × question_weight × pillar_weight × 20
+        Δ_overall = Δ × (q_weight / W_p) × (pillar_weight / A) × 20
 
-    Returns a list sorted by opportunity_pts descending.
+    It's linear, so the opportunities always sum to 100 − overall, whether or
+    not every pillar (or every question in a pillar) was answered.
+
+    Sorted by opportunity_pts descending; ties go to the weaker pillar, then
+    the lower current score, then id_code -- never to whichever pillar's
+    questions happened to be seeded first.
     """
+    if pillar_avgs is None:
+        pillar_avgs = compute_pillar_avgs(question_scores)
+
+    answered = {q: s for q, s in question_scores.items() if q in QUESTION_META}
+    pillar_q_weight: dict[str, float] = {p: 0.0 for p in PILLAR_WEIGHTS}
+    for q_id in answered:
+        meta = QUESTION_META[q_id]
+        pillar_q_weight[meta["pillar"]] += meta["weight"]
+    answered_pillar_weight = sum(
+        PILLAR_WEIGHTS[p] for p in PILLAR_WEIGHTS if pillar_q_weight[p] > 0
+    ) or 1.0
+
     results = []
-    for q_id, score in question_scores.items():
-        meta = QUESTION_META.get(q_id)
-        if not meta:
-            continue
+    for q_id, score in answered.items():
+        meta = QUESTION_META[q_id]
+        pillar = meta["pillar"]
         delta = max(0, 5 - score)
-        opp   = round(delta * meta["weight"] * PILLAR_WEIGHTS[meta["pillar"]] * 20, 2)
+        opp = round(
+            delta
+            * (meta["weight"] / pillar_q_weight[pillar])
+            * (PILLAR_WEIGHTS[pillar] / answered_pillar_weight)
+            * 20,
+            2,
+        )
         results.append({
             "id_code":        q_id,
             "dimension":      meta["dimension"],
-            "pillar":         meta["pillar"],
+            "pillar":         pillar,
             "current_score":  score,
             "opportunity_pts": opp,
             "question_weight": meta["weight"],
-            "pillar_weight":   PILLAR_WEIGHTS[meta["pillar"]],
+            "pillar_weight":   PILLAR_WEIGHTS[pillar],
         })
-    return sorted(results, key=lambda x: -x["opportunity_pts"])
+    return sorted(
+        results,
+        key=lambda x: (-x["opportunity_pts"], pillar_avgs.get(x["pillar"], 0.0), x["current_score"], x["id_code"]),
+    )
 
 
 def detect_patterns(
@@ -385,26 +438,11 @@ def build_recommendation_context(question_scores: dict[str, int]) -> dict:
       - (future) pytest fixtures     →  deterministic assertions on Ardent SA scores
     """
     pillar_avgs   = compute_pillar_avgs(question_scores)
-    opportunities = compute_opportunity_scores(question_scores)
+    opportunities = compute_opportunity_scores(question_scores, pillar_avgs)
     patterns      = detect_patterns(question_scores, pillar_avgs)
     top_3         = opportunities[:3]
 
-    # Renormalize by the weight of only the answered pillars (mirrors the
-    # identical fix in services._compute_scores) — otherwise a company whose
-    # unanswered/stage-exempt pillars are simply absent from question_scores
-    # would have its max possible current_overall capped at the answered
-    # pillars' raw weight instead of being able to reach 100.
-    answered_weight = sum(
-        PILLAR_WEIGHTS[p] for p in PILLAR_WEIGHTS if pillar_avgs[p] > 0
-    ) or 1.0
-    current_overall = round(
-        sum(
-            (pillar_avgs[p] / 5.0) * (PILLAR_WEIGHTS[p] / answered_weight) * 100
-            for p in PILLAR_WEIGHTS
-            if pillar_avgs[p] > 0
-        ),
-        1,
-    )
+    current_overall = compute_overall(question_scores)
     total_opportunity = round(sum(o["opportunity_pts"] for o in opportunities), 1)
 
     return {
