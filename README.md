@@ -262,14 +262,14 @@ gtm-public/
 ├── keys/                    # GCP Service Account Credentials (CREATE THIS - not in repo)
 │   └── service-account.json # Service account JSON key (git-ignored)
 │
-├── config/                  # Django settings
+├── gtm_validator/           # Django project package (settings, URLs)
 │   ├── settings.py          # Main settings
 │   ├── urls.py              # URL routing
 │   └── wsgi.py              # WSGI config
 │
 ├── gtm/                     # Main GTM assessment app
 │   ├── models.py            # Data models
-│   ├── views.py             # View logic
+│   ├── views/               # View logic (package)
 │   ├── urls.py              # URL routing
 │   ├── ai_services.py       # AI/Gemini integration
 │   ├── templates/           # HTML templates
@@ -278,7 +278,7 @@ gtm-public/
 │
 ├── dashboard/               # Dashboard & analytics app
 │   ├── models.py            # Dashboard models
-│   ├── views.py             # Dashboard views
+│   ├── views/               # Dashboard views (package)
 │   ├── analytics.py         # Analytics logic
 │   └── templates/           # Dashboard templates
 │
@@ -287,8 +287,7 @@ gtm-public/
 │
 ├── docs/                    # Documentation
 ├── theme/                   # UI theme/styling
-├── venv/                    # Python virtual environment (auto-created)
-└── workspace_resources/     # Workspace-related resources
+└── venv/                    # Python virtual environment (auto-created)
 ```
 
 **Important:** After cloning, create these missing directories and files:

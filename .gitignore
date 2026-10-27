@@ -58,3 +58,5 @@ test_documents/
 
 # Playwright MCP debugging artifacts (screenshots, page snapshots)
 .playwright-mcp/
+# MkDocs build output (regenerate with `mkdocs build`)
+site/
