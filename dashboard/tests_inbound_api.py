@@ -263,6 +263,14 @@ class WorkspaceHubApiKeyTests(TestCase):
         api_key.refresh_from_db()
         self.assertIsNone(api_key.revoked_at)
 
+    def test_revoke_confirms_in_hub_modal_not_native_dialog(self):
+        WorkspaceApiKey.generate(self.workspace, "Nightly sync", self.users["admin"])
+        self.client.force_login(self.users["admin"])
+        response = self.client.get(self.url)
+        self.assertContains(response, 'id="hub-confirm-template"')
+        self.assertContains(response, 'data-confirm-title="Revoke API key?"')
+        self.assertNotContains(response, "return confirm(")
+
     def test_malformed_revoke_id_is_handled(self):
         self.client.force_login(self.users["admin"])
         response = self.client.post(self.url, {"integration_action": "revoke_api_key", "api_key_id": "abc"})
