@@ -67,3 +67,7 @@ staticfiles/
 verify_vertex_ai.py
 diagnose_ai.py
 test_vertex.py
+
+# Local media (e.g. demo.mp4) is git-excluded via .git/info/exclude, which
+# gcloud does not read; keep it out of build uploads explicitly.
+*.mp4
