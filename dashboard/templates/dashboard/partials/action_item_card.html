@@ -1,5 +1,5 @@
 {% load markdown_filters %}
-<div class="bg-white p-3 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-move group relative" data-id="{{ item.id }}">
+<div class="bg-white p-3 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-move group relative" data-id="{{ item.id }}" data-board-flags="{{ item.board_flags|default:'' }}">
     <div class="flex justify-between items-start">
         <div class="text-sm text-gray-800 font-medium mb-2 pr-6 prose prose-sm max-w-none">
             {{ item.note|markdownify|safe }}
@@ -133,7 +133,8 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                {% if item.due_date %}{{ item.due_date|date:"M d" }}{% else %}No date{% endif %}
+                {% if item.due_date %}<span{% if item.is_overdue %} class="text-red-700 font-medium"{% endif %}>{{ item.due_date|date:"M d" }}</span>{% else %}No date{% endif %}
+                {% if item.is_overdue %}<span class="ml-1 px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-700 font-medium">Overdue</span>{% endif %}
             </span>
             <span class="w-2 h-2 rounded-full 
                 {% if item.status == 'todo' %}bg-gray-400{% endif %}

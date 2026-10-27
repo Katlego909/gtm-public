@@ -807,3 +807,55 @@ def prepare_gap_metrics_for_display(metrics, workspace, user):
     return metrics
 
 
+
+
+TASK_BOARD_FILTERS = ('overdue', 'due_week', 'unassigned', 'done_week')
+
+
+def build_task_board_context(action_items_qs):
+    """Columns plus at-a-glance stats for the Tasks board.
+
+    Shared by the full page (hub.tasks_board) and every board re-render
+    (actions.refresh_action_items) so the strip can't drift from the
+    columns. Stats are counted from the already-loaded cards -- no extra
+    queries -- and each card gets `board_flags` (space-separated
+    TASK_BOARD_FILTERS keys) that the board's CSS filters match on.
+
+    "Done this week" uses completed_at, the same definition as the
+    dashboard's completed-this-week KPI.
+    """
+    action_items_qs = action_items_qs.select_related('assigned_to', 'deliverable_document').prefetch_related('comments__user')
+    top_todo = list(action_items_qs.filter(status='todo').order_by('due_date'))
+    top_doing = list(action_items_qs.filter(status='doing').order_by('due_date'))
+    top_done = list(action_items_qs.filter(status='done').order_by('-created_at'))
+
+    today = timezone.localdate()
+    week_start = today - datetime.timedelta(days=today.weekday())
+    week_end = week_start + datetime.timedelta(days=6)
+
+    stats = dict.fromkeys(TASK_BOARD_FILTERS, 0)
+    for item in top_todo + top_doing + top_done:
+        flags = []
+        if item.status == 'done':
+            completed_on = timezone.localdate(item.completed_at) if item.completed_at else None
+            if completed_on and completed_on >= week_start:
+                flags.append('done_week')
+        else:
+            if item.due_date and item.due_date < today:
+                flags.append('overdue')
+            elif item.due_date and item.due_date <= week_end:
+                flags.append('due_week')
+            # A task routed to an AI agent has an owner even without a person.
+            if not item.assigned_to_id and not item.assigned_agent_type:
+                flags.append('unassigned')
+        for flag in flags:
+            stats[flag] += 1
+        item.board_flags = ' '.join(flags)
+        item.is_overdue = 'overdue' in flags
+
+    return {
+        'top_todo': top_todo,
+        'top_doing': top_doing,
+        'top_done': top_done,
+        'task_stats': stats,
+    }

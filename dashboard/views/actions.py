@@ -82,6 +82,7 @@ from ..document_processors import (
 # ================================================================
 
 from .helpers import (
+    build_task_board_context,
     _ai_gap_suggestions_from_assessment,
     _build_sidebar_notifications_context,
     _clean_json_payload,
@@ -134,12 +135,7 @@ def refresh_action_items(request):
     else:
         action_items_qs = ActionItem.objects.filter(session__user=request.user, workspace__isnull=True) if request.user.is_authenticated else ActionItem.objects.none()
 
-    action_items_qs = action_items_qs.prefetch_related('comments__user')
 
-    top_todo = action_items_qs.filter(status='todo').order_by('due_date').select_related('assigned_to', 'deliverable_document')
-    top_doing = action_items_qs.filter(status='doing').order_by('due_date').select_related('assigned_to', 'deliverable_document')
-    top_done = action_items_qs.filter(status='done').order_by('-created_at').select_related('assigned_to', 'deliverable_document')
-    
     # Get team members for assignments
     team_members = []
     if current_workspace:
@@ -147,9 +143,7 @@ def refresh_action_items(request):
         team_members = [m.user for m in memberships]
     
     context = {
-        'top_todo': list(top_todo),
-        'top_doing': list(top_doing),
-        'top_done': list(top_done),
+        **build_task_board_context(action_items_qs),
         'current_workspace': current_workspace,
         'team_members': team_members,
     }

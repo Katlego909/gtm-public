@@ -1,6 +1,7 @@
 from django.db import models
 import uuid
 from django.conf import settings
+from django.utils import timezone
 from django.core.serializers.json import DjangoJSONEncoder
 
 # Import workspace models so Django can find them
@@ -272,6 +273,17 @@ class ActionItem(models.Model):
 
     def save(self, *args, **kwargs):
         self.note_key = (self.note or "").strip().lower()
+        # completed_at is owned here rather than by each caller, so every path
+        # that changes status (board drag, edit form, playbook toggle, AI
+        # completion) keeps it honest for "done this week" style stats.
+        if self.status == "done":
+            if self.completed_at is None:
+                self.completed_at = timezone.now()
+        else:
+            self.completed_at = None
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "status" in update_fields:
+            kwargs["update_fields"] = {*update_fields, "completed_at"}
         super().save(*args, **kwargs)
 
     def __str__(self):

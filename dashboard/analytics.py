@@ -115,15 +115,17 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
     # Don't show percentage for 0 -> anything transitions
     
     # Completed items this week vs last week (workspace-scoped)
-    # Use updated_at so moving an existing task to Done this week is counted.
+    # completed_at (kept current by ActionItem.save) rather than updated_at,
+    # which also moves when an already-finished task is merely edited. Same
+    # definition as the Tasks board's "Done this week" stat.
     this_week_completed = action_items_qs.filter(
         status='done',
-        updated_at__date__gte=this_week_start
+        completed_at__date__gte=this_week_start
     ).count()
     last_week_completed = action_items_qs.filter(
         status='done',
-        updated_at__date__gte=last_week_start,
-        updated_at__date__lte=last_week_end
+        completed_at__date__gte=last_week_start,
+        completed_at__date__lte=last_week_end
     ).count()
     
     # Calculate percentage change for completed items

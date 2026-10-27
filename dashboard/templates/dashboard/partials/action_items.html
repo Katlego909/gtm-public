@@ -25,6 +25,45 @@
         </button>
     </div>
     
+    {% if task_stats %}
+    {# Stat strip: each tile filters the board. The hiding itself is CSS keyed #}
+    {# off #tasks-board[data-task-filter], so it survives board re-renders. #}
+    <style>
+        #tasks-board[data-task-filter="overdue"] [data-board-flags]:not([data-board-flags~="overdue"]),
+        #tasks-board[data-task-filter="due_week"] [data-board-flags]:not([data-board-flags~="due_week"]),
+        #tasks-board[data-task-filter="unassigned"] [data-board-flags]:not([data-board-flags~="unassigned"]),
+        #tasks-board[data-task-filter="done_week"] [data-board-flags]:not([data-board-flags~="done_week"]) {
+            display: none;
+        }
+    </style>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3" role="group" aria-label="Filter tasks">
+        <button type="button" data-task-filter-btn="overdue" aria-pressed="false"
+                class="text-left px-4 py-3 rounded-xl border bg-white transition-colors {% if task_stats.overdue %}border-red-200 hover:bg-red-50 aria-pressed:bg-red-50 aria-pressed:border-red-500{% else %}border-gray-200 hover:bg-gray-50 aria-pressed:bg-gray-50 aria-pressed:border-gray-500{% endif %}">
+            <span class="block text-xs font-medium uppercase tracking-wide {% if task_stats.overdue %}text-red-700{% else %}text-gray-500{% endif %}">Overdue</span>
+            <span class="block text-2xl font-bold {% if task_stats.overdue %}text-red-700{% else %}text-gray-800{% endif %}">{{ task_stats.overdue }}</span>
+        </button>
+        <button type="button" data-task-filter-btn="due_week" aria-pressed="false"
+                class="text-left px-4 py-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition-colors aria-pressed:bg-indigo-50 aria-pressed:border-indigo-500">
+            <span class="block text-xs font-medium uppercase tracking-wide text-gray-500">Due this week</span>
+            <span class="block text-2xl font-bold text-gray-800">{{ task_stats.due_week }}</span>
+        </button>
+        <button type="button" data-task-filter-btn="unassigned" aria-pressed="false"
+                class="text-left px-4 py-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition-colors aria-pressed:bg-indigo-50 aria-pressed:border-indigo-500">
+            <span class="block text-xs font-medium uppercase tracking-wide text-gray-500">Unassigned</span>
+            <span class="block text-2xl font-bold text-gray-800">{{ task_stats.unassigned }}</span>
+        </button>
+        <button type="button" data-task-filter-btn="done_week" aria-pressed="false"
+                class="text-left px-4 py-3 rounded-xl border border-gray-200 bg-white hover:bg-gray-50 transition-colors aria-pressed:bg-green-50 aria-pressed:border-green-500">
+            <span class="block text-xs font-medium uppercase tracking-wide text-gray-500">Done this week</span>
+            <span class="block text-2xl font-bold text-gray-800">{{ task_stats.done_week }}</span>
+        </button>
+    </div>
+    <p id="task-filter-hint" class="hidden mb-3 text-sm text-gray-600" aria-live="polite">
+        Showing <span data-task-filter-label class="font-medium text-gray-800"></span> tasks only.
+        <button type="button" data-task-filter-clear class="ml-1 font-medium text-indigo-600 hover:text-indigo-700 underline">Show all</button>
+    </p>
+    {% endif %}
+
     <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
         <!-- To Do Column -->
         <div class="bg-gray-50 rounded-xl p-4 border border-gray-200">
@@ -88,6 +127,47 @@
         return '';
     }
 
+    // ---- Stat-strip filters ----
+    // The filter value lives on #tasks-board (outside this re-rendered
+    // container) and CSS does the hiding; this only keeps the buttons'
+    // aria-pressed and the hint line in step with it after every render.
+    const TASK_FILTER_LABELS = {
+        overdue: 'overdue',
+        due_week: 'due this week',
+        unassigned: 'unassigned',
+        done_week: 'done this week',
+    };
+
+    function syncTaskFilter() {
+        const board = document.getElementById('tasks-board');
+        if (!board) return;
+        const active = board.dataset.taskFilter || '';
+        document.querySelectorAll('[data-task-filter-btn]').forEach(btn => {
+            btn.setAttribute('aria-pressed', String(btn.dataset.taskFilterBtn === active));
+        });
+        const hint = document.getElementById('task-filter-hint');
+        if (hint) {
+            hint.classList.toggle('hidden', !active);
+            const label = hint.querySelector('[data-task-filter-label]');
+            if (label) label.textContent = TASK_FILTER_LABELS[active] || '';
+        }
+    }
+    window.syncTaskFilter = syncTaskFilter;
+
+    // Delegated so it survives re-renders; bound once per page load.
+    if (!window.__taskFilterBound) {
+        window.__taskFilterBound = true;
+        document.addEventListener('click', function(evt) {
+            const board = document.getElementById('tasks-board');
+            if (!board) return;
+            const btn = evt.target.closest('[data-task-filter-btn], [data-task-filter-clear]');
+            if (!btn) return;
+            const next = btn.dataset.taskFilterBtn || '';
+            board.dataset.taskFilter = board.dataset.taskFilter === next ? '' : next;
+            window.syncTaskFilter();
+        });
+    }
+
     // Initialize drag and drop for action items kanban board
     function syncTaskCountersFromBoard() {
         const todoCount = document.querySelectorAll('#todo-list [data-id]').length;
@@ -109,6 +189,8 @@
         if (pendingKpi) {
             pendingKpi.textContent = String(pendingCount);
         }
+
+        syncTaskFilter();
     }
 
     function initializeKanban() {
