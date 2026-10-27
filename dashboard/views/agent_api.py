@@ -54,6 +54,7 @@ from dashboard.forms import GapAnalysisMetricForm, ActionItemForm, UserProfileFo
 from dashboard.utils_notifications import send_notification
 from ..forms import GapAnalysisMetricForm, ActionItemForm, UserProfileForm, ResourceForm
 from gtm.views import _compute_scores, _band_for_score
+from gtm.services import safe_get_session_or_403
 from ..utils import calculate_gap_metric_display_properties
 
 logger = logging.getLogger(__name__)
@@ -102,19 +103,11 @@ def dashboard_agent_api(request):
     if error_response:
         return error_response
 
-    try:
-        session = AssessmentSession.objects.get(pk=session_id)
-    except AssessmentSession.DoesNotExist:
+    # Owner-or-active-member check; a client-supplied ?workspace= grants nothing.
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
         return JsonResponse({"success": False, "error": "Assessment session not found."}, status=404)
-
-    workspace_id = request.GET.get('workspace') or request.session.get('current_workspace_id')
-    current_workspace = None
-    if workspace_id:
-        if str(session.workspace_id) != str(workspace_id):
-            return JsonResponse({"success": False, "error": "That assessment is not in the current workspace."}, status=403)
-        current_workspace = Workspace.objects.filter(id=workspace_id).first()
-    elif session.user_id != request.user.id:
-        return JsonResponse({"success": False, "error": "You do not have access to that assessment."}, status=403)
+    current_workspace = session.workspace
 
     from gtm.ai_credits import resolve_account
     account = resolve_account(workspace=current_workspace, user=request.user)
@@ -204,17 +197,9 @@ def dashboard_agent_clear_api(request):
     if not session_id:
         return JsonResponse({"success": False, "error": "Select an assessment first."}, status=400)
 
-    try:
-        session = AssessmentSession.objects.get(pk=session_id)
-    except AssessmentSession.DoesNotExist:
+    session, is_authorized = safe_get_session_or_403(request, session_id)
+    if not is_authorized:
         return JsonResponse({"success": False, "error": "Assessment session not found."}, status=404)
-
-    workspace_id = request.GET.get('workspace') or request.session.get('current_workspace_id')
-    if workspace_id:
-        if str(session.workspace_id) != str(workspace_id):
-            return JsonResponse({"success": False, "error": "That assessment is not in the current workspace."}, status=403)
-    elif session.user_id != request.user.id:
-        return JsonResponse({"success": False, "error": "You do not have access to that assessment."}, status=403)
 
     # [DEEP CLEAR] Wipe chat messages AND strategic evidence files
     deleted_count, _ = ChatMessage.objects.filter(session=session).delete()

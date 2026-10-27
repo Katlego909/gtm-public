@@ -91,13 +91,13 @@ from .helpers import (
     _upsert_gap_metric_in_scope,
 )
 
-@csrf_exempt
+@login_required
 def insight_export(request, pk, fmt):
     """Export an AI insight/playbook as a PDF or Word document."""
-    # Only allow access to insights in user's workspace
-    workspace_id = request.session.get('current_workspace_id')
-    if workspace_id:
-        insight = get_object_or_404(ResultSnapshot, pk=pk, session__workspace_id=workspace_id)
+    # Only allow access to insights in a workspace the user belongs to
+    workspace, _ = _resolve_dashboard_workspace(request)
+    if workspace:
+        insight = get_object_or_404(ResultSnapshot, pk=pk, session__workspace=workspace)
     else:
         insight = get_object_or_404(ResultSnapshot, pk=pk, session__user=request.user)
 
@@ -147,7 +147,6 @@ def assessment_history_export(request, fmt):
     return response
 
 
-@csrf_exempt
 def insight_feedback(request, pk):
     """Receive feedback for an AI insight."""
     if request.method == 'POST':
@@ -168,7 +167,6 @@ def insight_feedback(request, pk):
     return JsonResponse({'status': 'error', 'message': 'Invalid request.'}, status=400)
 
 
-@csrf_exempt
 def general_feedback(request):
     """Site-wide "Give Feedback" widget -- not scoped to one AI insight.
     Same persistence model as insight_feedback (BetaFeedback), context='general'."""
@@ -196,9 +194,9 @@ def general_feedback(request):
 def kpi_total_sessions(request):
     """Return total sessions as an HTML fragment."""
     if request.user.is_authenticated:
-        workspace_id = request.GET.get('workspace') or request.session.get('current_workspace_id')
-        if workspace_id:
-            total_sessions = AssessmentSession.objects.filter(workspace_id=workspace_id).count()
+        workspace, _ = _resolve_dashboard_workspace(request)
+        if workspace:
+            total_sessions = AssessmentSession.objects.filter(workspace=workspace).count()
         else:
             total_sessions = AssessmentSession.objects.filter(user=request.user).count()
     else:
@@ -210,9 +208,9 @@ def kpi_total_sessions(request):
 def kpi_completed_items(request):
     """Return completed action items count as an HTML fragment."""
     if request.user.is_authenticated:
-        workspace_id = request.GET.get('workspace') or request.session.get('current_workspace_id')
-        if workspace_id:
-            completed_items = ActionItem.objects.filter(workspace_id=workspace_id, status='done').count()
+        workspace, _ = _resolve_dashboard_workspace(request)
+        if workspace:
+            completed_items = ActionItem.objects.filter(workspace=workspace, status='done').count()
         else:
             completed_items = ActionItem.objects.filter(session__user=request.user, status='done').count()
     else:
@@ -224,9 +222,9 @@ def kpi_completed_items(request):
 def kpi_pending_items(request):
     """Return pending action items count as an HTML fragment."""
     if request.user.is_authenticated:
-        workspace_id = request.GET.get('workspace') or request.session.get('current_workspace_id')
-        if workspace_id:
-            pending_items = ActionItem.objects.filter(workspace_id=workspace_id).exclude(status='done').count()
+        workspace, _ = _resolve_dashboard_workspace(request)
+        if workspace:
+            pending_items = ActionItem.objects.filter(workspace=workspace).exclude(status='done').count()
         else:
             pending_items = ActionItem.objects.filter(session__user=request.user).exclude(status='done').count()
     else:

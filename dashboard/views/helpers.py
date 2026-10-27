@@ -10,6 +10,7 @@ import datetime
 import json
 import mimetypes
 import markdown
+from gtm.utils_markdown import render_markdown
 import os
 import re
 import uuid
@@ -89,7 +90,7 @@ def _md(text: str) -> str:
     text = re.sub(r'(?m)(?<=\S)\n([ \t]*(?:[*\-+]|\d+\.) )', r'\n\n\1', text)
     # Also ensure blank line after a heading line (### ...) before the next content
     text = re.sub(r'(?m)(^#{1,6} .+)\n(?!\n)', r'\1\n\n', text)
-    return markdown.markdown(text, extensions=['extra', 'nl2br', 'sane_lists'])
+    return render_markdown(text, extensions=['extra', 'nl2br', 'sane_lists'])
 
 
 from ..parsers import (

@@ -15,6 +15,7 @@ from django.contrib import messages
 from ..models import AssessmentSession, Question, Response, Category, RecommendationBand, ActionItem, ToolRecommendation, ResultSnapshot, DeliveryDocument, CategoryDocument
 from django.utils.safestring import mark_safe
 import markdown as md
+from gtm.utils_markdown import render_markdown
 import math
 import re
 from django.http import HttpResponse, JsonResponse
@@ -325,7 +326,7 @@ def results(request, session_id):
     ai_playbook_html = ""
     if snap and playbook_raw and not is_generic_fallback:
         src = _normalize_ai_playbook_markdown(snap.ai_playbook)
-        ai_playbook_html = mark_safe(md.markdown(src, extensions=["extra", "sane_lists"]))
+        ai_playbook_html = mark_safe(render_markdown(src, extensions=["extra", "sane_lists"]))
 
     from django.urls import reverse as _reverse
     next_moves_poll_url = _reverse("gtm:next_moves_content", kwargs={"session_id": session.uuid})

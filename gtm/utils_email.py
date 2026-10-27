@@ -13,8 +13,8 @@ def send_snapshot_report_email(snapshot):
     """
     from django.urls import reverse
     from .models import ActionItem
-    import markdown
-    
+    from .utils_markdown import render_markdown
+
     session = snapshot.session
     subject = f"Your GTM Assessment Results — {snapshot.company_name or 'Untitled'} ({floatformat(snapshot.overall, 0)}/100)"
 
@@ -45,7 +45,7 @@ def send_snapshot_report_email(snapshot):
     # Convert band actions markdown to HTML
     band_actions_html = ""
     if snapshot.band and snapshot.band.actions_markdown:
-        band_actions_html = markdown.markdown(snapshot.band.actions_markdown)
+        band_actions_html = render_markdown(snapshot.band.actions_markdown)
 
     # Build absolute URLs
     base_url = getattr(settings, "SITE_BASE_URL", "http://127.0.0.1:8000")

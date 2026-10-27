@@ -1,5 +1,5 @@
 import datetime
-import markdown
+from gtm.utils_markdown import render_markdown
 from django.utils import timezone
 from django.urls import reverse
 from gtm.models import AssessmentSession, ActionItem, ResultSnapshot, ToolRecommendation, ChatMessage
@@ -8,7 +8,7 @@ from gtm.services import _compute_scores, _band_for_score
 from gtm.ai_chat import get_suggested_prompts
 
 def _md(text):
-    return markdown.markdown(text)
+    return render_markdown(text)
 
 
 def _build_assessment_history_export_rows(sessions_qs):
@@ -234,7 +234,7 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
     
     insights = []
     for insight in insights_qs:
-        insight.playbook_html = markdown.markdown(insight.ai_playbook or "")
+        insight.playbook_html = render_markdown(insight.ai_playbook)
         insights.append(insight)
 
     # GTM Assessment History & Trends (workspace-scoped)
@@ -334,7 +334,7 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
     # Convert markdown notes to HTML for all relevant items
     def convert_notes(items):
         for item in items:
-            item.note_html = markdown.markdown(item.note or "")
+            item.note_html = render_markdown(item.note)
         return items
 
     recent_items = convert_notes(list(recent_items))

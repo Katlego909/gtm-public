@@ -550,18 +550,12 @@ def delete_gap_metric(request, pk):
 # INSIGHT VIEWS
 # ================================================================
 
+@login_required
 def gap_analysis_table(request):
-    workspace_id = request.GET.get('workspace') or request.POST.get('workspace') or request.session.get('current_workspace_id')
-    if workspace_id:
-        gap_analysis = GapAnalysisMetric.objects.filter(
-            workspace_id=workspace_id
-        )
-    else:
-        gap_analysis = GapAnalysisMetric.objects.filter(
-            user=request.user,
-            workspace__isnull=True,
-        )
-    gap_analysis = prepare_gap_metrics_for_display(gap_analysis, workspace_id, request.user)
+    # _get_gap_scope only honours a ?workspace= the user is an active member of.
+    current_workspace, _ = _get_gap_scope(request)
+    gap_analysis = _gap_metric_scope_queryset(request.user, current_workspace)
+    gap_analysis = prepare_gap_metrics_for_display(gap_analysis, current_workspace, request.user)
 
     return render(request, 'dashboard/partials/gap_analysis_table.html', {'gap_analysis': gap_analysis})
 
@@ -647,42 +641,22 @@ def gap_report(request):
         return render(request, 'dashboard/partials/gap_report_content.html', context)
     return render(request, 'dashboard/gap_report.html', context)
 
+@login_required
 def get_gap_metric_row(request, pk):
-    # Only allow access to metrics in user's workspace or user-created metrics
-    workspace_id = request.GET.get('workspace') or request.POST.get('workspace') or request.session.get('current_workspace_id')
-    if workspace_id:
-        metric = get_object_or_404(
-            GapAnalysisMetric.objects.filter(
-                workspace_id=workspace_id
-            ), 
-            pk=pk
-        )
-    else:
-        metric = get_object_or_404(
-            GapAnalysisMetric.objects.filter(
-                user=request.user,
-                workspace__isnull=True,
-            ),
-            pk=pk
-        )
+    # Only allow access to metrics in a workspace the user belongs to, or their own.
+    current_workspace, _ = _get_gap_scope(request)
+    metric = get_object_or_404(_gap_metric_scope_queryset(request.user, current_workspace), pk=pk)
 
-    prepare_gap_metrics_for_display([metric], workspace_id, request.user)
+    prepare_gap_metrics_for_display([metric], current_workspace, request.user)
 
     return render(request, 'dashboard/partials/_gap_analysis_row.html', {'gap': metric})
 
+@login_required
 def refresh_gap_analysis_table(request):
-    workspace_id = request.GET.get('workspace') or request.POST.get('workspace') or request.session.get('current_workspace_id')
-    if workspace_id:
-        gap_analysis = GapAnalysisMetric.objects.filter(
-            workspace_id=workspace_id
-        ).order_by('category', 'priority')
-    else:
-        gap_analysis = GapAnalysisMetric.objects.filter(
-            user=request.user,
-            workspace__isnull=True,
-        ).order_by('category', 'priority')
+    current_workspace, _ = _get_gap_scope(request)
+    gap_analysis = _gap_metric_scope_queryset(request.user, current_workspace).order_by('category', 'priority')
 
-    gap_analysis = prepare_gap_metrics_for_display(gap_analysis, workspace_id, request.user)
+    gap_analysis = prepare_gap_metrics_for_display(gap_analysis, current_workspace, request.user)
 
     return render(request, 'dashboard/partials/_gap_analysis_table_rows.html', {'gap_analysis': gap_analysis})
 

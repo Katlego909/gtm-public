@@ -289,15 +289,8 @@ class Resource(models.Model):
         """Convert markdown audit summary to HTML for display."""
         if not self.ai_audit_summary:
             return ""
-        try:
-            import markdown
-            html = markdown.markdown(self.ai_audit_summary, extensions=['extra', 'codehilite'])
-            return html
-        except ImportError:
-            # Fallback if markdown not available - just use the raw text with line breaks
-            import html as html_module
-            escaped = html_module.escape(self.ai_audit_summary)
-            return escaped.replace('\n', '<br>')
+        from gtm.utils_markdown import render_markdown
+        return render_markdown(self.ai_audit_summary, extensions=['extra', 'codehilite'])
 
 class AIResourceRecommendation(models.Model):
     """

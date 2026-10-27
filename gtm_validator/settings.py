@@ -21,6 +21,13 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "django-insecure-c=&nz9k*2q%_@ft=n_+
 # Default to True for local dev safety; explicitly set DEBUG=False in production
 DEBUG = os.getenv("DEBUG", "True").lower() in ("true", "1", "yes")
 
+# Sessions are signed cookies (SESSION_ENGINE below), so anyone who knows
+# SECRET_KEY can mint a session for any user. Refuse to boot a non-debug
+# instance on the public dev default rather than run silently takeover-able.
+if not DEBUG and (not SECRET_KEY or SECRET_KEY.startswith("django-insecure-")):
+    from django.core.exceptions import ImproperlyConfigured
+    raise ImproperlyConfigured("DJANGO_SECRET_KEY must be set when DEBUG is off.")
+
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,forge.funti3r.xyz,gtm-validator-601175512678.us-west1.run.app").split(",")
 
 # Error tracking (optional -- only active when SENTRY_DSN is set; safe to
@@ -330,6 +337,8 @@ if not DEBUG:
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+    # No includeSubDomains/preload: other funti3r.xyz subdomains aren't ours to pin.
+    SECURE_HSTS_SECONDS = 31536000
 
 # Cloud-safe Logging: File Handler removed to prevent container environment write crashes.
 LOGGING = {

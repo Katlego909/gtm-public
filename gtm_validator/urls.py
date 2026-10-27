@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib import admin
 from django.db import transaction
 from django.urls import path, include
@@ -15,8 +17,10 @@ def health_check(request):
         db = connections['default']
         db.ensure_connection()
         return JsonResponse({'status': 'healthy'}, status=200)
-    except Exception as e:
-        return JsonResponse({'status': 'unhealthy', 'error': str(e)}, status=503)
+    except Exception:
+        # Details go to the logs, not the public response (they can name DB hosts).
+        logging.getLogger(__name__).exception("Health check failed")
+        return JsonResponse({'status': 'unhealthy'}, status=503)
 
 
 urlpatterns = [

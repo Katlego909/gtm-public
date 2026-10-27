@@ -14,6 +14,7 @@ from django.contrib import messages
 from ..models import AssessmentSession, Question, Response, Category, RecommendationBand, ActionItem, ToolRecommendation, ResultSnapshot, DeliveryDocument, CategoryDocument
 from django.utils.safestring import mark_safe
 import markdown as md
+from gtm.utils_markdown import render_markdown
 import math
 import re
 from django.http import HttpResponse, JsonResponse
@@ -116,7 +117,7 @@ def next_moves_content(request, session_id):
     ai_playbook_html = ""
     if snap and playbook_raw and not is_generic_fallback:
         src = _normalize_ai_playbook_markdown(snap.ai_playbook)
-        ai_playbook_html = mark_safe(md.markdown(src, extensions=["extra", "sane_lists"]))
+        ai_playbook_html = mark_safe(render_markdown(src, extensions=["extra", "sane_lists"]))
 
     from django.urls import reverse as _reverse
     poll_url = _reverse("gtm:next_moves_content", kwargs={"session_id": session.uuid})
@@ -164,9 +165,9 @@ def enrichment_status(request, session_id):
     comp_no_credits = (snap.ai_competitor_analysis == ENRICHMENT_NO_CREDITS)
 
     if snap.ai_financial_summary and not fin_failed and not fin_no_credits:
-        fin_html = mark_safe(md.markdown(_normalize_ai_playbook_markdown(snap.ai_financial_summary), extensions=["extra", "sane_lists"]))
+        fin_html = mark_safe(render_markdown(_normalize_ai_playbook_markdown(snap.ai_financial_summary), extensions=["extra", "sane_lists"]))
     if snap.ai_competitor_analysis and not comp_failed and not comp_no_credits:
-        comp_html = mark_safe(md.markdown(_normalize_ai_playbook_markdown(snap.ai_competitor_analysis), extensions=["extra", "sane_lists"]))
+        comp_html = mark_safe(render_markdown(_normalize_ai_playbook_markdown(snap.ai_competitor_analysis), extensions=["extra", "sane_lists"]))
 
     # still_loading is True only while fields are genuinely empty (never attempted).
     # A sentinel value counts as "done" so the HTMX poll stops.
@@ -200,17 +201,17 @@ def playbook_content_status(request, session_id):
 
     if playbook_ready:
         src = _normalize_ai_playbook_markdown(snap.ai_playbook)
-        ai_playbook_html = md.markdown(src, extensions=["extra", "sane_lists", "toc"])
+        ai_playbook_html = render_markdown(src, extensions=["extra", "sane_lists", "toc"])
 
         # Render financial summary if available
         if snap.ai_financial_summary:
             fin_src = _normalize_ai_playbook_markdown(snap.ai_financial_summary)
-            ai_financial_html = md.markdown(fin_src, extensions=["extra", "sane_lists"])
+            ai_financial_html = render_markdown(fin_src, extensions=["extra", "sane_lists"])
 
         # Render competitor analysis if available
         if snap.ai_competitor_analysis:
             comp_src = _normalize_ai_playbook_markdown(snap.ai_competitor_analysis)
-            ai_competitor_html = md.markdown(comp_src, extensions=["extra", "sane_lists"])
+            ai_competitor_html = render_markdown(comp_src, extensions=["extra", "sane_lists"])
 
         return render(request, "gtm/partials/playbook_content_status.html", {
             "session": session,
@@ -349,7 +350,7 @@ def playbook(request, session_id):
     try:
         if snap and getattr(snap, "ai_playbook", ""):
             src = _normalize_ai_playbook_markdown(snap.ai_playbook)
-            ai_playbook_html = md.markdown(
+            ai_playbook_html = render_markdown(
                 src,
                 extensions=["extra", "sane_lists", "toc"]  # 'extra' already includes tables
             )
@@ -357,12 +358,12 @@ def playbook(request, session_id):
             # Render financial summary if available
             if snap.ai_financial_summary:
                 fin_src = _normalize_ai_playbook_markdown(snap.ai_financial_summary)
-                ai_financial_html = md.markdown(fin_src, extensions=["extra", "sane_lists"])
+                ai_financial_html = render_markdown(fin_src, extensions=["extra", "sane_lists"])
 
             # Render competitor analysis if available
             if snap.ai_competitor_analysis:
                 comp_src = _normalize_ai_playbook_markdown(snap.ai_competitor_analysis)
-                ai_competitor_html = md.markdown(comp_src, extensions=["extra", "sane_lists"])
+                ai_competitor_html = render_markdown(comp_src, extensions=["extra", "sane_lists"])
 
             playbook_ready = True
     except Exception as e:

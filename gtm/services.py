@@ -7,6 +7,8 @@ from django.utils.html import strip_tags
 from django.utils.safestring import mark_safe
 from django.db.models import Sum, F
 import markdown as md
+from django.template.defaultfilters import linebreaksbr
+from .utils_markdown import render_markdown
 
 from .models import Category, Question, AssessmentSession, Response, RecommendationBand, ResultSnapshot
 from .utils_logging import log_error
@@ -227,10 +229,10 @@ def _format_band_actions_markdown(markdown_text):
     
     # Render markdown to HTML
     try:
-        return mark_safe(md.markdown(actions_md, extensions=["extra", "sane_lists"]))
+        return render_markdown(actions_md, extensions=["extra", "sane_lists"])
     except Exception:
         # Fallback to simple line break conversion
-        return mark_safe(actions_md.replace("\n", "<br>"))
+        return linebreaksbr(actions_md, autoescape=True)
 
 
 # Company-stage → applicable pillars. Deliberately small: any stage not
