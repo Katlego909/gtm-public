@@ -1,0 +1,32 @@
+{% load markdown_filters %}
+{# One comment on a task card. Long comments open on a whole-sentence preview #}
+{# (comment.preview) and expand in place; nothing is ever cut mid-sentence. #}
+<li class="py-2 first:pt-1 group/comment">
+    <div class="flex items-center gap-1.5 text-[11px] text-gray-500 mb-0.5">
+        {% if comment.agent_type %}
+            <span class="px-1.5 py-px rounded border border-indigo-200 bg-indigo-50 text-indigo-700 font-semibold">{{ comment.agent_name }}</span>
+            <span>AI &middot; for {{ comment.user.get_full_name|default:comment.user.username }}</span>
+        {% else %}
+            <span class="font-semibold text-gray-700">{{ comment.user.get_full_name|default:comment.user.username }}</span>
+        {% endif %}
+        <span aria-hidden="true">&middot;</span>
+        <time datetime="{{ comment.created_at|date:'c' }}" title="{{ comment.created_at|date:'M j, Y H:i' }}">{{ comment.created_at|date:"M j, H:i" }}</time>
+        {% if comment.user == request.user or membership.role == 'admin' or membership.role == 'funti3r_consultant' %}
+        <form hx-post="{% url 'delete_action_item_comment' comment.id %}" hx-target="#action-items-container" class="ml-auto">
+            {% csrf_token %}
+            <button type="submit" class="text-[11px] text-gray-400 hover:text-red-600 opacity-0 group-hover/comment:opacity-100 focus:opacity-100 transition-opacity">Delete</button>
+        </form>
+        {% endif %}
+    </div>
+    {% if comment.preview %}
+        <details class="group/body">
+            <summary class="list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+                <span class="group-open/body:hidden text-xs text-gray-700 break-words">{{ comment.preview }} <span class="font-medium text-indigo-600 hover:text-indigo-700">Show more</span></span>
+                <span class="hidden group-open/body:inline text-[11px] font-medium text-indigo-600 hover:text-indigo-700">Show less</span>
+            </summary>
+            <div class="mt-1 text-xs text-gray-700 break-words prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1">{{ comment.text|markdownify|safe }}</div>
+        </details>
+    {% else %}
+        <div class="text-xs text-gray-700 break-words prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1">{{ comment.text|markdownify|safe }}</div>
+    {% endif %}
+</li>

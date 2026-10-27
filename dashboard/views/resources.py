@@ -47,6 +47,7 @@ from gtm.models import (
     GTMFile,
 )
 from gtm.models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation, WorkspaceActivityEvent
+from gtm.utils_text import sentence_preview
 from gtm.ai_chat import get_suggested_prompts, process_chat_message
 from gtm.decorators import workspace_permission_required, workspace_member_required
 from dashboard.models import Channel, ChannelAnalytics, GapAnalysisMetric, GapAnalysisSuggestion, Resource, Notification, UserSettings
@@ -103,46 +104,6 @@ _DOCUMENT_TYPE_STYLES = {
 }
 
 
-def _sentence_preview(text: str, max_chars: int = 200) -> str:
-    """Build a preview out of whole sentences only, growing until the next
-    sentence would exceed `max_chars` -- never cuts a sentence off mid-way,
-    so what's shown always reads as a complete thought (even a single long
-    sentence beats a fragment ending nowhere).
-
-    Skips label:value metadata paragraphs (e.g. "Document ID: ... Author:
-    AI Assistant") that some documents open with -- otherwise those glue
-    onto the first real sentence since they have no terminal punctuation
-    of their own, producing an oddly long, metadata-heavy preview."""
-    import re
-
-    from django.utils.text import Truncator
-
-    text = text.strip()
-    paragraphs = [p.strip() for p in re.split(r'\n\s*\n', text) if p.strip()]
-
-    for paragraph in paragraphs:
-        word_count = len(paragraph.split())
-        looks_like_labels = paragraph.count(':') >= 2 and word_count < 25
-        if looks_like_labels:
-            continue
-
-        sentences = re.split(r'(?<=[.!?])\s+', paragraph)
-        preview = ''
-        for sentence in sentences:
-            if not sentence:
-                continue
-            candidate = f"{preview} {sentence}".strip() if preview else sentence
-            if preview and len(candidate) > max_chars:
-                break
-            preview = candidate
-        if preview:
-            return preview
-
-    # Every paragraph looked like metadata -- fall back to a word-safe cut
-    # of the raw text rather than showing nothing.
-    return Truncator(text).words(28, truncate='')
-
-
 @login_required
 @vary_on_headers('HX-Request')
 def asset_library(request):
@@ -186,7 +147,7 @@ def asset_library(request):
             # the document's own title/section headers (already shown in
             # the card header) before any real body text appears.
             body_html = re.sub(r'<h[1-6][^>]*>.*?</h[1-6]>', '', _md(doc.content), flags=re.IGNORECASE | re.DOTALL)
-            doc.preview = _sentence_preview(strip_tags(body_html))
+            doc.preview = sentence_preview(strip_tags(body_html))
             doc.badge_class, doc.accent_class = _DOCUMENT_TYPE_STYLES.get(
                 doc.doc_type, _DOCUMENT_TYPE_STYLES['other']
             )

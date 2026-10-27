@@ -45,7 +45,7 @@ def _agent_name_hint(candidate: str, *, action: str = "consult") -> Optional[str
     return None
 
 
-def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]] = None) -> List[Any]:
+def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]] = None, agent_type: str = "") -> List[Any]:
     """Build the shared set of workspace-collaboration tools available to
     any agent chatting on behalf of `user` within `workspace`.
 
@@ -54,7 +54,10 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
     assign_task_to_agent) record real ActionItem ids into as they resolve
     them -- see agent_runtime.record_task_ref. Callers read this back after
     the turn to persist structured task grounding (WorkspaceChatMessage/
-    ChatMessage.task_refs) independent of whatever text the model wrote."""
+    ChatMessage.task_refs) independent of whatever text the model wrote.
+
+    `agent_type` identifies which agent is using these tools, so comments it
+    posts are shown as written by that agent rather than by `user`."""
     from dashboard.parsers import _resolve_assignee, log_workspace_activity
     from dashboard.utils_notifications import send_notification
     from dashboard.views.helpers import _upsert_gap_metric_in_scope
@@ -95,7 +98,7 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
         except (ActionItem.DoesNotExist, ValueError, TypeError):
             return f"I couldn't find task {action_item_id} in this workspace."
         record_task_ref(task_refs_sink, item.id, item.note)
-        ActionItemComment.objects.create(action_item=item, user=user, text=comment_text)
+        ActionItemComment.objects.create(action_item=item, user=user, text=comment_text, agent_type=agent_type)
         log_workspace_activity(
             workspace, user, 'comment_added',
             f"{user.get_full_name() or user.username} commented on task '{item.note[:80]}'.",

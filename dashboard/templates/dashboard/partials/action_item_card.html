@@ -155,30 +155,24 @@
 
         {% with comments=item.comments.all %}
             {% if comments %}
-                <div class="space-y-2 max-h-32 overflow-y-auto pr-1">
-                    {% for comment in comments %}
-                    <div class="bg-gray-50 border border-gray-200 rounded-lg px-2 py-1.5">
-                        <div class="flex items-start justify-between gap-2">
-                            <div class="min-w-0">
-                                <div class="text-[11px] text-gray-500">
-                                    <span class="font-semibold text-gray-700">{{ comment.user.get_full_name|default:comment.user.username }}</span>
-                                    · {{ comment.created_at|date:"M d, H:i" }}
-                                </div>
-                                <div class="text-xs text-gray-700 break-words">{{ comment.text }}</div>
-                            </div>
-                            {% if comment.user == request.user or membership.role == 'admin' or membership.role == 'funti3r_consultant' %}
-                            <form hx-post="{% url 'delete_action_item_comment' comment.id %}" hx-target="#action-items-container">
-                                {% csrf_token %}
-                                <button type="submit"
-                                        class="text-[10px] text-red-600 hover:text-red-700 px-1 py-0.5 rounded">
-                                    Delete
-                                </button>
-                            </form>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
+                {% if comments|length > 2 %}
+                <details class="group/earlier">
+                    <summary class="list-none cursor-pointer text-[11px] font-medium text-indigo-600 hover:text-indigo-700 [&::-webkit-details-marker]:hidden">
+                        <span class="group-open/earlier:hidden">Show {{ comments|length|add:"-2" }} earlier comment{{ comments|length|add:"-2"|pluralize }}</span>
+                        <span class="hidden group-open/earlier:inline">Hide earlier comments</span>
+                    </summary>
+                    <ul class="divide-y divide-gray-100">
+                        {% for comment in comments %}{% if forloop.revcounter > 2 %}
+                            {% include 'dashboard/partials/action_item_comment.html' %}
+                        {% endif %}{% endfor %}
+                    </ul>
+                </details>
+                {% endif %}
+                <ul class="divide-y divide-gray-100{% if comments|length > 2 %} border-t border-gray-100{% endif %}">
+                    {% for comment in comments %}{% if forloop.revcounter <= 2 %}
+                        {% include 'dashboard/partials/action_item_comment.html' %}
+                    {% endif %}{% endfor %}
+                </ul>
             {% else %}
                 <div class="text-xs text-gray-400">No comments yet.</div>
             {% endif %}

@@ -490,7 +490,7 @@ def _build_workspace_tools(
     context = build_workspace_agent_context(agent_type, workspace, user=user)
     document_tools = _build_document_tools(agent_type, workspace, user=user, document_refs_sink=document_refs_sink)
     web_tools = build_web_tools(workspace=workspace, user=user)
-    action_tools = build_agent_action_tools(workspace, user, task_refs_sink=task_refs_sink) if user else []
+    action_tools = build_agent_action_tools(workspace, user, task_refs_sink=task_refs_sink, agent_type=agent_type) if user else []
     dashboard_tools = build_dashboard_tools(workspace=workspace, user=user, task_refs_sink=task_refs_sink) if user else []
     consult_tools = (
         _build_consult_tools(

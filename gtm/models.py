@@ -2,6 +2,8 @@ from django.db import models
 import uuid
 from django.conf import settings
 from django.utils import timezone
+from django.utils.functional import cached_property
+from django.utils.html import strip_tags
 from django.core.serializers.json import DjangoJSONEncoder
 
 # Import workspace models so Django can find them
@@ -307,11 +309,37 @@ class ActionItemComment(models.Model):
     prompt_token_count = models.PositiveIntegerField(null=True, blank=True)
     candidates_token_count = models.PositiveIntegerField(null=True, blank=True)
 
+    agent_type = models.CharField(
+        max_length=20, choices=ActionItem.AGENT_TYPE_CHOICES, blank=True, default="",
+        help_text="Set when an AI agent wrote this comment; `user` is then the person it acted for.",
+    )
+
+    PREVIEW_MAX_CHARS = 160
+
     class Meta:
         ordering = ['created_at']
 
     def __str__(self):
         return f"Comment by {self.user.username} on task {self.action_item.id}"
+
+    @property
+    def agent_name(self):
+        """The agent's first name (e.g. "Charlie"), or "" for a human comment."""
+        if not self.agent_type:
+            return ""
+        from .agent_runtime import AGENT_DIRECTORY
+        return AGENT_DIRECTORY.get(self.agent_type, {}).get("name", "AI agent")
+
+    @cached_property
+    def preview(self):
+        """Whole-sentence plain-text preview, or "" when the full comment is
+        already short enough to show as-is."""
+        from .utils_markdown import render_markdown
+        from .utils_text import sentence_preview
+
+        plain = " ".join(strip_tags(render_markdown(self.text)).split())
+        preview = sentence_preview(plain, max_chars=self.PREVIEW_MAX_CHARS)
+        return preview if len(preview) < len(plain) else ""
 
 class ToolRecommendation(models.Model):
     category = models.ForeignKey("Category", on_delete=models.CASCADE)

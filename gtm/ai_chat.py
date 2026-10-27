@@ -554,7 +554,7 @@ def _build_session_tools(
         *build_web_tools(session=session, user=user),
         *build_dashboard_tools(workspace=session.workspace, session=session, user=user, task_refs_sink=task_refs_sink),
         *(
-            build_agent_action_tools(session.workspace, user, task_refs_sink=task_refs_sink)
+            build_agent_action_tools(session.workspace, user, task_refs_sink=task_refs_sink, agent_type="gtm_strategist")
             if session.workspace and user else []
         ),
         *(

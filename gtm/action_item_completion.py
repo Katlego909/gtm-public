@@ -282,6 +282,7 @@ def complete_action_item(action_item: ActionItem, user=None) -> Dict[str, Any]:
         action_item=action_item,
         user=user,
         text=comment_text,
+        agent_type="gtm_strategist",
         duration_ms=duration_ms,
         prompt_token_count=prompt_token_count,
         candidates_token_count=candidates_token_count,
