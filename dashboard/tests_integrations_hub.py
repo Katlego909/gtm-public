@@ -27,6 +27,10 @@ class WorkspaceHubIntegrationCardTests(TestCase):
         self.workspace = Workspace.objects.create(name="Hub Integration Co")
         WorkspaceMembership.objects.create(workspace=self.workspace, user=self.admin, role="admin", is_active=True)
         WorkspaceMembership.objects.create(workspace=self.workspace, user=self.contributor, role="contributor", is_active=True)
+        self.manager = User.objects.create_user(username="hub-manager", password="pass1234", email="manager@test.com")
+        self.consultant = User.objects.create_user(username="hub-consultant", password="pass1234", email="consultant@test.com")
+        WorkspaceMembership.objects.create(workspace=self.workspace, user=self.manager, role="manager", is_active=True)
+        WorkspaceMembership.objects.create(workspace=self.workspace, user=self.consultant, role="funti3r_consultant", is_active=True)
         self.url = reverse("workspace_hub")
 
     def test_admin_sees_integrations_card(self):
@@ -85,3 +89,35 @@ class WorkspaceHubIntegrationCardTests(TestCase):
         integration.refresh_from_db()
         self.assertEqual(integration.status, "not_connected")
         self.assertEqual(integration.encrypted_credentials, "")
+
+    def test_manager_post_is_denied(self):
+        """can_manage_integrations deliberately excludes 'manager', unlike can_invite_users."""
+        self.client.force_login(self.manager)
+        self.client.post(
+            f"{self.url}?workspace={self.workspace.id}",
+            {"integration_action": "save_hubspot", "token": "pat-na1-manager"},
+        )
+        self.assertFalse(WorkspaceIntegration.objects.filter(workspace=self.workspace).exists())
+
+    @mock.patch("dashboard.views.hub.HubSpotClient")
+    def test_consultant_can_save_hubspot(self, mock_client_cls):
+        mock_client_cls.return_value.test_connection.return_value = (True, "Connected.")
+        self.client.force_login(self.consultant)
+        self.client.post(
+            f"{self.url}?workspace={self.workspace.id}",
+            {"integration_action": "save_hubspot", "token": "pat-na1-consult"},
+        )
+        integration = WorkspaceIntegration.objects.get(workspace=self.workspace, provider="hubspot")
+        self.assertEqual(integration.status, "connected")
+
+    @mock.patch("dashboard.views.hub.HubSpotClient")
+    def test_save_with_failed_connection_test_marks_error(self, mock_client_cls):
+        mock_client_cls.return_value.test_connection.return_value = (False, "HubSpot rejected this token.")
+        self.client.force_login(self.admin)
+        self.client.post(
+            f"{self.url}?workspace={self.workspace.id}",
+            {"integration_action": "save_hubspot", "token": "pat-na1-badtoken"},
+        )
+        integration = WorkspaceIntegration.objects.get(workspace=self.workspace, provider="hubspot")
+        self.assertEqual(integration.status, "error")
+        self.assertEqual(integration.last_error, "HubSpot rejected this token.")

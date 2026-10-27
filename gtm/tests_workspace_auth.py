@@ -138,7 +138,12 @@ class WorkspaceMiddlewareTests(TestCase):
 
         response = self.client.get(url)
 
-        self.assertEqual(response.status_code, 200)
+        # Legacy detail page now forwards to the dashboard Workspace Hub.
+        self.assertRedirects(
+            response,
+            f"{reverse('workspace_hub')}?workspace={self.workspace.id}",
+            fetch_redirect_response=False,
+        )
         self.assertEqual(
             self.client.session.get("current_workspace_id"), str(self.workspace.id)
         )

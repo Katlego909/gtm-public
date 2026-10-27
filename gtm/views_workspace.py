@@ -1,24 +1,26 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.core.mail import send_mail
-from django.conf import settings
 from django.utils import timezone
 from django.urls import reverse
 from .models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation
-from .models_integrations import WorkspaceIntegration
-from .integrations.crypto import CredentialDecryptionError
-from .integrations.hubspot_client import HubSpotClient
 from .forms import WorkspaceInvitationForm
 from .middleware_workspace import workspace_required, admin_or_manager_required
 from .decorators import workspace_permission_required
 
 
+def _hub_redirect(workspace_id=None):
+    """Workspace management lives in the dashboard's Workspace Hub; the legacy
+    gtm/workspace pages redirect there."""
+    url = reverse('workspace_hub')
+    if workspace_id:
+        url = f'{url}?workspace={workspace_id}'
+    return redirect(url)
+
+
 @login_required
 def workspace_list(request):
-    """List user's workspaces"""
-    memberships = WorkspaceMembership.objects.filter(user=request.user).select_related('workspace')
-    return render(request, 'gtm/workspace/list.html', {'memberships': memberships})
+    return _hub_redirect()
 
 
 @login_required
@@ -36,31 +38,14 @@ def workspace_create(request):
                 return render(request, 'gtm/workspace/create.html')
             workspace = Workspace.create_for_user(name=name, user=request.user)
             messages.success(request, f'Workspace "{name}" created successfully')
-            return redirect('workspace:detail', workspace_id=workspace.id)
+            return _hub_redirect(workspace.id)
         messages.error(request, 'Workspace name is required')
     return render(request, 'gtm/workspace/create.html')
 
 
 @workspace_required
 def workspace_detail(request, workspace_id):
-    """Workspace detail and management"""
-    workspace = request.workspace
-    members = WorkspaceMembership.objects.filter(workspace=workspace).select_related('user')
-    pending_invites = WorkspaceInvitation.objects.filter(workspace=workspace, accepted_at__isnull=True)
-    
-    # Get the admin user who created this workspace
-    admin_member = members.filter(role='admin').first()
-    
-    invitation_form = WorkspaceInvitationForm()
-
-    return render(request, 'gtm/workspace/detail.html', {
-        'workspace': workspace,
-        'members': members,
-        'pending_invites': pending_invites,
-        'user_membership': request.workspace_membership,
-        'admin_member': admin_member,
-        'invitation_form': invitation_form,
-    })
+    return _hub_redirect(workspace_id)
 
 
 @workspace_required
@@ -127,92 +112,7 @@ def workspace_invite(request, workspace_id):
 
 @workspace_permission_required('can_manage_integrations', workspace_param='workspace_id')
 def workspace_integrations(request, workspace_id):
-    """View and configure workspace integrations (HubSpot CRM, etc.)."""
-    workspace = request.workspace
-    integration = WorkspaceIntegration.objects.filter(workspace=workspace, provider='hubspot').first()
-
-    if request.method == 'POST':
-        token = request.POST.get('token', '').strip()
-        if not token:
-            messages.error(request, 'Please paste a HubSpot Private App token.')
-            return redirect('workspace:integrations', workspace_id=workspace_id)
-
-        if integration is None:
-            integration = WorkspaceIntegration(workspace=workspace, provider='hubspot')
-        integration.auth_method = 'api_key'
-        integration.set_credential(token)
-        integration.configured_by = request.user
-        integration.save()
-
-        ok, result_message = HubSpotClient(token).test_connection()
-        integration.status = 'connected' if ok else 'error'
-        integration.last_verified_at = timezone.now()
-        integration.last_error = '' if ok else result_message
-        integration.save()
-
-        if ok:
-            messages.success(request, 'HubSpot connected successfully.')
-        else:
-            messages.error(request, f'Token saved, but the connection test failed: {result_message}')
-
-        return redirect('workspace:integrations', workspace_id=workspace_id)
-
-    return render(request, 'gtm/workspace/integrations.html', {
-        'workspace': workspace,
-        'integration': integration,
-        'user_membership': request.membership,
-    })
-
-
-@workspace_permission_required('can_manage_integrations', workspace_param='workspace_id')
-def workspace_integration_test_hubspot(request, workspace_id):
-    """Re-verify the stored HubSpot token's connection status."""
-    if request.method != 'POST':
-        return redirect('workspace:integrations', workspace_id=workspace_id)
-
-    workspace = request.workspace
-    integration = get_object_or_404(WorkspaceIntegration, workspace=workspace, provider='hubspot')
-
-    try:
-        token = integration.get_credential()
-    except CredentialDecryptionError:
-        integration.status = 'error'
-        integration.last_error = 'Stored credential could not be decrypted. Please reconnect.'
-        integration.last_verified_at = timezone.now()
-        integration.save()
-        messages.error(request, integration.last_error)
-        return redirect('workspace:integrations', workspace_id=workspace_id)
-
-    ok, result_message = HubSpotClient(token).test_connection()
-    integration.status = 'connected' if ok else 'error'
-    integration.last_verified_at = timezone.now()
-    integration.last_error = '' if ok else result_message
-    integration.save()
-
-    if ok:
-        messages.success(request, 'Connection is healthy.')
-    else:
-        messages.error(request, result_message)
-
-    return redirect('workspace:integrations', workspace_id=workspace_id)
-
-
-@workspace_permission_required('can_manage_integrations', workspace_param='workspace_id')
-def workspace_integration_disconnect_hubspot(request, workspace_id):
-    """Disconnect the workspace's HubSpot integration (clears the stored credential)."""
-    if request.method != 'POST':
-        return redirect('workspace:integrations', workspace_id=workspace_id)
-
-    workspace = request.workspace
-    integration = get_object_or_404(WorkspaceIntegration, workspace=workspace, provider='hubspot')
-    integration.clear_credential()
-    integration.status = 'not_connected'
-    integration.last_error = ''
-    integration.last_verified_at = None
-    integration.save()
-
-    messages.success(request, 'HubSpot has been disconnected.')
-    return redirect('workspace:integrations', workspace_id=workspace_id)
+    return _hub_redirect(workspace_id)
 
 
 @login_required
@@ -222,7 +122,7 @@ def workspace_join(request, token):
     
     if invitation.expires_at < timezone.now():
         messages.error(request, 'This invitation has expired')
-        return redirect('workspace:list')
+        return _hub_redirect()
     
     if request.method == 'POST':
         # Check if user is already a member
@@ -238,6 +138,6 @@ def workspace_join(request, token):
         else:
             messages.info(request, 'You are already a member of this workspace')
         
-        return redirect('workspace:detail', workspace_id=invitation.workspace.id)
+        return _hub_redirect(invitation.workspace.id)
     
     return render(request, 'gtm/workspace/join.html', {'invitation': invitation})

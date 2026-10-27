@@ -77,7 +77,7 @@ class WorkspaceMiddleware:
                 # infinite redirect loop on every subsequent workspace request.
             except Http404:
                 # Invalid workspace, redirect to workspace selection
-                return redirect('gtm:workspace:list')
+                return redirect('workspace_hub')
         else:
             # Try to get workspace from session
             workspace_id = request.session.get('current_workspace_id')
@@ -118,7 +118,7 @@ class WorkspaceMiddleware:
                 if request.session.get('current_workspace_id') == str(workspace.id):
                     del request.session['current_workspace_id']
                 messages.error(request, "You don't have access to this workspace.")
-                return redirect('gtm:workspace:list')
+                return redirect('workspace_hub')
 
 
 def workspace_required(view_func):
@@ -128,7 +128,7 @@ def workspace_required(view_func):
     def wrapper(request, *args, **kwargs):
         if not hasattr(request, 'workspace') or not request.workspace:
             messages.error(request, "Please select a workspace to continue.")
-            return redirect('gtm:workspace:list')
+            return redirect('workspace_hub')
         return view_func(request, *args, **kwargs)
     return wrapper
 
@@ -142,7 +142,7 @@ def role_required(allowed_roles):
         def wrapper(request, *args, **kwargs):
             if not hasattr(request, 'workspace_membership') or not request.workspace_membership:
                 messages.error(request, "Workspace access required.")
-                return redirect('gtm:workspace:list')
+                return redirect('workspace_hub')
                 
             if request.workspace_membership.role not in allowed_roles:
                 messages.error(request, "You don't have sufficient permissions for this action.")
