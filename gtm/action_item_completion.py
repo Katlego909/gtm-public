@@ -199,7 +199,7 @@ def complete_action_item(action_item: ActionItem, user=None) -> Dict[str, Any]:
         _request_budget_available,
         _set_quota_cooldown,
     )
-    from .ai_credits import resolve_account_for_session, can_spend, record_spend, format_reset_time
+    from .ai_credits import resolve_account_for_session, can_spend, record_spend, credits_exhausted_message
 
     session = action_item.session
     if session is None:
@@ -212,8 +212,7 @@ def complete_action_item(action_item: ActionItem, user=None) -> Dict[str, Any]:
 
     credit_check = can_spend(account=account)
     if not credit_check.allowed:
-        reset_note = f" They reset at {format_reset_time(credit_check.reset_at)}." if credit_check.reset_at else ""
-        return {"success": False, "error": "This workspace has used all of its AI credits for today." + reset_note}
+        return {"success": False, "error": credits_exhausted_message(credit_check.reset_at)}
 
     client = _get_chat_client()
     if not client:

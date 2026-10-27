@@ -283,7 +283,7 @@ def _run_team_turn(agent_type, workspace, session, message, user, allow_transfer
         _set_quota_cooldown,
         MONITORING_AVAILABLE,
     )
-    from .ai_credits import resolve_account, resolve_account_for_session, can_spend, record_spend, format_reset_time
+    from .ai_credits import resolve_account, resolve_account_for_session, can_spend, record_spend, credits_exhausted_message
     from .utils_ai_monitoring import AIUsageTracker
 
     turn_task_refs: List[Dict[str, Any]] = []
@@ -300,9 +300,8 @@ def _run_team_turn(agent_type, workspace, session, message, user, allow_transfer
 
     credit_check = can_spend(account=account)
     if not credit_check.allowed:
-        reset_note = f" They reset at {format_reset_time(credit_check.reset_at)}." if credit_check.reset_at else ""
         return (
-            agent_type, "This workspace has used all of its AI credits for today." + reset_note,
+            agent_type, credits_exhausted_message(credit_check.reset_at),
             None, None, turn_task_refs, turn_document_refs,
         )
 

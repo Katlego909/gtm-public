@@ -771,7 +771,7 @@ def handle_general_chat_workspace(
         _set_quota_cooldown,
     )
     from .agent_runtime import run_agent_turn
-    from .ai_credits import resolve_account, can_spend, format_reset_time
+    from .ai_credits import resolve_account, can_spend, credits_exhausted_message
 
     account = resolve_account(workspace=workspace, user=user)
 
@@ -780,8 +780,7 @@ def handle_general_chat_workspace(
 
     credit_check = can_spend(account=account)
     if not credit_check.allowed:
-        reset_note = f" They reset at {format_reset_time(credit_check.reset_at)}." if credit_check.reset_at else ""
-        return f"You've used all of {workspace.name}'s AI credits for today." + reset_note, [], []
+        return credits_exhausted_message(credit_check.reset_at, owner=workspace.name), [], []
 
     client = _get_chat_client()
     if not client:

@@ -10,7 +10,9 @@
             <div class="h-full rounded-full {% if ai_credits_low %}bg-amber-500{% else %}bg-indigo-600{% endif %}"
                  style="width: {{ ai_credits_percent_used }}%"></div>
         </div>
-        {% if ai_credits_low %}
+        {% if ai_credits_exhausted %}
+        <p class="text-[11px] text-red-600 mt-1.5">Used up &mdash; AI features are paused until they reset in {{ ai_credits_reset_at|timeuntil }}.</p>
+        {% elif ai_credits_low %}
         <p class="text-[11px] text-amber-600 mt-1.5">Running low &mdash; resets {{ ai_credits_reset_at|timeuntil }} from now.</p>
         {% endif %}
     </div>

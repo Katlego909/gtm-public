@@ -1136,7 +1136,7 @@ def handle_general_chat(
     # 1. Quota Safety Gate
     from .ai_services import _quota_cooldown_active, _request_budget_available, _is_quota_error, _set_quota_cooldown, _extract_retry_delay_seconds
     from .agent_runtime import run_agent_turn
-    from .ai_credits import resolve_account_for_session, can_spend, format_reset_time
+    from .ai_credits import resolve_account_for_session, can_spend, credits_exhausted_message
 
     account = resolve_account_for_session(session, user=user)
 
@@ -1149,11 +1149,10 @@ def handle_general_chat(
 
     credit_check = can_spend(account=account)
     if not credit_check.allowed:
-        reset_note = f" They reset at {format_reset_time(credit_check.reset_at)}." if credit_check.reset_at else ""
         return (
-            "You've used all of this workspace's AI credits for today." + reset_note +
+            credits_exhausted_message(credit_check.reset_at) +
             f" In the meantime: your overall GTM score is **{context['overall_score']}/100**. "
-            "Try asking for 'scores' or 'action items' for a non-AI answer."
+            "Ask \"show my scores\" for a full breakdown, which works without credits."
         ), [], []
 
     # 2. Initialize Agent with Tools
@@ -1225,7 +1224,7 @@ def handle_general_chat(
         # Final Fallback
         return (
             f"I'm processing a lot of data right now. Your current GTM score is {context['overall_score']}/100. "
-            "Try asking for 'scores' or 'action items' directly."
+            "Ask \"show my scores\" for a full breakdown."
         ), [], []
 
 # ================================================================

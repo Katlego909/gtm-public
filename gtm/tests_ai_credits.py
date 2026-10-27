@@ -342,3 +342,51 @@ class TierAndCreditUnitTests(TestCase):
         account = resolve_account(user=self.user)
         self.assertEqual(account.tier, AICreditAccount.TIER_FREE)
         self.assertEqual(account.token_budget, AICreditAccount.DEFAULT_PERSONAL_TOKEN_BUDGET)
+
+
+class ExhaustedMessageTests(TestCase):
+    """The shared "out of credits" copy: monthly periods must name a date,
+    not a bare clock time that reads as "later today"."""
+
+    def test_reset_later_in_the_month_names_the_date(self):
+        from gtm.ai_credits import credits_exhausted_message
+        reset_at = timezone.now() + timedelta(days=10)
+        local = timezone.localtime(reset_at)
+        message = credits_exhausted_message(reset_at)
+        self.assertIn(f"They reset on {local.day} {local.strftime('%B')}.", message)
+        self.assertNotIn("today", message)
+
+    def test_reset_later_today_names_the_time(self):
+        from gtm.ai_credits import format_reset_time
+        now = timezone.localtime()
+        reset_at = now.replace(hour=23, minute=59) if now.hour < 23 else now
+        self.assertTrue(format_reset_time(reset_at).startswith("today at "))
+
+    def test_owner_name_is_used(self):
+        from gtm.ai_credits import credits_exhausted_message
+        self.assertTrue(credits_exhausted_message(None, owner="Acme").startswith("Acme has used all"))
+
+
+class ExhaustedChatSuggestionTests(TestCase):
+    """The exhausted chat reply points at a phrase that really answers
+    without credits."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="chat-out", password="pw")
+        self.workspace = Workspace.objects.create(name="Chat Out Co")
+        self.session = AssessmentSession.objects.create(
+            owner_client_id="chat-out", user=self.user, workspace=self.workspace, is_completed=True,
+        )
+        AICreditAccount.objects.create(
+            workspace=self.workspace, token_budget=1000, tokens_used=1000,
+            period_started_at=timezone.now(),
+        )
+
+    def test_suggested_phrase_answers_without_gemini(self):
+        from gtm.ai_chat import process_chat_message
+        with patch("gtm.ai_chat._get_chat_client") as client:
+            blocked = process_chat_message(str(self.session.uuid), "what should I fix first?", user=self.user)
+            self.assertIn('"show my scores"', str(blocked))
+            answered = process_chat_message(str(self.session.uuid), "show my scores", user=self.user)
+            client.assert_not_called()
+        self.assertIn("Overall Score", str(answered))

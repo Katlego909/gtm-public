@@ -135,12 +135,26 @@ def can_spend(*, workspace=None, user=None, account: Optional[AICreditAccount] =
 
 
 def format_reset_time(reset_at) -> str:
-    """Portable 12-hour time format (e.g. "3:00 PM") without relying on the
-    platform-specific %-I/%#I strftime flags, which differ between Linux
-    (Cloud Run, prod) and Windows (local dev)."""
+    """When credits come back, phrased for the user: "today at 3:00 PM" when
+    the period ends today, otherwise the date ("on 6 November"). Periods are
+    usually monthly, so a bare clock time reads as "later today" and is
+    wrong. Avoids the platform-specific %-I/%#I/%-d strftime flags, which
+    differ between Linux (Cloud Run, prod) and Windows (local dev)."""
     if not reset_at:
         return ""
-    return reset_at.strftime("%I:%M %p").lstrip("0")
+    local = timezone.localtime(reset_at)
+    if local.date() == timezone.localdate():
+        return "today at " + local.strftime("%I:%M %p").lstrip("0")
+    return f"on {local.day} {local.strftime('%B')}"
+
+
+def credits_exhausted_message(reset_at, owner="This workspace") -> str:
+    """The one user-facing "out of credits" sentence, shared by every AI
+    entry point so the wording and reset date can't drift apart."""
+    message = f"{owner} has used all of its AI credits for this period."
+    if reset_at:
+        message += f" They reset {format_reset_time(reset_at)}."
+    return message
 
 
 def record_spend(account: Optional[AICreditAccount], tokens_used: int, feature: str, *,

@@ -181,7 +181,7 @@ def _build_sidebar_notifications_context(request, current_workspace):
 
     ai_credits_remaining = ai_credits_budget = ai_credits_reset_at = ai_credits_used = None
     ai_credits_percent_used = 0
-    ai_credits_low = False
+    ai_credits_low = ai_credits_exhausted = False
     if current_workspace:
         from gtm.ai_credits import can_spend
         from gtm.models_ai_credits import AICreditAccount
@@ -195,6 +195,7 @@ def _build_sidebar_notifications_context(request, current_workspace):
             used_tokens = max(budget_tokens - remaining_tokens, 0)
             ai_credits_reset_at = credit_check.reset_at
             ai_credits_low = budget_tokens > 0 and (remaining_tokens / budget_tokens) < 0.1
+            ai_credits_exhausted = remaining_tokens <= 0
             if budget_tokens > 0:
                 ai_credits_percent_used = min(round(used_tokens / budget_tokens * 100), 100)
             ai_credits_budget = AICreditAccount.tokens_to_credits(budget_tokens)
@@ -211,6 +212,7 @@ def _build_sidebar_notifications_context(request, current_workspace):
         'ai_credits_percent_used': ai_credits_percent_used,
         'ai_credits_reset_at': ai_credits_reset_at,
         'ai_credits_low': ai_credits_low,
+        'ai_credits_exhausted': ai_credits_exhausted,
     }
 
 
