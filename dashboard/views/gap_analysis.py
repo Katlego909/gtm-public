@@ -90,7 +90,7 @@ from .helpers import (
     _md,
     _resolve_dashboard_workspace,
     _upsert_gap_metric_in_scope,
-    apply_measured_closure,
+    record_gap_measurement,
     estimate_method_from_generator,
     prepare_gap_metrics_for_display,
 )
@@ -311,17 +311,10 @@ def log_gap_measurement(request, pk):
         form = GapMeasurementForm(request.POST)
         if form.is_valid():
             value = form.cleaned_data['value']
-            GapMetricMeasurement.objects.create(
-                gap_metric=metric,
-                value=value,
-                source='manual',
-                note=form.cleaned_data.get('note', ''),
-                recorded_by=request.user,
+            closed = record_gap_measurement(
+                metric, value, source='manual',
+                note=form.cleaned_data.get('note', ''), recorded_by=request.user,
             )
-            metric.current = value
-            metric.estimate_method = 'measured'
-            metric.save(update_fields=['current', 'estimate_method'])
-            closed = apply_measured_closure(metric)
 
             response = _render_gap_metric_row(request, metric, current_workspace)
             toast = f"Gap closed: {metric.metric} reached its target ({value} vs {metric.target})." if closed \

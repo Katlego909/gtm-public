@@ -22,7 +22,7 @@
             {% for m in measurements %}
             <li class="px-3 py-2 flex items-center justify-between gap-3">
                 <span class="font-medium text-gray-800">{{ m.value }}</span>
-                <span class="text-xs text-gray-500">{{ m.measured_at|date:"M j, Y" }}{% if m.note %} &middot; {{ m.note }}{% endif %}</span>
+                <span class="text-xs text-gray-500">{{ m.measured_at|date:"M j, Y" }}{% if m.source != 'manual' %} &middot; {{ m.get_source_display }}{% endif %}{% if m.note %} &middot; {{ m.note }}{% endif %}</span>
             </li>
             {% endfor %}
         </ul>

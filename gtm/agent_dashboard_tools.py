@@ -67,8 +67,8 @@ def build_dashboard_tools(
     omitted from the returned list when there's no workspace, rather than
     included but erroring.
     """
-    from dashboard.models import GapAnalysisMetric, GapMetricMeasurement, Notification
-    from dashboard.views.helpers import _gap_metric_scope_queryset, apply_measured_closure, prepare_gap_metrics_for_display
+    from dashboard.models import GapAnalysisMetric, Notification
+    from dashboard.views.helpers import _gap_metric_scope_queryset, prepare_gap_metrics_for_display, record_gap_measurement
 
     def list_gap_metrics(status: str = "open") -> str:
         """List GTM gap-analysis metrics in this workspace (or, outside a
@@ -144,14 +144,10 @@ def build_dashboard_tools(
             return f"No gap metric found for '{metric_name}' in scope -- use escalate_gap first to flag it."
 
         default_note = f"Reported via chat by {user.get_full_name() or user.username}." if user else "Reported via chat."
-        GapMetricMeasurement.objects.create(
-            gap_metric=metric, value=value, source="agent",
-            note=(note.strip() or default_note)[:240], recorded_by=user,
+        closed = record_gap_measurement(
+            metric, value, source="agent",
+            note=note.strip() or default_note, recorded_by=user,
         )
-        metric.current = value
-        metric.estimate_method = "measured"
-        metric.save(update_fields=["current", "estimate_method"])
-        closed = apply_measured_closure(metric)
         if closed:
             return f"Logged {metric.metric} at {value} and closed the gap -- target reached ({metric.target})."
         return f"Logged {metric.metric} at {value}. Target: {metric.target}."

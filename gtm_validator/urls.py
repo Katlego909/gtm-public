@@ -9,6 +9,8 @@ from django.http import JsonResponse
 
 from allauth.account.views import signup as allauth_signup
 
+from dashboard.views import inbound_api
+
 
 def health_check(request):
     """Health check endpoint for Cloud Run and container orchestration."""
@@ -39,6 +41,9 @@ urlpatterns = [
     path('', include('gtm.urls', namespace='gtm')),
     path('workspace/', include(('gtm.urls_workspace', 'workspace'), namespace='workspace')),
     path('dashboard/', include('dashboard.urls')),
+    # Inbound metrics API (API-key auth, see docs/inbound_api.md).
+    path('api/v1/gap-metrics/', inbound_api.list_gap_metrics, name='api_list_gap_metrics'),
+    path('api/v1/gap-metrics/measurements/', inbound_api.create_gap_measurement, name='api_create_gap_measurement'),
 ]
 
 if settings.DEBUG:

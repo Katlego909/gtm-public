@@ -707,6 +707,31 @@ def apply_measured_closure(metric):
     return True
 
 
+def record_gap_measurement(metric, value, *, source, note='', recorded_by=None, api_key=None):
+    """Record one genuinely measured value for a gap metric and auto-close
+    it if the value reached target. The single write path shared by the
+    manual check-in form, the chat agent tool, and the inbound API, so
+    every measurement source honours the same closure rule.
+
+    Returns True when this measurement closed the gap.
+    """
+    from dashboard.models import GapMetricMeasurement
+
+    with transaction.atomic():
+        GapMetricMeasurement.objects.create(
+            gap_metric=metric,
+            value=value,
+            source=source,
+            note=(note or '')[:240],
+            recorded_by=recorded_by,
+            api_key=api_key,
+        )
+        metric.current = value
+        metric.estimate_method = 'measured'
+        metric.save(update_fields=['current', 'estimate_method'])
+        return apply_measured_closure(metric)
+
+
 def prepare_gap_metrics_for_display(metrics, workspace, user):
     """Annotate gap metrics with everything the table row renders: the
     existing gap%/priority styling, linked-task progress, deterministic

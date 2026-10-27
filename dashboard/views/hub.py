@@ -26,6 +26,7 @@ from django.utils import timezone
 from django.conf import settings
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.vary import vary_on_headers
+from django.utils.cache import add_never_cache_headers
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib import messages
@@ -48,7 +49,7 @@ from gtm.models import (
     WorkspaceChatMessage,
 )
 from gtm.models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation, WorkspaceActivityEvent
-from gtm.models_integrations import WorkspaceIntegration
+from gtm.models_integrations import WorkspaceApiKey, WorkspaceIntegration
 from gtm.integrations.hubspot_client import HubSpotClient
 from gtm.agent_runtime import AGENT_DIRECTORY, agent_display_label
 from gtm.ai_chat import get_suggested_prompts, process_chat_message
@@ -150,6 +151,34 @@ def _handle_hubspot_integration_action(request, workspace):
         messages.success(request, 'HubSpot has been disconnected.')
 
 
+def _handle_api_key_action(request, workspace):
+    """Create/revoke an inbound API key. Caller has already verified the
+    requesting user has can_manage_integrations. Returns the new key's
+    plaintext on create -- rendered once into the response, never put in
+    `messages` (those ride in the signed, unencrypted session cookie)."""
+    action = request.POST.get('integration_action')
+
+    if action == 'create_api_key':
+        name = request.POST.get('api_key_name', '').strip()[:80]
+        if not name:
+            messages.error(request, 'Please give the API key a name.')
+            return None
+        _, plaintext = WorkspaceApiKey.generate(workspace, name, request.user)
+        messages.success(request, f'API key "{name}" created.')
+        return plaintext
+
+    if action == 'revoke_api_key':
+        api_key_id = request.POST.get('api_key_id', '')
+        revoked = WorkspaceApiKey.objects.filter(
+            pk=api_key_id, workspace=workspace, revoked_at__isnull=True,
+        ).update(revoked_at=timezone.now()) if api_key_id.isdigit() else 0
+        if revoked:
+            messages.success(request, 'API key revoked.')
+        else:
+            messages.error(request, 'That API key was not found.')
+    return None
+
+
 @vary_on_headers('HX-Request')
 @login_required
 def workspace_hub(request):
@@ -178,17 +207,26 @@ def workspace_hub(request):
             workspace=current_workspace, user=request.user, is_active=True
         ).first()
 
+    user_can_manage_integrations = bool(user_membership and user_membership.can_manage_integrations)
+    new_api_key = None
     if request.method == 'POST' and current_workspace and 'integration_action' in request.POST:
-        if not user_membership or not user_membership.can_manage_integrations:
+        if not user_can_manage_integrations:
             messages.error(request, "You don't have permission to manage integrations in this workspace.")
+        elif request.POST.get('integration_action') in ('create_api_key', 'revoke_api_key'):
+            new_api_key = _handle_api_key_action(request, current_workspace)
         else:
             _handle_hubspot_integration_action(request, current_workspace)
 
     hubspot_integration = None
+    api_keys = []
     if current_workspace:
         hubspot_integration = WorkspaceIntegration.objects.filter(
             workspace=current_workspace, provider='hubspot'
         ).first()
+        if user_can_manage_integrations:
+            api_keys = WorkspaceApiKey.objects.filter(
+                workspace=current_workspace, revoked_at__isnull=True,
+            ).select_related('created_by')
 
     team_members = []
     workspace_memberships = []
@@ -227,7 +265,9 @@ def workspace_hub(request):
         'pending_invites': pending_invites,
         'accepted_awaiting': accepted_awaiting,
         'hubspot_integration': hubspot_integration,
-        'user_can_manage_integrations': bool(user_membership and user_membership.can_manage_integrations),
+        'api_keys': api_keys,
+        'new_api_key': new_api_key,
+        'user_can_manage_integrations': user_can_manage_integrations,
         'user_can_edit_workspace': bool(user_membership and user_membership.can_edit_workspace),
         'page_title': 'Workspace Hub'
     }
@@ -235,8 +275,11 @@ def workspace_hub(request):
     if request.htmx:
         response = render(request, 'dashboard/partials/workspace_hub_content.html', context)
         response['HX-Trigger'] = 'refreshNotifications, refreshAgentActions'
-        return response
-    return render(request, 'dashboard/workspace_hub.html', context)
+    else:
+        response = render(request, 'dashboard/workspace_hub.html', context)
+    if new_api_key:
+        add_never_cache_headers(response)
+    return response
 
 @vary_on_headers('HX-Request')
 @login_required

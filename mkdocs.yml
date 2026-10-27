@@ -40,6 +40,7 @@ nav:
   - Python API Reference:
       - Module Directory: python_reference.md
       - API & Views: api_reference.md
+      - Inbound Metrics API: inbound_api.md
   - Operations & Tools:
       - CLI Commands: maintenance_tools.md
 

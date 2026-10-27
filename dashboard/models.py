@@ -131,15 +131,17 @@ class GapAnalysisMetric(models.Model):
 class GapMetricMeasurement(models.Model):
     """One real, dated data point for a gap metric's current value.
 
-    Only genuinely measured values belong here (a human check-in today,
-    a CRM pull later) -- AI estimates never create measurements, so this
-    history is what makes 'gap closed' an honest claim.
+    Only genuinely measured values belong here (a human check-in, a value
+    a user stated in chat, or one pushed by the customer's own tooling
+    through the inbound API) -- AI estimates never create measurements, so
+    this history is what makes 'gap closed' an honest claim.
     """
 
     SOURCE_CHOICES = [
         ('manual', 'Manual check-in'),
         ('crm', 'CRM'),
         ('agent', 'AI agent (chat-relayed)'),
+        ('api', 'API'),
     ]
 
     gap_metric = models.ForeignKey(GapAnalysisMetric, on_delete=models.CASCADE, related_name='measurements')
@@ -147,6 +149,10 @@ class GapMetricMeasurement(models.Model):
     source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default='manual')
     note = models.CharField(max_length=240, blank=True, default='')
     recorded_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='gap_measurements')
+    api_key = models.ForeignKey(
+        'gtm.WorkspaceApiKey', on_delete=models.SET_NULL, null=True, blank=True, related_name='measurements',
+        help_text="Set when the value was pushed through the inbound API.",
+    )
     measured_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

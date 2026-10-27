@@ -5,7 +5,7 @@ from django.core.serializers.json import DjangoJSONEncoder
 
 # Import workspace models so Django can find them
 from .models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation
-from .models_integrations import WorkspaceIntegration
+from .models_integrations import WorkspaceApiKey, WorkspaceIntegration
 from .models_ai_credits import AICreditAccount, AICreditTransaction
 from .models_ai_locks import AIGenerationLock
 from .models_beta import BetaInviteCode

@@ -175,6 +175,50 @@
                     </button>
                 </form>
             </div>
+
+            <!-- Inbound API keys -->
+            <div class="bg-white rounded-xl border border-gray-200 p-6 mb-8">
+                <h3 class="text-lg font-bold text-gray-800 mb-2">API Keys</h3>
+                <p class="text-sm text-gray-500 mb-4">Let your CRM, BI tool or automation push measured gap-metric values into this workspace. A pushed value that reaches its target closes the gap, exactly like a manual check-in.</p>
+
+                {% if new_api_key %}
+                    <div class="border border-green-300 bg-green-50 rounded-lg p-4 mb-4">
+                        <p class="text-sm font-medium text-green-800 mb-2">Copy this key now. It won't be shown again.</p>
+                        <code class="block text-sm font-mono text-gray-900 bg-white border border-green-200 rounded px-3 py-2 break-all select-all">{{ new_api_key }}</code>
+                    </div>
+                {% endif %}
+
+                {% if api_keys %}
+                    <ul class="divide-y divide-gray-200 border border-gray-200 rounded-lg mb-4">
+                        {% for key in api_keys %}
+                            <li class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-3">
+                                <div class="text-sm">
+                                    <p class="font-medium text-gray-800">{{ key.name }} <span class="font-mono text-gray-500">{{ key.prefix }}&hellip;</span></p>
+                                    <p class="text-gray-500">
+                                        Created {{ key.created_at|date:"M j, Y" }}{% if key.created_by %} by {{ key.created_by.get_full_name|default:key.created_by.username }}{% endif %}
+                                        &middot; {% if key.last_used_at %}Last used {{ key.last_used_at|timesince }} ago{% else %}Never used{% endif %}
+                                    </p>
+                                </div>
+                                <form hx-post="{% url 'workspace_hub' %}?workspace={{ current_workspace.id }}" hx-target="#main-content" hx-swap="innerHTML"
+                                      onsubmit="return confirm('Revoke this API key? Anything using it will stop working immediately.');">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="integration_action" value="revoke_api_key">
+                                    <input type="hidden" name="api_key_id" value="{{ key.id }}">
+                                    <button type="submit" class="px-3 py-1.5 text-sm font-medium bg-white text-red-600 rounded-lg border border-red-300 hover:bg-red-50">Revoke</button>
+                                </form>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+
+                <form hx-post="{% url 'workspace_hub' %}?workspace={{ current_workspace.id }}" hx-target="#main-content" hx-swap="innerHTML" class="flex flex-col sm:flex-row gap-3">
+                    {% csrf_token %}
+                    <input type="hidden" name="integration_action" value="create_api_key">
+                    <input type="text" name="api_key_name" required maxlength="80" placeholder="Key name, e.g. HubSpot nightly sync"
+                           class="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <button type="submit" class="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 flex-shrink-0">Create Key</button>
+                </form>
+            </div>
             {% endif %}
 
             <!-- Library link (Resources + Documents now live on one unified page) -->
