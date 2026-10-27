@@ -143,13 +143,13 @@ def _extract_gtm_categories(audit_text: str) -> list:
     return found
 
 
-def _extract_summary(audit_text: str, max_len: int = 300) -> str:
-    """Extract the first meaningful paragraph as a short summary."""
-    if not audit_text:
-        return ""
-    lines = [l.strip() for l in audit_text.split('\n') if l.strip() and not l.strip().startswith('#')]
-    summary = " ".join(lines[:3])
-    return summary[:max_len] + ("..." if len(summary) > max_len else "")
+def _read_upload(field_file):
+    """Read a FileField through the storage API (works for local disk and GCS)."""
+    field_file.open('rb')
+    try:
+        return field_file.read(), guess_upload_mime_type(field_file.name)
+    finally:
+        field_file.close()
 
 
 # ─── Core audit function ──────────────────────────────────────────────────────
@@ -224,12 +224,7 @@ def perform_gtm_visual_audit(session_file, session_context=None):
     Saves results back to the model.
     """
     try:
-        session_file.file.open('rb')
-        file_bytes = session_file.file.read()
-        session_file.file.close()
-
-        mime_type = guess_upload_mime_type(session_file.file.name)
-
+        file_bytes, mime_type = _read_upload(session_file.file)
     except Exception as e:
         logger.error(f"Failed to read GTMFile for audit: {e}")
         return "ERROR: Could not read the evidence file."
@@ -278,12 +273,7 @@ def perform_resource_audit(resource) -> bool:
         return False
 
     try:
-        resource.file.open('rb')
-        file_bytes = resource.file.read()
-        resource.file.close()
-
-        mime_type = guess_upload_mime_type(resource.file.name)
-
+        file_bytes, mime_type = _read_upload(resource.file)
     except Exception as e:
         logger.error(f"Failed to read Resource file for audit: {resource.id} — {e}")
         resource.audit_status = 'failed'
@@ -312,17 +302,11 @@ def perform_resource_audit(resource) -> bool:
 
     from django.utils import timezone
     if audit_text:
-        resource.ai_audit_summary = _extract_summary(audit_text)
+        resource.ai_audit_summary = audit_text  # full text; UI truncates for display
         resource.ai_score_modifier = _extract_score_modifier(audit_text)
         resource.gtm_categories = _extract_gtm_categories(audit_text)
         resource.ai_audit_at = timezone.now()
         resource.audit_status = 'complete'
-        # Store full notes in a separate field if needed (re-use description temporarily)
-        # We store the full text in ai_audit_summary at max_len=300, 
-        # and full text is accessible via a separate detail endpoint.
-        # To avoid a schema change, we'll store full text in a hidden JSON metadata approach:
-        # Actually let's just store the full thing in ai_audit_summary without truncation
-        resource.ai_audit_summary = audit_text  # full text; UI will truncate display
         resource.save(update_fields=[
             'ai_audit_summary', 'ai_score_modifier', 'gtm_categories',
             'ai_audit_at', 'audit_status'
