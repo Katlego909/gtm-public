@@ -1,5 +1,5 @@
 {% load markdown_filters %}
-<div class="bg-white p-3 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-move group relative" data-id="{{ item.id }}" data-board-flags="{{ item.board_flags|default:'' }}">
+<div class="bg-white p-3 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-move group relative" data-id="{{ item.id }}" data-board-flags="{{ item.board_flags|default:'' }}"{% if item.ai_run_display == 'running' %} data-ai-locked{% endif %}>
     <div class="text-sm text-gray-800 font-medium mb-2 prose prose-sm max-w-none">
         {{ item.note|markdownify|safe }}
     </div>
@@ -42,8 +42,28 @@
         </div>
     {% endif %}
 
-    <!-- AI completion status (JS-toggled while a background job runs) -->
-    <div id="ai-status-{{ item.id }}" class="hidden mb-2 text-xs text-indigo-600"></div>
+    <!-- AI completion status: rendered from the run state stored on the task,
+         so it survives board re-renders, reloads, and shows for teammates too. -->
+    {% if item.ai_run_display == 'running' %}
+        <div class="mb-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-800"
+             role="status" data-ai-running="{{ item.id }}" data-ai-elapsed="{{ item.ai_run_elapsed|default:0 }}">
+            <p class="flex items-center gap-1.5">
+                <span class="inline-block w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" aria-hidden="true"></span>
+                <span><span class="font-semibold">{{ ai_completion_agent_name }}</span> is working on this &middot; <span data-ai-elapsed-label>0:00</span></span>
+            </p>
+            <p class="mt-0.5 text-indigo-700">Usually takes about a minute. You can keep working; this card updates when it's done.</p>
+        </div>
+    {% elif item.ai_run_display == 'stale' and item.status == 'todo' %}
+        <div class="mb-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 flex items-center justify-between gap-2" role="status">
+            <span>This is taking longer than expected.</span>
+            <button type="button" onclick="completeActionItemWithAI({{ item.id }})" class="flex-shrink-0 font-medium underline hover:text-amber-900">Try again</button>
+        </div>
+    {% elif item.ai_run_display == 'failed' and item.status == 'todo' %}
+        <div class="mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800 flex items-center justify-between gap-2" role="status">
+            <span>{{ ai_completion_agent_name }} couldn't finish: {{ item.ai_run_error|default:"something went wrong." }}</span>
+            <button type="button" onclick="completeActionItemWithAI({{ item.id }})" class="flex-shrink-0 font-medium underline hover:text-red-900">Try again</button>
+        </div>
+    {% endif %}
     
     <div class="mt-3 pt-2 border-t border-gray-50 flex flex-col gap-1">
         <div class="flex items-center justify-between gap-2 text-xs text-gray-500">
@@ -101,7 +121,8 @@
                     <button type="button"
                             id="complete-ai-btn-{{ item.id }}"
                             onclick="completeActionItemWithAI({{ item.id }})"
-                            class="text-gray-400 hover:text-indigo-600 p-1 bg-transparent border-0"
+                            {% if item.ai_run_display == 'running' %}disabled{% endif %}
+                            class="text-gray-400 hover:text-indigo-600 p-1 bg-transparent border-0 disabled:opacity-40 disabled:cursor-not-allowed"
                             title="Complete with AI" aria-label="Complete with AI">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -206,81 +227,91 @@ document.addEventListener('click', function(event) {
     }
 });
 
-function completeActionItemWithAI(itemId) {
-    const btn = document.getElementById('complete-ai-btn-' + itemId);
-    const statusEl = document.getElementById('ai-status-' + itemId);
-    if (!btn) return;
-
-    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+function actionItemsWorkspaceQS() {
     const workspaceSelector = document.getElementById('workspace-selector');
     const workspaceId = workspaceSelector ? workspaceSelector.value : '';
-    const qs = workspaceId ? `?workspace=${encodeURIComponent(workspaceId)}` : '';
+    return workspaceId ? `?workspace=${encodeURIComponent(workspaceId)}` : '';
+}
 
-    btn.disabled = true;
-    btn.classList.add('opacity-50', 'cursor-not-allowed');
-    if (statusEl) {
-        statusEl.textContent = 'AI is working on this...';
-        statusEl.classList.remove('hidden');
-    }
+function refreshActionItemsBoard() {
+    if (!window.htmx || !document.getElementById('action-items-container')) return;
+    htmx.ajax('GET', `/dashboard/refresh-action-items/${actionItemsWorkspaceQS()}`, {
+        target: '#action-items-container',
+        swap: 'outerHTML',
+    });
+}
 
-    fetch(`/dashboard/action-item/${itemId}/complete-ai/${qs}`, {
+function completeActionItemWithAI(itemId) {
+    const btn = document.getElementById('complete-ai-btn-' + itemId);
+    if (btn) btn.disabled = true;
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+
+    fetch(`/dashboard/action-item/${itemId}/complete-ai/${actionItemsWorkspaceQS()}`, {
         method: 'POST',
         headers: { 'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest' },
         credentials: 'same-origin',
     })
         .then(response => response.json())
         .then(data => {
-            if (!data.success) {
-                if (statusEl) statusEl.textContent = data.error || 'Could not start AI completion.';
-                btn.disabled = false;
-                btn.classList.remove('opacity-50', 'cursor-not-allowed');
-                return;
-            }
-            pollActionItemAICompletion(itemId, qs, statusEl);
+            if (!data.success) throw new Error(data.error || 'Could not start AI completion.');
+            // The server now has the run recorded; re-render so the card shows it.
+            refreshActionItemsBoard();
         })
-        .catch(() => {
-            if (statusEl) statusEl.textContent = 'Could not reach the AI service.';
-            btn.disabled = false;
-            btn.classList.remove('opacity-50', 'cursor-not-allowed');
+        .catch(error => {
+            if (btn) btn.disabled = false;
+            if (typeof window.showDashboardToast === 'function') {
+                window.showDashboardToast(error.message || 'Could not reach the AI service.', 'error');
+            }
         });
 }
 
-function pollActionItemAICompletion(itemId, qs, statusEl, attempt) {
-    attempt = attempt || 0;
-    if (attempt > 60) {
-        if (statusEl) statusEl.textContent = 'Still working -- check back shortly.';
-        return;
-    }
-    fetch(`/dashboard/action-item/${itemId}/complete-ai-status/${qs}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.state === 'running' || data.state === 'idle') {
-                setTimeout(() => pollActionItemAICompletion(itemId, qs, statusEl, attempt + 1), 2500);
-                return;
-            }
-            if (data.state === 'done') {
-                if (typeof window.showDashboardToast === 'function') {
-                    window.showDashboardToast(
-                        data.status === 'done'
+// One ticker per page, independent of board re-renders (a drag replaces the
+// board via outerHTML, which doesn't run scripts): every second it updates
+// the elapsed time on running cards and makes sure each has a status poll.
+if (!window.__aiRunTicker) {
+    window.__aiRunPolls = new Set();
+
+    const pollAIRun = function(itemId) {
+        if (!document.getElementById('action-items-container')) {
+            window.__aiRunPolls.delete(itemId);  // navigated away from the board
+            return;
+        }
+        fetch(`/dashboard/action-item/${itemId}/complete-ai-status/${actionItemsWorkspaceQS()}`, { credentials: 'same-origin' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.state === 'running') {
+                    setTimeout(() => pollAIRun(itemId), 3000);
+                    return;
+                }
+                window.__aiRunPolls.delete(itemId);
+                const toast = window.showDashboardToast;
+                if (typeof toast === 'function') {
+                    if (data.state === 'done') {
+                        toast(data.task_status === 'done'
                             ? 'AI completed this task.'
-                            : 'AI worked on this task -- check the comment for details.',
-                        'success'
-                    );
+                            : 'AI worked on this task. See its comment for details.', 'success');
+                    } else if (data.state === 'failed') {
+                        toast(data.error || 'AI could not complete this task.', 'error');
+                    }
                 }
-            } else if (data.state === 'failed') {
-                if (typeof window.showDashboardToast === 'function') {
-                    window.showDashboardToast(data.error || 'AI could not complete this task.', 'error');
-                }
+                refreshActionItemsBoard();
+            })
+            .catch(() => setTimeout(() => pollAIRun(itemId), 5000));
+    };
+
+    window.__aiRunTicker = setInterval(function() {
+        document.querySelectorAll('[data-ai-running]').forEach(function(el) {
+            if (!el.dataset.aiSeenAt) el.dataset.aiSeenAt = String(Date.now());
+            const secs = Number(el.dataset.aiElapsed || 0) + Math.floor((Date.now() - Number(el.dataset.aiSeenAt)) / 1000);
+            const label = el.querySelector('[data-ai-elapsed-label]');
+            if (label) label.textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+
+            const itemId = el.dataset.aiRunning;
+            if (!window.__aiRunPolls.has(itemId)) {
+                window.__aiRunPolls.add(itemId);
+                setTimeout(() => pollAIRun(itemId), 3000);
             }
-            if (window.htmx) {
-                htmx.ajax('GET', `/dashboard/refresh-action-items/${qs}`, {
-                    target: '#action-items-container',
-                    swap: 'outerHTML',
-                });
-            }
-        })
-        .catch(() => {
-            if (statusEl) statusEl.textContent = 'Could not check AI completion status.';
         });
+    }, 1000);
 }
 </script>

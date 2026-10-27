@@ -809,6 +809,22 @@ def prepare_gap_metrics_for_display(metrics, workspace, user):
 
 
 
+def action_item_ai_lock_key(action_item_id) -> str:
+    return f"gtm:ai:action_item_complete:{action_item_id}:lock"
+
+
+def ai_run_display_state(item):
+    """The AI-completion state a card should show: the stored state, except a
+    'running' run whose lock is no longer held (its thread died, or it ran
+    past the lock TTL) reads as 'stale' so the card offers a retry instead
+    of spinning forever."""
+    from gtm.ai_services import _lock_is_held
+
+    if item.ai_run_state == 'running' and not _lock_is_held(action_item_ai_lock_key(item.id)):
+        return 'stale'
+    return item.ai_run_state
+
+
 TASK_BOARD_FILTERS = ('overdue', 'due_week', 'unassigned', 'done_week')
 
 
@@ -852,8 +868,15 @@ def build_task_board_context(action_items_qs):
             stats[flag] += 1
         item.board_flags = ' '.join(flags)
         item.is_overdue = 'overdue' in flags
+        item.ai_run_display = ai_run_display_state(item) if item.ai_run_state else ''
+        if item.ai_run_display == 'running' and item.ai_run_started_at:
+            item.ai_run_elapsed = max(int((timezone.now() - item.ai_run_started_at).total_seconds()), 0)
+
+    from gtm.action_item_completion import COMPLETION_AGENT_TYPE
+    from gtm.agent_runtime import AGENT_DIRECTORY
 
     return {
+        'ai_completion_agent_name': AGENT_DIRECTORY[COMPLETION_AGENT_TYPE]['name'],
         'top_todo': top_todo,
         'top_doing': top_doing,
         'top_done': top_done,

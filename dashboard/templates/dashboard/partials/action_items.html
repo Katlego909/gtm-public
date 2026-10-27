@@ -206,7 +206,7 @@
                 ghostClass: 'opacity-30',
                 dragClass: 'shadow-2xl',
                 handle: '.bg-white', // The card itself is draggable
-                filter: '.border-dashed, button, a, input, textarea, form', // Keep interactive controls clickable
+                filter: '.border-dashed, button, a, input, textarea, form, [data-ai-locked]', // Keep controls clickable; a card AI is working on can't be moved
                 preventOnFilter: false, // MUST BE FALSE for inputs to gain focus!
                 delayOnTouchOnly: true,
                 delay: 120,

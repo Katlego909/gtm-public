@@ -249,6 +249,19 @@ class ActionItem(models.Model):
     )
     crm_synced_at = models.DateTimeField(null=True, blank=True)
 
+    # Durable state of the latest "Complete with AI" run, so every worker,
+    # instance, teammate and page reload sees the same thing (Django's cache
+    # is per-process here). Written with queryset.update() so it never bumps
+    # updated_at / the card's "Edited" date.
+    AI_RUN_STATE_CHOICES = [
+        ("running", "Running"),
+        ("done", "Done"),
+        ("failed", "Failed"),
+    ]
+    ai_run_state = models.CharField(max_length=10, choices=AI_RUN_STATE_CHOICES, blank=True, default="")
+    ai_run_started_at = models.DateTimeField(null=True, blank=True)
+    ai_run_error = models.CharField(max_length=240, blank=True, default="")
+
     note_key = models.CharField(
         max_length=240, editable=False, blank=True, default="",
         help_text="Normalized (trimmed, lowercased) note text, used to enforce no-duplicate-tasks constraints.",

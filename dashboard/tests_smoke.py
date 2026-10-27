@@ -231,17 +231,19 @@ class ActionItemAICompletionTests(TestCase):
         self.assertEqual(status_response.status_code, 200)
         status_data = status_response.json()
         self.assertEqual(status_data["state"], "done")
-        self.assertEqual(status_data["status"], "done")
+        item.refresh_from_db()
+        self.assertEqual(item.ai_run_state, "done")
+        self.assertIsNotNone(item.ai_run_started_at)
 
     def test_lock_prevents_concurrent_double_trigger(self):
         """Simulates an already-in-flight job by pre-acquiring the same
         lock key the view uses, then confirms a second POST doesn't start
         a duplicate run."""
         from gtm.ai_services import _acquire_lock, _release_lock
-        from dashboard.views.actions import _action_item_complete_lock_key
+        from dashboard.views.helpers import action_item_ai_lock_key
 
         item = self._make_item()
-        lock_key = _action_item_complete_lock_key(item.id)
+        lock_key = action_item_ai_lock_key(item.id)
         self.assertTrue(_acquire_lock(lock_key, ttl_seconds=60))
         # The cache backend is process-global, not part of the DB transaction
         # this TestCase rolls back -- release explicitly so a held lock can't

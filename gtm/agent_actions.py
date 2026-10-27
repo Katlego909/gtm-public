@@ -167,26 +167,10 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
         if item.status != 'todo':
             return f"Routed \"{item.note[:50]}\" to {agent_name}. It's already {item.get_status_display()}, so they won't re-attempt it."
 
-        from django.core.cache import cache
-        from gtm.ai_services import _acquire_lock
-        from gtm.utils_async import run_in_background
-        from dashboard.views.actions import (
-            _action_item_complete_lock_key,
-            _action_item_complete_status_cache_key,
-            _complete_action_item_background,
-        )
+        from dashboard.views.actions import start_ai_completion
 
-        lock_key = _action_item_complete_lock_key(item.id)
-        if not _acquire_lock(lock_key, ttl_seconds=180):
+        if not start_ai_completion(item, user.id, workspace.id):
             return f"Routed \"{item.note[:50]}\" to {agent_name} -- they're already working on it."
-
-        status_key = _action_item_complete_status_cache_key(item.id)
-        cache.set(status_key, {"state": "running"}, timeout=600)
-        run_in_background(
-            _complete_action_item_background,
-            item.id, user.id, workspace.id,
-            name=f"action_item_complete:{item.id}",
-        )
         return f'Routed "{item.note[:50]}" to {agent_name} -- they\'re attempting it now.'
 
     def find_tasks(query: str = "", status: str = "", assignee: str = "", created_on: str = "") -> str:

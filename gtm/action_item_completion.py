@@ -50,6 +50,10 @@ except ImportError:
 # so the response came back as a bare function_call with no summary.
 MAX_TOOL_ROUNDS = 8
 
+# The agent that performs "Complete with AI" -- its deliverables, its comment,
+# and the "<name> is working on this" status on the card are all attributed to it.
+COMPLETION_AGENT_TYPE = "gtm_strategist"
+
 
 def _build_completion_tools(action_item: ActionItem, user, created_doc_ids: List[Any]) -> List[Any]:
     """Tool set for one completion turn: the same read tools the GTM
@@ -80,7 +84,7 @@ def _build_completion_tools(action_item: ActionItem, user, created_doc_ids: List
         (client_summary, action_plan, roadmap, resource_brief, other).
         """
         doc = create_agent_document(
-            agent_type="gtm_strategist",
+            agent_type=COMPLETION_AGENT_TYPE,
             title=title,
             content=content,
             doc_type=doc_type,
@@ -282,7 +286,7 @@ def complete_action_item(action_item: ActionItem, user=None) -> Dict[str, Any]:
         action_item=action_item,
         user=user,
         text=comment_text,
-        agent_type="gtm_strategist",
+        agent_type=COMPLETION_AGENT_TYPE,
         duration_ms=duration_ms,
         prompt_token_count=prompt_token_count,
         candidates_token_count=candidates_token_count,

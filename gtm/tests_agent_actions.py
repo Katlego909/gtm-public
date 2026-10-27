@@ -136,7 +136,7 @@ class AgentActionToolsTests(TestCase):
         self.assertIn("Notified", result)
         self.assertTrue(Notification.objects.filter(recipient=human_milo, title="Heads up").exists())
 
-    @mock.patch("gtm.utils_async.run_in_background", side_effect=lambda target, *args, **kwargs: target(*args))
+    @mock.patch("dashboard.views.actions.run_in_background", side_effect=lambda target, *args, **kwargs: target(*args))
     @mock.patch("gtm.action_item_completion.complete_action_item")
     def test_assign_task_to_agent_routes_and_triggers_completion(self, mock_complete, mock_run_bg):
         """run_in_background is patched to run synchronously so the effect
@@ -144,11 +144,8 @@ class AgentActionToolsTests(TestCase):
         box (same convention as dashboard.tests_smoke's
         ActionItemAICompletionTests) -- it owns the actual status/comment
         write-back, so what's observable here is _complete_action_item_background's
-        own side effects: the cached completion state and the activity log,
-        confirmed via the polling cache key it writes to."""
-        from django.core.cache import cache
-        from dashboard.views.actions import _action_item_complete_status_cache_key
-
+        own side effects: the run state it records on the task and the
+        activity log."""
         mock_complete.return_value = {
             "success": True, "status": "done",
             "summary": "Drafted the ICP one-pager.", "document_id": None,
@@ -162,9 +159,8 @@ class AgentActionToolsTests(TestCase):
         self.task.refresh_from_db()
         self.assertEqual(self.task.assigned_agent_type, "insights")
         mock_complete.assert_called_once()
-        cached_status = cache.get(_action_item_complete_status_cache_key(self.task.id))
-        self.assertEqual(cached_status["state"], "done")
-        self.assertEqual(cached_status["status"], "done")
+        self.assertEqual(self.task.ai_run_state, "done")
+        self.assertIsNotNone(self.task.ai_run_started_at)
 
     def test_assign_task_to_agent_rejects_invalid_agent_type(self):
         tools = self._tools()
