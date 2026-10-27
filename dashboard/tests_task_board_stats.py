@@ -115,6 +115,13 @@ class TasksBoardRenderingTests(TestCase):
         self.assertContains(response, 'data-board-flags="overdue unassigned"')
         self.assertContains(response, ">Overdue</span>", count=2)  # strip label + card badge
 
+    def test_card_actions_sit_in_footer_not_over_title(self):
+        response = self.client.get(reverse("tasks_board"), {"workspace": str(self.workspace.id)})
+        self.assertContains(response, 'aria-label="Edit task"')
+        self.assertContains(response, 'aria-label="Delete task"')
+        # The old hover-only toolbar floated over the title and was unreachable on touch screens.
+        self.assertNotContains(response, "absolute top-2 right-2 opacity-0")
+
     def test_board_refresh_keeps_strip(self):
         response = self.client.get(reverse("refresh_action_items"), {"workspace": str(self.workspace.id)})
         self.assertEqual(response.status_code, 200)

@@ -1,89 +1,7 @@
 {% load markdown_filters %}
 <div class="bg-white p-3 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-move group relative" data-id="{{ item.id }}" data-board-flags="{{ item.board_flags|default:'' }}">
-    <div class="flex justify-between items-start">
-        <div class="text-sm text-gray-800 font-medium mb-2 pr-6 prose prose-sm max-w-none">
-            {{ item.note|markdownify|safe }}
-        </div>
-        <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-white rounded shadow-sm p-1">
-            {% if current_workspace and team_members %}
-                <!-- Assignment dropdown -->
-                <div class="relative">
-                    <button type="button"
-                            onclick="toggleAssignmentDropdown({{ item.id }})"
-                            class="text-gray-400 hover:text-indigo-600 p-1 bg-transparent border-0"
-                            title="Assign to team member">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                    </button>
-                    <div id="assignment-dropdown-{{ item.id }}" class="hidden absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
-                        <div class="p-2">
-                            <div class="text-xs font-medium text-gray-700 mb-2">Assign to:</div>
-                            {% for member in team_members %}
-                                <button type="button"
-                                        hx-post="{% url 'assign_action_item' item.id %}"
-                                        hx-vals='{"assigned_to": "{{ member.id }}"}'
-                                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                                        hx-target="#action-items-container"
-                                        onclick="toggleAssignmentDropdown({{ item.id }})"
-                                        class="w-full text-left px-2 py-1 text-xs hover:bg-gray-100 rounded">
-                                    {{ member.get_full_name|default:member.username }}
-                                </button>
-                            {% endfor %}
-                            {% if item.assigned_to %}
-                                <hr class="my-2 border-gray-200">
-                                <button type="button"
-                                        hx-post="{% url 'unassign_action_item' item.id %}"
-                                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                                        hx-target="#action-items-container"
-                                        onclick="toggleAssignmentDropdown({{ item.id }})"
-                                        class="w-full text-left px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded">
-                                    Unassign
-                                </button>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
-            
-            {% if item.status == 'todo' %}
-                {% if item.session_id %}
-                <button type="button"
-                        id="complete-ai-btn-{{ item.id }}"
-                        onclick="completeActionItemWithAI({{ item.id }})"
-                        class="text-gray-400 hover:text-indigo-600 p-1 bg-transparent border-0"
-                        title="Complete with AI">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                </button>
-                {% else %}
-                <span class="text-gray-300 p-1" title="Needs a linked assessment before AI can complete this">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                </span>
-                {% endif %}
-            {% endif %}
-            <button type="button"
-                    hx-get="{% url 'edit_action_item' pk=item.id %}"
-                    hx-target="#modal-content"
-                    onclick="openModal()"
-                    class="text-gray-400 hover:text-indigo-600 p-1 bg-transparent border-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-            </button>
-            <button type="button"
-                    hx-get="{% url 'delete_action_item' pk=item.id %}"
-                    hx-target="#modal-content"
-                    onclick="openModal()"
-                    class="text-gray-400 hover:text-red-600 p-1 bg-transparent border-0">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-            </button>
-        </div>
+    <div class="text-sm text-gray-800 font-medium mb-2 prose prose-sm max-w-none">
+        {{ item.note|markdownify|safe }}
     </div>
     
     <!-- Assignment display -->
@@ -128,7 +46,7 @@
     <div id="ai-status-{{ item.id }}" class="hidden mb-2 text-xs text-indigo-600"></div>
     
     <div class="mt-3 pt-2 border-t border-gray-50 flex flex-col gap-1">
-        <div class="flex items-center justify-between text-xs text-gray-500">
+        <div class="flex items-center justify-between gap-2 text-xs text-gray-500">
             <span class="flex items-center gap-1" title="Due Date">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -136,11 +54,93 @@
                 {% if item.due_date %}<span{% if item.is_overdue %} class="text-red-700 font-medium"{% endif %}>{{ item.due_date|date:"M d" }}</span>{% else %}No date{% endif %}
                 {% if item.is_overdue %}<span class="ml-1 px-1.5 py-0.5 rounded border border-red-200 bg-red-50 text-red-700 font-medium">Overdue</span>{% endif %}
             </span>
-            <span class="w-2 h-2 rounded-full 
+            <div class="flex items-center gap-0.5">
+                {% if current_workspace and team_members %}
+                    <!-- Assignment dropdown -->
+                    <div class="relative">
+                        <button type="button"
+                                onclick="toggleAssignmentDropdown({{ item.id }})"
+                                class="text-gray-400 hover:text-indigo-600 p-1 bg-transparent border-0"
+                                title="Assign to team member" aria-label="Assign to team member">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                            </svg>
+                        </button>
+                        <div id="assignment-dropdown-{{ item.id }}" class="hidden absolute right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                            <div class="p-2">
+                                <div class="text-xs font-medium text-gray-700 mb-2">Assign to:</div>
+                                {% for member in team_members %}
+                                    <button type="button"
+                                            hx-post="{% url 'assign_action_item' item.id %}"
+                                            hx-vals='{"assigned_to": "{{ member.id }}"}'
+                                            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                                            hx-target="#action-items-container"
+                                            onclick="toggleAssignmentDropdown({{ item.id }})"
+                                            class="w-full text-left px-2 py-1 text-xs hover:bg-gray-100 rounded">
+                                        {{ member.get_full_name|default:member.username }}
+                                    </button>
+                                {% endfor %}
+                                {% if item.assigned_to %}
+                                    <hr class="my-2 border-gray-200">
+                                    <button type="button"
+                                            hx-post="{% url 'unassign_action_item' item.id %}"
+                                            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                                            hx-target="#action-items-container"
+                                            onclick="toggleAssignmentDropdown({{ item.id }})"
+                                            class="w-full text-left px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded">
+                                        Unassign
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+            
+                {% if item.status == 'todo' %}
+                    {% if item.session_id %}
+                    <button type="button"
+                            id="complete-ai-btn-{{ item.id }}"
+                            onclick="completeActionItemWithAI({{ item.id }})"
+                            class="text-gray-400 hover:text-indigo-600 p-1 bg-transparent border-0"
+                            title="Complete with AI" aria-label="Complete with AI">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                    </button>
+                    {% else %}
+                    <span class="text-gray-300 p-1" title="Needs a linked assessment before AI can complete this">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                    </span>
+                    {% endif %}
+                {% endif %}
+                <button type="button"
+                        hx-get="{% url 'edit_action_item' pk=item.id %}"
+                        hx-target="#modal-content"
+                        onclick="openModal()"
+                        class="text-gray-400 hover:text-indigo-600 p-1 bg-transparent border-0"
+                        title="Edit task" aria-label="Edit task">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                </button>
+                <button type="button"
+                        hx-get="{% url 'delete_action_item' pk=item.id %}"
+                        hx-target="#modal-content"
+                        onclick="openModal()"
+                        class="text-gray-400 hover:text-red-600 p-1 bg-transparent border-0"
+                        title="Delete task" aria-label="Delete task">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </button>
+                <span class="ml-1 w-2 h-2 rounded-full 
                 {% if item.status == 'todo' %}bg-gray-400{% endif %}
                 {% if item.status == 'doing' %}bg-blue-500 animate-pulse{% endif %}
                 {% if item.status == 'done' %}bg-green-500{% endif %}
-            "></span>
+                "></span>
+            </div>
         </div>
         <div class="flex justify-between text-[10px] text-gray-400">
             <span>Created: {{ item.created_at|date:"M d" }}{% if item.created_by %} by {{ item.created_by.get_full_name|default:item.created_by.username }}{% endif %}</span>
