@@ -49,7 +49,7 @@ opportunity = (5 − score) × (question_weight / W_p) × (pillar_weight / A) ×
 
 `W_p` is the summed weight of the answered questions in that question's pillar. `A` is the summed weight of the answered pillars. The relationship is linear, so the opportunities always add up to `100 − overall`, including for stage-exempt or partial assessments. That sum is the "pts still available overall" figure.
 
-The top three are ranked purely by points. Ties go to the weaker pillar, then the lower current score, then the question code. Seed order never decides a tie.
+Opportunities are sorted by points. Ties go to the weaker pillar, then the lower current score, then the question code, so seed order never decides a tie. The card's top three (`select_top_priorities`) take the biggest opportunity in each pillar, so the priorities span Demand, Conversion and Delivery rather than repeating one. When fewer than three pillars were answered, the remaining slots fall back to the next-biggest items.
 
 ---
 

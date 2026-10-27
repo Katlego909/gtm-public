@@ -10,9 +10,9 @@
     <div>
       <h3 class="text-2xl font-bold text-gray-900 mb-1">Priority Opportunities</h3>
       <p class="text-sm text-gray-600">
-        Ranked by score-point impact — fix these first.
-        {% if scoring_context.total_opportunity_pts %}
-          <span class="font-semibold text-indigo-600">+{{ scoring_context.total_opportunity_pts|floatformat:1 }} pts still available overall.</span>
+        The biggest score-point win in each pillar.
+        {% if scoring_context.top_priorities_pts %}
+          <span class="font-semibold text-indigo-600">Fixing these {{ scoring_context.top_priorities|length }} takes you from {{ scoring_context.current_overall|floatformat:1 }} to {{ scoring_context.top_priorities_target|floatformat:1 }}.</span>
         {% endif %}
       </p>
     </div>

@@ -428,6 +428,28 @@ def detect_patterns(
     return sorted(fired, key=lambda x: _SEVERITY_ORDER.get(x["severity"], 99))
 
 
+def select_top_priorities(opportunities: list[dict], limit: int = 3) -> list[dict]:
+    """
+    The biggest opportunity in each pillar, ordered by points, so the
+    priorities span the GTM motion instead of repeating one pillar. When
+    fewer pillars than `limit` were answered (stage-exempt or partial
+    assessments) the remaining slots fall back to the next-biggest items.
+    `opportunities` must already be sorted (compute_opportunity_scores).
+    """
+    picked: list[dict] = []
+    seen_pillars: set[str] = set()
+    for opp in opportunities:
+        if opp["pillar"] not in seen_pillars:
+            picked.append(opp)
+            seen_pillars.add(opp["pillar"])
+    for opp in opportunities:
+        if len(picked) >= limit:
+            break
+        if opp not in picked:
+            picked.append(opp)
+    return sorted(picked[:limit], key=opportunities.index)
+
+
 def build_recommendation_context(question_scores: dict[str, int]) -> dict:
     """
     Main entry point.
@@ -440,15 +462,23 @@ def build_recommendation_context(question_scores: dict[str, int]) -> dict:
     pillar_avgs   = compute_pillar_avgs(question_scores)
     opportunities = compute_opportunity_scores(question_scores, pillar_avgs)
     patterns      = detect_patterns(question_scores, pillar_avgs)
-    top_3         = opportunities[:3]
+    top_3         = select_top_priorities(opportunities)
 
     current_overall = compute_overall(question_scores)
+    top_3_pts = round(sum(round(o["opportunity_pts"], 1) for o in top_3), 1)
     total_opportunity = round(sum(o["opportunity_pts"] for o in opportunities), 1)
 
     return {
         "pillar_avgs":         pillar_avgs,
         "current_overall":     current_overall,
         "top_priorities":      top_3,
+        # What fixing just the shown priorities is worth -- the card leads
+        # with this rather than total_opportunity_pts, which spans every
+        # question and read as if it were the three cards' combined gain.
+        # Summed from the 1-decimal values the cards display, so a reader
+        # adding up the cards lands on the same number.
+        "top_priorities_pts":  top_3_pts,
+        "top_priorities_target": round(current_overall + top_3_pts, 1),
         "all_opportunities":   opportunities,
         "patterns":            patterns,
         "total_opportunity_pts": total_opportunity,

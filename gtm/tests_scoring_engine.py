@@ -110,3 +110,35 @@ class EngineMatchesDatabaseScoringTests(TestCase):
         for scores in (FULL_JUN_05, DEMAND_ONLY_JUL_11, {"DEM-ICP-01": 2, "CON-STG-03": 1}):
             with self.subTest(answers=len(scores)):
                 self.assertEqual(self._overall_from_db(scores), compute_overall(scores))
+
+
+class TopPrioritiesTests(SimpleTestCase):
+    def _top(self, scores):
+        return [(o["dimension"], o["pillar"]) for o in build_recommendation_context(scores)["top_priorities"]]
+
+    def test_one_priority_per_pillar_ordered_by_points(self):
+        # Pure impact order would be Pipeline Hygiene, Channel Strategy, Lead Quality (Demand twice).
+        self.assertEqual(self._top(FULL_JUN_05), [
+            ("Pipeline Hygiene", "Conversion"),
+            ("Channel Strategy", "Demand"),
+            ("Time to Value", "Delivery"),
+        ])
+
+    def test_single_pillar_assessment_still_fills_three_slots(self):
+        top = self._top(DEMAND_ONLY_JUL_11)
+        self.assertEqual(len(top), 3)
+        self.assertEqual([d for d, _ in top], ["ICP Clarity", "Attribution", "Positioning"])
+
+    def test_total_still_counts_every_question(self):
+        ctx = build_recommendation_context(FULL_JUN_05)
+        self.assertEqual(ctx["total_opportunity_pts"], 40.0)
+        self.assertEqual(len(ctx["all_opportunities"]), 18)
+
+
+class TopPrioritiesSummaryTests(SimpleTestCase):
+    def test_summary_is_the_shown_items_not_every_question(self):
+        ctx = build_recommendation_context(FULL_JUN_05)
+        # As displayed: Pipeline Hygiene 5.3 + Channel Strategy 4.8 + Time to Value 2.2
+        self.assertEqual(ctx["top_priorities_pts"], 12.3)
+        self.assertEqual(ctx["top_priorities_target"], 72.3)
+        self.assertEqual(ctx["total_opportunity_pts"], 40.0)
