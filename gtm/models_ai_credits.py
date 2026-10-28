@@ -53,11 +53,14 @@ class AICreditAccount(models.Model):
         (TIER_PRO, "Pro"),
         (TIER_SCALE, "Scale"),
     ]
-    # Monthly Gemini prompt+output token allowance per tier. Tunable.
+    # Monthly Gemini prompt+output token allowance per tier. Tunable. Raised
+    # 3x on 2026-10-28 when agent turns started charging every function-
+    # calling request (they used to charge only the last), so users keep
+    # about the same usable amount while the ledger matches real cost.
     TIER_MONTHLY_TOKEN_BUDGET = {
-        TIER_FREE: 250_000,
-        TIER_PRO: 2_500_000,
-        TIER_SCALE: 10_000_000,
+        TIER_FREE: 750_000,
+        TIER_PRO: 7_500_000,
+        TIER_SCALE: 30_000_000,
     }
 
     # User-facing "credits" are a friendlier unit than raw tokens: 1 credit =
@@ -66,7 +69,7 @@ class AICreditAccount(models.Model):
     TOKENS_PER_CREDIT = 1000
 
     DEFAULT_WORKSPACE_TOKEN_BUDGET = TIER_MONTHLY_TOKEN_BUDGET[TIER_FREE]
-    DEFAULT_PERSONAL_TOKEN_BUDGET = 100_000
+    DEFAULT_PERSONAL_TOKEN_BUDGET = 300_000
 
     @classmethod
     def budget_for_tier(cls, tier):

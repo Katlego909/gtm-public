@@ -309,13 +309,13 @@ class TierAndCreditUnitTests(TestCase):
 
     def test_budget_for_tier_mapping(self):
         self.assertEqual(
-            AICreditAccount.budget_for_tier(AICreditAccount.TIER_FREE), 250_000
+            AICreditAccount.budget_for_tier(AICreditAccount.TIER_FREE), 750_000
         )
         self.assertEqual(
-            AICreditAccount.budget_for_tier(AICreditAccount.TIER_PRO), 2_500_000
+            AICreditAccount.budget_for_tier(AICreditAccount.TIER_PRO), 7_500_000
         )
         self.assertEqual(
-            AICreditAccount.budget_for_tier(AICreditAccount.TIER_SCALE), 10_000_000
+            AICreditAccount.budget_for_tier(AICreditAccount.TIER_SCALE), 30_000_000
         )
 
     def test_budget_for_tier_unknown_falls_back_to_free(self):

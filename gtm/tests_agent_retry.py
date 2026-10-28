@@ -128,3 +128,65 @@ class AgentRunRetryTests(AgentRunTestBase):
         run = self._start()
         run.refresh_from_db()
         self.assertEqual(run.status, "awaiting_approval")
+
+
+class _Usage:
+    def __init__(self, total):
+        self.total_token_count = total
+
+
+class _UsageResponse:
+    def __init__(self, total, text="ok"):
+        self.usage_metadata, self.text = _Usage(total), text
+
+
+class _FakeModels:
+    """Stands in for client.models: each _generate_content is one request."""
+
+    def __init__(self, totals):
+        self.totals = list(totals)
+
+    def _generate_content(self, **kwargs):
+        return _UsageResponse(self.totals.pop(0))
+
+
+class _FakeGenaiClient:
+    def __init__(self, totals):
+        self.models = _FakeModels(totals)
+
+
+class UsageCountingTests(SimpleTestCase):
+    def test_sdk_still_has_the_hooked_per_request_method(self):
+        from google.genai import models
+
+        self.assertTrue(hasattr(models.Models, "_generate_content"))
+
+    def test_every_request_in_a_scope_is_counted(self):
+        from gtm.agent_runtime import charged_tokens, count_usage, install_usage_counter
+
+        client = install_usage_counter(_FakeGenaiClient([5000, 6000, 7000]))
+        with count_usage() as usage:
+            for _ in range(3):  # three function-calling rounds of one turn
+                last = client.models._generate_content()
+        self.assertEqual(charged_tokens(usage, last), 18000)
+        install_usage_counter(client)  # idempotent: no double wrapping
+        self.assertTrue(client.models._generate_content._counts_usage)
+
+    def test_a_nested_turn_is_not_charged_to_the_outer_one(self):
+        from gtm.agent_runtime import count_usage, install_usage_counter
+
+        client = install_usage_counter(_FakeGenaiClient([1000, 2000, 3000]))
+        with count_usage() as outer:
+            client.models._generate_content()
+            with count_usage() as nested:  # e.g. a consulted agent's own turn
+                client.models._generate_content()
+            client.models._generate_content()
+        self.assertEqual(outer["tokens"], 4000)
+        self.assertEqual(nested["tokens"], 2000)
+
+    def test_falls_back_to_the_response_without_a_counter(self):
+        from gtm.agent_runtime import charged_tokens, count_usage
+
+        with count_usage() as usage:
+            pass
+        self.assertEqual(charged_tokens(usage, _UsageResponse(900)), 900)

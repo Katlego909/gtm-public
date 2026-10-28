@@ -341,11 +341,13 @@ def _get_client():
 
         location = getattr(settings, "GCP_LOCATION", "us-central1")
         try:
-            client = genai.Client(
+            from .agent_runtime import install_usage_counter
+
+            client = install_usage_counter(genai.Client(
                 vertexai=True,
                 project=project_id,
                 location=location
-            )
+            ))
             _cached_client = client
             return client
         except Exception as e:

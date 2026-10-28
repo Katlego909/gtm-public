@@ -576,22 +576,25 @@ def _send(run: AgentRun, chat, account, message: str):
     from .ai_credits import record_spend
     from .ai_services import _extract_retry_delay_seconds, _is_quota_error, _set_quota_cooldown
 
-    from .agent_runtime import send_with_retry
+    from .agent_runtime import charged_tokens, count_usage, send_with_retry
 
-    try:
-        # Safe to retry: the plan gate refuses a repeat of a step already done.
-        response = send_with_retry(chat, message)
-    except Exception as e:
-        if _is_quota_error(e):
-            _set_quota_cooldown(_extract_retry_delay_seconds(e))
-            raise RunStopped("Hit a temporary AI quota. Please retry shortly.") from e
-        raise
-    usage = getattr(response, "usage_metadata", None)
-    total = getattr(usage, "total_token_count", None) if usage else None
-    if total:
-        run.total_tokens += total
-        _save(run, "total_tokens")
-        record_spend(account, total, "agent_run", session=run.session, actor=run.requested_by)
+    response = None
+    with count_usage() as usage:
+        try:
+            # Safe to retry: the plan gate refuses a repeat of a step already done.
+            response = send_with_retry(chat, message)
+        except Exception as e:
+            if _is_quota_error(e):
+                _set_quota_cooldown(_extract_retry_delay_seconds(e))
+                raise RunStopped("Hit a temporary AI quota. Please retry shortly.") from e
+            raise
+        finally:
+            # Every tool round's request is charged, even if the turn failed partway.
+            total = charged_tokens(usage, response)
+            if total:
+                run.total_tokens += total
+                _save(run, "total_tokens")
+                record_spend(account, total, "agent_run", session=run.session, actor=run.requested_by)
     return response
 
 

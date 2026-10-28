@@ -9,6 +9,8 @@ import functools
 import logging
 import re
 import time
+from contextlib import contextmanager
+from contextvars import ContextVar
 from typing import Any, Dict, List, Optional, Sequence
 
 logger = logging.getLogger(__name__)
@@ -289,6 +291,68 @@ def build_tagged_content_history(
 
 
 # ================================================================
+# TOKEN USAGE ACROSS FUNCTION-CALLING ROUNDS
+# ================================================================
+# With automatic function calling, one send_message makes a Gemini request
+# per tool round, but the response it returns reports only the LAST
+# request's usage -- the SDK replaces the response each round (see the AFC
+# loop in google/genai/models.py Models.generate_content). Charging that
+# alone undercounted agent turns 2-3x. install_usage_counter hooks the
+# per-request method so every request counts toward the active
+# count_usage() scope. Scopes don't nest into each other: a consulted
+# agent's nested turn charges its own requests, not the outer turn's.
+
+_turn_usage: ContextVar[Optional[Dict[str, int]]] = ContextVar("gemini_turn_usage", default=None)
+
+
+def install_usage_counter(client):
+    """Hook `client` so each Gemini request adds to the current scope. A
+    no-op (with a warning) if the SDK no longer has the private per-request
+    method; charges then fall back to the final response's usage."""
+    models = getattr(client, "models", None)
+    original = getattr(models, "_generate_content", None)
+    if original is None:
+        logger.warning("google-genai has no Models._generate_content; agent turns will be undercounted")
+        return client
+    if getattr(original, "_counts_usage", False):
+        return client
+
+    @functools.wraps(original)
+    def counted(*args, **kwargs):
+        response = original(*args, **kwargs)
+        usage = _turn_usage.get()
+        meta = getattr(response, "usage_metadata", None)
+        if usage is not None and meta is not None:
+            usage["tokens"] += meta.total_token_count or 0
+            usage["requests"] += 1
+        return response
+
+    counted._counts_usage = True
+    models._generate_content = counted
+    return client
+
+
+@contextmanager
+def count_usage():
+    """Collect the tokens of every Gemini request made inside this block."""
+    usage = {"tokens": 0, "requests": 0}
+    token = _turn_usage.set(usage)
+    try:
+        yield usage
+    finally:
+        _turn_usage.reset(token)
+
+
+def charged_tokens(usage: Dict[str, int], response=None) -> int:
+    """Tokens to charge for a scope: every request counted, else (counter
+    unavailable) the final response's own usage."""
+    if usage["requests"]:
+        return usage["tokens"]
+    meta = getattr(response, "usage_metadata", None)
+    return (meta.total_token_count or 0) if meta is not None else 0
+
+
+# ================================================================
 # TRANSIENT GEMINI ERRORS
 # ================================================================
 
@@ -392,15 +456,19 @@ def run_agent_turn(
     if getattr(config, "tools", None):
         config = config.model_copy(update={"tools": track_writes(config.tools, state)})
     chat = client.chats.create(model=model, config=config, history=history)
-    response = send_with_retry(chat, message, state)
-
-    if getattr(response, "usage_metadata", None):
-        total_tokens = response.usage_metadata.total_token_count
-        if MONITORING_AVAILABLE:
-            AIUsageTracker.log_usage(total_tokens, usage_label)
-        if account is not None:
-            from .ai_credits import record_spend
-            record_spend(account, total_tokens, feature or usage_label, session=session)
+    response = None
+    with count_usage() as usage:
+        try:
+            response = send_with_retry(chat, message, state)
+        finally:
+            # Charged even when the turn fails partway: those requests ran.
+            total_tokens = charged_tokens(usage, response)
+            if total_tokens:
+                if MONITORING_AVAILABLE:
+                    AIUsageTracker.log_usage(total_tokens, usage_label)
+                if account is not None:
+                    from .ai_credits import record_spend
+                    record_spend(account, total_tokens, feature or usage_label, session=session)
 
     if response.text is None or not response.text.strip():
         return None
