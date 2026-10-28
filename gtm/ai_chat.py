@@ -1161,6 +1161,12 @@ def handle_general_chat(
         return text or "I've processed your request. Check your action items for the results.", turn_task_refs, turn_document_refs
 
     except Exception as e:
+        from .agent_runtime import PartialTurnError
+        from .workspace_agent_chat import PARTIAL_TURN_MESSAGE, UNREACHABLE_MESSAGE
+
+        if isinstance(e, PartialTurnError):
+            log_ai_error("Agent turn failed after acting", e, service="google-genai", extra={"session_id": str(session.uuid)})
+            return PARTIAL_TURN_MESSAGE, turn_task_refs, turn_document_refs
         # 5. Handle Quota/Rate Limits Gracefully
         if _is_quota_error(e):
             _set_quota_cooldown(_extract_retry_delay_seconds(e))
@@ -1180,8 +1186,8 @@ def handle_general_chat(
 
         # Final Fallback
         return (
-            f"I'm processing a lot of data right now. Your current GTM score is {context['overall_score']}/100. "
-            "Ask \"show my scores\" for a full breakdown."
+            f"{UNREACHABLE_MESSAGE} Your current GTM score is {context['overall_score']}/100; "
+            "ask \"show my scores\" for a full breakdown."
         ), [], []
 
 # ================================================================

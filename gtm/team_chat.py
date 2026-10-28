@@ -25,12 +25,12 @@ executing it.
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from .agent_runtime import current_agent_type
+from .agent_runtime import current_agent_type, send_with_retry
 from .ai_chat import GENAI_AVAILABLE, GTM_STRATEGIST_SYSTEM_INSTRUCTION, _build_session_tools, _get_chat_client
 from .models import AssessmentSession
 from .models_workspace import Workspace
 from .utils_logging import log_ai_error
-from .workspace_agent_chat import SYSTEM_INSTRUCTIONS, _build_workspace_tools
+from .workspace_agent_chat import SYSTEM_INSTRUCTIONS, UNREACHABLE_MESSAGE, _build_workspace_tools
 
 logger = logging.getLogger(__name__)
 
@@ -348,7 +348,8 @@ def _run_team_turn(agent_type, workspace, session, message, user, allow_transfer
 
     try:
         chat = client.chats.create(model="gemini-2.5-flash", config=config, history=history)
-        response = chat.send_message(message)
+        # Tools here run only after a response succeeds, so each call can retry safely.
+        response = send_with_retry(chat, message)
         _record_usage(response)
 
         for _ in range(MAX_TOOL_ROUNDS):
@@ -374,7 +375,7 @@ def _run_team_turn(agent_type, workspace, session, message, user, allow_transfer
                 )
                 for call in calls
             ]
-            response = chat.send_message(parts)
+            response = send_with_retry(chat, parts)
             _record_usage(response)
 
         # Exhausted the manual round cap without a final text answer.
@@ -400,7 +401,7 @@ def _run_team_turn(agent_type, workspace, session, message, user, allow_transfer
             extra={"workspace_id": str(workspace.id) if workspace else None, "agent_type": agent_type},
         )
         return (
-            agent_type, "I'm processing a lot of data right now. Please try asking again in a moment.",
+            agent_type, UNREACHABLE_MESSAGE,
             None, None, turn_task_refs, turn_document_refs,
         )
 

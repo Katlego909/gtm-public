@@ -5,8 +5,10 @@ lists, and quota-error handling stay local to each agent module since they
 already diverge per agent.
 """
 
+import functools
 import logging
 import re
+import time
 from typing import Any, Dict, List, Optional, Sequence
 
 logger = logging.getLogger(__name__)
@@ -286,6 +288,79 @@ def build_tagged_content_history(
     return history
 
 
+# ================================================================
+# TRANSIENT GEMINI ERRORS
+# ================================================================
+
+# Seconds to wait before each retry of a rate-limited (429) or unavailable
+# (5xx) Gemini call. Vertex 429s are usually momentary bursts; only when every
+# retry fails does the caller fall back to its quota cooldown or message.
+TRANSIENT_RETRY_DELAYS = (3, 8)
+
+# Tools that change something. If one already ran when a turn fails,
+# retrying the turn could do it twice, so the error surfaces instead.
+CHAT_ONLY_WRITE_TOOLS = {
+    "log_gap_measurement_from_chat", "build_prioritized_action_plan", "draft_client_summary",
+    "start_multi_step_work",
+}
+WRITE_TOOL_PREFIXES = ("consult_", "transfer_to_")  # run another agent, which can write
+
+
+class PartialTurnError(Exception):
+    """A turn failed after a write tool had already run -- not retried."""
+
+
+def is_transient_ai_error(error: Exception) -> bool:
+    from .ai_services import _is_quota_error
+
+    code = getattr(error, "code", None)
+    text = str(error).lower()
+    return (
+        _is_quota_error(error)
+        or (isinstance(code, int) and code >= 500)
+        or isinstance(error, TimeoutError)
+        or "deadline exceeded" in text
+        or "timed out" in text
+    )
+
+
+def is_write_tool(name: str) -> bool:
+    from .agent_runs import TOOL_KIND
+
+    return name in TOOL_KIND or name in CHAT_ONLY_WRITE_TOOLS or name.startswith(WRITE_TOOL_PREFIXES)
+
+
+def track_writes(tools: Sequence[Any], state: Dict[str, bool]) -> List[Any]:
+    """Wrap `tools` so `state["wrote"]` turns True once a write tool runs."""
+    def wrap(tool):
+        if not is_write_tool(tool.__name__):
+            return tool
+
+        @functools.wraps(tool)
+        def tracked(*args, **kwargs):
+            state["wrote"] = True
+            return tool(*args, **kwargs)
+        return tracked
+
+    return [wrap(t) for t in tools]
+
+
+def send_with_retry(chat, message, state: Optional[Dict[str, bool]] = None, delays: Sequence[int] = TRANSIENT_RETRY_DELAYS):
+    """chat.send_message, retried on transient errors. With `state` from
+    track_writes, a failure after a write tool ran raises PartialTurnError
+    instead of retrying, so nothing is done twice."""
+    for delay in (*delays, None):
+        try:
+            return chat.send_message(message)
+        except Exception as e:
+            if state and state.get("wrote"):
+                raise PartialTurnError(str(e)) from e
+            if delay is None or not is_transient_ai_error(e):
+                raise
+            logger.warning("Transient Gemini error (%s), retrying in %ss", getattr(e, "code", type(e).__name__), delay)
+            time.sleep(delay)
+
+
 def run_agent_turn(
     client,
     model: str,
@@ -310,9 +385,14 @@ def run_agent_turn(
     supply its own agent-appropriate fallback copy. Raises whatever the SDK
     raises on failure -- callers keep their own try/except + quota-cooldown
     handling, since the user-facing fallback message differs per agent.
+    Transient errors are retried first (send_with_retry); a failure after a
+    write tool ran raises PartialTurnError instead.
     """
+    state = {"wrote": False}
+    if getattr(config, "tools", None):
+        config = config.model_copy(update={"tools": track_writes(config.tools, state)})
     chat = client.chats.create(model=model, config=config, history=history)
-    response = chat.send_message(message)
+    response = send_with_retry(chat, message, state)
 
     if getattr(response, "usage_metadata", None):
         total_tokens = response.usage_metadata.total_token_count

@@ -674,6 +674,12 @@ def _build_capability_tools(
 # reuses ai_chat's cached Vertex AI client)
 # ================================================================
 
+UNREACHABLE_MESSAGE = "I couldn't reach the AI service just now. Please try again in a moment."
+PARTIAL_TURN_MESSAGE = (
+    "The AI service failed partway through my answer. Anything I'd already done (tasks, documents, "
+    "notifications) is saved -- check those before asking again, so nothing gets done twice."
+)
+
 SYSTEM_INSTRUCTIONS = {
     "insights": (
         "You are Milo, a proactive account-health monitor. Summarize what changed for this client since the last "
@@ -863,6 +869,11 @@ def handle_general_chat_workspace(
         )
         return text or "I've processed your request but don't have anything further to add right now.", turn_task_refs, turn_document_refs
     except Exception as e:
+        from .agent_runtime import PartialTurnError
+
+        if isinstance(e, PartialTurnError):
+            log_ai_error(f"Workspace {agent_type} agent turn failed after acting", e, service="google-genai")
+            return PARTIAL_TURN_MESSAGE, turn_task_refs, turn_document_refs
         if _is_quota_error(e):
             _set_quota_cooldown(_extract_retry_delay_seconds(e))
             return (
@@ -876,7 +887,7 @@ def handle_general_chat_workspace(
             model="gemini-2.5-flash",
             extra={"workspace_id": str(workspace.id), "agent_type": agent_type},
         )
-        return "I'm processing a lot of data right now. Please try asking again in a moment.", [], []
+        return UNREACHABLE_MESSAGE, [], []
 
 
 # ================================================================

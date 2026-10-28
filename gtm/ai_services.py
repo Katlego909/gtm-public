@@ -80,6 +80,10 @@ def _is_quota_error(error: Exception) -> bool:
     msg = str(error).lower()
     return (
         error.__class__.__name__ == "ResourceExhausted"
+        # google-genai raises ClientError(code=429, status="RESOURCE_EXHAUSTED")
+        # for Vertex rate limits, whose text matches none of the phrases below.
+        or getattr(error, "code", None) == 429
+        or "resource_exhausted" in msg
         or "quota exceeded" in msg
         or "resourceexhausted" in msg
         or "rate limit" in msg

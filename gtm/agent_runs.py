@@ -576,8 +576,11 @@ def _send(run: AgentRun, chat, account, message: str):
     from .ai_credits import record_spend
     from .ai_services import _extract_retry_delay_seconds, _is_quota_error, _set_quota_cooldown
 
+    from .agent_runtime import send_with_retry
+
     try:
-        response = chat.send_message(message)
+        # Safe to retry: the plan gate refuses a repeat of a step already done.
+        response = send_with_retry(chat, message)
     except Exception as e:
         if _is_quota_error(e):
             _set_quota_cooldown(_extract_retry_delay_seconds(e))

@@ -35,6 +35,10 @@ def log_ai_error(
         "service": service,
         "model": model,
         "prompt": prompt,
+        # google-genai APIError carries the HTTP code and status (e.g. 503
+        # UNAVAILABLE) -- what tells a transient outage from a real bug.
+        "code": getattr(err, "code", None),
+        "status": getattr(err, "status", None),
     }
     if extra:
         ai_extra.update(extra)
