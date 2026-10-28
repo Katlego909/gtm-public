@@ -37,22 +37,18 @@ AGENT_DIRECTORY = {
     "gtm_strategist": {
         "name": "Charlie",
         "label": "GTM Strategist",
-        "domain": "This specific assessment's scores, gaps, action items, roadmap, and evidence audits.",
-    },
-    "portfolio": {
-        "name": "Nora",
-        "label": "Portfolio Agent",
-        "domain": "Score trends and comparisons across all of this workspace's assessments over time.",
-    },
-    "resource": {
-        "name": "Theo",
-        "label": "Resource Agent",
-        "domain": "The workspace's resource library -- finding and recommending existing docs/tools/decks.",
+        "domain": (
+            "This specific assessment's scores, gaps, action items, roadmap, and evidence audits, plus the "
+            "workspace's resource library -- finding and recommending existing docs, tools, and decks."
+        ),
     },
     "insights": {
         "name": "Milo",
         "label": "Insights Agent",
-        "domain": "Recent workspace activity, score changes, pending reviews, overdue tasks, and documents.",
+        "domain": (
+            "Recent workspace activity, pending reviews, overdue tasks, and documents, plus score trends and "
+            "comparisons across all of the workspace's assessments over time."
+        ),
     },
     "gtm_engineer": {
         "name": "Remy",
@@ -65,11 +61,31 @@ AGENT_DIRECTORY = {
 }
 
 
+# Agents merged into another one (2026-10-28). Kept so past comments,
+# documents, and chat turns still show who actually wrote them, and so
+# anything still routed to a retired agent goes to its successor.
+RETIRED_AGENTS = {
+    "portfolio": {"name": "Nora", "label": "Portfolio Agent", "successor": "insights"},
+    "resource": {"name": "Theo", "label": "Resource Agent", "successor": "gtm_strategist"},
+}
+
+
+def current_agent_type(agent_type: str) -> str:
+    """The active agent for `agent_type`: itself, or a retired agent's successor."""
+    return RETIRED_AGENTS.get(agent_type, {}).get("successor", agent_type)
+
+
+def agent_name(agent_type: str, default: str = "AI agent") -> str:
+    """First name for display, including retired agents (history stays honest)."""
+    info = AGENT_DIRECTORY.get(agent_type) or RETIRED_AGENTS.get(agent_type) or {}
+    return info.get("name", default)
+
+
 def agent_display_label(agent_type: str) -> str:
     """"Name · Role" display string for UI (e.g. "Nora · Portfolio Agent") --
     the single source of truth so templates/JS don't hardcode names
     separately from AGENT_DIRECTORY."""
-    info = AGENT_DIRECTORY.get(agent_type, {})
+    info = AGENT_DIRECTORY.get(agent_type) or RETIRED_AGENTS.get(agent_type) or {}
     name = info.get("name", agent_type)
     label = info.get("label", agent_type)
     return f"{name} · {label}" if name != label else label

@@ -86,19 +86,19 @@ class CompletionAgentRoutingTests(TestCase):
         self.assertIn("get_gtm_diagnosis", names)
         self.assertNotIn("find_resource", names)
 
-    def test_task_routed_to_theo_runs_as_theo_with_his_tools(self):
-        item = self._item("resource")
+    def test_task_routed_to_milo_runs_as_milo_with_his_tools(self):
+        item = self._item("insights")
         agent_type = completion_agent_type(item)
-        self.assertEqual(agent_type, "resource")
+        self.assertEqual(agent_type, "insights")
 
         created = []
         tools = {t.__name__: t for t in _build_completion_tools(item, self.user, created, agent_type=agent_type)}
-        for theo_tool in ("find_resource", "recommend_resource_for_gap", "list_resources", "get_coverage_gaps"):
-            self.assertIn(theo_tool, tools)
+        for milo_tool in ("get_trend_overview", "compare_sessions", "get_overdue_tasks", "get_pending_reviews"):
+            self.assertIn(milo_tool, tools)
         self.assertNotIn("draft_client_summary", tools)
 
-        tools["create_document"]("Deck pick", "Use the enterprise deck.")
-        self.assertEqual(AgentDocument.objects.get(pk=created[0]).agent_type, "resource")
+        tools["create_document"]("Trend brief", "Demand rose from 2.1 to 2.6.")
+        self.assertEqual(AgentDocument.objects.get(pk=created[0]).agent_type, "insights")
 
         run = AgentRun(agent_type=agent_type, goal=item.note, session=self.session, workspace=self.workspace)
-        self.assertIn("You are Theo", _persona(run))
+        self.assertIn("You are Milo", _persona(run))

@@ -187,9 +187,9 @@ def _notify(recipients, run: AgentRun, notification_type: str, title: str, messa
 
 
 def _agent_info(agent_type: str) -> Dict[str, str]:
-    from .agent_runtime import AGENT_DIRECTORY
+    from .agent_runtime import AGENT_DIRECTORY, current_agent_type
 
-    return AGENT_DIRECTORY[agent_type]
+    return AGENT_DIRECTORY[current_agent_type(agent_type)]
 
 
 # ================================================================
@@ -201,8 +201,9 @@ def start_run(
 ) -> Optional[AgentRun]:
     """Create a run and start its planning turn in the background. Returns
     None if a worker already holds this task's lock."""
-    from .agent_runtime import AGENT_DIRECTORY
+    from .agent_runtime import AGENT_DIRECTORY, current_agent_type
 
+    agent_type = current_agent_type(agent_type)
     if agent_type not in AGENT_DIRECTORY:
         raise ValueError(f"Unknown agent_type: {agent_type}")
     if action_item is not None:
@@ -237,7 +238,13 @@ def launch(run: AgentRun, phase: str) -> bool:
 def _worker(run_id, phase: str) -> None:
     from .ai_services import _release_lock
 
+    from .agent_runtime import current_agent_type
+
     run = AgentRun.objects.select_related("session", "workspace", "action_item", "requested_by").get(pk=run_id)
+    if current_agent_type(run.agent_type) != run.agent_type:
+        # A retried run from a retired agent is carried on by its successor.
+        run.agent_type = current_agent_type(run.agent_type)
+        _save(run, "agent_type")
     try:
         if phase == "plan":
             _plan(run)
@@ -335,7 +342,7 @@ def _build_run_write_tools(run: AgentRun, state: Dict[str, Any]) -> List[Any]:
         """Create follow-up tasks on the Tasks board, linked to the task this
         run is working on. Each has a `note` (the concrete task, specific to
         this company), an optional `assignee` (a teammate's name, username,
-        or email, or a fellow agent's name such as Theo), and an optional
+        or email, or a fellow agent's name such as Remy), and an optional
         `due_date` (YYYY-MM-DD). Give every task an owner and a date unless
         you truly can't.
         """

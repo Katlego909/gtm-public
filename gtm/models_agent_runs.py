@@ -70,9 +70,9 @@ class AgentRun(models.Model):
 
     @property
     def agent_name(self):
-        from .agent_runtime import AGENT_DIRECTORY
+        from .agent_runtime import agent_name
 
-        return AGENT_DIRECTORY.get(self.agent_type, {}).get("name", self.agent_type)
+        return agent_name(self.agent_type, default=self.agent_type)
 
     @property
     def active_steps(self):

@@ -217,7 +217,7 @@ class TaskIdGroundingTests(TestCase):
         outer_document_sink = []
         with patch(
             "gtm.workspace_agent_chat.handle_general_chat_workspace",
-            return_value=("Theo's answer.", [{"id": 999, "note": "Nested task"}], [
+            return_value=("Remy's answer.", [{"id": 999, "note": "Nested task"}], [
                 {"id": "doc-1", "title": "Nested doc", "doc_type": "other",
                  "doc_type_display": "Other", "version": 1, "action": "created"},
             ]),
@@ -225,12 +225,12 @@ class TaskIdGroundingTests(TestCase):
             tools = {
                 t.__name__: t
                 for t in _build_workspace_tools(
-                    "portfolio", self.workspace, user=self.user,
+                    "insights", self.workspace, user=self.user,
                     task_refs_sink=outer_sink, document_refs_sink=outer_document_sink,
                 )
             }
-            result = tools["consult_resource_agent"]("What resources do we have?")
+            result = tools["consult_gtm_engineer_agent"]("What's our win rate?")
 
-        self.assertEqual(result, "Theo's answer.")
+        self.assertEqual(result, "Remy's answer.")
         self.assertIn({"id": 999, "note": "Nested task"}, outer_sink)
         self.assertEqual(outer_document_sink[0]["id"], "doc-1")

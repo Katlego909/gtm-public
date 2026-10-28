@@ -6,7 +6,6 @@ of a single AssessmentSession. Uses real multi-turn memory
 """
 
 import logging
-import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from .ai_chat import GENAI_AVAILABLE, _get_chat_client
@@ -31,7 +30,7 @@ try:
 except ImportError:
     MONITORING_AVAILABLE = False
 
-AGENT_TYPES = ("portfolio", "resource", "insights", "gtm_engineer")
+AGENT_TYPES = ("insights", "gtm_engineer")
 
 
 # ================================================================
@@ -133,21 +132,6 @@ def handle_portfolio_summary(context: Dict[str, Any], message: str) -> str:
     return response
 
 
-def handle_find_resource(context: Dict[str, Any], message: str) -> str:
-    message_lower = message.lower()
-    tokens = [t for t in re.findall(r"[a-z0-9]{4,}", message_lower)]
-    matches = [
-        r for r in context["resources"]
-        if r.name.lower() in message_lower or any(token in r.name.lower() for token in tokens)
-    ]
-    if matches:
-        response = "**Found in your resource library:**\n"
-        for r in matches[:5]:
-            response += f"\n• **{r.name}** ({r.get_category_display()})"
-        return response
-    return handle_list_resources(context, message)
-
-
 def handle_recommend_for_gap(context: Dict[str, Any], message: str) -> str:
     if not context["weakest_categories"]:
         return f"No completed assessments yet for **{context['workspace_name']}**, so I don't have gap data to match resources against."
@@ -160,15 +144,6 @@ def handle_recommend_for_gap(context: Dict[str, Any], message: str) -> str:
             response += f"\n• {r.name} ({r.get_category_display()})"
     else:
         response += "\n\nAll your library resources have already been matched to an assessment."
-    return response
-
-
-def handle_list_resources(context: Dict[str, Any], message: str) -> str:
-    if not context["resources"]:
-        return f"**{context['workspace_name']}** doesn't have any resources in its library yet."
-    response = f"**Resource Library — {context['workspace_name']}** ({context['resource_count']} items)\n"
-    for r in context["resources"][:10]:
-        response += f"\n• **{r.name}** — {r.get_category_display()}"
     return response
 
 
@@ -425,8 +400,8 @@ def _make_consult_tool(
                 intent="handoff_query",
             )
             # The consulted peer's own tool calls surfaced these -- fold
-            # them into the outer agent's sink too, so a fact Nora only
-            # learned by asking Theo is still actable this same turn.
+            # them into the outer agent's sink too, so a fact Milo only
+            # learned by asking Remy is still actable this same turn.
             for ref in nested_task_refs:
                 record_task_ref(task_refs_sink, ref["id"], ref["note"])
             for ref in nested_document_refs:
@@ -517,7 +492,7 @@ def _build_workspace_tools(
     # rather than a domain tool (task completion tracks its own deliverables).
     summary_tools = (
         [_make_draft_client_summary_tool(agent_type, workspace, user, document_refs_sink=document_refs_sink)]
-        if agent_type in ("portfolio", "insights") else []
+        if agent_type == "insights" else []
     )
     return [
         *assessment_tools,
@@ -545,23 +520,45 @@ def _build_latest_assessment_tools(workspace: Workspace) -> List[Any]:
     return [_make_get_gtm_assessment_data_tool(latest), _make_get_gtm_diagnosis_tool(latest)]
 
 
+# Which specialist tool sets each agent owns. Nora's trends moved to Milo and
+# Theo's resource library to Charlie when those agents were retired.
+DOMAIN_CAPABILITIES = {
+    "gtm_strategist": ("resource",),
+    "insights": ("insights", "portfolio"),
+    "gtm_engineer": ("gtm_engineer",),
+}
+
+
 def _build_domain_tools(
     agent_type: str,
     workspace: Workspace,
     user=None,
     task_refs_sink: Optional[List[Any]] = None,
 ) -> List[Any]:
-    """The read tools that make one workspace agent a specialist (Nora's
-    trends, Theo's library, Milo's activity), scoped to `workspace`.
-    Shared by chat (_build_workspace_tools) and gtm/action_item_completion.py,
-    so a task routed to an agent is attempted with that agent's own tools.
-    Returns [] for an agent without workspace domain tools (e.g. Charlie).
-    """
-    if agent_type not in CONTEXT_BUILDERS:
-        return []
-    context = build_workspace_agent_context(agent_type, workspace, user=user)
+    """The read tools that make an agent a specialist, scoped to `workspace`.
+    Shared by chat (_build_workspace_tools, and Charlie's session tools) and
+    gtm/action_item_completion.py, so a task routed to an agent is attempted
+    with that agent's own tools. [] for an agent with none."""
+    tools: List[Any] = []
+    for capability in DOMAIN_CAPABILITIES.get(agent_type, ()):
+        tools += _build_capability_tools(capability, workspace, user=user, task_refs_sink=task_refs_sink)
+    return tools
 
-    if agent_type == "portfolio":
+
+def _build_capability_tools(
+    capability: str,
+    workspace: Workspace,
+    user=None,
+    task_refs_sink: Optional[List[Any]] = None,
+) -> List[Any]:
+    """One set of specialist read tools (score trends, the resource
+    library, workspace activity, or GTM engineering), scoped to `workspace`.
+    See DOMAIN_CAPABILITIES for which agent owns which."""
+    if capability not in CONTEXT_BUILDERS:
+        return []
+    context = build_workspace_agent_context(capability, workspace, user=user)
+
+    if capability == "portfolio":
         def get_trend_overview() -> str:
             """Get the overall GTM score trend across all completed
             assessments in this workspace. Use this when asked about
@@ -593,24 +590,13 @@ def _build_domain_tools(
 
         return [get_trend_overview, get_category_trend, compare_sessions, get_assessment_history]
 
-    if agent_type == "resource":
-        def find_resource(query: str = "") -> str:
-            """Search the workspace's resource library for a document,
-            deck, or tool matching a topic. Use this when asked whether a
-            specific resource exists.
-            """
-            return handle_find_resource(context, query)
-
+    if capability == "resource":
         def recommend_resource_for_gap() -> str:
             """Recommend resources from the library that address the
             workspace's currently weakest GTM categories. Use this when
             asked what to use for a weak area, or for a recommendation.
             """
             return handle_recommend_for_gap(context, "")
-
-        def list_resources() -> str:
-            """List all resources currently in the workspace's library."""
-            return handle_list_resources(context, "")
 
         def get_coverage_gaps() -> str:
             """Identify weak GTM categories that have no matching resource
@@ -619,9 +605,9 @@ def _build_domain_tools(
             """
             return handle_coverage_gap(context, "")
 
-        return [find_resource, recommend_resource_for_gap, list_resources, get_coverage_gaps]
+        return [recommend_resource_for_gap, get_coverage_gaps]
 
-    if agent_type == "insights":
+    if capability == "insights":
         def get_score_change() -> str:
             """Get the workspace's score trend/change since its first
             assessment. Use this when asked what changed with scores.
@@ -652,7 +638,7 @@ def _build_domain_tools(
 
         return [get_score_change, get_activity_summary, get_pending_reviews, get_overdue_tasks]
 
-    if agent_type == "gtm_engineer":
+    if capability == "gtm_engineer":
         from .ai_chat import build_session_context
         from .data_tools import build_data_tools
         from .models import ToolRecommendation
@@ -689,17 +675,10 @@ def _build_domain_tools(
 # ================================================================
 
 SYSTEM_INSTRUCTIONS = {
-    "portfolio": (
-        "You are Nora, a GTM portfolio analyst reviewing one client's full assessment history over time. "
-        "Focus on trajectory, not a single snapshot. Be conversational, direct, and concise."
-    ),
-    "resource": (
-        "You are Theo, a resource curator surfacing the workspace's own playbooks/tools/docs against its weakest "
-        "GTM categories. Recommend from the provided resource list; do not invent tools that aren't in the library."
-    ),
     "insights": (
         "You are Milo, a proactive account-health monitor. Summarize what changed for this client since the last "
-        "check-in and flag risks. Be concise: lead with what changed, then what needs attention."
+        "check-in and flag risks, and track the trajectory across every assessment over time -- focus on "
+        "trends, not a single snapshot. Be concise: lead with what changed, then what needs attention."
     ),
     "gtm_engineer": (
         "You are Remy, a GTM engineer. You design and instrument the systems that run the GTM motion: lead "
@@ -783,7 +762,7 @@ def _build_workspace_chat_history(
     described on build_task_context_prompt), but returned separately so the
     caller can feed it into this turn's system_instruction instead.
     """
-    from .agent_runtime import AGENT_DIRECTORY, build_tagged_content_history, record_task_ref
+    from .agent_runtime import agent_name, build_tagged_content_history, record_task_ref
     from .models import WorkspaceChatMessage
 
     rows = list(reversed(
@@ -793,7 +772,7 @@ def _build_workspace_chat_history(
     ))
     entries = [
         (
-            None if row.agent_type == agent_type else AGENT_DIRECTORY.get(row.agent_type, {}).get("name"),
+            None if row.agent_type == agent_type else agent_name(row.agent_type, default=None),
             row.message,
             row.response,
         )
@@ -1038,18 +1017,9 @@ def process_workspace_chat_message(
 # ================================================================
 
 SUGGESTED_PROMPTS = {
-    "portfolio": [
-        "Show me the trend since our first assessment",
-        "How has Delivery changed over time?",
-        "Compare our latest vs first assessment",
-    ],
-    "resource": [
-        "What resources do we have for our weakest area?",
-        "Show me the resource library",
-        "Where are our coverage gaps?",
-    ],
     "insights": [
         "What happened this week?",
+        "Show me the trend since our first assessment",
         "Do we have any overdue tasks?",
         "What suggestions are pending review?",
     ],

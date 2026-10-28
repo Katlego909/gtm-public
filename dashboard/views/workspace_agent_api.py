@@ -175,7 +175,7 @@ def dashboard_workspace_agent_context_api(request, agent_type):
 
 
 # ================================================================
-# TEAM CHAT -- one window, real transfer_to_agent between all 4 agents
+# TEAM CHAT -- one window, real transfer_to_agent between all the agents
 # (gtm/team_chat.py). Persistence happens inside process_team_chat_message
 # itself (into whichever agent's own table actually responded), so this
 # view is a thin wrapper unlike the other chat endpoints above.

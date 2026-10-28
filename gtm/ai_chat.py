@@ -202,7 +202,7 @@ def _build_consult_tools_for_session(
     session: AssessmentSession, user=None, _handoff_depth: int = 0,
     task_refs_sink: Optional[List[Any]] = None, document_refs_sink: Optional[List[Any]] = None,
 ) -> List[Any]:
-    """Build consult tools to the 3 workspace agents, depth-gated so a
+    """Build consult tools to the workspace agents, depth-gated so a
     handoff chain is guaranteed to terminate (see
     agent_runtime.MAX_HANDOFF_DEPTH)."""
     from .agent_runtime import MAX_HANDOFF_DEPTH
@@ -214,7 +214,7 @@ def _build_consult_tools_for_session(
             agent_type, session, user, _handoff_depth,
             task_refs_sink=task_refs_sink, document_refs_sink=document_refs_sink,
         )
-        for agent_type in ("portfolio", "resource", "insights", "gtm_engineer")
+        for agent_type in ("insights", "gtm_engineer")
     ]
 
 
@@ -479,6 +479,7 @@ def _build_session_tools(
     from .agent_dashboard_tools import build_dashboard_tools
     from .agent_runs import build_run_starter_tool
     from .web_tools import build_web_tools
+    from .workspace_agent_chat import _build_domain_tools
 
     return [
         get_gtm_assessment_data,
@@ -488,6 +489,10 @@ def _build_session_tools(
         search_internal_resources,
         audit_strategic_evidence,
         *_build_document_tools_for_session(session, user=user, document_refs_sink=document_refs_sink),
+        *(
+            _build_domain_tools("gtm_strategist", session.workspace, user=user, task_refs_sink=task_refs_sink)
+            if session.workspace else []
+        ),
         *build_web_tools(session=session, user=user),
         *build_dashboard_tools(workspace=session.workspace, session=session, user=user, task_refs_sink=task_refs_sink),
         *(
@@ -541,6 +546,10 @@ call the appropriate tool to fetch real scores, action items, resources, or othe
 guessing or making up numbers. If a tool exists that answers the user's question, call it before answering.
 Only call a tool that modifies data (like building an action plan) when the user explicitly asks for that
 action, not to preview or describe what it would do.
+
+For resources, recommend only from the workspace's own library (search_internal_resources,
+recommend_resource_for_gap, get_coverage_gaps) -- never invent tools or documents that aren't in it; when the
+library has nothing for a gap, say so.
 
 You can also create, edit, and save documents (action plans, roadmaps, summaries, briefs) that the user
 can export as PDF, Word, or Markdown -- use create_document/edit_document/list_documents for this.
@@ -1026,7 +1035,7 @@ def _build_chat_history(session: AssessmentSession, max_turns: int = 16) -> Tupl
     for why this is a separate return value rather than folded into the
     Content history text.
     """
-    from .agent_runtime import AGENT_DIRECTORY, build_tagged_content_history, record_task_ref
+    from .agent_runtime import agent_name, build_tagged_content_history, record_task_ref
     from .models import WorkspaceChatMessage
 
     own_rows = list(ChatMessage.objects.filter(session=session).order_by('-created_at')[:max_turns])
@@ -1040,7 +1049,7 @@ def _build_chat_history(session: AssessmentSession, max_turns: int = 16) -> Tupl
         )
         entries += [
             (
-                AGENT_DIRECTORY.get(row.agent_type, {}).get("name"), row.created_at, row.message, row.response,
+                agent_name(row.agent_type, default=None), row.created_at, row.message, row.response,
                 row.task_refs,
             )
             for row in workspace_rows

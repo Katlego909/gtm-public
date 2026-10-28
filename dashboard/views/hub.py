@@ -353,8 +353,8 @@ def tasks_board(request):
 @login_required
 def agent_hub(request):
     """Dedicated GTM agent page. Supports the original session-scoped GTM
-    Agent ('session', default) plus three workspace-scoped agents (portfolio,
-    resource, insights) selected via ?agent_type=."""
+    Agent ('session', default) plus the workspace-scoped agents (insights,
+    gtm_engineer) selected via ?agent_type=."""
     workspace_id = request.GET.get('workspace') or request.session.get('current_workspace_id')
     agent_session_id = request.GET.get('agent_session')
     active_agent_type = request.GET.get('agent_type', 'session')
@@ -486,8 +486,6 @@ def agent_hub(request):
         'active_agent_display': active_agent_display,
         'agent_tabs': [
             ('session', f"{AGENT_DIRECTORY['gtm_strategist']['name']} · GTM Agent", AGENT_DIRECTORY['gtm_strategist']['name'][0]),
-            ('portfolio', f"{AGENT_DIRECTORY['portfolio']['name']} · Portfolio", AGENT_DIRECTORY['portfolio']['name'][0]),
-            ('resource', f"{AGENT_DIRECTORY['resource']['name']} · Resources", AGENT_DIRECTORY['resource']['name'][0]),
             ('insights', f"{AGENT_DIRECTORY['insights']['name']} · Insights", AGENT_DIRECTORY['insights']['name'][0]),
             ('gtm_engineer', f"{AGENT_DIRECTORY['gtm_engineer']['name']} · GTM Engineer", AGENT_DIRECTORY['gtm_engineer']['name'][0]),
             ('team', 'Team · All Agents', None),

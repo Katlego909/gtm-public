@@ -1,6 +1,14 @@
 # Agent Runs, Human Approval, and Automations
 
-The five AI agents (Charlie, Nora, Theo, Milo, Remy) do real work in the app: they write deliverables, break work into owned tasks, ask teammates for missing facts, measure gaps from uploaded data, and set up automations. A person approves every plan before an agent changes anything.
+The three AI agents do real work in the app: they write deliverables, break work into owned tasks, ask teammates for missing facts, measure gaps from uploaded data, and set up automations. A person approves every plan before an agent changes anything.
+
+| Agent | Type | Owns |
+|---|---|---|
+| Charlie, GTM Strategist | `gtm_strategist` (one assessment) | Diagnosis, priorities, plans, and the resource library |
+| Milo, Insights | `insights` (workspace) | Recent activity, pending reviews, overdue tasks, and score trends across assessments |
+| Remy, GTM Engineer | `gtm_engineer` (workspace) | Systems design, data and measurements, the tool stack, and automations |
+
+Nora (portfolio trends) and Theo (resource library) were merged into Milo and Charlie on 2026-10-28 (`RETIRED_AGENTS` in `gtm/agent_runtime.py`). Their past comments, documents, and chat turns still show their names; anything still routed to them goes to the successor. Specialist tools are grouped by capability and assigned in `DOMAIN_CAPABILITIES` (`gtm/workspace_agent_chat.py`).
 
 ## The run lifecycle (`gtm/agent_runs.py`)
 

@@ -16,8 +16,8 @@ from .models import ActionItem, ActionItemComment, AssessmentSession
 
 
 def _agent_name_hint(candidate: str, *, action: str = "consult") -> Optional[str]:
-    """If `candidate` matches a fellow AI agent's display name (Charlie/Nora/
-    Theo/Milo), return a corrective message pointing at the right tool.
+    """If `candidate` matches a fellow AI agent's display name (Charlie/Milo/
+    Remy), return a corrective message pointing at the right tool.
     Fellow agents aren't WorkspaceMembership users -- there's no inbox to
     notify -- so a plain "not found" error would just leave the model
     retrying a human lookup that can never succeed.
@@ -151,8 +151,8 @@ def build_agent_action_tools(
         starts their work in the background, the same as a human clicking
         "Complete with AI": they investigate and propose a plan that a
         person approves before anything changes.
-        `agent_type` must be one of: gtm_strategist (Charlie), portfolio
-        (Nora), resource (Theo), insights (Milo). Use find_tasks first if
+        `agent_type` must be one of: gtm_strategist (Charlie), insights
+        (Milo), gtm_engineer (Remy). Use find_tasks first if
         you don't already have this task's real ID. Only usable if the
         requesting user has task-assignment permission in this workspace.
         """
@@ -235,7 +235,9 @@ def build_agent_action_tools(
             if item.assigned_to:
                 assignee_label = item.assigned_to.get_full_name() or item.assigned_to.username
             elif item.assigned_agent_type:
-                assignee_label = AGENT_DIRECTORY.get(item.assigned_agent_type, {}).get("name", item.assigned_agent_type)
+                from .agent_runtime import agent_name
+
+                assignee_label = agent_name(item.assigned_agent_type, default=item.assigned_agent_type)
             else:
                 assignee_label = "Unassigned"
             lines.append(

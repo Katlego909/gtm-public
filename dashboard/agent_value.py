@@ -1,4 +1,4 @@
-"""Aggregates what the 4 AI agents (Charlie/Nora/Theo/Milo) have actually
+"""Aggregates what the AI agents (Charlie/Milo/Remy, plus the retired Nora/Theo) have actually
 produced for a workspace, for the "Impact" tab in the Team hub.
 
 Deliberately split into two trust tiers, kept as separate context
@@ -19,7 +19,7 @@ import datetime
 from django.db.models import Avg, Count, Sum
 from django.utils import timezone
 
-from gtm.agent_runtime import AGENT_DIRECTORY
+from gtm.agent_runtime import AGENT_DIRECTORY, RETIRED_AGENTS
 from gtm.models import (
     ActionItem,
     ActionItemComment,
@@ -102,6 +102,11 @@ def get_agent_value_context(current_workspace):
     documents_by_agent = [
         {"agent_type": agent_type, "name": info["name"], "count": counts_by_type.get(agent_type, 0)}
         for agent_type, info in AGENT_DIRECTORY.items()
+    ] + [
+        # Retired agents still get credit for what they produced.
+        {"agent_type": agent_type, "name": info["name"], "count": counts_by_type[agent_type]}
+        for agent_type, info in RETIRED_AGENTS.items()
+        if counts_by_type.get(agent_type)
     ]
 
     tasks_completed = ActionItem.objects.filter(

@@ -160,7 +160,7 @@ class ExecutionTests(AgentRunTestBase):
             tools["create_document"](title="ICP one-pager", content="Inclusion: B2B SaaS, 50-500 staff.")
             tools["create_subtasks"](tasks=[
                 {"note": "Interview 5 best customers", "assignee": "Priya", "due_date": "2026-11-15"},
-                {"note": "Pick a sales deck for the ICP", "assignee": "Theo"},
+                {"note": "Pick a sales deck for the ICP", "assignee": "Remy"},
             ])
             return "Wrote the ICP one-pager and created two follow-up tasks."
         self.client.scripts.append(execute)
@@ -176,7 +176,7 @@ class ExecutionTests(AgentRunTestBase):
         subtasks = {t.note: t for t in self.item.subtasks.all()}
         self.assertEqual(subtasks["Interview 5 best customers"].assigned_to, self.teammate)
         self.assertEqual(str(subtasks["Interview 5 best customers"].due_date), "2026-11-15")
-        self.assertEqual(subtasks["Pick a sales deck for the ICP"].assigned_agent_type, "resource")
+        self.assertEqual(subtasks["Pick a sales deck for the ICP"].assigned_agent_type, "gtm_engineer")
         comment = ActionItemComment.objects.get(action_item=self.item)
         self.assertEqual(comment.agent_type, "gtm_strategist")
 

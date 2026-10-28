@@ -25,6 +25,7 @@ executing it.
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
+from .agent_runtime import current_agent_type
 from .ai_chat import GENAI_AVAILABLE, GTM_STRATEGIST_SYSTEM_INSTRUCTION, _build_session_tools, _get_chat_client
 from .models import AssessmentSession
 from .models_workspace import Workspace
@@ -38,7 +39,7 @@ try:
 except ImportError:
     types = None
 
-TEAM_AGENT_TYPES = ("gtm_strategist", "portfolio", "resource", "insights", "gtm_engineer")
+TEAM_AGENT_TYPES = ("gtm_strategist", "insights", "gtm_engineer")
 
 # Cap on transfers within a single incoming user message -- mirrors
 # agent_runtime.MAX_HANDOFF_DEPTH's role for the consult-tool mesh. Without
@@ -97,7 +98,9 @@ def _resolve_active_agent_type(workspace: Optional[Workspace], session: Optional
     play)."""
     timeline = _collect_team_timeline(workspace, session)
     if timeline:
-        return timeline[-1][0]
+        # A conversation last answered by a retired agent continues with its successor.
+        active = current_agent_type(timeline[-1][0])
+        return active if active != "gtm_strategist" or session is not None else "insights"
     return "gtm_strategist" if session is not None else "insights"
 
 
@@ -118,12 +121,12 @@ def _build_team_history(
     Also returns the real task IDs surfaced across this timeline, aggregated
     and capped for system_instruction use -- NOT folded into the tagged
     Content text above, for the same self-tagging-leak reason."""
-    from .agent_runtime import AGENT_DIRECTORY, build_tagged_content_history, record_task_ref
+    from .agent_runtime import agent_name, build_tagged_content_history, record_task_ref
 
     timeline = _collect_team_timeline(workspace, session, max_turns=max_turns)
     tagged = [
         (
-            None if agent_type == viewer_agent_type else AGENT_DIRECTORY.get(agent_type, {}).get("name"),
+            None if agent_type == viewer_agent_type else agent_name(agent_type, default=None),
             message,
             response,
         )

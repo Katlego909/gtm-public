@@ -246,8 +246,8 @@ class RemyTests(AgentRunTestBase):
                      "list_automations", "start_multi_step_work", "consult_insights_agent"):
             self.assertIn(tool, names)
         self.assertEqual(len(names), len(set(names)))
-        nora = [t.__name__ for t in _build_workspace_tools("portfolio", self.workspace, user=self.admin)]
-        self.assertIn("consult_gtm_engineer_agent", nora)
+        milo = [t.__name__ for t in _build_workspace_tools("insights", self.workspace, user=self.admin)]
+        self.assertIn("consult_gtm_engineer_agent", milo)
 
     def test_task_routed_to_remy_runs_as_remy_with_unique_tools(self):
         self.item.assigned_agent_type = "gtm_engineer"

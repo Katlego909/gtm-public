@@ -175,8 +175,8 @@ class ActionItem(models.Model):
     STATUS_CHOICES = [("todo","To do"),("doing","In progress"),("done","Done")]
     AGENT_TYPE_CHOICES = [
         ("gtm_strategist", "Charlie · GTM Strategist"),
-        ("portfolio", "Nora · Portfolio Agent"),
-        ("resource", "Theo · Resource Agent"),
+        ("portfolio", "Nora · Portfolio Agent (retired)"),
+        ("resource", "Theo · Resource Agent (retired)"),
         ("insights", "Milo · Insights Agent"),
         ("gtm_engineer", "Remy · GTM Engineer"),
     ]
@@ -359,8 +359,8 @@ class ActionItemComment(models.Model):
         """The agent's first name (e.g. "Charlie"), or "" for a human comment."""
         if not self.agent_type:
             return ""
-        from .agent_runtime import AGENT_DIRECTORY
-        return AGENT_DIRECTORY.get(self.agent_type, {}).get("name", "AI agent")
+        from .agent_runtime import agent_name
+        return agent_name(self.agent_type)
 
     @cached_property
     def preview(self):
@@ -482,8 +482,8 @@ class WorkspaceChatMessage(models.Model):
     single AssessmentSession."""
 
     AGENT_TYPE_CHOICES = [
-        ("portfolio", "Portfolio Agent"),
-        ("resource", "Resource Agent"),
+        ("portfolio", "Portfolio Agent (retired)"),
+        ("resource", "Resource Agent (retired)"),
         ("insights", "Insights Agent"),
         ("gtm_engineer", "GTM Engineer"),
     ]
@@ -541,8 +541,8 @@ class AgentDocument(models.Model):
     ]
     AGENT_TYPE_CHOICES = [
         ("gtm_strategist", "GTM Strategist"),
-        ("portfolio", "Portfolio Agent"),
-        ("resource", "Resource Agent"),
+        ("portfolio", "Portfolio Agent (retired)"),
+        ("resource", "Resource Agent (retired)"),
         ("insights", "Insights Agent"),
         ("gtm_engineer", "GTM Engineer"),
     ]

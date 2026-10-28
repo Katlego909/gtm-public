@@ -34,11 +34,10 @@ def completion_agent_type(action_item: ActionItem) -> str:
     it was routed to (assign_task_to_agent), else Charlie. Its persona and
     domain tools run the work, and its deliverables, its comment, and the
     "<name> is working on this" status on the card are all attributed to it."""
-    from .agent_runtime import AGENT_DIRECTORY
+    from .agent_runtime import AGENT_DIRECTORY, current_agent_type
 
-    if action_item.assigned_agent_type in AGENT_DIRECTORY:
-        return action_item.assigned_agent_type
-    return DEFAULT_COMPLETION_AGENT_TYPE
+    routed = current_agent_type(action_item.assigned_agent_type or "")
+    return routed if routed in AGENT_DIRECTORY else DEFAULT_COMPLETION_AGENT_TYPE
 
 
 def build_task_tools(

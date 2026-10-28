@@ -117,7 +117,7 @@ class AgentActionToolsTests(TestCase):
         mechanism), not consult_* -- consulting is for questions, this is
         for handing off task ownership."""
         tools = self._tools()
-        result = tools["assign_task"](str(self.task.id), "Nora")
+        result = tools["assign_task"](str(self.task.id), "Remy")
         self.assertIn("fellow AI agent", result)
         self.assertIn("assign_task_to_agent", result)
         self.task.refresh_from_db()
