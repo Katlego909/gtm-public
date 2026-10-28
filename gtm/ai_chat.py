@@ -253,6 +253,66 @@ def _make_get_gtm_assessment_data_tool(session: AssessmentSession):
     return get_gtm_assessment_data
 
 
+def _make_get_gtm_diagnosis_tool(session: AssessmentSession):
+    """Factory for the get_gtm_diagnosis tool, scoped to `session`. Exposes
+    the deterministic Layer-1 diagnosis from gtm/scoring_engine.py -- the
+    same priorities and patterns the results page shows -- so the agent
+    reasons over those numbers instead of inventing its own. Module level
+    so gtm/action_item_completion.py can reuse it."""
+
+    def get_gtm_diagnosis() -> str:
+        """Retrieves the scoring engine's diagnosis for this assessment: the
+        detected GTM failure patterns (with root cause and quick win), the
+        top 3 priorities with how many overall score points each is worth,
+        and every other improvement opportunity ranked by points. Use this
+        whenever the user asks what to fix first, what the risks are, where
+        to invest, or for a roadmap -- build the answer from these
+        priorities rather than from general advice.
+        """
+        from .scoring_engine import build_recommendation_context
+
+        responses = Response.objects.filter(session=session).select_related("question")
+        question_scores = {r.question.id_code: r.score for r in responses}
+        if not question_scores:
+            return "This assessment has no answered questions yet, so there is no diagnosis."
+        ctx = build_recommendation_context(question_scores)
+
+        report = [f"Overall score: {ctx['current_overall']}/100"]
+        if ctx["patterns"]:
+            report.append("\nDetected GTM patterns (most severe first):")
+            for pat in ctx["patterns"]:
+                report.append(
+                    f"  - {pat['name']} [{pat['severity']}]: {pat['headline']}\n"
+                    f"    Root cause: {pat['root_cause']}\n"
+                    f"    Quick win: {pat['quick_win']}"
+                )
+        else:
+            report.append("\nNo named GTM failure patterns detected.")
+
+        report.append(
+            f"\nTop priorities (worth {ctx['top_priorities_pts']} points together, "
+            f"taking the score to {ctx['top_priorities_target']}/100):"
+        )
+        for opp in ctx["top_priorities"]:
+            report.append(
+                f"  - {opp['dimension']} ({opp['pillar']}, currently {opp['current_score']}/5): "
+                f"+{round(opp['opportunity_pts'], 1)} points"
+            )
+
+        top_ids = {opp["id_code"] for opp in ctx["top_priorities"]}
+        others = [o for o in ctx["all_opportunities"] if o["id_code"] not in top_ids and o["opportunity_pts"] > 0]
+        if others:
+            report.append("\nOther opportunities, by points:")
+            for opp in others:
+                report.append(
+                    f"  - {opp['dimension']} ({opp['pillar']}, {opp['current_score']}/5): "
+                    f"+{round(opp['opportunity_pts'], 1)}"
+                )
+        return "\n".join(report)
+
+    return get_gtm_diagnosis
+
+
 def _make_search_internal_resources_tool(session: AssessmentSession):
     """Factory for the search_internal_resources tool, scoped to `session`.
     Extracted to module level for the same reason as
@@ -312,6 +372,7 @@ def _build_session_tools(
         document_refs_sink = []
 
     get_gtm_assessment_data = _make_get_gtm_assessment_data_tool(session)
+    get_gtm_diagnosis = _make_get_gtm_diagnosis_tool(session)
     search_internal_resources = _make_search_internal_resources_tool(session)
 
     def build_prioritized_action_plan() -> str:
@@ -364,143 +425,6 @@ def _build_session_tools(
         except Exception as e:
             return f"Error reviewing action items: {str(e)}"
 
-    def analyze_risk_and_mitigation() -> str:
-        """Provides a deep-dive risk analysis based on the GTM assessment.
-        Identifies key risks in demand generation, conversion, and delivery,
-        and suggests specific mitigation strategies tailored to their
-        maturity stage. Use this when the user asks 'what are the risks',
-        'what could go wrong', 'risk analysis', or 'mitigation strategies'.
-        """
-        try:
-            context = build_session_context(session)
-            risks = []
-            for cat in context.get('categories', []):
-                if cat['score'] < 2.5:
-                    if cat['name'] == 'Demand':
-                        risks.append("HIGH: Weak demand generation is your biggest risk—you may struggle to build pipeline. Immediate focus: clarify ICP and messaging.")
-                    elif cat['name'] == 'Conversion':
-                        risks.append("HIGH: Poor conversion efficiency means pipeline becomes expensive fast. Focus: tighten qualification and enable sales.")
-                    elif cat['name'] == 'Delivery':
-                        risks.append("HIGH: Churn risk is elevated. Poor delivery kills expansion revenue. Focus: define TTV milestones.")
-            return ("Risk Assessment:\n" + "\n".join(risks)) if risks else f"Your GTM is solid at the {context.get('stage')} stage—no critical risks detected. Keep maintaining momentum."
-        except Exception as e:
-            logger.error(f"Risk analysis error: {e}")
-            return "Let me get your assessment data first so I can analyze the risks properly."
-
-    def build_implementation_roadmap(timeframe: str = "90-day") -> str:
-        """Creates a phased implementation roadmap. `timeframe` must be one
-        of '30-day', '60-day', or '90-day'. Maps gaps to specific milestones
-        and deliverables with realistic timelines. Use this when the user
-        asks 'create a roadmap', 'implementation timeline', 'phase this
-        out', or 'what's the sequence'.
-        """
-        try:
-            context = build_session_context(session)
-            phases = {
-                "30-day": [
-                    "Week 1-2: Define ICP & messaging",
-                    "Week 3: Set up qualification process",
-                    "Week 4: Define TTV milestones",
-                ],
-                "60-day": [
-                    "Phase 1 (Week 1-2): Quick wins—fix the most critical gap",
-                    "Phase 2 (Week 3-4): Build process—implement qualification/onboarding",
-                    "Phase 3 (Week 5-8): Test—run small pilots to validate changes",
-                    "Phase 4 (Week 9+): Scale—expand what works",
-                ],
-                "90-day": [
-                    "Month 1: Diagnostic & quick wins (pick top 2 gaps)",
-                    "Month 2: Process implementation & team alignment",
-                    "Month 3: Measurement & optimization (review results, adjust)",
-                ],
-            }
-            plan = phases.get(timeframe, phases["90-day"])
-            return f"{timeframe.upper()} Roadmap for {context['company_name']}:\n\n" + "\n".join(plan)
-        except Exception as e:
-            logger.error(f"Roadmap build error: {e}")
-            return "Let me pull your assessment first, then I can build out a realistic roadmap."
-
-    def competitive_benchmarking_analysis() -> str:
-        """Provides competitive benchmarking based on industry, company
-        size, and stage. Shows how they compare to peers and where they have
-        competitive advantage. Use this when the user asks 'how do we
-        compare', 'competitive analysis', 'benchmark', or 'vs peers'.
-        """
-        try:
-            context = build_session_context(session)
-            score = context.get('overall_score', 0)
-            stage = context.get('stage', 'Unknown')
-            analysis = f"Your Competitive Position ({stage} stage):\n\n"
-            analysis += f"Your GTM Score: {score}/100\n"
-            analysis += f"Industry peers at this stage: 45-70\n"
-            analysis += f"Position: {'Ahead of curve' if score > 60 else 'Room to improve'}\n\n"
-            cats = sorted(context.get('categories', []), key=lambda x: x.get('score', 0), reverse=True)
-            if cats:
-                analysis += f"Your Strengths:\n"
-                for cat in cats[:2]:
-                    analysis += f"  • {cat['name']}: {cat['score']}/5\n"
-            analysis += f"\nGaps vs Peers:\n"
-            for cat in list(reversed(cats))[:2]:
-                analysis += f"  • {cat['name']}: {cat['score']}/5 — this is where you can pull ahead\n"
-            return analysis
-        except Exception as e:
-            logger.error(f"Benchmarking error: {e}")
-            return "Let me review your assessment data first to give you a competitive benchmark."
-
-    def resource_allocation_guidance() -> str:
-        """Provides guidance on where to allocate budget and team capacity
-        based on gaps. Prioritizes spending on the highest-impact
-        initiatives. Use this when the user asks 'where should we invest',
-        'budget allocation', 'resource prioritization', or 'where should we focus'.
-        """
-        try:
-            context = build_session_context(session)
-            guidance = f"Resource Allocation for {context['company_name']}:\n\n"
-            cats = sorted(context.get('categories', []), key=lambda x: x.get('score', 0))
-            if len(cats) >= 3:
-                guidance += f"HIGH PRIORITY (40-50% budget):\n"
-                guidance += f"   {cats[0]['name']} ({cats[0]['score']}/5)\n"
-                guidance += f"   Hire, build process, invest in tools\n\n"
-                guidance += f"MEDIUM PRIORITY (30-40% budget):\n"
-                guidance += f"   {cats[1]['name']} ({cats[1]['score']}/5)\n"
-                guidance += f"   Quick wins, measure progress\n\n"
-                guidance += f"MAINTENANCE (10-20% budget):\n"
-                guidance += f"   {cats[2]['name']} ({cats[2]['score']}/5)\n"
-                guidance += f"   Keep stable, don't regress\n"
-            return guidance
-        except Exception as e:
-            logger.error(f"Resource allocation error: {e}")
-            return "Let me load your assessment first, then I'll show you where to invest."
-
-    def customer_segment_analysis() -> str:
-        """Analyzes customer segments and GTM implications for different
-        market segments. Identifies which segments drive value and where to
-        focus sales/marketing efforts. Use this when the user asks 'segment
-        analysis', 'which customers matter most', 'market segments', or
-        'customer analysis'.
-        """
-        try:
-            context = build_session_context(session)
-            company = context.get('company_name', 'Your company')
-            industry = context.get('industry', 'your industry')
-            stage = context.get('stage', 'Growth')
-            analysis = f"Customer Segment Strategy for {company}:\n\n"
-            analysis += f"As a {stage}-stage {industry} player, here's where to focus:\n\n"
-            analysis += "1. Early Adopters (20% of TAM, 40% of value)\n"
-            analysis += "   Lower CAC, faster sales, become advocates\n"
-            analysis += "   Start here: Easier wins + proof points\n\n"
-            analysis += "2. Fast-Growing SMBs (35% of TAM, 35% of value)\n"
-            analysis += "   Need quick implementation, price-sensitive\n"
-            analysis += "   Then here: Volume plays, repeatable process\n\n"
-            analysis += "3. Enterprise (10% of TAM, 25% of value)\n"
-            analysis += "   High LTV, long sales cycle, need support\n"
-            analysis += "   Finally here: Scale when you have proof\n\n"
-            analysis += "Pro tip: Build segment-specific playbooks for messaging & pricing."
-            return analysis
-        except Exception as e:
-            logger.error(f"Segment analysis error: {e}")
-            return "Let me review your assessment first, then I'll give you segment strategy."
-
     def audit_strategic_evidence(file_id: str = "") -> str:
         """Performs a deep multimodal audit of a strategic asset (image or
         PDF) already uploaded to this assessment. Use this when the user
@@ -541,14 +465,10 @@ def _build_session_tools(
 
     return [
         get_gtm_assessment_data,
+        get_gtm_diagnosis,
         build_prioritized_action_plan,
         review_current_action_items,
         search_internal_resources,
-        analyze_risk_and_mitigation,
-        build_implementation_roadmap,
-        competitive_benchmarking_analysis,
-        resource_allocation_guidance,
-        customer_segment_analysis,
         audit_strategic_evidence,
         *_build_document_tools_for_session(session, user=user, document_refs_sink=document_refs_sink),
         *build_web_tools(session=session, user=user),
@@ -614,6 +534,12 @@ Treat a teammate's marked turn as background you're aware of, not as an answer t
 current question needs specific data -- a name, a number, anything not identical to what a teammate
 already looked up -- call the right tool yourself and get a fresh answer rather than repeating or lightly
 rewording something a teammate said about a different question.
+
+For what to fix first, risks, where to invest, or a roadmap, call get_gtm_diagnosis and build your answer
+from its patterns and point-ranked priorities -- those are the same numbers the results page shows, so
+never reorder them or substitute your own diagnosis. Never state peer benchmarks, market-share or TAM
+figures, or budget splits that no tool returned; if the user asks how they compare to peers and no tool
+has that data, say so plainly (web_search can find published industry benchmarks if they want them).
 
 Focus on: their strongest areas, critical gaps, and specific next steps they can take immediately.
 Keep responses conversational and avoid lengthy lists. End with a specific next step."""

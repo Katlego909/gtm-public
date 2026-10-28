@@ -49,7 +49,7 @@
              role="status" data-ai-running="{{ item.id }}" data-ai-elapsed="{{ item.ai_run_elapsed|default:0 }}">
             <p class="flex items-center gap-1.5">
                 <span class="inline-block w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" aria-hidden="true"></span>
-                <span><span class="font-semibold">{{ ai_completion_agent_name }}</span> is working on this &middot; <span data-ai-elapsed-label>0:00</span></span>
+                <span><span class="font-semibold">{{ item.ai_completion_agent_name }}</span> is working on this &middot; <span data-ai-elapsed-label>0:00</span></span>
             </p>
             <p class="mt-0.5 text-indigo-700">Usually takes about a minute. You can keep working; this card updates when it's done.</p>
         </div>
@@ -60,7 +60,7 @@
         </div>
     {% elif item.ai_run_display == 'failed' and item.status == 'todo' %}
         <div class="mb-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800 flex items-center justify-between gap-2" role="status">
-            <span>{{ ai_completion_agent_name }} couldn't finish: {{ item.ai_run_error|default:"something went wrong." }}</span>
+            <span>{{ item.ai_completion_agent_name }} couldn't finish: {{ item.ai_run_error|default:"something went wrong." }}</span>
             <button type="button" onclick="completeActionItemWithAI({{ item.id }})" class="flex-shrink-0 font-medium underline hover:text-red-900">Try again</button>
         </div>
     {% endif %}

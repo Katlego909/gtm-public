@@ -487,7 +487,9 @@ def _build_workspace_tools(
     if document_refs_sink is None:
         document_refs_sink = []
 
-    context = build_workspace_agent_context(agent_type, workspace, user=user)
+    domain_tools = _build_domain_tools(agent_type, workspace, user=user, task_refs_sink=task_refs_sink)
+    if not domain_tools:
+        return []
     document_tools = _build_document_tools(agent_type, workspace, user=user, document_refs_sink=document_refs_sink)
     web_tools = build_web_tools(workspace=workspace, user=user)
     action_tools = build_agent_action_tools(workspace, user, task_refs_sink=task_refs_sink, agent_type=agent_type) if user else []
@@ -499,6 +501,39 @@ def _build_workspace_tools(
         )
         if include_consult else []
     )
+
+    # Writes a document through its own path, so it stays a chat-only tool
+    # rather than a domain tool (task completion tracks its own deliverables).
+    summary_tools = (
+        [_make_draft_client_summary_tool(agent_type, workspace, user, document_refs_sink=document_refs_sink)]
+        if agent_type in ("portfolio", "insights") else []
+    )
+    return [
+        *domain_tools,
+        *summary_tools,
+        *document_tools,
+        *web_tools,
+        *action_tools,
+        *dashboard_tools,
+        *consult_tools,
+    ]
+
+
+def _build_domain_tools(
+    agent_type: str,
+    workspace: Workspace,
+    user=None,
+    task_refs_sink: Optional[List[Any]] = None,
+) -> List[Any]:
+    """The read tools that make one workspace agent a specialist (Nora's
+    trends, Theo's library, Milo's activity), scoped to `workspace`.
+    Shared by chat (_build_workspace_tools) and gtm/action_item_completion.py,
+    so a task routed to an agent is attempted with that agent's own tools.
+    Returns [] for an agent without workspace domain tools (e.g. Charlie).
+    """
+    if agent_type not in CONTEXT_BUILDERS:
+        return []
+    context = build_workspace_agent_context(agent_type, workspace, user=user)
 
     if agent_type == "portfolio":
         def get_trend_overview() -> str:
@@ -530,18 +565,7 @@ def _build_workspace_tools(
             """
             return handle_portfolio_summary(context, "")
 
-        return [
-            get_trend_overview,
-            get_category_trend,
-            compare_sessions,
-            get_assessment_history,
-            _make_draft_client_summary_tool("portfolio", workspace, user, document_refs_sink=document_refs_sink),
-            *document_tools,
-            *web_tools,
-            *action_tools,
-            *dashboard_tools,
-            *consult_tools,
-        ]
+        return [get_trend_overview, get_category_trend, compare_sessions, get_assessment_history]
 
     if agent_type == "resource":
         def find_resource(query: str = "") -> str:
@@ -569,17 +593,7 @@ def _build_workspace_tools(
             """
             return handle_coverage_gap(context, "")
 
-        return [
-            find_resource,
-            recommend_resource_for_gap,
-            list_resources,
-            get_coverage_gaps,
-            *document_tools,
-            *web_tools,
-            *action_tools,
-            *dashboard_tools,
-            *consult_tools,
-        ]
+        return [find_resource, recommend_resource_for_gap, list_resources, get_coverage_gaps]
 
     if agent_type == "insights":
         def get_score_change() -> str:
@@ -610,18 +624,7 @@ def _build_workspace_tools(
             """
             return handle_overdue_tasks(context, "", task_refs_sink=task_refs_sink)
 
-        return [
-            get_score_change,
-            get_activity_summary,
-            get_pending_reviews,
-            get_overdue_tasks,
-            _make_draft_client_summary_tool("insights", workspace, user, document_refs_sink=document_refs_sink),
-            *document_tools,
-            *web_tools,
-            *action_tools,
-            *dashboard_tools,
-            *consult_tools,
-        ]
+        return [get_score_change, get_activity_summary, get_pending_reviews, get_overdue_tasks]
 
     return []
 
@@ -642,7 +645,7 @@ SYSTEM_INSTRUCTIONS = {
     ),
     "insights": (
         "You are Milo, a proactive account-health monitor. Summarize what changed for this client since the last "
-        "check-in, flag risks, and be concise — this is a digest, not a conversation."
+        "check-in and flag risks. Be concise: lead with what changed, then what needs attention."
     ),
 }
 

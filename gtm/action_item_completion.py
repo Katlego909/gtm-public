@@ -31,6 +31,7 @@ from .agent_documents import (
 from .ai_chat import (
     _get_chat_client,
     _make_get_gtm_assessment_data_tool,
+    _make_get_gtm_diagnosis_tool,
     _make_search_internal_resources_tool,
 )
 from .models import ActionItem, ActionItemComment, AgentDocument
@@ -50,21 +51,38 @@ except ImportError:
 # so the response came back as a bare function_call with no summary.
 MAX_TOOL_ROUNDS = 8
 
-# The agent that performs "Complete with AI" -- its deliverables, its comment,
-# and the "<name> is working on this" status on the card are all attributed to it.
-COMPLETION_AGENT_TYPE = "gtm_strategist"
+# The agent that performs "Complete with AI" when the task hasn't been routed
+# to a specific agent.
+DEFAULT_COMPLETION_AGENT_TYPE = "gtm_strategist"
 
 
-def _build_completion_tools(action_item: ActionItem, user, created_doc_ids: List[Any]) -> List[Any]:
-    """Tool set for one completion turn: the same read tools the GTM
-    Strategist has (assessment data, resource search -- so the agent checks
-    what already exists rather than duplicating work) plus document tools
-    that record the id of anything created/edited, so the caller can tell
-    whether real work actually happened."""
+def completion_agent_type(action_item: ActionItem) -> str:
+    """The agent that performs "Complete with AI" for `action_item`: the one
+    it was routed to (assign_task_to_agent), else Charlie. Its persona and
+    domain tools run the turn, and its deliverables, its comment, and the
+    "<name> is working on this" status on the card are all attributed to it."""
+    from .agent_runtime import AGENT_DIRECTORY
+
+    if action_item.assigned_agent_type in AGENT_DIRECTORY:
+        return action_item.assigned_agent_type
+    return DEFAULT_COMPLETION_AGENT_TYPE
+
+
+def _build_completion_tools(
+    action_item: ActionItem, user, created_doc_ids: List[Any], agent_type: str = DEFAULT_COMPLETION_AGENT_TYPE,
+) -> List[Any]:
+    """Tool set for one completion turn: the GTM Strategist's read tools
+    (assessment data, scoring-engine diagnosis, resource search -- so the
+    agent checks what already exists rather than duplicating work), the
+    completing agent's own domain read tools when it's a workspace agent,
+    plus document tools that record the id of anything created/edited, so
+    the caller can tell whether real work actually happened."""
     from .agent_dashboard_tools import build_dashboard_tools
+    from .workspace_agent_chat import _build_domain_tools
 
     session = action_item.session
     get_gtm_assessment_data = _make_get_gtm_assessment_data_tool(session)
+    get_gtm_diagnosis = _make_get_gtm_diagnosis_tool(session)
     search_internal_resources = _make_search_internal_resources_tool(session)
     # Read-only dashboard tools (gap/notification context) so a completion
     # turn can ground its deliverable in real data. The write tool
@@ -84,7 +102,7 @@ def _build_completion_tools(action_item: ActionItem, user, created_doc_ids: List
         (client_summary, action_plan, roadmap, resource_brief, other).
         """
         doc = create_agent_document(
-            agent_type=COMPLETION_AGENT_TYPE,
+            agent_type=agent_type,
             title=title,
             content=content,
             doc_type=doc_type,
@@ -168,16 +186,23 @@ def _build_completion_tools(action_item: ActionItem, user, created_doc_ids: List
             lines.append(f'- {d.original_filename} ({d.get_category_display()}): "{snippet}"')
         return "\n".join(lines)
 
+    workspace = action_item.workspace or session.workspace
+    domain_tools = _build_domain_tools(agent_type, workspace, user=user) if workspace else []
+
     return [
-        get_gtm_assessment_data, search_internal_resources, create_document, edit_document, list_documents,
-        read_document, search_documents, search_evidence, *dashboard_read_tools,
+        get_gtm_assessment_data, get_gtm_diagnosis, search_internal_resources, create_document, edit_document,
+        list_documents, read_document, search_documents, search_evidence, *dashboard_read_tools, *domain_tools,
     ]
 
 
-def _build_completion_system_instruction(action_item: ActionItem) -> str:
+def _build_completion_system_instruction(action_item: ActionItem, agent_type: str = DEFAULT_COMPLETION_AGENT_TYPE) -> str:
+    from .agent_runtime import AGENT_DIRECTORY
+
     session = action_item.session
     company = session.company_name or "this company"
+    agent = AGENT_DIRECTORY[agent_type]
     return (
+        f"You are {agent['name']}, the {agent['label']}. Your specialty: {agent['domain']} "
         f'You are completing one specific action item for {company}: "{action_item.note}"\n\n'
         "Actually complete this task -- do not just describe or plan it. Use your tools to ground the "
         "work in this company's real assessment data (scores, gaps, industry) and its existing resource "
@@ -222,10 +247,11 @@ def complete_action_item(action_item: ActionItem, user=None) -> Dict[str, Any]:
     if not client:
         return {"success": False, "error": "Could not connect to the AI service. Please try again in a moment."}
 
+    agent_type = completion_agent_type(action_item)
     created_doc_ids: List[Any] = []
-    tools = _build_completion_tools(action_item, user, created_doc_ids)
+    tools = _build_completion_tools(action_item, user, created_doc_ids, agent_type=agent_type)
     config = types.GenerateContentConfig(
-        system_instruction=_build_completion_system_instruction(action_item),
+        system_instruction=_build_completion_system_instruction(action_item, agent_type=agent_type),
         temperature=0.6,
         max_output_tokens=2048,
         thinking_config=types.ThinkingConfig(thinking_budget=0),
@@ -286,7 +312,7 @@ def complete_action_item(action_item: ActionItem, user=None) -> Dict[str, Any]:
         action_item=action_item,
         user=user,
         text=comment_text,
-        agent_type=COMPLETION_AGENT_TYPE,
+        agent_type=agent_type,
         duration_ms=duration_ms,
         prompt_token_count=prompt_token_count,
         candidates_token_count=candidates_token_count,

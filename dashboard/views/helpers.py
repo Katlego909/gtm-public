@@ -840,7 +840,10 @@ def build_task_board_context(action_items_qs):
     "Done this week" uses completed_at, the same definition as the
     dashboard's completed-this-week KPI.
     """
-    action_items_qs = action_items_qs.select_related('assigned_to', 'deliverable_document').prefetch_related('comments__user')
+    from gtm.action_item_completion import completion_agent_type
+    from gtm.agent_runtime import AGENT_DIRECTORY
+
+    action_items_qs =action_items_qs.select_related('assigned_to', 'deliverable_document').prefetch_related('comments__user')
     top_todo = list(action_items_qs.filter(status='todo').order_by('due_date'))
     top_doing = list(action_items_qs.filter(status='doing').order_by('due_date'))
     top_done = list(action_items_qs.filter(status='done').order_by('-created_at'))
@@ -869,14 +872,11 @@ def build_task_board_context(action_items_qs):
         item.board_flags = ' '.join(flags)
         item.is_overdue = 'overdue' in flags
         item.ai_run_display = ai_run_display_state(item) if item.ai_run_state else ''
+        item.ai_completion_agent_name = AGENT_DIRECTORY[completion_agent_type(item)]['name']
         if item.ai_run_display == 'running' and item.ai_run_started_at:
             item.ai_run_elapsed = max(int((timezone.now() - item.ai_run_started_at).total_seconds()), 0)
 
-    from gtm.action_item_completion import COMPLETION_AGENT_TYPE
-    from gtm.agent_runtime import AGENT_DIRECTORY
-
     return {
-        'ai_completion_agent_name': AGENT_DIRECTORY[COMPLETION_AGENT_TYPE]['name'],
         'top_todo': top_todo,
         'top_doing': top_doing,
         'top_done': top_done,
