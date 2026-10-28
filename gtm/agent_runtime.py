@@ -54,6 +54,14 @@ AGENT_DIRECTORY = {
         "label": "Insights Agent",
         "domain": "Recent workspace activity, score changes, pending reviews, overdue tasks, and documents.",
     },
+    "gtm_engineer": {
+        "name": "Remy",
+        "label": "GTM Engineer",
+        "domain": (
+            "Designing and instrumenting the systems that run GTM -- lead scoring, routing, SLAs, funnel stages, "
+            "metrics computed from uploaded data, and the tool stack."
+        ),
+    },
 }
 
 

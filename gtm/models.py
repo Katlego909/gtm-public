@@ -12,6 +12,8 @@ from .models_integrations import WorkspaceApiKey, WorkspaceIntegration
 from .models_ai_credits import AICreditAccount, AICreditTransaction
 from .models_ai_locks import AIGenerationLock
 from .models_beta import BetaInviteCode
+from .models_agent_runs import AgentRun, AgentRunQuestion
+from .models_automations import Automation, AutomationRun
 
 # AI generation status choices
 AI_STATUS_CHOICES = [
@@ -176,6 +178,7 @@ class ActionItem(models.Model):
         ("portfolio", "Nora · Portfolio Agent"),
         ("resource", "Theo · Resource Agent"),
         ("insights", "Milo · Insights Agent"),
+        ("gtm_engineer", "Remy · GTM Engineer"),
     ]
 
     objects = ActionItemManager()
@@ -220,6 +223,22 @@ class ActionItem(models.Model):
     completed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name="subtasks",
+        help_text="The task this one was broken out of, if any.",
+    )
+
+    current_run = models.ForeignKey(
+        'AgentRun',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="+",
+        help_text="The latest agent run working on this task, shown on its card.",
+    )
 
     deliverable_document = models.ForeignKey(
         'AgentDocument',
@@ -466,6 +485,7 @@ class WorkspaceChatMessage(models.Model):
         ("portfolio", "Portfolio Agent"),
         ("resource", "Resource Agent"),
         ("insights", "Insights Agent"),
+        ("gtm_engineer", "GTM Engineer"),
     ]
 
     workspace = models.ForeignKey(
@@ -524,6 +544,7 @@ class AgentDocument(models.Model):
         ("portfolio", "Portfolio Agent"),
         ("resource", "Resource Agent"),
         ("insights", "Insights Agent"),
+        ("gtm_engineer", "GTM Engineer"),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

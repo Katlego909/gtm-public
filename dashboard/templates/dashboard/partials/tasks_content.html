@@ -28,6 +28,14 @@
     <div class="flex items-center gap-4">
         {% include 'dashboard/partials/global_search.html' with instance_id="header" %}
         {% include 'dashboard/partials/notification_bell.html' with instance_id="header" %}
+        {% if current_workspace %}
+        <button hx-get="{% url 'automations_panel' %}?workspace={{ current_workspace.id }}"
+                hx-target="#modal-content"
+                onclick="openModal()"
+                class="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors">
+            Automations
+        </button>
+        {% endif %}
         <button hx-get="{% url 'add_action_item' %}"
                 hx-target="#modal-content"
                 onclick="openModal()"
@@ -46,3 +54,17 @@
         {% include 'dashboard/partials/action_items.html' %}
     </div>
 </div>
+
+{% if open_run_id %}
+<script>
+    // Opened from a notification: show the agent run's review panel.
+    (function() {
+        const show = function() {
+            if (!window.htmx || !window.openModal) return setTimeout(show, 100);
+            window.openModal();
+            htmx.ajax('GET', '{% url "agent_run_panel" open_run_id %}', { target: '#modal-content' });
+        };
+        show();
+    })();
+</script>
+{% endif %}

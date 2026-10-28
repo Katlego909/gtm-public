@@ -282,6 +282,23 @@ def workspace_hub(request):
         add_never_cache_headers(response)
     return response
 
+def _viewable_run_id(request, run_id):
+    """The agent run a notification deep-linked to (?run=<id>), if this user
+    may see it -- the board opens its review panel on load."""
+    import uuid as uuid_lib
+
+    from gtm.agent_runs import can_view_run
+    from gtm.models import AgentRun
+
+    if not run_id or not request.user.is_authenticated:
+        return None
+    try:
+        run = AgentRun.objects.select_related('workspace', 'session').get(pk=uuid_lib.UUID(str(run_id)))
+    except (ValueError, AgentRun.DoesNotExist):
+        return None
+    return run.id if can_view_run(request.user, run) else None
+
+
 @vary_on_headers('HX-Request')
 @login_required
 def tasks_board(request):
@@ -321,7 +338,8 @@ def tasks_board(request):
         'user_workspaces': user_workspaces,
         **build_task_board_context(action_items_qs),
         'team_members': team_members,
-        'page_title': 'Tasks & Execution'
+        'page_title': 'Tasks & Execution',
+        'open_run_id': _viewable_run_id(request, request.GET.get('run')),
     }
 
     if request.htmx:
@@ -471,6 +489,7 @@ def agent_hub(request):
             ('portfolio', f"{AGENT_DIRECTORY['portfolio']['name']} · Portfolio", AGENT_DIRECTORY['portfolio']['name'][0]),
             ('resource', f"{AGENT_DIRECTORY['resource']['name']} · Resources", AGENT_DIRECTORY['resource']['name'][0]),
             ('insights', f"{AGENT_DIRECTORY['insights']['name']} · Insights", AGENT_DIRECTORY['insights']['name'][0]),
+            ('gtm_engineer', f"{AGENT_DIRECTORY['gtm_engineer']['name']} · GTM Engineer", AGENT_DIRECTORY['gtm_engineer']['name'][0]),
             ('team', 'Team · All Agents', None),
         ],
         'agent_display_labels': {at: agent_display_label(at) for at in AGENT_DIRECTORY},

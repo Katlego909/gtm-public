@@ -9,13 +9,10 @@ Gemini call, matching gtm/tests_agent_actions.py.
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from gtm.action_item_completion import (
-    _build_completion_system_instruction,
-    _build_completion_tools,
-    completion_agent_type,
-)
+from gtm.action_item_completion import _build_completion_tools, completion_agent_type
+from gtm.agent_runs import _persona
 from gtm.ai_chat import _build_session_tools
-from gtm.models import ActionItem, AgentDocument, AssessmentSession, Category, Question, Response
+from gtm.models import ActionItem, AgentDocument, AgentRun, AssessmentSession, Category, Question, Response
 from gtm.models_workspace import Workspace, WorkspaceMembership
 from gtm.scoring_engine import build_recommendation_context
 from gtm.tests_scoring_engine import FULL_JUN_05
@@ -103,4 +100,5 @@ class CompletionAgentRoutingTests(TestCase):
         tools["create_document"]("Deck pick", "Use the enterprise deck.")
         self.assertEqual(AgentDocument.objects.get(pk=created[0]).agent_type, "resource")
 
-        self.assertIn("You are Theo", _build_completion_system_instruction(item, agent_type=agent_type))
+        run = AgentRun(agent_type=agent_type, goal=item.note, session=self.session, workspace=self.workspace)
+        self.assertIn("You are Theo", _persona(run))

@@ -142,6 +142,7 @@ class GapMetricMeasurement(models.Model):
         ('crm', 'CRM'),
         ('agent', 'AI agent (chat-relayed)'),
         ('api', 'API'),
+        ('evidence', 'Computed from uploaded data (human-confirmed)'),
     ]
 
     gap_metric = models.ForeignKey(GapAnalysisMetric, on_delete=models.CASCADE, related_name='measurements')
@@ -160,6 +161,43 @@ class GapMetricMeasurement(models.Model):
 
     def __str__(self):
         return f"{self.gap_metric.metric}: {self.value} ({self.measured_at:%Y-%m-%d})"
+
+
+class GapMeasurementProposal(models.Model):
+    """A gap metric value an agent computed from an uploaded data file,
+    waiting for a person to confirm it. Only confirmation creates a
+    GapMetricMeasurement (source='evidence'), so an AI-computed number never
+    moves or closes a gap on its own. `method` records exactly how the value
+    was computed, so the reviewer can check it."""
+
+    STATUS_CHOICES = [
+        ('pending', 'Pending review'),
+        ('accepted', 'Confirmed'),
+        ('rejected', 'Rejected'),
+    ]
+
+    gap_metric = models.ForeignKey(GapAnalysisMetric, on_delete=models.CASCADE, related_name='measurement_proposals')
+    value = models.FloatField()
+    method = models.TextField(help_text="How the value was computed, e.g. '12 of 40 closed deals are Closed Won'.")
+    source_file_name = models.CharField(max_length=255, blank=True, default='')
+    source_file_id = models.CharField(max_length=64, blank=True, default='')
+    run = models.ForeignKey(
+        'gtm.AgentRun', on_delete=models.SET_NULL, null=True, blank=True, related_name='measurement_proposals',
+    )
+    agent_type = models.CharField(max_length=20, blank=True, default='')
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    measurement = models.ForeignKey(
+        GapMetricMeasurement, on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.gap_metric.metric} = {self.value} ({self.status})"
 
 
 class GapAnalysisSuggestion(models.Model):
@@ -333,6 +371,8 @@ class Notification(models.Model):
         ('task_status', 'Task Status Update'),
         ('invite', 'Workspace Invitation'),
         ('ai_report', 'AI Report Ready'),
+        ('agent_plan', 'Agent Plan Awaiting Approval'),
+        ('agent_question', 'Agent Question'),
         ('system', 'System Message'),
     ]
 

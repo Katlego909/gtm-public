@@ -31,7 +31,7 @@ try:
 except ImportError:
     MONITORING_AVAILABLE = False
 
-AGENT_TYPES = ("portfolio", "resource", "insights")
+AGENT_TYPES = ("portfolio", "resource", "insights", "gtm_engineer")
 
 
 # ================================================================
@@ -50,10 +50,18 @@ def build_insights_context(workspace: Workspace, user=None) -> Dict[str, Any]:
     return {"workspace_name": workspace.name, **build_workspace_insights_digest(workspace, user=user)}
 
 
+def build_engineer_context(workspace: Workspace, user=None) -> Dict[str, Any]:
+    from .models import AssessmentSession
+
+    latest = AssessmentSession.objects.filter(workspace=workspace, is_completed=True).order_by("-created_at").first()
+    return {"workspace_name": workspace.name, "latest_session": latest}
+
+
 CONTEXT_BUILDERS = {
     "portfolio": build_portfolio_context,
     "resource": build_resource_context,
     "insights": build_insights_context,
+    "gtm_engineer": build_engineer_context,
 }
 
 
@@ -480,6 +488,7 @@ def _build_workspace_tools(
     """
     from .agent_actions import build_agent_action_tools
     from .agent_dashboard_tools import build_dashboard_tools
+    from .agent_runs import build_run_starter_tool
     from .web_tools import build_web_tools
 
     if task_refs_sink is None:
@@ -490,10 +499,12 @@ def _build_workspace_tools(
     domain_tools = _build_domain_tools(agent_type, workspace, user=user, task_refs_sink=task_refs_sink)
     if not domain_tools:
         return []
+    assessment_tools = _build_latest_assessment_tools(workspace)
     document_tools = _build_document_tools(agent_type, workspace, user=user, document_refs_sink=document_refs_sink)
     web_tools = build_web_tools(workspace=workspace, user=user)
     action_tools = build_agent_action_tools(workspace, user, task_refs_sink=task_refs_sink, agent_type=agent_type) if user else []
     dashboard_tools = build_dashboard_tools(workspace=workspace, user=user, task_refs_sink=task_refs_sink) if user else []
+    run_tools = [build_run_starter_tool(agent_type, user, workspace=workspace)] if user else []
     consult_tools = (
         _build_consult_tools(
             agent_type, workspace, user=user, _handoff_depth=_handoff_depth,
@@ -509,14 +520,29 @@ def _build_workspace_tools(
         if agent_type in ("portfolio", "insights") else []
     )
     return [
+        *assessment_tools,
         *domain_tools,
         *summary_tools,
         *document_tools,
         *web_tools,
         *action_tools,
         *dashboard_tools,
+        *run_tools,
         *consult_tools,
     ]
+
+
+def _build_latest_assessment_tools(workspace: Workspace) -> List[Any]:
+    """Every workspace agent works from the same facts Charlie does: the
+    workspace's latest completed assessment (scores, the company's own
+    context notes, weak areas) and its scoring-engine diagnosis."""
+    from .ai_chat import _make_get_gtm_assessment_data_tool, _make_get_gtm_diagnosis_tool
+    from .models import AssessmentSession
+
+    latest = AssessmentSession.objects.filter(workspace=workspace, is_completed=True).order_by("-created_at").first()
+    if latest is None:
+        return []
+    return [_make_get_gtm_assessment_data_tool(latest), _make_get_gtm_diagnosis_tool(latest)]
 
 
 def _build_domain_tools(
@@ -626,6 +652,34 @@ def _build_domain_tools(
 
         return [get_score_change, get_activity_summary, get_pending_reviews, get_overdue_tasks]
 
+    if agent_type == "gtm_engineer":
+        from .ai_chat import build_session_context
+        from .data_tools import build_data_tools
+        from .models import ToolRecommendation
+
+        latest = context["latest_session"]
+
+        def get_tool_recommendations() -> str:
+            """List the GTM tools this app recommends for the workspace's
+            weakest assessment categories first (by the latest completed
+            assessment). Use this with web_search when advising on the tool
+            stack -- say which recommendation came from where.
+            """
+            if latest is None:
+                return "This workspace has no completed assessment yet, so there's nothing to rank tools against."
+            categories = sorted(build_session_context(latest)["categories"], key=lambda c: c["score"])
+            lines = []
+            for cat in categories:
+                for rec in ToolRecommendation.objects.filter(category__name=cat["name"]):
+                    lines.append(f"- {cat['name']} ({cat['score']}/5) -- {rec.keyword}: {', '.join(rec.tool_list())}")
+            if not lines:
+                return "No tool recommendations are configured."
+            return "Tool recommendations, weakest category first:\n" + "\n".join(lines)
+
+        from .automations import build_automation_read_tool
+
+        return [get_tool_recommendations, *build_data_tools(workspace=workspace), build_automation_read_tool(workspace)]
+
     return []
 
 
@@ -646,6 +700,21 @@ SYSTEM_INSTRUCTIONS = {
     "insights": (
         "You are Milo, a proactive account-health monitor. Summarize what changed for this client since the last "
         "check-in and flag risks. Be concise: lead with what changed, then what needs attention."
+    ),
+    "gtm_engineer": (
+        "You are Remy, a GTM engineer. You design and instrument the systems that run the GTM motion: lead "
+        "scoring, routing and speed-to-lead SLAs, funnel stage definitions, the metrics behind each gap, and the "
+        "tool stack and automations between them. Every system you design comes with how it will be measured. "
+        "Always start from what the assessment already says: call get_gtm_assessment_data and "
+        "get_gtm_diagnosis first -- the company's answers, its own context notes, and its weak areas describe "
+        "its ICP, motion, and gaps. Design from those; don't make the user repeat them, and don't wait for "
+        "uploaded data to start. When data files exist, use them to calibrate, and compute numbers with "
+        "compute_metric_from_file -- never estimate them. Ask only for what the assessment doesn't cover, and "
+        "never present an assumption as something the company told you: if the assessment doesn't record a "
+        "fact (target industries, buyer roles, deal sizes), say so, mark your proposal as a starting "
+        "suggestion, and ask for the real answer. "
+        "Be specific: real fields, thresholds, owners, and steps. When the user wants something built or rolled out, use start_multi_step_work so they can "
+        "approve the plan before you act."
     ),
 }
 
@@ -683,7 +752,7 @@ def _get_workspace_chat_config(
 
     return types.GenerateContentConfig(
         system_instruction=system_instruction,
-        temperature=0.7,
+        temperature=0.4,
         max_output_tokens=1536,
         thinking_config=types.ThinkingConfig(thinking_budget=0),
         tools=tools or None,
@@ -983,6 +1052,12 @@ SUGGESTED_PROMPTS = {
         "What happened this week?",
         "Do we have any overdue tasks?",
         "What suggestions are pending review?",
+    ],
+    "gtm_engineer": [
+        "Design a lead scoring model for our ICP",
+        "What's our win rate in the uploaded deals data?",
+        "Set up a speed-to-lead SLA and how we'll measure it",
+        "Which tools should our GTM stack add first?",
     ],
 }
 

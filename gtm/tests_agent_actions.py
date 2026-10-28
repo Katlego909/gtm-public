@@ -136,29 +136,24 @@ class AgentActionToolsTests(TestCase):
         self.assertIn("Notified", result)
         self.assertTrue(Notification.objects.filter(recipient=human_milo, title="Heads up").exists())
 
-    @mock.patch("dashboard.views.actions.run_in_background", side_effect=lambda target, *args, **kwargs: target(*args))
-    @mock.patch("gtm.action_item_completion.complete_action_item")
-    def test_assign_task_to_agent_routes_and_triggers_completion(self, mock_complete, mock_run_bg):
-        """run_in_background is patched to run synchronously so the effect
-        is observable immediately. complete_action_item is mocked as a black
-        box (same convention as dashboard.tests_smoke's
-        ActionItemAICompletionTests) -- it owns the actual status/comment
-        write-back, so what's observable here is _complete_action_item_background's
-        own side effects: the run state it records on the task and the
-        activity log."""
-        mock_complete.return_value = {
-            "success": True, "status": "done",
-            "summary": "Drafted the ICP one-pager.", "document_id": None,
-        }
+    @mock.patch("gtm.agent_runs.run_in_background", side_effect=lambda target, *args, **kwargs: target(*args))
+    def test_assign_task_to_agent_routes_and_starts_a_plan(self, mock_run_bg):
+        """run_in_background runs synchronously and Gemini is a scripted
+        fake (see gtm/tests_agent_runs.py): routing starts the routed
+        agent's run, which proposes a plan and waits for approval."""
+        from gtm.tests_agent_runs import _FakeClient, _propose
+
         self.task.session = self.session
         self.task.save()
-        tools = self._tools()
-        result = tools["assign_task_to_agent"](str(self.task.id), "insights")
+        client = _FakeClient([_propose(("create_document", "Digest"))])
+        with mock.patch("gtm.agent_runs._client_or_error", return_value=(client, None, "")):
+            result = self._tools()["assign_task_to_agent"](str(self.task.id), "insights")
         self.assertIn("Routed", result)
         self.assertIn("Milo", result)
         self.task.refresh_from_db()
         self.assertEqual(self.task.assigned_agent_type, "insights")
-        mock_complete.assert_called_once()
+        self.assertEqual(self.task.current_run.agent_type, "insights")
+        self.assertEqual(self.task.current_run.status, "awaiting_approval")
         self.assertEqual(self.task.ai_run_state, "done")
         self.assertIsNotNone(self.task.ai_run_started_at)
 

@@ -66,6 +66,21 @@ urlpatterns = [
     path('action-item/<int:action_id>/comments/add/', views.add_action_item_comment, name='add_action_item_comment'),
     path('action-item/comments/<uuid:comment_id>/delete/', views.delete_action_item_comment, name='delete_action_item_comment'),
     path('refresh-action-items/', views.refresh_action_items, name='refresh_action_items'),
+
+    # Automations
+    path('automations/', views.automations_panel, name='automations_panel'),
+    path('automations/<uuid:automation_id>/toggle/', views.automation_toggle, name='automation_toggle'),
+    path('automations/<uuid:automation_id>/delete/', views.automation_delete, name='automation_delete'),
+
+    # Agent runs (plan approval and progress)
+    path('agent-runs/<uuid:run_id>/', views.agent_run_panel, name='agent_run_panel'),
+    path('agent-runs/<uuid:run_id>/approve/', views.agent_run_approve, name='agent_run_approve'),
+    path('agent-runs/<uuid:run_id>/reject/', views.agent_run_reject, name='agent_run_reject'),
+    path('agent-runs/<uuid:run_id>/cancel/', views.agent_run_cancel, name='agent_run_cancel'),
+    path('agent-runs/<uuid:run_id>/retry/', views.agent_run_retry, name='agent_run_retry'),
+    path('agent-runs/<uuid:run_id>/questions/<uuid:question_id>/answer/', views.agent_run_answer, name='agent_run_answer'),
+    path('agent-runs/<uuid:run_id>/measurements/<int:proposal_id>/confirm/', views.agent_run_confirm_measurement, name='agent_run_confirm_measurement'),
+    path('agent-runs/<uuid:run_id>/measurements/<int:proposal_id>/reject/', views.agent_run_reject_measurement, name='agent_run_reject_measurement'),
     
     # Profile URL
     path('profile/', views.profile, name='profile'),

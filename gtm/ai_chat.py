@@ -214,7 +214,7 @@ def _build_consult_tools_for_session(
             agent_type, session, user, _handoff_depth,
             task_refs_sink=task_refs_sink, document_refs_sink=document_refs_sink,
         )
-        for agent_type in ("portfolio", "resource", "insights")
+        for agent_type in ("portfolio", "resource", "insights", "gtm_engineer")
     ]
 
 
@@ -227,15 +227,21 @@ def _make_get_gtm_assessment_data_tool(session: AssessmentSession):
     def get_gtm_assessment_data() -> str:
         """Retrieves the complete GTM assessment results for the company.
         Includes: Overall score (0-100), Maturity Stage (e.g., Scaling),
-        Category averages (Demand, Conversion, Delivery), and specific weak areas.
+        Category averages (Demand, Conversion, Delivery), specific weak areas,
+        and the context the company wrote alongside its answers (who they
+        sell to, how their process works).
         Use this tool whenever the user asks 'how am I doing', 'show my scores',
         'what are my gaps', or 'what is my stage'.
         """
         try:
             context = build_session_context(session)
+            workspace = session.workspace
+            not_stated = "not stated in the assessment"
             report = [
                 f"Company: {context['company_name']}",
-                f"Industry: {context['industry']}",
+                f"Industry: {session.industry or (workspace.industry if workspace else '') or not_stated}",
+                f"Company size: {(workspace.company_size if workspace else '') or not_stated}",
+                f"Website: {(workspace.website if workspace else '') or not_stated}",
                 f"Overall GTM Score: {context['overall_score']}/100",
                 f"Stage: {context['stage']} ({context['headline']})",
                 "Category Scores:",
@@ -246,6 +252,16 @@ def _make_get_gtm_assessment_data_tool(session: AssessmentSession):
                 report.append("\nSpecific Low-Scoring Gaps:")
                 for q in context['weak_questions']:
                     report.append(f"  - [{q['id_code']}] {q['text']} (Score: {q['score']}/5)")
+            if context['context_notes']:
+                report.append("\nContext the company gave with its answers:")
+                report.extend(f"  - {note}" for note in context['context_notes'])
+            else:
+                report.append("\nThe company added no written context to its answers.")
+            report.append(
+                "\nThis is everything the assessment records. Anything not listed here (e.g. target "
+                "industries, buyer roles, deal sizes, lead sources) was not stated -- never present it as "
+                "something the company said."
+            )
             return "\n".join(report)
         except Exception as e:
             return f"Error retrieving assessment: {str(e)}"
@@ -461,6 +477,7 @@ def _build_session_tools(
 
     from .agent_actions import build_agent_action_tools
     from .agent_dashboard_tools import build_dashboard_tools
+    from .agent_runs import build_run_starter_tool
     from .web_tools import build_web_tools
 
     return [
@@ -477,6 +494,7 @@ def _build_session_tools(
             build_agent_action_tools(session.workspace, user, task_refs_sink=task_refs_sink, agent_type="gtm_strategist")
             if session.workspace and user else []
         ),
+        *([build_run_starter_tool("gtm_strategist", user, session=session, workspace=session.workspace)] if user else []),
         *(
             _build_consult_tools_for_session(
                 session, user=user, _handoff_depth=_handoff_depth,
@@ -541,6 +559,10 @@ never reorder them or substitute your own diagnosis. Never state peer benchmarks
 figures, or budget splits that no tool returned; if the user asks how they compare to peers and no tool
 has that data, say so plainly (web_search can find published industry benchmarks if they want them).
 
+Never present an assumption as something the company told you. If a fact you need (target industries,
+buyer roles, deal sizes, lead sources) isn't in a tool result, say it isn't recorded, label anything you
+propose in its place as your suggestion, and ask for the real answer.
+
 Focus on: their strongest areas, critical gaps, and specific next steps they can take immediately.
 Keep responses conversational and avoid lengthy lists. End with a specific next step."""
 
@@ -568,7 +590,7 @@ def _get_chat_config(
 
     return types.GenerateContentConfig(
         system_instruction=system_instruction,
-        temperature=0.8,
+        temperature=0.4,
         max_output_tokens=2048,
         thinking_config=types.ThinkingConfig(thinking_budget=0),
         tools=tools or None,

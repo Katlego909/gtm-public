@@ -45,7 +45,18 @@ def _agent_name_hint(candidate: str, *, action: str = "consult") -> Optional[str
     return None
 
 
-def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]] = None, agent_type: str = "") -> List[Any]:
+def _record_outcome(sink: Optional[List[Any]], tool: str, **ref: Any) -> None:
+    """Record that a write tool really changed something, so an agent run
+    can tell a completed step from a refused or failed call (every tool
+    returns a plain string either way). A no-op when `sink is None`."""
+    if sink is not None:
+        sink.append({"tool": tool, **ref})
+
+
+def build_agent_action_tools(
+    workspace, user, task_refs_sink: Optional[List[Any]] = None, agent_type: str = "",
+    outcomes_sink: Optional[List[Any]] = None,
+) -> List[Any]:
     """Build the shared set of workspace-collaboration tools available to
     any agent chatting on behalf of `user` within `workspace`.
 
@@ -57,7 +68,10 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
     ChatMessage.task_refs) independent of whatever text the model wrote.
 
     `agent_type` identifies which agent is using these tools, so comments it
-    posts are shown as written by that agent rather than by `user`."""
+    posts are shown as written by that agent rather than by `user`.
+
+    `outcomes_sink`, when given, gets one entry per successful write (see
+    _record_outcome) -- gtm/agent_runs.py uses it to mark plan steps done."""
     from dashboard.parsers import _resolve_assignee, log_workspace_activity
     from dashboard.utils_notifications import send_notification
     from dashboard.views.helpers import _upsert_gap_metric_in_scope
@@ -82,6 +96,7 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
             notification_type='ai_report', level='info',
             title=title, message=message, link=link,
         )
+        _record_outcome(outcomes_sink, "notify_teammate", user_id=recipient.id)
         return f"Notified {recipient.get_full_name() or recipient.username}."
 
     def comment_on_task(action_item_id: str, comment_text: str) -> str:
@@ -104,6 +119,7 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
             f"{user.get_full_name() or user.username} commented on task '{item.note[:80]}'.",
             object_type='action_item', object_id=item.id,
         )
+        _record_outcome(outcomes_sink, "comment_on_task", task_id=item.id)
         return f'Commented on "{item.note[:50]}".'
 
     def assign_task(action_item_id: str, assignee: str) -> str:
@@ -126,13 +142,15 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
             return hint or f"I couldn't find a teammate matching '{assignee}' in this workspace."
         item.assigned_to = recipient
         item.save()
+        _record_outcome(outcomes_sink, "assign_task", task_id=item.id, user_id=recipient.id)
         return f'Assigned "{item.note[:50]}" to {recipient.get_full_name() or recipient.username}.'
 
     def assign_task_to_agent(action_item_id: str, agent_type: str) -> str:
-        """Route a task (ActionItem) to one of the 4 fellow AI agents so they
-        actually attempt it -- this both labels the task as theirs (visible
-        on the Tasks board) and kicks off their real completion attempt in
-        the background, the same as a human clicking "Complete with AI".
+        """Route a task (ActionItem) to a fellow AI agent so they work on it
+        -- this labels the task as theirs (visible on the Tasks board) and
+        starts their work in the background, the same as a human clicking
+        "Complete with AI": they investigate and propose a plan that a
+        person approves before anything changes.
         `agent_type` must be one of: gtm_strategist (Charlie), portfolio
         (Nora), resource (Theo), insights (Milo). Use find_tasks first if
         you don't already have this task's real ID. Only usable if the
@@ -156,6 +174,7 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
         agent_name = AGENT_DIRECTORY[agent_type]['name']
         item.assigned_agent_type = agent_type
         item.save(update_fields=['assigned_agent_type'])
+        _record_outcome(outcomes_sink, "assign_task_to_agent", task_id=item.id, agent_type=agent_type)
         log_workspace_activity(
             workspace, user, 'task_moved',
             f"{user.get_full_name() or user.username} routed task '{item.note[:80]}' to {agent_name}.",
@@ -170,8 +189,8 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
         from dashboard.views.actions import start_ai_completion
 
         if not start_ai_completion(item, user.id, workspace.id):
-            return f"Routed \"{item.note[:50]}\" to {agent_name} -- they're already working on it."
-        return f'Routed "{item.note[:50]}" to {agent_name} -- they\'re attempting it now.'
+            return f"Routed \"{item.note[:50]}\" to {agent_name} -- they're already working on it or waiting for review."
+        return f'Routed "{item.note[:50]}" to {agent_name} -- they\'re drafting a plan, which a person approves before they act.'
 
     def find_tasks(query: str = "", status: str = "", assignee: str = "", created_on: str = "") -> str:
         """Search for tasks (ActionItems) in this workspace and get back
@@ -232,6 +251,8 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
         Customer Success, Product Marketing, Sales Velocity, Marketing ROI.
         `metric` must be one of: Monthly Qualified Leads, Average Deal Size,
         Net Revenue Retention, Product Qualified Leads, Win Rate, CAC Payback Period.
+        `current` must be a value you actually have from data or the user;
+        if nobody has measured it yet, pass 0 -- never estimate it.
         """
         denial = _check_workspace_permission(workspace, user)
         if denial:
@@ -249,6 +270,7 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
             },
             source='AI',
         )
+        _record_outcome(outcomes_sink, "escalate_gap", metric=metric)
         return f"Flagged '{metric}' as a gap for the team to review."
 
     def recommend_resource(resource_name: str, session_id: str, rationale: str) -> str:
@@ -270,6 +292,7 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
             session=session, resource=resource,
             defaults={'rationale': rationale[:255]},
         )
+        _record_outcome(outcomes_sink, "recommend_resource", resource_id=resource.id)
         return f'Recommended "{resource.name}" for this assessment.'
 
     def _hubspot_or_message(workspace):
@@ -336,6 +359,7 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
         except HubSpotAPIError as exc:
             return f"HubSpot write failed: {exc}"
         company_name = company.get('properties', {}).get('name', company_identifier)
+        _record_outcome(outcomes_sink, "log_insight_to_crm", company=company_name)
         return f'Logged a note to HubSpot on "{company_name}".'
 
     def create_crm_follow_up_task(action_item_id: str, company_identifier: str, due_date: str = "") -> str:
@@ -382,6 +406,7 @@ def build_agent_action_tools(workspace, user, task_refs_sink: Optional[List[Any]
         item.crm_synced_at = timezone.now()
         item.save(update_fields=['external_crm_task_id', 'crm_sync_status', 'crm_synced_at'])
         company_name = company.get('properties', {}).get('name', company_identifier)
+        _record_outcome(outcomes_sink, "create_crm_follow_up_task", task_id=item.id)
         return f'{action_verb} "{subject}" to HubSpot as a task on {company_name}.'
 
     return [

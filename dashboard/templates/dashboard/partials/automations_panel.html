@@ -1,0 +1,45 @@
+<div id="automations-panel" class="p-6 sm:p-8">
+    <h2 class="text-lg font-semibold text-gray-900">Automations</h2>
+    <p class="text-sm text-gray-600 mb-4">Rules that keep running in {{ workspace.name }}: on a schedule, while a gap metric is off target, or when tasks are overdue. Agents set these up only through a plan you approve. Ask Remy to design one.</p>
+
+    {% if error %}
+        <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">{{ error }}</div>
+    {% endif %}
+
+    {% if rows %}
+        <ul class="space-y-2">
+            {% for row in rows %}
+                <li class="rounded-lg border border-gray-200 p-3{% if not row.a.is_active %} bg-gray-50{% endif %}">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <p class="text-sm font-medium text-gray-900">{{ row.a.name }}{% if not row.a.is_active %} <span class="ml-1 px-1.5 py-0.5 text-[11px] rounded border border-gray-200 text-gray-600">Paused</span>{% endif %}</p>
+                            <p class="text-xs text-gray-600">{{ row.summary|capfirst }}</p>
+                            {% if row.a.description %}<p class="mt-1 text-xs text-gray-500">{{ row.a.description }}</p>{% endif %}
+                            <p class="mt-1 text-xs text-gray-500">
+                                {% if row.a.is_active %}Next run {{ row.a.next_run_at|date:"M d, H:i" }}{% endif %}
+                                {% if row.last_run %} &middot; Last run {{ row.last_run.ran_at|date:"M d" }}: {{ row.last_run.get_outcome_display|lower }}{% if row.last_run.detail %} ({{ row.last_run.detail|truncatechars:90 }}){% endif %}{% endif %}
+                                {% if row.a.agent_type %} &middot; Set up by an agent, approved by {{ row.a.approved_by.get_full_name|default:row.a.approved_by.username|default:"a reviewer" }}{% endif %}
+                            </p>
+                        </div>
+                        {% if can_manage %}
+                            <div class="flex flex-shrink-0 gap-1">
+                                <button type="button" hx-post="{% url 'automation_toggle' row.a.id %}?workspace={{ workspace.id }}" hx-target="#automations-panel" hx-swap="outerHTML"
+                                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                                        class="px-2.5 py-1 text-xs font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">{% if row.a.is_active %}Pause{% else %}Resume{% endif %}</button>
+                                <button type="button" hx-post="{% url 'automation_delete' row.a.id %}?workspace={{ workspace.id }}" hx-target="#automations-panel" hx-swap="outerHTML"
+                                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}' hx-confirm="Delete the automation '{{ row.a.name }}'?"
+                                        class="px-2.5 py-1 text-xs font-medium rounded-lg border border-red-200 text-red-700 hover:bg-red-50">Delete</button>
+                            </div>
+                        {% endif %}
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="text-sm text-gray-500">No automations yet.</p>
+    {% endif %}
+
+    <div class="mt-6 flex">
+        <button type="button" onclick="closeModal()" class="ml-auto px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">Close</button>
+    </div>
+</div>

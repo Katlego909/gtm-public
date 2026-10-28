@@ -141,6 +141,12 @@ class WorkspaceMembership(models.Model):
         return self.role in ['admin', 'manager', 'funti3r_consultant']
 
     @property
+    def can_approve_agent_runs(self):
+        """Check if user can approve an agent's plan before it acts (same
+        roles that can assign tasks, since an approved plan assigns work)"""
+        return self.can_assign_tasks
+
+    @property
     def can_manage_integrations(self):
         """Check if user can configure/revoke workspace integrations (CRM credentials, etc.)"""
         return self.role in ['admin', 'funti3r_consultant']

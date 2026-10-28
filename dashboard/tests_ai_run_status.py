@@ -13,7 +13,7 @@ from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from dashboard.views.actions import _complete_action_item_background, start_ai_completion
+from dashboard.views.actions import start_ai_completion
 from dashboard.views.helpers import action_item_ai_lock_key
 from gtm.ai_services import _acquire_lock, _release_lock
 from gtm.models import ActionItem, AssessmentSession
@@ -61,7 +61,7 @@ class AIRunStatusTests(TestCase):
 
     def test_start_records_running_without_touching_edited_date(self):
         before = ActionItem.objects.get(pk=self.item.pk).updated_at
-        with mock.patch("dashboard.views.actions.run_in_background"):
+        with mock.patch("gtm.agent_runs.run_in_background"):
             self.assertTrue(start_ai_completion(self.item, self.user.id, self.workspace.id))
             self.addCleanup(_release_lock, action_item_ai_lock_key(self.item.id))
             # A second start while the first holds the lock is refused.
@@ -80,20 +80,23 @@ class AIRunStatusTests(TestCase):
         self._mark_running(seconds_ago=400)
         self.assertEqual(self._status()["state"], "stale")
 
+    def _start_synchronously(self):
+        with mock.patch("gtm.agent_runs.run_in_background", side_effect=lambda target, *a, **k: target(*a)):
+            start_ai_completion(self.item, self.user.id, self.workspace.id)
+
     def test_failed_run_records_error(self):
-        with mock.patch("gtm.action_item_completion.complete_action_item",
-                        return_value={"success": False, "error": "Out of AI credits."}):
-            _complete_action_item_background(self.item.id, self.user.id, self.workspace.id)
+        with mock.patch("gtm.agent_runs._client_or_error", return_value=(None, None, "Out of AI credits.")):
+            self._start_synchronously()
         data = self._status()
         self.assertEqual(data["state"], "failed")
         self.assertEqual(data["error"], "Out of AI credits.")
 
     def test_crashed_run_records_failure(self):
-        with mock.patch("gtm.action_item_completion.complete_action_item", side_effect=RuntimeError("boom")):
-            _complete_action_item_background(self.item.id, self.user.id, self.workspace.id)
+        with mock.patch("gtm.agent_runs._plan", side_effect=RuntimeError("boom")):
+            self._start_synchronously()
         self.item.refresh_from_db()
         self.assertEqual(self.item.ai_run_state, "failed")
-        self.assertEqual(self.item.ai_run_error, "Unexpected error completing this task.")
+        self.assertEqual(self.item.ai_run_error, "Ran into a technical error. You can retry this run.")
 
     def test_board_shows_running_card_locked(self):
         self._mark_running()

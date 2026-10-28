@@ -251,6 +251,7 @@
                     {% if active_agent_type == 'portfolio' %}Trends across every assessment in this workspace.
                     {% elif active_agent_type == 'resource' %}Matches your resource library against current gaps.
                     {% elif active_agent_type == 'insights' %}A proactive digest of activity, scores, and pending reviews.
+                    {% elif active_agent_type == 'gtm_engineer' %}Designs the systems behind your GTM motion and measures them from your real data.
                     {% endif %}
                 </p>
 
@@ -309,6 +310,7 @@
                             {% if active_agent_type == 'portfolio' %}Hi, I'm {{ active_agent_name }}, your Portfolio Agent. Ask me about trends across this workspace's assessments.
                             {% elif active_agent_type == 'resource' %}Hi, I'm {{ active_agent_name }}, your Resource Agent. Ask me about the resource library or coverage gaps.
                             {% elif active_agent_type == 'insights' %}Hi, I'm {{ active_agent_name }}, your Insights Agent. Ask me what changed recently, or click Refresh Insights for a digest.
+                            {% elif active_agent_type == 'gtm_engineer' %}Hi, I'm {{ active_agent_name }}, your GTM Engineer. I design lead scoring, routing, SLAs and the metrics behind them, and I can compute numbers from your uploaded data. Anything I build goes to you as a plan to approve first.
                             {% endif %}
                         </div>
                     </div>

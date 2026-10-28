@@ -67,6 +67,17 @@ from .workspace_agent_api import (
     document_export,
     document_list_api,
 )
+from .automations import automation_delete, automation_toggle, automations_panel
+from .agent_runs import (
+    agent_run_answer,
+    agent_run_approve,
+    agent_run_cancel,
+    agent_run_confirm_measurement,
+    agent_run_panel,
+    agent_run_reject_measurement,
+    agent_run_reject,
+    agent_run_retry,
+)
 from .actions import (
     add_action_item_comment,
     add_edit_action_item,

@@ -50,9 +50,7 @@ from gtm.models import (
 )
 from gtm.models_workspace import Workspace, WorkspaceMembership, WorkspaceInvitation, WorkspaceActivityEvent
 from gtm.ai_chat import get_suggested_prompts, process_chat_message
-from gtm.ai_services import _acquire_lock, _release_lock
 from gtm.decorators import workspace_permission_required, workspace_member_required
-from gtm.utils_async import run_in_background
 from gtm.utils_logging import log_ai_error
 from dashboard.models import Channel, ChannelAnalytics, GapAnalysisMetric, GapAnalysisSuggestion, Resource, Notification, UserSettings
 from dashboard.forms import GapAnalysisMetricForm, ActionItemForm, UserProfileForm, UserSettingsForm
@@ -82,7 +80,6 @@ from ..document_processors import (
 # ================================================================
 
 from .helpers import (
-    action_item_ai_lock_key,
     ai_run_display_state,
     build_task_board_context,
     _ai_gap_suggestions_from_assessment,
@@ -441,82 +438,25 @@ def _resolve_action_item_for_user(request, pk):
     return item, current_workspace, None
 
 
-# How long a completion run may hold its lock. Past this the card stops
-# showing "working" and offers a retry (see helpers.ai_run_display_state).
-AI_COMPLETION_LOCK_TTL_SECONDS = 180
-
-
-def _set_ai_run(action_item_id, **fields):
-    """Write AI-run fields with update() so the card's "Edited" date and the
-    rest of the row are untouched."""
-    ActionItem.objects.filter(pk=action_item_id).update(**fields)
-
-
-def _complete_action_item_background(action_item_id, user_id, workspace_id):
-    """Background job: run the real completion turn and record its outcome
-    on the ActionItem for the polling endpoint and the board to read."""
-    from gtm.action_item_completion import complete_action_item
-
-    lock_key = action_item_ai_lock_key(action_item_id)
-    try:
-        action_item = ActionItem.objects.select_related('session').get(pk=action_item_id)
-        user = User.objects.filter(pk=user_id).first()
-        result = complete_action_item(action_item, user=user)
-        if result.get("success"):
-            _set_ai_run(action_item_id, ai_run_state='done', ai_run_error='')
-            log_workspace_activity(
-                Workspace.objects.filter(id=workspace_id).first() if workspace_id else None,
-                user,
-                'task_moved',
-                f"AI completed task '{action_item.note[:80]}'.",
-                object_type='action_item',
-                object_id=action_item.id,
-                metadata={'status': result["status"], 'ai_completed': True},
-                session=action_item.session,
-            )
-            if result["status"] == "done":
-                workspace = Workspace.objects.filter(id=workspace_id).first() if workspace_id else None
-                recipients = {r for r in (action_item.created_by, action_item.assigned_to) if r and r != user}
-                for recipient in recipients:
-                    send_notification(
-                        recipient=recipient,
-                        sender=user,
-                        workspace=workspace,
-                        notification_type='task_status',
-                        level='success',
-                        title="Task Completed by AI",
-                        message=f"AI completed your task: {action_item.note[:50]}",
-                        link=f"/dashboard/tasks/?workspace={workspace.id if workspace else ''}"
-                    )
-        else:
-            _set_ai_run(action_item_id, ai_run_state='failed', ai_run_error=(result.get("error") or "Unknown error.")[:240])
-    except Exception as e:
-        log_ai_error(
-            "Action item AI completion background job failed",
-            e,
-            extra={"action_item_id": action_item_id},
-        )
-        _set_ai_run(action_item_id, ai_run_state='failed', ai_run_error="Unexpected error completing this task.")
-    finally:
-        _release_lock(lock_key)
-
-
 def start_ai_completion(item, user_id, workspace_id):
-    """Start a background "Complete with AI" run for `item`, recording it on
-    the task so every worker and the board can see it. Returns False if a
-    run is already in flight. The single entry point for the board button
-    and the agents' assign_task_to_agent tool."""
-    if not _acquire_lock(action_item_ai_lock_key(item.id), ttl_seconds=AI_COMPLETION_LOCK_TTL_SECONDS):
-        return False
-    _set_ai_run(item.id, ai_run_state='running', ai_run_started_at=timezone.now(), ai_run_error='')
-    run_in_background(
-        _complete_action_item_background,
-        item.id,
-        user_id,
-        workspace_id,
-        name=f"action_item_complete:{item.id}",
-    )
-    return True
+    """Start agent work on `item` with "Complete with AI" or an agent's
+    assign_task_to_agent tool: a run for the agent the task is routed to,
+    which investigates and proposes a plan that a person approves before
+    anything changes (see gtm/agent_runs.py). Resumes a stalled run instead
+    of starting a second one. Returns False if a run is already in flight or
+    waiting on a person."""
+    from gtm.action_item_completion import completion_agent_type
+    from gtm.agent_runs import launch, start_run
+    from gtm.models import AgentRun
+
+    run = item.current_run
+    if run is not None:
+        if run.status in AgentRun.NEEDS_HUMAN_STATUSES:
+            return False
+        if run.status in AgentRun.ACTIVE_STATUSES:
+            return launch(run, "execute" if run.approved_at else "plan")
+    user = User.objects.filter(pk=user_id).first()
+    return start_run(agent_type=completion_agent_type(item), goal=item.note, user=user, action_item=item) is not None
 
 
 @login_required
@@ -537,7 +477,11 @@ def complete_action_item_ai(request, pk):
     if item.status != 'todo':
         return JsonResponse({'success': False, 'error': 'This item is not in To Do.'}, status=400)
 
-    start_ai_completion(item, request.user.id, current_workspace.id if current_workspace else None)
+    if not start_ai_completion(item, request.user.id, current_workspace.id if current_workspace else None):
+        return JsonResponse(
+            {'success': False, 'error': 'An agent is already working on this task or waiting for review.'},
+            status=409,
+        )
     return JsonResponse({'success': True, 'status': 'running'})
 
 
@@ -549,10 +493,13 @@ def complete_action_item_ai_status(request, pk):
     if error_response:
         return error_response
 
+    run = item.current_run
     return JsonResponse({
         'success': True,
         'state': ai_run_display_state(item) or 'idle',
         'task_status': item.status,
+        'run_status': run.status if run else '',
+        'agent_name': run.agent_name if run else '',
         'error': item.ai_run_error,
     })
 

@@ -222,8 +222,8 @@ class TaskCompletionNotificationTests(TestCase):
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class AICompletionNotificationTests(TestCase):
-    """dashboard/views/actions.py::_complete_action_item_background must
-    notify the creator/assignee once the AI turn actually finishes an item."""
+    """gtm/agent_runs.py::_write_back_to_task must notify the creator/
+    assignee once an agent run actually finishes an item, and only then."""
 
     @classmethod
     def setUpTestData(cls):
@@ -258,24 +258,28 @@ class AICompletionNotificationTests(TestCase):
         defaults.update(kwargs)
         return ActionItem.objects.create(**defaults)
 
-    def test_successful_ai_completion_notifies_creator(self):
-        from dashboard.views.actions import _complete_action_item_background
+    def _finish_run(self, item, status, step_status):
+        from gtm.agent_runs import _write_back_to_task
+        from gtm.models import AgentRun
 
+        run = AgentRun.objects.create(
+            agent_type="gtm_strategist", goal=item.note, status=status, requested_by=self.triggerer,
+            session=self.session, workspace=self.workspace, action_item=item,
+            plan=[{"id": "s1", "kind": "create_subtasks", "title": "Tasks", "detail": "", "status": step_status,
+                   "result": "", "refs": []}],
+        )
+        _write_back_to_task(run)
+
+    def test_successful_ai_completion_notifies_creator(self):
         item = self._make_item()
-        with mock.patch("gtm.action_item_completion.complete_action_item") as mock_complete:
-            mock_complete.return_value = {"success": True, "status": "done", "summary": "Done."}
-            _complete_action_item_background(item.id, self.triggerer.id, self.workspace.id)
+        self._finish_run(item, "completed", "done")
 
         notification = Notification.objects.get(recipient=self.creator, notification_type='task_status')
-        self.assertIn("AI", notification.title)
+        self.assertIn("Charlie", notification.title)
 
     def test_partial_ai_completion_does_not_notify(self):
-        from dashboard.views.actions import _complete_action_item_background
-
         item = self._make_item()
-        with mock.patch("gtm.action_item_completion.complete_action_item") as mock_complete:
-            mock_complete.return_value = {"success": True, "status": "doing", "summary": "Partial."}
-            _complete_action_item_background(item.id, self.triggerer.id, self.workspace.id)
+        self._finish_run(item, "failed", "failed")
 
         self.assertFalse(Notification.objects.filter(notification_type='task_status').exists())
 

@@ -1,0 +1,207 @@
+<div id="agent-run-panel" class="p-6 sm:p-8"
+     {% if is_active %}hx-get="{% url 'agent_run_panel' run.id %}" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+    <div class="flex items-start justify-between gap-4 mb-1">
+        <div>
+            <p class="text-xs font-medium uppercase tracking-wide text-gray-500">{{ run.agent_name }}</p>
+            <h2 class="text-lg font-semibold text-gray-900">{{ run.goal|truncatechars:160 }}</h2>
+        </div>
+        <span class="flex-shrink-0 px-2 py-1 text-xs font-medium rounded-md border
+            {% if run.status == 'awaiting_approval' or run.status == 'waiting_for_input' %}border-amber-200 bg-amber-50 text-amber-800
+            {% elif run.status == 'completed' %}border-green-200 bg-green-50 text-green-800
+            {% elif run.status == 'failed' %}border-red-200 bg-red-50 text-red-800
+            {% elif is_active %}border-indigo-200 bg-indigo-50 text-indigo-800
+            {% else %}border-gray-200 bg-gray-50 text-gray-700{% endif %}">
+            {{ run.get_status_display }}
+        </span>
+    </div>
+    <p class="text-xs text-gray-500 mb-4">
+        Requested by {{ run.requested_by.get_full_name|default:run.requested_by.username|default:"someone" }} &middot; {{ run.created_at|date:"M d, H:i" }}
+        {% if run.approved_by %} &middot; Approved by {{ run.approved_by.get_full_name|default:run.approved_by.username }}{% endif %}
+    </p>
+
+    {% if error %}
+        <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="alert">{{ error }}</div>
+    {% endif %}
+
+    {% if is_stalled %}
+        <div class="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800" role="status">
+            This run stopped responding. Retry to pick up where it left off.
+        </div>
+    {% elif run.status == 'planning' %}
+        <div class="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-800" role="status">
+            {{ run.agent_name }} is looking into this and drafting a plan. Nothing changes until you approve it.
+        </div>
+    {% elif run.status == 'running' %}
+        <div class="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-800" role="status">
+            {{ run.agent_name }} is carrying out the approved plan ({{ run.done_step_count }} of {{ run.active_steps|length }} steps done).
+        </div>
+    {% elif run.status == 'failed' %}
+        <div class="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800" role="status">{{ run.error|default:"The run stopped before finishing." }}</div>
+    {% endif %}
+
+    {% if run.plan_summary %}
+        <p class="text-sm text-gray-700 mb-4">{{ run.plan_summary }}</p>
+    {% endif %}
+
+    {% if run.status == 'awaiting_approval' and can_review %}
+        <form hx-post="{% url 'agent_run_approve' run.id %}" hx-target="#agent-run-panel" hx-swap="outerHTML">
+            {% csrf_token %}
+            <p class="text-sm font-medium text-gray-800 mb-2">Proposed plan. Untick any step you don't want, then approve.</p>
+            <ol class="space-y-2 mb-4">
+                {% for step in steps %}
+                    <li class="rounded-lg border border-gray-200 p-3">
+                        <label class="flex items-start gap-3 cursor-pointer">
+                            <input type="checkbox" name="keep_step" value="{{ step.id }}" checked class="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600">
+                            <span class="min-w-0">
+                                <span class="flex items-center gap-2">
+                                    <span class="px-1.5 py-0.5 text-[11px] font-medium rounded border border-gray-200 bg-gray-50 text-gray-600" title="{{ step.kind_help }}">{{ step.kind_label }}</span>
+                                    <span class="text-sm font-medium text-gray-900">{{ step.title }}</span>
+                                </span>
+                                {% if step.detail %}<span class="block mt-1 text-sm text-gray-600 whitespace-pre-line">{{ step.detail }}</span>{% endif %}
+                            </span>
+                        </label>
+                    </li>
+                {% endfor %}
+            </ol>
+            <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">Approve and run</button>
+        </form>
+
+        <form hx-post="{% url 'agent_run_reject' run.id %}" hx-target="#agent-run-panel" hx-swap="outerHTML" class="mt-5 pt-4 border-t border-gray-100">
+            {% csrf_token %}
+            <label for="run-feedback-{{ run.id }}" class="block text-sm font-medium text-gray-800 mb-1">Not quite right?</label>
+            <textarea id="run-feedback-{{ run.id }}" name="feedback" rows="2" placeholder="What should change? For example: skip the CRM note, and give the onboarding checklist to Priya."
+                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+            <div class="mt-2 flex flex-wrap gap-2">
+                <button type="submit" name="revise" value="1" class="px-4 py-2 text-sm font-medium rounded-lg border border-indigo-200 text-indigo-700 hover:bg-indigo-50">Send back with feedback</button>
+                <button type="submit" name="revise" value="0" class="px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Dismiss plan</button>
+            </div>
+        </form>
+    {% elif steps %}
+        {% if run.status == 'awaiting_approval' %}
+            <p class="text-sm text-gray-600 mb-2">Waiting for a workspace admin or manager to approve this plan.</p>
+        {% endif %}
+        <ol class="space-y-2">
+            {% for step in steps %}
+                <li class="rounded-lg border border-gray-200 p-3{% if step.status == 'skipped' %} opacity-60{% endif %}">
+                    <div class="flex items-center justify-between gap-2">
+                        <span class="flex items-center gap-2 min-w-0">
+                            <span class="px-1.5 py-0.5 text-[11px] font-medium rounded border border-gray-200 bg-gray-50 text-gray-600">{{ step.kind_label }}</span>
+                            <span class="text-sm font-medium text-gray-900">{{ step.title }}</span>
+                        </span>
+                        <span class="flex-shrink-0 text-xs font-medium
+                            {% if step.status == 'done' %}text-green-700{% elif step.status == 'failed' %}text-red-700{% elif step.status == 'skipped' %}text-gray-500{% else %}text-gray-600{% endif %}">
+                            {% if step.status == 'done' %}Done{% elif step.status == 'failed' %}Not done{% elif step.status == 'skipped' %}Skipped{% else %}To do{% endif %}
+                        </span>
+                    </div>
+                    {% if step.detail %}<p class="mt-1 text-sm text-gray-600 whitespace-pre-line">{{ step.detail }}</p>{% endif %}
+                    {% if step.produced %}
+                        <ul class="mt-2 space-y-1">
+                            {% for item in step.produced %}
+                                <li class="text-xs text-gray-700">
+                                    {% if item.kind == 'document' %}
+                                        <a href="/dashboard/documents/{{ item.obj.id }}/export/pdf/{% if run.workspace_id %}?workspace={{ run.workspace_id }}{% elif run.session_id %}?session_id={{ run.session_id }}{% endif %}" target="_blank" class="text-indigo-700 underline">{{ item.obj.title }}</a>
+                                    {% else %}
+                                        Task: {{ item.obj.note|truncatechars:90 }}
+                                    {% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% elif step.result and step.status != 'done' %}
+                        <p class="mt-1 text-xs text-gray-500">{{ step.result|truncatechars:240 }}</p>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ol>
+    {% endif %}
+
+    {% if questions %}
+        <div class="mt-5 pt-4 border-t border-gray-100 space-y-3">
+            <p class="text-sm font-medium text-gray-800">Questions from {{ run.agent_name }}</p>
+            {% for entry in questions %}
+                <div class="rounded-lg border border-gray-200 p-3">
+                    <p class="text-xs text-gray-500">To {{ entry.q.asked_to.get_full_name|default:entry.q.asked_to.username }}</p>
+                    <p class="text-sm text-gray-900 whitespace-pre-line">{{ entry.q.question }}</p>
+                    {% if entry.q.answer %}
+                        <p class="mt-2 text-sm text-gray-700 whitespace-pre-line"><span class="font-medium">Answer:</span> {{ entry.q.answer }}</p>
+                    {% elif entry.can_answer %}
+                        <form hx-post="{% url 'agent_run_answer' run.id entry.q.id %}" hx-target="#agent-run-panel" hx-swap="outerHTML" class="mt-2">
+                            {% csrf_token %}
+                            <label for="answer-{{ entry.q.id }}" class="sr-only">Your answer</label>
+                            <textarea id="answer-{{ entry.q.id }}" name="answer" rows="3" required
+                                      class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                            <button type="submit" class="mt-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">Send answer</button>
+                        </form>
+                    {% else %}
+                        <p class="mt-2 text-xs text-gray-500">Waiting for their answer.</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% if proposals %}
+        <div class="mt-5 pt-4 border-t border-gray-100 space-y-3">
+            <p class="text-sm font-medium text-gray-800">Measurements to confirm</p>
+            <p class="text-xs text-gray-500">Computed from uploaded data. A value only counts toward the gap once a person confirms it.</p>
+            {% for proposal in proposals %}
+                <div class="rounded-lg border border-gray-200 p-3">
+                    <p class="text-sm text-gray-900"><span class="font-medium">{{ proposal.gap_metric.metric }}: {{ proposal.value|floatformat:"-2" }}</span> <span class="text-gray-500">(target {{ proposal.gap_metric.target|floatformat:"-2" }})</span></p>
+                    <p class="mt-1 text-xs text-gray-600">{{ proposal.method }}</p>
+                    {% if proposal.status == 'pending' and can_review %}
+                        <div class="mt-2 flex gap-2">
+                            <form hx-post="{% url 'agent_run_confirm_measurement' run.id proposal.id %}" hx-target="#agent-run-panel" hx-swap="outerHTML">
+                                {% csrf_token %}
+                                <button type="submit" class="px-3 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700">Confirm value</button>
+                            </form>
+                            <form hx-post="{% url 'agent_run_reject_measurement' run.id proposal.id %}" hx-target="#agent-run-panel" hx-swap="outerHTML">
+                                {% csrf_token %}
+                                <button type="submit" class="px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Reject</button>
+                            </form>
+                        </div>
+                    {% elif proposal.status == 'pending' %}
+                        <p class="mt-2 text-xs text-gray-500">Waiting for a workspace admin or manager to confirm.</p>
+                    {% else %}
+                        <p class="mt-2 text-xs {% if proposal.status == 'accepted' %}text-green-700{% else %}text-gray-500{% endif %}">{{ proposal.get_status_display }} by {{ proposal.reviewed_by.get_full_name|default:proposal.reviewed_by.username }}</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {% if run.result_summary %}
+        <div class="mt-5 pt-4 border-t border-gray-100">
+            <p class="text-sm font-medium text-gray-800 mb-1">Summary</p>
+            <p class="text-sm text-gray-700 whitespace-pre-line">{{ run.result_summary }}</p>
+        </div>
+    {% endif %}
+
+    {% if run.log %}
+        <details class="mt-5 pt-4 border-t border-gray-100">
+            <summary class="text-sm font-medium text-gray-700 cursor-pointer">Activity log</summary>
+            <ul class="mt-2 space-y-1">
+                {% for entry in run.log %}
+                    <li class="text-xs text-gray-600">
+                        <span class="text-gray-400">{{ entry.at|slice:":16"|cut:"T" }}</span>
+                        {{ entry.event }}{% if entry.tool %}: {{ entry.tool }}{% endif %}{% if entry.by %} by {{ entry.by }}{% endif %}{% if entry.reason %} ({{ entry.reason }}){% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        </details>
+    {% endif %}
+
+    <div class="mt-6 flex flex-wrap items-center gap-2">
+        {% if can_review and run.status == 'failed' or can_review and is_stalled %}
+            <form hx-post="{% url 'agent_run_retry' run.id %}" hx-target="#agent-run-panel" hx-swap="outerHTML">
+                {% csrf_token %}
+                <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">{% if run.approved_at %}Retry remaining steps{% else %}Retry planning{% endif %}</button>
+            </form>
+        {% endif %}
+        {% if can_review and run.status != 'completed' and run.status != 'rejected' and run.status != 'cancelled' %}
+            <form hx-post="{% url 'agent_run_cancel' run.id %}" hx-target="#agent-run-panel" hx-swap="outerHTML">
+                {% csrf_token %}
+                <button type="submit" class="px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50">Stop this run</button>
+            </form>
+        {% endif %}
+        <button type="button" onclick="closeModal()" class="ml-auto px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200">Close</button>
+    </div>
+</div>

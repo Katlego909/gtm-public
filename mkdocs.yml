@@ -33,6 +33,7 @@ nav:
       - Scoring Math: scoring_logic.md
       - Core Logic Deep Dives: core_logic.md
       - AI Engine & Resilience: ai_engine.md
+      - Agent Runs & Automations: agent_runs.md
       - Document Processing: document_processing.md
   - Data Architecture:
       - Data Models: data_models.md

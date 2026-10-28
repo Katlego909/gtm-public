@@ -87,6 +87,21 @@ steps:
       - '--max-instances=4'
       - '--timeout=120'
 
+  # Keep the scheduled automations job (python manage.py run_automations,
+  # triggered hourly by Cloud Scheduler) on the same image as the service.
+  # Only updates an existing job -- creating it is a one-time step, see
+  # docs/agent_runs.md -- so a deploy never creates GCP resources by itself.
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        if gcloud run jobs describe gtm-automations --region=us-west1 >/dev/null 2>&1; then
+          gcloud run jobs update gtm-automations --region=us-west1 --image=gcr.io/$PROJECT_ID/gtm-validator:$SHORT_SHA
+        else
+          echo "gtm-automations job not created yet; see docs/agent_runs.md"
+        fi
+
 availableSecrets:
   secretManager:
     - versionName: projects/$PROJECT_ID/secrets/DB_PASSWORD/versions/latest

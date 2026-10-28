@@ -38,7 +38,7 @@ try:
 except ImportError:
     types = None
 
-TEAM_AGENT_TYPES = ("gtm_strategist", "portfolio", "resource", "insights")
+TEAM_AGENT_TYPES = ("gtm_strategist", "portfolio", "resource", "insights", "gtm_engineer")
 
 # Cap on transfers within a single incoming user message -- mirrors
 # agent_runtime.MAX_HANDOFF_DEPTH's role for the consult-tool mesh. Without
@@ -222,11 +222,11 @@ def _get_team_config(
 
     if agent_type == "gtm_strategist":
         base_instruction = GTM_STRATEGIST_SYSTEM_INSTRUCTION
-        temperature = 0.8
+        temperature = 0.4
         max_output_tokens = 2048
     else:
         base_instruction = SYSTEM_INSTRUCTIONS.get(agent_type, "You are a helpful GTM strategy assistant.")
-        temperature = 0.7
+        temperature = 0.4
         max_output_tokens = 1536
 
     system_instruction = (

@@ -843,7 +843,7 @@ def build_task_board_context(action_items_qs):
     from gtm.action_item_completion import completion_agent_type
     from gtm.agent_runtime import AGENT_DIRECTORY
 
-    action_items_qs =action_items_qs.select_related('assigned_to', 'deliverable_document').prefetch_related('comments__user')
+    action_items_qs =action_items_qs.select_related('assigned_to', 'deliverable_document', 'current_run').prefetch_related('comments__user')
     top_todo = list(action_items_qs.filter(status='todo').order_by('due_date'))
     top_doing = list(action_items_qs.filter(status='doing').order_by('due_date'))
     top_done = list(action_items_qs.filter(status='done').order_by('-created_at'))

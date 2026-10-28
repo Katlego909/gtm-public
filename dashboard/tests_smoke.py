@@ -158,13 +158,10 @@ class ViewPackageSmokeTests(TestCase):
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class ActionItemAICompletionTests(TestCase):
-    """gtm/action_item_completion.py's on-demand "Complete with AI" flow
-    (dashboard/views/actions.py). The actual Gemini turn needs a live call
-    (matching every other AI endpoint in this repo, none of which are
-    exercised end-to-end here) -- these tests cover the deterministic glue
-    around it instead: eligibility gates, permissions, locking, and the
-    background-job/polling wiring, with complete_action_item mocked as a
-    black box."""
+    """The on-demand "Complete with AI" flow (dashboard/views/actions.py),
+    which starts an agent run (gtm/agent_runs.py): eligibility gates,
+    permissions, locking, and the background-job/polling wiring. The run
+    lifecycle itself is covered in gtm/tests_agent_runs.py."""
 
     @classmethod
     def setUpTestData(cls):
@@ -209,35 +206,30 @@ class ActionItemAICompletionTests(TestCase):
         response = self.client.post(reverse("complete_action_item_ai", args=[item.id]))
         self.assertEqual(response.status_code, 400)
 
-    @mock.patch("dashboard.views.actions.run_in_background", side_effect=lambda target, *args, **kwargs: target(*args))
-    @mock.patch("gtm.action_item_completion.complete_action_item")
-    def test_complete_action_item_ai_runs_and_polls_to_done(self, mock_complete, mock_run_bg):
-        """run_in_background is patched to run synchronously so the status
-        endpoint can be polled deterministically right after the POST."""
-        mock_complete.return_value = {
-            "success": True,
-            "status": "done",
-            "summary": "Drafted the ICP one-pager grounded in this company's assessment data.",
-            "document_id": "11111111-1111-1111-1111-111111111111",
-        }
-        item = self._make_item()
+    @mock.patch("gtm.agent_runs.run_in_background", side_effect=lambda target, *args, **kwargs: target(*args))
+    def test_complete_action_item_ai_plans_and_polls_to_awaiting_approval(self, mock_run_bg):
+        """run_in_background is patched to run synchronously and Gemini is a
+        scripted fake (see gtm/tests_agent_runs.py), so the status endpoint
+        can be polled deterministically right after the POST."""
+        from gtm.tests_agent_runs import _FakeClient, _propose
 
-        response = self.client.post(reverse("complete_action_item_ai", args=[item.id]))
+        client = _FakeClient([_propose(("create_document", "ICP one-pager"))])
+        item = self._make_item()
+        with mock.patch("gtm.agent_runs._client_or_error", return_value=(client, None, "")):
+            response = self.client.post(reverse("complete_action_item_ai", args=[item.id]))
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["success"])
-        mock_complete.assert_called_once()
 
-        status_response = self.client.get(reverse("complete_action_item_ai_status", args=[item.id]))
-        self.assertEqual(status_response.status_code, 200)
-        status_data = status_response.json()
-        self.assertEqual(status_data["state"], "done")
-        item.refresh_from_db()
-        self.assertEqual(item.ai_run_state, "done")
-        self.assertIsNotNone(item.ai_run_started_at)
+        status = self.client.get(reverse("complete_action_item_ai_status", args=[item.id])).json()
+        self.assertEqual(status["state"], "done")
+        self.assertEqual(status["run_status"], "awaiting_approval")
+        self.assertEqual(status["agent_name"], "Charlie")
+        # Nothing changes until a person approves the plan.
+        self.assertEqual(status["task_status"], "todo")
 
     def test_lock_prevents_concurrent_double_trigger(self):
         """Simulates an already-in-flight job by pre-acquiring the same
-        lock key the view uses, then confirms a second POST doesn't start
+        lock key the run uses, then confirms a second POST doesn't start
         a duplicate run."""
         from gtm.ai_services import _acquire_lock, _release_lock
         from dashboard.views.helpers import action_item_ai_lock_key
@@ -250,11 +242,10 @@ class ActionItemAICompletionTests(TestCase):
         # leak into another test whose ActionItem happens to reuse this id.
         self.addCleanup(_release_lock, lock_key)
 
-        with mock.patch("gtm.action_item_completion.complete_action_item") as mock_complete:
+        with mock.patch("gtm.agent_runs.run_in_background") as mock_run_bg:
             response = self.client.post(reverse("complete_action_item_ai", args=[item.id]))
-            self.assertEqual(response.status_code, 200)
-            self.assertEqual(response.json()["status"], "running")
-            mock_complete.assert_not_called()
+        self.assertEqual(response.status_code, 409)
+        mock_run_bg.assert_not_called()
 
     def test_non_member_cannot_trigger_completion(self):
         outsider = User.objects.create_user(username="outsider", password="pass1234", email="outsider@test.com")

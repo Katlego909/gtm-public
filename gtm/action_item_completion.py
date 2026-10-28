@@ -1,24 +1,14 @@
-"""On-demand AI completion of a single ActionItem.
+"""The tool kit an agent works with on one assessment's task.
 
-Distinct from the chat agents in gtm/ai_chat.py / gtm/workspace_agent_chat.py
-/ gtm/team_chat.py: this is not a conversation, it's one real, tool-using
-agent turn scoped to a single ActionItem's task text. The point is to
-actually perform the work the item describes -- ground it in this company's
-real assessment data, produce the concrete deliverable the task calls for
-(via the same create_document/edit_document/list_documents tools the chat
-agents already use), and only then write back completion state.
-
-Write-back is honest, not automatic: `status` only becomes "done" when a
-real AgentDocument was actually produced this turn. If the agent judged
-nothing needed drafting, the item moves to "doing" with a comment
-explaining why -- not a false "done."
+Shared by agent runs (gtm/agent_runs.py), which wrap the write tools here
+behind the human-approved plan: assessment data and the scoring-engine
+diagnosis, resource search, uploaded-evidence search, read-only dashboard
+context, the completing agent's own domain tools, and document tools that
+record the id of anything created/edited -- so the caller can tell whether
+real work actually happened, rather than trusting the model's own account.
 """
 
-import logging
-import time
-from typing import Any, Dict, List, Optional
-
-from django.utils import timezone
+from typing import Any, List
 
 from .agent_documents import (
     create_agent_document,
@@ -29,37 +19,20 @@ from .agent_documents import (
     _snippet_around,
 )
 from .ai_chat import (
-    _get_chat_client,
     _make_get_gtm_assessment_data_tool,
     _make_get_gtm_diagnosis_tool,
     _make_search_internal_resources_tool,
 )
-from .models import ActionItem, ActionItemComment, AgentDocument
-from .utils_logging import log_ai_error
+from .models import ActionItem
 
-logger = logging.getLogger(__name__)
-
-try:
-    from google.genai import types
-except ImportError:
-    types = None
-
-# Higher than the maximum_remote_calls=4 used for ordinary chat turns
-# elsewhere in this app: a real completion turn already needs ~3 rounds
-# before it can close (check assessment data, check existing documents,
-# create the deliverable) -- 4 left no room for a final closing-text turn,
-# so the response came back as a bare function_call with no summary.
-MAX_TOOL_ROUNDS = 8
-
-# The agent that performs "Complete with AI" when the task hasn't been routed
-# to a specific agent.
+# The agent that works on a task when it hasn't been routed to a specific one.
 DEFAULT_COMPLETION_AGENT_TYPE = "gtm_strategist"
 
 
 def completion_agent_type(action_item: ActionItem) -> str:
-    """The agent that performs "Complete with AI" for `action_item`: the one
+    """The agent that works on `action_item` with "Complete with AI": the one
     it was routed to (assign_task_to_agent), else Charlie. Its persona and
-    domain tools run the turn, and its deliverables, its comment, and the
+    domain tools run the work, and its deliverables, its comment, and the
     "<name> is working on this" status on the card are all attributed to it."""
     from .agent_runtime import AGENT_DIRECTORY
 
@@ -68,29 +41,24 @@ def completion_agent_type(action_item: ActionItem) -> str:
     return DEFAULT_COMPLETION_AGENT_TYPE
 
 
-def _build_completion_tools(
-    action_item: ActionItem, user, created_doc_ids: List[Any], agent_type: str = DEFAULT_COMPLETION_AGENT_TYPE,
+def build_task_tools(
+    session, user, created_doc_ids: List[Any], agent_type: str = DEFAULT_COMPLETION_AGENT_TYPE, workspace=None,
 ) -> List[Any]:
-    """Tool set for one completion turn: the GTM Strategist's read tools
-    (assessment data, scoring-engine diagnosis, resource search -- so the
-    agent checks what already exists rather than duplicating work), the
-    completing agent's own domain read tools when it's a workspace agent,
-    plus document tools that record the id of anything created/edited, so
-    the caller can tell whether real work actually happened."""
+    """Read tools plus document tools for work on `session`, as `agent_type`.
+    `workspace` defaults to the session's; the completing agent's domain
+    read tools are added when it's a workspace agent. The dashboard write
+    tool (log_gap_measurement_from_chat) is excluded: no person said a
+    number in chat here, so there's nothing legitimate for it to relay."""
     from .agent_dashboard_tools import build_dashboard_tools
+    from .data_tools import build_data_tools
     from .workspace_agent_chat import _build_domain_tools
 
-    session = action_item.session
+    workspace = workspace or session.workspace
     get_gtm_assessment_data = _make_get_gtm_assessment_data_tool(session)
     get_gtm_diagnosis = _make_get_gtm_diagnosis_tool(session)
     search_internal_resources = _make_search_internal_resources_tool(session)
-    # Read-only dashboard tools (gap/notification context) so a completion
-    # turn can ground its deliverable in real data. The write tool
-    # (log_gap_measurement_from_chat) is excluded -- this is a one-shot,
-    # single-purpose turn with no user in the loop to have "said a number
-    # in chat", so there's nothing legitimate for it to relay.
     dashboard_read_tools = [
-        tool for tool in build_dashboard_tools(workspace=session.workspace, session=session, user=user)
+        tool for tool in build_dashboard_tools(workspace=workspace, session=session, user=user)
         if tool.__name__ != "log_gap_measurement_from_chat"
     ]
 
@@ -106,7 +74,7 @@ def _build_completion_tools(
             title=title,
             content=content,
             doc_type=doc_type,
-            workspace=session.workspace,
+            workspace=workspace,
             session=session,
             user=user,
         )
@@ -186,141 +154,23 @@ def _build_completion_tools(
             lines.append(f'- {d.original_filename} ({d.get_category_display()}): "{snippet}"')
         return "\n".join(lines)
 
-    workspace = action_item.workspace or session.workspace
-    domain_tools = _build_domain_tools(agent_type, workspace, user=user) if workspace else []
-
-    return [
+    tools = [
         get_gtm_assessment_data, get_gtm_diagnosis, search_internal_resources, create_document, edit_document,
-        list_documents, read_document, search_documents, search_evidence, *dashboard_read_tools, *domain_tools,
+        list_documents, read_document, search_documents, search_evidence, *dashboard_read_tools,
+        *build_data_tools(session=session, workspace=workspace),
     ]
+    # A workspace agent's domain tools can overlap the ones above (e.g. data
+    # tools); Gemini rejects duplicate tool names, so the first one wins.
+    names = {t.__name__ for t in tools}
+    domain_tools = _build_domain_tools(agent_type, workspace, user=user) if workspace else []
+    return tools + [t for t in domain_tools if t.__name__ not in names]
 
 
-def _build_completion_system_instruction(action_item: ActionItem, agent_type: str = DEFAULT_COMPLETION_AGENT_TYPE) -> str:
-    from .agent_runtime import AGENT_DIRECTORY
-
-    session = action_item.session
-    company = session.company_name or "this company"
-    agent = AGENT_DIRECTORY[agent_type]
-    return (
-        f"You are {agent['name']}, the {agent['label']}. Your specialty: {agent['domain']} "
-        f'You are completing one specific action item for {company}: "{action_item.note}"\n\n'
-        "Actually complete this task -- do not just describe or plan it. Use your tools to ground the "
-        "work in this company's real assessment data (scores, gaps, industry) and its existing resource "
-        "library, then use create_document to produce the concrete, specific deliverable this task calls "
-        "for (e.g. an actual SLA policy with real target numbers, an actual ICP one-pager with real "
-        "inclusion/exclusion criteria, an actual checklist) -- not a generic template and not a "
-        "description of what such a document would contain. Check list_documents first so you don't "
-        "duplicate an existing deliverable; use edit_document instead if one already covers this task. "
-        "When you're done, reply with a short (2-4 sentence) summary of exactly what you created and why "
-        "it addresses the task."
+def _build_completion_tools(
+    action_item: ActionItem, user, created_doc_ids: List[Any], agent_type: str = DEFAULT_COMPLETION_AGENT_TYPE,
+) -> List[Any]:
+    """build_task_tools scoped to one ActionItem's assessment and workspace."""
+    return build_task_tools(
+        action_item.session, user, created_doc_ids, agent_type=agent_type,
+        workspace=action_item.workspace or action_item.session.workspace,
     )
-
-
-def complete_action_item(action_item: ActionItem, user=None) -> Dict[str, Any]:
-    """Run one real, tool-using agent turn to actually perform the work an
-    ActionItem describes, then write back the result. Returns a dict with
-    `success`, and on success `status` ("done" or "doing"), `summary`, and
-    `document_id` (None if no deliverable was produced)."""
-    from .ai_services import (
-        _extract_retry_delay_seconds,
-        _is_quota_error,
-        _quota_cooldown_active,
-        _request_budget_available,
-        _set_quota_cooldown,
-    )
-    from .ai_credits import resolve_account_for_session, can_spend, record_spend, credits_exhausted_message
-
-    session = action_item.session
-    if session is None:
-        return {"success": False, "error": "This action item has no linked assessment, so AI can't complete it yet."}
-
-    account = resolve_account_for_session(session, user=user)
-
-    if _quota_cooldown_active():
-        return {"success": False, "error": "AI is cooling down to stay within API limits. Please try again shortly."}
-
-    credit_check = can_spend(account=account)
-    if not credit_check.allowed:
-        return {"success": False, "error": credits_exhausted_message(credit_check.reset_at)}
-
-    client = _get_chat_client()
-    if not client:
-        return {"success": False, "error": "Could not connect to the AI service. Please try again in a moment."}
-
-    agent_type = completion_agent_type(action_item)
-    created_doc_ids: List[Any] = []
-    tools = _build_completion_tools(action_item, user, created_doc_ids, agent_type=agent_type)
-    config = types.GenerateContentConfig(
-        system_instruction=_build_completion_system_instruction(action_item, agent_type=agent_type),
-        temperature=0.6,
-        max_output_tokens=2048,
-        thinking_config=types.ThinkingConfig(thinking_budget=0),
-        tools=tools,
-        automatic_function_calling=types.AutomaticFunctionCallingConfig(maximum_remote_calls=MAX_TOOL_ROUNDS),
-    )
-
-    start_time = time.monotonic()
-    try:
-        chat = client.chats.create(model="gemini-2.5-flash", config=config, history=[])
-        response = chat.send_message(f"Complete this task: {action_item.note}")
-        raw_text = (response.text or "").strip()
-    except Exception as e:
-        if _is_quota_error(e):
-            _set_quota_cooldown(_extract_retry_delay_seconds(e))
-            return {"success": False, "error": "Hit a temporary AI quota. Please try again shortly."}
-        log_ai_error(
-            "Action item AI completion failure",
-            e,
-            service="google-genai",
-            model="gemini-2.5-flash",
-            extra={"action_item_id": action_item.id},
-        )
-        return {"success": False, "error": "Ran into a technical error completing this task. Please try again."}
-
-    duration_ms = round((time.monotonic() - start_time) * 1000)
-    usage = getattr(response, "usage_metadata", None)
-    prompt_token_count = getattr(usage, "prompt_token_count", None) if usage else None
-    candidates_token_count = getattr(usage, "candidates_token_count", None) if usage else None
-    if usage and getattr(usage, "total_token_count", None):
-        record_spend(account, usage.total_token_count, "action_item_completion", session=session, actor=user)
-
-    deliverable = None
-    if created_doc_ids:
-        deliverable = AgentDocument.objects.filter(pk__in=created_doc_ids).order_by("-updated_at").first()
-
-    if raw_text:
-        summary_text = raw_text
-    elif deliverable:
-        summary_text = f'Created "{deliverable.title}" to complete this task.'
-    else:
-        summary_text = "I looked into this task but didn't produce a deliverable."
-
-    if deliverable:
-        comment_text = f"AI completed this task: {summary_text}"
-        action_item.deliverable_document = deliverable
-        action_item.status = "done"
-        action_item.completed_at = timezone.now()
-        action_item.save(update_fields=["deliverable_document", "status", "completed_at", "updated_at"])
-        result_status = "done"
-    else:
-        comment_text = f"AI attempted this task but didn't produce a deliverable: {summary_text}"
-        action_item.status = "doing"
-        action_item.save(update_fields=["status", "updated_at"])
-        result_status = "doing"
-
-    ActionItemComment.objects.create(
-        action_item=action_item,
-        user=user,
-        text=comment_text,
-        agent_type=agent_type,
-        duration_ms=duration_ms,
-        prompt_token_count=prompt_token_count,
-        candidates_token_count=candidates_token_count,
-    )
-
-    return {
-        "success": True,
-        "status": result_status,
-        "summary": summary_text,
-        "document_id": str(deliverable.pk) if deliverable else None,
-    }
