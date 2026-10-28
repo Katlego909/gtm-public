@@ -119,7 +119,7 @@ class LogGapMeasurementFromChatTests(DashboardToolsTestCase):
     def test_no_matching_metric_in_scope_fails_gracefully(self):
         tools = self._tools(workspace=self.workspace, user=self.actor)
         result = tools["log_gap_measurement_from_chat"]("Win Rate", 38.0)
-        self.assertIn("No gap metric found", result)
+        self.assertIn("isn't a tracked gap yet", result)
         self.assertFalse(GapMetricMeasurement.objects.exists())
 
 

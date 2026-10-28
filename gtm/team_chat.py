@@ -221,10 +221,10 @@ def _get_team_config(
     workspace=None, session=None, user=None,
 ):
     from .agent_dashboard_tools import build_dashboard_ambient_context
-    from .agent_runtime import build_task_context_prompt
+    from .agent_runtime import GAP_FLAGGING_RULE, build_task_context_prompt
 
     if agent_type == "gtm_strategist":
-        base_instruction = GTM_STRATEGIST_SYSTEM_INSTRUCTION
+        base_instruction = GTM_STRATEGIST_SYSTEM_INSTRUCTION + GAP_FLAGGING_RULE
         temperature = 0.4
         max_output_tokens = 2048
     else:

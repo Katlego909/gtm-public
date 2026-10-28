@@ -67,7 +67,7 @@ STEP_KINDS: Dict[str, tuple] = {
     "notify_teammate": ("Send a teammate a notification", ("notify_teammate",)),
     "comment": ("Comment on a task", ("comment_on_task",)),
     "recommend_resource": ("Recommend a Library resource for this assessment", ("recommend_resource",)),
-    "flag_gap": ("Flag a measurable GTM gap in Gap Analysis for the team to track", ("escalate_gap",)),
+    "flag_gap": ("Propose a measurable GTM gap (metric, real target, evidence) for the team to accept", ("escalate_gap",)),
     "create_automation": (
         "Set up an automation that keeps running: on a schedule, or while a gap metric is off target, or when "
         "tasks are overdue, it creates a task or notifies people",
@@ -426,7 +426,9 @@ def _build_run_write_tools(run: AgentRun, state: Dict[str, Any]) -> List[Any]:
         never move or close a gap on its own. `metric_name` must be one of:
         Monthly Qualified Leads, Average Deal Size, Net Revenue Retention,
         Product Qualified Leads, Win Rate, CAC Payback Period, and the gap
-        must already exist (use a flag_gap step first if it doesn't).
+        must already be tracked. If it isn't, propose it with a flag_gap
+        step instead, passing the computed value as `current` with the file
+        as `current_source` -- a teammate accepts it before it's tracked.
         """
         from dashboard.models import GapAnalysisMetric, GapMeasurementProposal
         from dashboard.views.helpers import _gap_metric_scope_queryset
@@ -435,7 +437,10 @@ def _build_run_write_tools(run: AgentRun, state: Dict[str, Any]) -> List[Any]:
             return f"'{metric_name}' isn't a recognized metric."
         metric = _gap_metric_scope_queryset(user, run.workspace, metric_name).first()
         if not metric:
-            return f"There's no '{metric_name}' gap to measure yet -- it has to be flagged first."
+            return (
+                f"There's no tracked '{metric_name}' gap to measure yet. Propose it with escalate_gap "
+                "(with the computed value as current); it's tracked once a teammate accepts it."
+            )
         try:
             doc = find_document(file_id, session=run.session, workspace=run.workspace)
             result = compute(doc, operation, column, filters, denominator_filters)

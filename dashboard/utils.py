@@ -18,6 +18,9 @@ def calculate_gap_metric_display_properties(metric: GapAnalysisMetric):
         gap = 0
     
     metric.gap_percent = f"{gap:.1f}%"
+    # Nothing to compare yet: a gap with no target, or one nobody has
+    # measured, isn't "on target" -- showing a green 0.0% would say it is.
+    metric.awaiting_measurement = target <= 0 or getattr(metric, 'estimate_method', None) == 'unmeasured'
 
     # Determine styling based on priority and gap
     # Note: Priorities in model are 'High', 'Medium', 'Low' (PascalCase)
@@ -33,6 +36,9 @@ def calculate_gap_metric_display_properties(metric: GapAnalysisMetric):
     else: # Low priority
         metric.priority_class = 'bg-green-100 text-green-700'
         metric.gap_class = 'bg-green-100 text-green-700'
+    if metric.awaiting_measurement:
+        metric.gap_percent = 'Awaiting measurement' if target > 0 else 'No target set'
+        metric.gap_class = 'bg-gray-100 text-gray-600'
 
     # Provenance: how much to trust the Current value -- a real Gemini
     # estimate, the deterministic fallback formula, a manually typed
@@ -44,6 +50,7 @@ def calculate_gap_metric_display_properties(metric: GapAnalysisMetric):
         'formula': ('Formula Estimate', 'bg-amber-50 text-amber-700 border border-amber-200'),
         'manual_entry': ('Manual Entry', 'bg-gray-50 text-gray-600 border border-gray-200'),
         'measured': ('Measured', 'bg-green-50 text-green-700 border border-green-200'),
+        'unmeasured': ('Not measured', 'bg-gray-50 text-gray-500 border border-gray-200'),
     }
     metric.estimate_method_label, metric.estimate_method_class = estimate_method_styles.get(
         getattr(metric, 'estimate_method', None), (None, None)

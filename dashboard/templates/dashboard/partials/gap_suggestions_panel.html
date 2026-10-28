@@ -24,7 +24,7 @@
     <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
             <h4 class="text-sm font-bold text-indigo-900">AI Suggestions (Drafts)</h4>
-            <p class="text-xs text-indigo-700 mt-1">AI proposes candidates from completed assessments. You stay in control by accepting, editing, or rejecting each item. Current/target figures are AI estimates, not measured business data.</p>
+            <p class="text-xs text-indigo-700 mt-1">AI proposes candidates from completed assessments, and agents propose gaps they find in your data. Nothing is tracked until you accept it. Generated figures are AI estimates, not measured business data.</p>
         </div>
         <form id="gap-generate-form"
               hx-post="{% url 'generate_gap_suggestions' %}"
@@ -69,20 +69,26 @@
             <div class="flex items-start justify-between gap-3">
                 <div>
                     <p class="text-sm font-semibold text-gray-900">{{ suggestion.metric }}</p>
+                    {% if suggestion.is_agent_proposal %}
+                    <p class="text-xs text-gray-500 mt-0.5">{{ suggestion.category }} &middot;
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-50 text-indigo-700 border border-indigo-200">Proposed by {{ suggestion.proposed_by }}</span>
+                    </p>
+                    {% else %}
                     <p class="text-xs text-gray-500 mt-0.5">{{ suggestion.category }} • Confidence {{ suggestion.confidence }}%</p>
+                    {% endif %}
                 </div>
                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium {{ suggestion.gap_class|default:'bg-gray-100 text-gray-600' }}">{{ suggestion.gap_percent|default:'n/a' }}</span>
             </div>
             <div class="mt-2 text-xs text-gray-700">
-                <span class="font-medium">Current:</span> {{ suggestion.current }}
+                <span class="font-medium">Current:</span> {% if suggestion.is_unmeasured %}Not measured{% else %}{{ suggestion.current }}{% endif %}
                 <span class="mx-2 text-gray-300">|</span>
-                <span class="font-medium">Target:</span> {{ suggestion.target }}
+                <span class="font-medium">Target:</span> {% if suggestion.target > 0 %}{{ suggestion.target }}{% else %}Not set{% endif %}
                 <span class="mx-2 text-gray-300">|</span>
                 <span class="font-medium">Priority:</span> {{ suggestion.priority }}
             </div>
             <p class="mt-2 text-xs text-gray-700 leading-relaxed">{{ suggestion.recommendation }}</p>
             {% if suggestion.rationale %}
-            <p class="mt-1 text-[11px] text-gray-500">Why: {{ suggestion.rationale }}</p>
+            <p class="mt-1 text-[11px] text-gray-500">{% if suggestion.is_agent_proposal %}Evidence{% else %}Why{% endif %}: {{ suggestion.rationale }}</p>
             {% endif %}
             {% if suggestion.is_formula_estimate %}
             <p class="mt-1 text-[11px] text-amber-700">Estimated via formula &mdash; AI was unavailable when this was generated.</p>
@@ -97,8 +103,14 @@
                       hx-indicator="#gap-suggestions-indicator, #gap-accept-form-{{ suggestion.id }}"
                       class="inline-flex">
                     {% csrf_token %}
+                    {% if not suggestion.target > 0 %}
+                    <label class="sr-only" for="gap-accept-target-{{ suggestion.id }}">Target</label>
+                    <input id="gap-accept-target-{{ suggestion.id }}" type="number" name="target" step="any" min="0" required
+                           placeholder="Target"
+                           class="w-24 mr-2 px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-400">
+                    {% endif %}
                     <button type="submit" class="px-2.5 py-1.5 text-xs rounded-md bg-green-600 text-white hover:bg-green-700 transition-colors">
-                        <span class="action-idle">Accept</span>
+                        <span class="action-idle">{% if suggestion.target > 0 %}Accept{% else %}Set target &amp; accept{% endif %}</span>
                         <span class="action-loading items-center gap-1.5">
                             <svg class="animate-spin h-3 w-3" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>

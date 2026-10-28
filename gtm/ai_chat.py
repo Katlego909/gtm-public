@@ -582,9 +582,9 @@ def _get_chat_config(
 ):
     """Builds the configuration for the chat agent, including its tool set."""
     from .agent_dashboard_tools import build_dashboard_ambient_context
-    from .agent_runtime import build_task_context_prompt
+    from .agent_runtime import GAP_FLAGGING_RULE, build_task_context_prompt
 
-    system_instruction = GTM_STRATEGIST_SYSTEM_INSTRUCTION + build_task_context_prompt(task_refs)
+    system_instruction = GTM_STRATEGIST_SYSTEM_INSTRUCTION + GAP_FLAGGING_RULE + build_task_context_prompt(task_refs)
     system_instruction += build_dashboard_ambient_context(
         workspace=session.workspace if session else None, session=session, user=user,
     )

@@ -45,6 +45,29 @@ def _agent_name_hint(candidate: str, *, action: str = "consult") -> Optional[str
     return None
 
 
+def _assessment_evidence(session, pillar: str) -> str:
+    """The deterministic assessment facts behind a gap in `pillar`: the
+    pillar's score and its weakest questions, from scoring_engine. Attached
+    to every agent-proposed gap so the reviewer sees real evidence whatever
+    the agent wrote. Empty when there's no scored assessment."""
+    if session is None or not pillar:
+        return ""
+    from .models import Response
+    from .scoring_engine import build_recommendation_context
+
+    scores = {r.question.id_code: r.score for r in Response.objects.filter(session=session).select_related("question")}
+    if not scores:
+        return ""
+    ctx = build_recommendation_context(scores)
+    weakest = sorted(
+        (o for o in ctx["all_opportunities"] if o["pillar"] == pillar),
+        key=lambda o: o["current_score"],
+    )[:2]
+    parts = ", ".join(f"{o['dimension']} {o['current_score']}/5" for o in weakest)
+    text = f"Assessment: {pillar} pillar {round(ctx['pillar_avgs'].get(pillar, 0), 1)}/5"
+    return text + (f"; weakest: {parts}." if parts else ".")
+
+
 def _record_outcome(sink: Optional[List[Any]], tool: str, **ref: Any) -> None:
     """Record that a write tool really changed something, so an agent run
     can tell a completed step from a refused or failed call (every tool
@@ -74,8 +97,8 @@ def build_agent_action_tools(
     _record_outcome) -- gtm/agent_runs.py uses it to mark plan steps done."""
     from dashboard.parsers import _resolve_assignee, log_workspace_activity
     from dashboard.utils_notifications import send_notification
-    from dashboard.views.helpers import _upsert_gap_metric_in_scope
-    from dashboard.models import AIResourceRecommendation, GapAnalysisMetric, Resource
+    from dashboard.views.helpers import _gap_metric_scope_queryset
+    from dashboard.models import AIResourceRecommendation, GapAnalysisMetric, GapAnalysisSuggestion, Resource
     from django.utils.dateparse import parse_date
     from .agent_dashboard_tools import _check_workspace_permission
     from .agent_runtime import record_task_ref
@@ -246,34 +269,108 @@ def build_agent_action_tools(
             )
         return "\n".join(lines)
 
-    def escalate_gap(category: str, metric: str, current: float, target: float, recommendation: str) -> str:
-        """Flag a GTM gap for human review in the Gap Analysis panel. This
-        does NOT auto-create tasks -- a teammate still has to accept it there
-        first. `category` must be one of: Lead Generation, Sales Efficiency,
-        Customer Success, Product Marketing, Sales Velocity, Marketing ROI.
-        `metric` must be one of: Monthly Qualified Leads, Average Deal Size,
-        Net Revenue Retention, Product Qualified Leads, Win Rate, CAC Payback Period.
-        `current` must be a value you actually have from data or the user;
-        if nobody has measured it yet, pass 0 -- never estimate it.
+    def escalate_gap(
+        metric: str, target: float, target_basis: str, evidence: str, recommendation: str,
+        current: Optional[float] = None, current_source: str = "",
+    ) -> str:
+        """Propose a measurable GTM gap. This creates a DRAFT in the Gap
+        Analysis "AI Suggestions" panel -- a teammate accepts, edits, or
+        rejects it there; nothing goes live until they do.
+
+        Only flag a gap when the concern really is one of these metrics:
+        - Monthly Qualified Leads: qualified leads per month (demand volume, ICP fit)
+        - Product Qualified Leads: product-led signups that hit a usage threshold
+        - Win Rate: % of closed deals won (qualification, sales process)
+        - Average Deal Size: average closed-won amount (pricing, packaging, segment)
+        - Net Revenue Retention: % of recurring revenue kept incl. expansion (onboarding, churn)
+        - CAC Payback Period: months to recover acquisition cost (channel efficiency)
+        If the concern doesn't map to one of these (e.g. "channel strategy is
+        undefined"), don't flag a gap -- propose a task or a document instead.
+        The category is set from the metric.
+
+        `target`: the goal value, above 0. `target_basis`: where it comes from
+        -- the user's stated goal, or a benchmark you name. If you have
+        neither, ask the user for the target instead of calling this.
+        `evidence`: the assessment finding or data that shows the gap -- name
+        the diagnosis pattern or question (call get_gtm_diagnosis if you
+        haven't), not the user's request. `current`: leave it out unless you have a real
+        number, and then say where it came from in `current_source` (a data
+        file you computed it from, or the user stating it) -- never estimate it.
         """
         denial = _check_workspace_permission(workspace, user)
         if denial:
             return denial
-        if category not in dict(GapAnalysisMetric.CATEGORY_CHOICES):
-            return f"'{category}' isn't a recognized gap category."
         if metric not in dict(GapAnalysisMetric.METRIC_CHOICES):
-            return f"'{metric}' isn't a recognized metric."
-        _upsert_gap_metric_in_scope(
-            user=user, workspace=workspace, session=None,
-            payload={
-                'category': category, 'metric': metric,
-                'current': current, 'target': target,
-                'priority': 'Medium', 'recommendation': recommendation,
+            options = ", ".join(GapAnalysisMetric.METRIC_FIELD_MAPPING)
+            return (
+                f"'{metric}' isn't a tracked gap metric (options: {options}). If the concern doesn't "
+                "map to one of them, propose a task or document instead of a gap."
+            )
+        if not target or target <= 0:
+            return "A gap needs a real target above 0. Ask the user what they're aiming for first."
+        if not (target_basis or "").strip():
+            return "Say where the target comes from (the user's stated goal or a named benchmark)."
+        if not (evidence or "").strip():
+            return "Give the evidence behind this gap -- the assessment finding or data that shows it."
+        if current is not None and not (current_source or "").strip():
+            return (
+                "Say where the current value came from (a data file or the user). If nobody has "
+                "measured it, leave current out -- don't estimate it."
+            )
+
+        scope = _gap_metric_scope_queryset(user, workspace, metric)
+        if scope.filter(status="open").exists():
+            return (
+                f"'{metric}' is already tracked as an open gap. Don't re-flag it: log a real value "
+                "with log_gap_measurement_from_chat (a number the user stated) or propose_measurement "
+                "(computed from a data file)."
+            )
+        drafts = GapAnalysisSuggestion.objects.filter(metric=metric, status="pending")
+        drafts = drafts.filter(workspace=workspace) if workspace else drafts.filter(workspace__isnull=True, user=user)
+        if drafts.exists():
+            return f"A draft for '{metric}' is already waiting for review in Gap Analysis."
+        if not user:
+            return "I can only propose a gap on behalf of a signed-in teammate."
+
+        sessions = AssessmentSession.objects.filter(is_completed=True)
+        sessions = sessions.filter(workspace=workspace) if workspace else sessions.filter(user=user)
+        session = sessions.order_by("-created_at").first()
+        category = GapAnalysisMetric.METRIC_CATEGORY[metric]
+        facts = _assessment_evidence(session, GapAnalysisMetric.CATEGORY_PILLAR_MAPPING.get(category, ""))
+        from .agent_runtime import agent_name
+
+        proposer = agent_name(agent_type) if agent_type else "An AI agent"
+        suggestion = GapAnalysisSuggestion.objects.create(
+            category=category,
+            metric=metric,
+            current=current if current is not None else 0,
+            target=target,
+            priority="Medium",
+            recommendation=recommendation,
+            rationale=" ".join(
+                part if part.endswith(".") else part + "."
+                for part in (
+                    facts,
+                    f"Agent's evidence: {evidence.strip()}",
+                    f"Target basis: {target_basis.strip()}",
+                    f"Current value from: {current_source.strip()}" if current is not None else "",
+                )
+                if part
+            ),
+            status="pending",
+            session=session,
+            workspace=workspace,
+            user=user,
+            source_payload={
+                "generator": "agent", "agent_type": agent_type, "proposed_by": proposer,
+                "unmeasured": current is None,
             },
-            source='AI',
         )
-        _record_outcome(outcomes_sink, "escalate_gap", metric=metric)
-        return f"Flagged '{metric}' as a gap for the team to review."
+        _record_outcome(outcomes_sink, "escalate_gap", suggestion_id=suggestion.id, metric=metric)
+        return (
+            f"Proposed '{metric}' (target {target}) as a draft gap. It's waiting in Gap Analysis > "
+            "AI Suggestions for a teammate to accept -- it isn't tracked until they do."
+        )
 
     def recommend_resource(resource_name: str, session_id: str, rationale: str) -> str:
         """Recommend an existing workspace Resource (from the Library) for a

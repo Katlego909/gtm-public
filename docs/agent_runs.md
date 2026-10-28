@@ -65,7 +65,7 @@ An `Automation` creates a task or notifies people. It fires on a schedule, while
 
 ### One-time scheduler setup (production)
 
-`cloudbuild.yaml` updates the job's image on every deploy once the job exists. Create the job and its hourly trigger once:
+`cloudbuild.yaml` updates the job's image on every deploy once the job exists. Create the job and its hourly trigger once (done for production on 2026-10-28). In PowerShell, quote the comma-separated flags (`"--args=manage.py,run_automations"`): unquoted, PowerShell joins them into one argument and the job exits with "can't open file 'manage.py run_automations'".
 
 ```bash
 gcloud run jobs create gtm-automations \

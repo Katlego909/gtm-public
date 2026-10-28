@@ -123,7 +123,7 @@
 
         <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <h2 class="text-lg font-bold text-gray-900 mb-1">Detailed Metrics</h2>
-            <p class="text-xs text-gray-500 mb-4">Current/Target figures are AI estimates inferred from your assessment scores, not measured business metrics.</p>
+            <p class="text-xs text-gray-500 mb-4">Each Current value is labelled with where it came from: an AI or formula estimate, a manual entry, a real measurement, or not measured yet.</p>
             {% if metrics %}
             <div class="overflow-x-auto">
                 <table class="min-w-full text-sm">
@@ -131,8 +131,8 @@
                         <tr>
                             <th class="px-4 py-3 text-left">Category</th>
                             <th class="px-4 py-3 text-left">Metric</th>
-                            <th class="px-4 py-3 text-left">Current (Est.)</th>
-                            <th class="px-4 py-3 text-left">Target (Est.)</th>
+                            <th class="px-4 py-3 text-left">Current</th>
+                            <th class="px-4 py-3 text-left">Target</th>
                             <th class="px-4 py-3 text-left">Gap</th>
                             <th class="px-4 py-3 text-left">Priority</th>
                             <th class="px-4 py-3 text-left">Source</th>
@@ -144,7 +144,7 @@
                         <tr>
                             <td class="px-4 py-3 text-gray-900 font-medium whitespace-nowrap">{{ metric.category }}</td>
                             <td class="px-4 py-3 text-gray-700 whitespace-nowrap">{{ metric.metric }}</td>
-                            <td class="px-4 py-3 text-gray-700 whitespace-nowrap">{{ metric.current }}</td>
+                            <td class="px-4 py-3 text-gray-700 whitespace-nowrap">{% if metric.estimate_method == 'unmeasured' %}<span class="text-gray-400">&mdash;</span>{% else %}{{ metric.current }}{% endif %}{% if metric.estimate_method_label %}<span class="block mt-0.5 text-[10px] text-gray-500">{{ metric.estimate_method_label }}</span>{% endif %}</td>
                             <td class="px-4 py-3 text-gray-700 whitespace-nowrap">{{ metric.target }}</td>
                             <td class="px-4 py-3 whitespace-nowrap">
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ metric.gap_class }}">{{ metric.gap_percent }}</span>

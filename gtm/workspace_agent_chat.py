@@ -704,6 +704,12 @@ SYSTEM_INSTRUCTIONS = {
 }
 
 
+from .agent_runtime import GAP_FLAGGING_RULE  # noqa: E402
+
+for _agent_type in SYSTEM_INSTRUCTIONS:
+    SYSTEM_INSTRUCTIONS[_agent_type] += GAP_FLAGGING_RULE
+
+
 def _get_workspace_chat_config(
     agent_type: str, tools: Optional[List[Any]] = None, task_refs: Optional[List[Any]] = None,
     workspace=None, user=None,

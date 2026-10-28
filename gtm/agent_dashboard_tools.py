@@ -131,8 +131,9 @@ def build_dashboard_tools(
         target, exactly like a human logging a check-in in the Gap
         Analysis panel. `metric_name` must be one of: Monthly Qualified
         Leads, Average Deal Size, Net Revenue Retention, Product Qualified
-        Leads, Win Rate, CAC Payback Period. Use escalate_gap first if this
-        gap hasn't been flagged yet.
+        Leads, Win Rate, CAC Payback Period. The gap must already be tracked;
+        if it isn't, propose it with escalate_gap (passing this value as
+        current) and a teammate accepts it.
         """
         denial = _check_workspace_permission(workspace, user)
         if denial:
@@ -141,7 +142,10 @@ def build_dashboard_tools(
             return f"'{metric_name}' isn't a recognized metric."
         metric = _gap_metric_scope_queryset(user, workspace, metric_name).first()
         if not metric:
-            return f"No gap metric found for '{metric_name}' in scope -- use escalate_gap first to flag it."
+            return (
+                f"'{metric_name}' isn't a tracked gap yet. Propose it with escalate_gap, passing this "
+                "value as current and the user as current_source; it's tracked once a teammate accepts it."
+            )
 
         default_note = f"Reported via chat by {user.get_full_name() or user.username}." if user else "Reported via chat."
         closed = record_gap_measurement(

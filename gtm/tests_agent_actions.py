@@ -15,7 +15,7 @@ from django.test import TestCase
 from gtm.agent_actions import build_agent_action_tools
 from gtm.models import ActionItem, ActionItemComment, AssessmentSession
 from gtm.models_workspace import Workspace, WorkspaceMembership
-from dashboard.models import AIResourceRecommendation, GapAnalysisMetric, Notification, Resource
+from dashboard.models import AIResourceRecommendation, GapAnalysisMetric, GapAnalysisSuggestion, Notification, Resource
 
 User = get_user_model()
 
@@ -199,22 +199,24 @@ class AgentActionToolsTests(TestCase):
         self.task.status = "todo"
         self.task.save()
 
-    def test_escalate_gap_creates_pending_metric_without_action_items(self):
+    def test_escalate_gap_proposes_a_draft_without_tracking_it(self):
         tools = self._tools()
         result = tools["escalate_gap"](
-            "Marketing ROI", "CAC Payback Period", 11.5, 9.0,
+            "CAC Payback Period", 9.0, "The CFO's stated goal.", "Paid channels score 2/5.",
             "Reduce spend on underperforming channels.",
         )
-        self.assertIn("Flagged", result)
-        metric = GapAnalysisMetric.objects.get(workspace=self.workspace, metric="CAC Payback Period")
-        self.assertEqual(metric.source, "AI")
+        self.assertIn("draft", result)
+        self.assertFalse(GapAnalysisMetric.objects.filter(workspace=self.workspace).exists())
+        draft = GapAnalysisSuggestion.objects.get(workspace=self.workspace, metric="CAC Payback Period")
+        self.assertEqual(draft.status, "pending")
+        self.assertEqual(draft.category, "Marketing ROI")
         self.assertEqual(ActionItem.objects.filter(workspace=self.workspace).count(), 1)  # only the seeded task
 
-    def test_escalate_gap_rejects_invalid_category(self):
+    def test_escalate_gap_rejects_an_untracked_metric(self):
         tools = self._tools()
-        result = tools["escalate_gap"]("Not A Real Category", "Win Rate", 1, 2, "x")
-        self.assertIn("recognized gap category", result)
-        self.assertFalse(GapAnalysisMetric.objects.filter(workspace=self.workspace).exists())
+        result = tools["escalate_gap"]("Channel Strategy", 1, "basis", "evidence", "x")
+        self.assertIn("isn't a tracked gap metric", result)
+        self.assertFalse(GapAnalysisSuggestion.objects.filter(workspace=self.workspace).exists())
 
     def test_recommend_resource_creates_recommendation(self):
         tools = self._tools()

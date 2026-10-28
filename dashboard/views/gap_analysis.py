@@ -138,7 +138,9 @@ def generate_gap_suggestions(request):
             status='pending',
             workspace__isnull=True,
         )
-        existing_qs.delete()
+        # Regenerating replaces only earlier generated drafts -- a gap an
+        # agent proposed (with its own evidence) stays until someone decides.
+        existing_qs.exclude(source_payload__generator='agent').delete()
 
         GapAnalysisSuggestion.objects.bulk_create([
             GapAnalysisSuggestion(
@@ -174,6 +176,18 @@ def generate_gap_suggestions(request):
     return response
 
 
+def _gap_suggestion_refusal(request, current_workspace, suggestion, message):
+    """Re-render the suggestions panel with a warning toast, leaving the
+    draft pending."""
+    response = render(request, 'dashboard/partials/gap_suggestions_panel.html', {
+        'gap_suggestions': _load_pending_gap_suggestions(request, current_workspace),
+        'current_workspace': current_workspace,
+        'latest_completed_session': suggestion.session,
+    })
+    response['HX-Trigger'] = json.dumps({'resourceToast': {'message': message, 'level': 'warning'}})
+    return response
+
+
 @require_http_methods(["POST"])
 @login_required
 def accept_gap_suggestion(request, suggestion_id):
@@ -185,7 +199,33 @@ def accept_gap_suggestion(request, suggestion_id):
         suggestion_qs = suggestion_qs.filter(workspace__isnull=True)
     suggestion = get_object_or_404(suggestion_qs)
 
-    generator = suggestion.source_payload.get('generator') if isinstance(suggestion.source_payload, dict) else None
+    payload = suggestion.source_payload if isinstance(suggestion.source_payload, dict) else {}
+    generator = payload.get('generator')
+
+    target = suggestion.target
+    target_override = (request.POST.get('target') or '').strip()
+    if target_override:
+        try:
+            target = float(target_override)
+        except ValueError:
+            target = 0
+    if not target or target <= 0:
+        return _gap_suggestion_refusal(
+            request, current_workspace, suggestion, 'Set a target above 0 before accepting this gap.'
+        )
+
+    if generator == 'agent':
+        # An agent draft must never replace a gap the team already tracks
+        # (that would wipe a real measured value). Generated drafts keep the
+        # existing replace-on-accept behaviour.
+        if _gap_metric_scope_queryset(request.user, suggestion.workspace, suggestion.metric).filter(status='open').exists():
+            return _gap_suggestion_refusal(
+                request, current_workspace, suggestion,
+                f"'{suggestion.metric}' is already tracked as an open gap. Reject this draft or log a measurement instead.",
+            )
+        estimate_method = 'unmeasured' if payload.get('unmeasured') else 'manual_entry'
+    else:
+        estimate_method = estimate_method_from_generator(generator)
 
     with transaction.atomic():
         _upsert_gap_metric_in_scope(
@@ -196,12 +236,12 @@ def accept_gap_suggestion(request, suggestion_id):
                 'category': suggestion.category,
                 'metric': suggestion.metric,
                 'current': suggestion.current,
-                'target': suggestion.target,
+                'target': target,
                 'priority': suggestion.priority,
                 'recommendation': suggestion.recommendation,
             },
             source='AI',
-            estimate_method=estimate_method_from_generator(generator),
+            estimate_method=estimate_method,
         )
         suggestion.status = 'accepted'
         suggestion.save(update_fields=['status', 'updated_at'])
@@ -571,13 +611,15 @@ def gap_report(request):
     metrics = prepare_gap_metrics_for_display(metrics_qs, current_workspace, request.user)
     for metric in metrics:
         metric.gap_numeric = _gap_percent_value(metric)
-        metric.is_behind = metric.gap_numeric < 0
+        metric.is_behind = not metric.awaiting_measurement and metric.gap_numeric < 0
 
     total_metrics = len(metrics)
-    behind_metrics = [m for m in metrics if m.is_behind]
-    on_track_metrics = [m for m in metrics if not m.is_behind]
+    # A gap nobody has measured is neither behind nor on track.
+    compared = [m for m in metrics if not m.awaiting_measurement]
+    behind_metrics = [m for m in compared if m.is_behind]
+    on_track_metrics = [m for m in compared if not m.is_behind]
 
-    avg_gap = round(sum(m.gap_numeric for m in metrics) / total_metrics, 1) if total_metrics else 0.0
+    avg_gap = round(sum(m.gap_numeric for m in compared) / len(compared), 1) if compared else 0.0
     high_priority_count = sum(1 for m in metrics if m.priority == 'High')
     medium_priority_count = sum(1 for m in metrics if m.priority == 'Medium')
     low_priority_count = sum(1 for m in metrics if m.priority == 'Low')

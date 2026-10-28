@@ -47,6 +47,17 @@ class GapAnalysisMetric(models.Model):
         'CAC Payback Period': 'cac_payback_period',
     }
     METRIC_CHOICES = [(metric_name, metric_name) for metric_name in METRIC_FIELD_MAPPING.keys()]
+    # The one category each metric belongs to. Agents don't pick a category:
+    # letting them choose filed metrics under unrelated categories (e.g.
+    # leads under Marketing ROI) just to have somewhere to put a concern.
+    METRIC_CATEGORY = {
+        'Monthly Qualified Leads': 'Lead Generation',
+        'Product Qualified Leads': 'Product Marketing',
+        'Win Rate': 'Sales Efficiency',
+        'Average Deal Size': 'Sales Velocity',
+        'Net Revenue Retention': 'Customer Success',
+        'CAC Payback Period': 'Marketing ROI',
+    }
     # Maps each gap category to the assessment pillar (Category.name in the
     # gtm app) whose deterministic score movement is the honest progress
     # signal for gaps in that category.
@@ -71,6 +82,7 @@ class GapAnalysisMetric(models.Model):
         ('formula', 'Formula Estimate'),
         ('manual_entry', 'Manual Entry'),
         ('measured', 'Measured'),
+        ('unmeasured', 'Not measured'),
     ]
     # How precise a number for this metric is honest to display -- current/
     # target get rounded to the nearest multiple of this, regardless of what

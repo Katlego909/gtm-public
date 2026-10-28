@@ -290,6 +290,16 @@ def build_tagged_content_history(
     return history
 
 
+# Shared by every agent's instructions: a gap is a tracked metric with a real
+# target, proposed as a draft a person accepts -- not a place to file any
+# concern (see agent_actions.escalate_gap).
+GAP_FLAGGING_RULE = (
+    "\n\nFlag a gap (escalate_gap) only when the concern is one of the six tracked metrics and you have a "
+    "real target from the user or a named benchmark; it becomes a draft a teammate accepts. Otherwise "
+    "propose a task or document, or ask the user for the target."
+)
+
+
 # ================================================================
 # TOKEN USAGE ACROSS FUNCTION-CALLING ROUNDS
 # ================================================================

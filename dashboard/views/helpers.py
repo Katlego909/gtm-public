@@ -591,17 +591,22 @@ def _load_pending_gap_suggestions(request, current_workspace):
 
     suggestions = list(qs.order_by('-created_at'))
     for suggestion in suggestions:
+        payload = suggestion.source_payload if isinstance(suggestion.source_payload, dict) else {}
+        generator = payload.get('generator')
+        suggestion.is_agent_proposal = generator == 'agent'
+        suggestion.proposed_by = payload.get('proposed_by') or 'An AI agent'
+        suggestion.is_unmeasured = bool(payload.get('unmeasured'))
         pseudo_metric = type('PseudoMetric', (), {
             'metric': suggestion.metric,
             'current': suggestion.current,
             'target': suggestion.target,
             'priority': suggestion.priority,
+            'estimate_method': 'unmeasured' if suggestion.is_unmeasured else None,
         })()
         calculate_gap_metric_display_properties(pseudo_metric)
         suggestion.gap_percent = pseudo_metric.gap_percent
         suggestion.gap_class = pseudo_metric.gap_class
-        generator = suggestion.source_payload.get('generator') if isinstance(suggestion.source_payload, dict) else None
-        suggestion.is_formula_estimate = generator not in (None, 'gemini')
+        suggestion.is_formula_estimate = generator not in (None, 'gemini', 'agent')
     return suggestions
 
 
@@ -697,6 +702,9 @@ def apply_measured_closure(metric):
     already inverts CAC Payback Period, where lower is better).
     """
     if metric.status == 'closed':
+        return False
+    # Without a target there's nothing to reach: any value would "close" it.
+    if float(metric.target or 0) <= 0:
         return False
     if _gap_percent_value(metric) < 0:
         return False
