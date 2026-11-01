@@ -94,6 +94,15 @@ class DashboardQueryCountTests(TestCase):
         self.assertEqual(response.status_code, 200)
         return len(ctx.captured_queries)
 
+    def test_tool_recommendations_are_not_on_the_dashboard(self):
+        # Deliberately removed: a static vendor catalog doesn't answer "where
+        # are we, what's next". Tool advice lives on the results page,
+        # playbook, and Remy's get_tool_recommendations tool instead.
+        self._seed(sessions=1, items=1, channels=0)
+        response = self.client.get(reverse("dashboard"))
+        self.assertNotContains(response, "Top Tool Recommendations")
+        self.assertNotIn("top_tool_groups", response.context)
+
     def test_query_count_does_not_scale_with_data(self):
         self._seed(sessions=2, items=3, channels=1)
         small = self._count_dashboard_queries()
