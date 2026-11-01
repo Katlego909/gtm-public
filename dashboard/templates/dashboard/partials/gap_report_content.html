@@ -40,89 +40,68 @@
 </header>
 
 <div class="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50">
-    <div class="max-w-7xl mx-auto">
-        <p class="text-xs text-gray-500 mb-4">
-            {% if current_workspace %}Workspace <span class="font-semibold text-gray-700">{{ current_workspace.name }}</span>{% else %}Personal scope{% endif %}
-            &middot; Completed assessments: {{ completed_assessments }}
-            {% if latest_assessment %}
-                &middot; Latest: {{ latest_assessment.company_name|default:'Unnamed' }} ({{ latest_assessment.created_at|date:"M d, Y" }})
-            {% endif %}
+    <div class="max-w-7xl mx-auto space-y-6">
+        <p class="text-sm text-gray-500">
+            {% if current_workspace %}{{ current_workspace.name }}{% else %}Personal scope{% endif %}
+            &middot; {{ completed_assessments }} completed assessment{{ completed_assessments|pluralize }}
+            {% if latest_assessment %}&middot; latest {{ latest_assessment.created_at|date:"M d, Y" }}{% endif %}
         </p>
 
-        <div class="bg-white rounded-xl border border-gray-100 p-5 mb-6">
-            {% include 'dashboard/partials/gap_suggestions_panel.html' with gap_suggestions=gap_suggestions latest_completed_session=latest_completed_gap_session %}
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-            <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-                <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold">Total Metrics</p>
-                <p class="text-2xl font-bold text-gray-900 mt-2">{{ total_metrics }}</p>
+        {# Re-fetched after any successful change on this page (accept a draft, #}
+        {# add, log, resolve or delete a gap) so the numbers never go stale #}
+        {# while the table updates in place. hx-select swaps in just this block. #}
+        <div id="gap-summary"
+             hx-get="{% url 'gap_report' %}"
+             hx-include="#workspace-selector"
+             hx-trigger="htmx:afterRequest[detail.successful && detail.requestConfig.verb !== 'get'] from:body"
+             hx-select="#gap-summary"
+             hx-swap="outerHTML"
+             class="grid grid-cols-2 xl:grid-cols-4 gap-4">
+            <div class="bg-white rounded-xl border border-gray-100 p-5">
+                <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold">Tracked</p>
+                <p class="text-3xl font-bold text-gray-900 mt-2">{{ total_metrics }}</p>
+                {% if closed_count %}<p class="text-xs text-gray-500 mt-1">{{ closed_count }} closed</p>{% endif %}
             </div>
-            <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-                <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold">Behind Target</p>
-                <p class="text-2xl font-bold text-red-600 mt-2">{{ behind_count }}</p>
+            <div class="bg-white rounded-xl border border-gray-100 p-5">
+                <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold">Behind target</p>
+                <p class="text-3xl font-bold mt-2 {% if behind_count %}text-red-600{% else %}text-gray-900{% endif %}">{{ behind_count }}</p>
             </div>
-            <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-                <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold">On Track</p>
-                <p class="text-2xl font-bold text-green-600 mt-2">{{ on_track_count }}</p>
+            <div class="bg-white rounded-xl border border-gray-100 p-5">
+                <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold">On track</p>
+                <p class="text-3xl font-bold text-green-700 mt-2">{{ on_track_count }}</p>
             </div>
-            <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-                <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold">Average Gap</p>
-                <p class="text-2xl font-bold {% if avg_gap < 0 %}text-red-600{% else %}text-green-600{% endif %} mt-2">{{ avg_gap }}%</p>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-            <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5 lg:col-span-2">
-                <h2 class="text-lg font-bold text-gray-900 mb-4">Highest-Risk Metrics</h2>
-                {% if at_risk_metrics %}
-                <div class="space-y-3">
-                    {% for metric in at_risk_metrics %}
-                    <div class="rounded-lg border border-red-100 bg-red-50 px-4 py-3 flex items-center justify-between gap-4">
-                        <div>
-                            <p class="text-sm font-semibold text-gray-900">{{ metric.metric }}</p>
-                            <p class="text-xs text-gray-600 mt-0.5">{{ metric.category }} • Priority {{ metric.priority }}</p>
-                            <p class="text-xs text-gray-700 mt-1">Current {{ metric.current }} -> Target {{ metric.target }} <span class="text-gray-400">(est.)</span></p>
-                        </div>
-                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">{{ metric.gap_numeric|floatformat:1 }}%</span>
-                    </div>
-                    {% endfor %}
-                </div>
+            <div class="bg-white rounded-xl border border-gray-100 p-5">
+                <p class="text-xs uppercase tracking-wide text-gray-500 font-semibold">Average gap</p>
+                {% if avg_gap is None %}
+                    <p class="text-3xl font-bold text-gray-300 mt-2">&mdash;</p>
+                    <p class="text-xs text-gray-500 mt-1">Nothing measured yet</p>
                 {% else %}
-                <div class="rounded-lg border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
-                    No at-risk metrics yet.
-                </div>
+                    <p class="text-3xl font-bold mt-2 {% if avg_gap < 0 %}text-red-600{% else %}text-green-700{% endif %}">{{ avg_gap }}%</p>
                 {% endif %}
             </div>
-
-            <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-                <h2 class="text-lg font-bold text-gray-900 mb-4">Coverage Snapshot</h2>
-                <div class="space-y-3 text-sm">
-                    <div class="flex items-center justify-between"><span class="text-gray-600">High Priority</span><span class="font-semibold text-red-600">{{ high_priority_count }}</span></div>
-                    <div class="flex items-center justify-between"><span class="text-gray-600">Medium Priority</span><span class="font-semibold text-yellow-700">{{ medium_priority_count }}</span></div>
-                    <div class="flex items-center justify-between"><span class="text-gray-600">Low Priority</span><span class="font-semibold text-green-700">{{ low_priority_count }}</span></div>
-                    <hr class="my-2 border-gray-100">
-                    <div class="flex items-center justify-between"><span class="text-gray-600">AI Metrics</span><span class="font-semibold text-indigo-700">{{ source_breakdown.ai }}</span></div>
-                    <div class="flex items-center justify-between"><span class="text-gray-600">User Metrics</span><span class="font-semibold text-gray-700">{{ source_breakdown.user }}</span></div>
-                    <hr class="my-2 border-gray-100">
-                    <div class="flex items-center justify-between"><span class="text-gray-600">AI Suggestions Pending</span><span class="font-semibold text-indigo-700">{{ suggestions_breakdown.pending }}</span></div>
-                    <div class="flex items-center justify-between"><span class="text-gray-600">AI Suggestions Accepted</span><span class="font-semibold text-green-700">{{ suggestions_breakdown.accepted }}</span></div>
-                    <div class="flex items-center justify-between"><span class="text-gray-600">AI Suggestions Rejected</span><span class="font-semibold text-gray-700">{{ suggestions_breakdown.rejected }}</span></div>
-                </div>
-            </div>
         </div>
 
-        <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-6">
-            <h2 class="text-lg font-bold text-gray-900 mb-4">Category Performance Summary</h2>
-            {% if category_summary %}
+        {% include 'dashboard/partials/gap_suggestions_panel.html' with gap_suggestions=gap_suggestions latest_completed_session=latest_completed_gap_session %}
+
+        <div class="bg-white rounded-xl border border-gray-100 p-5">
+            <div class="flex items-baseline justify-between gap-4">
+                <h2 class="text-lg font-bold text-gray-900">All gaps</h2>
+                <p class="text-xs text-gray-500">Furthest behind first &middot; closed gaps last</p>
+            </div>
+            {% include 'dashboard/partials/gap_analysis_table.html' %}
+        </div>
+
+        {% if category_summary %}
+        <div class="bg-white rounded-xl border border-gray-100 p-5">
+            <h2 class="text-lg font-bold text-gray-900 mb-4">By category</h2>
             <div class="overflow-x-auto">
                 <table class="min-w-full text-sm">
                     <thead class="bg-gray-50 text-gray-500 uppercase text-xs font-semibold">
                         <tr>
                             <th class="px-4 py-3 text-left">Category</th>
-                            <th class="px-4 py-3 text-left">Metrics</th>
+                            <th class="px-4 py-3 text-left">Gaps</th>
                             <th class="px-4 py-3 text-left">Behind</th>
-                            <th class="px-4 py-3 text-left">Average Gap</th>
+                            <th class="px-4 py-3 text-left">Average gap</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
@@ -130,23 +109,17 @@
                         <tr>
                             <td class="px-4 py-3 font-medium text-gray-900">{{ row.category }}</td>
                             <td class="px-4 py-3 text-gray-700">{{ row.count }}</td>
-                            <td class="px-4 py-3 text-gray-700">{{ row.behind_count }}</td>
-                            <td class="px-4 py-3 {% if row.avg_gap < 0 %}text-red-600{% else %}text-green-600{% endif %} font-semibold">{{ row.avg_gap }}%</td>
+                            <td class="px-4 py-3 {% if row.behind_count %}text-red-600 font-medium{% else %}text-gray-700{% endif %}">{{ row.behind_count }}</td>
+                            <td class="px-4 py-3">
+                                {% if row.avg_gap is None %}<span class="text-gray-400">Not measured</span>
+                                {% else %}<span class="font-medium {% if row.avg_gap < 0 %}text-red-600{% else %}text-green-700{% endif %}">{{ row.avg_gap }}%</span>{% endif %}
+                            </td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-            {% else %}
-            <div class="rounded-lg border border-dashed border-gray-200 px-4 py-8 text-center text-sm text-gray-500">
-                No category data available yet.
-            </div>
-            {% endif %}
         </div>
-
-        <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-            <h2 class="text-lg font-bold text-gray-900">All gaps</h2>
-            {% include 'dashboard/partials/gap_analysis_table.html' %}
-        </div>
+        {% endif %}
     </div>
 </div>

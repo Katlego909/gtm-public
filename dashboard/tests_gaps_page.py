@@ -73,3 +73,34 @@ class GapsPageTests(TestCase):
     def test_sidebar_links_to_gaps_page(self):
         response = self.client.get(reverse("dashboard"))
         self.assertContains(response, f'href="{reverse("gap_report")}"')
+
+    def test_table_orders_worst_first_then_unmeasured_then_on_track_then_closed(self):
+        self._metric("On Track", 120)
+        self._metric("Closed One", 50, status="closed")
+        self._metric("Unmeasured", 0, estimate_method="unmeasured")
+        self._metric("Slightly Behind", 90)
+        self._metric("Far Behind", 20)
+        response = self.client.get(reverse("gap_report"))
+        names = [m.metric for m in response.context["gap_analysis"]]
+        self.assertEqual(names, ["Far Behind", "Slightly Behind", "Unmeasured", "On Track", "Closed One"])
+        # Closed and unmeasured gaps count as neither behind nor on track.
+        self.assertEqual(response.context["behind_count"], 2)
+        self.assertEqual(response.context["on_track_count"], 1)
+
+    def test_refreshed_rows_keep_the_same_order(self):
+        self._metric("On Track", 120)
+        self._metric("Far Behind", 20)
+        response = self.client.get(reverse("refresh_gap_analysis_table"))
+        self.assertEqual([m.metric for m in response.context["gap_analysis"]], ["Far Behind", "On Track"])
+
+    def test_empty_drafts_message_and_breakdown_hidden_for_one_category(self):
+        self._metric("Win Rate", 50)
+        response = self.client.get(reverse("gap_report"))
+        self.assertContains(response, "No drafts waiting for review")
+        self.assertNotContains(response, "By category")
+
+    def test_breakdown_shown_once_gaps_span_categories(self):
+        self._metric("Win Rate", 50)
+        self._metric("Net Revenue Retention", 85, category="Customer Success")
+        response = self.client.get(reverse("gap_report"))
+        self.assertContains(response, "By category")

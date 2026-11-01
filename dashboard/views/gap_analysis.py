@@ -85,8 +85,7 @@ from .helpers import (
     _fallback_gap_suggestions,
     _gap_metric_scope_queryset,
     _get_gap_scope,
-    annotate_gap_standing,
-    highest_risk_gaps,
+    gaps_for_table,
     _load_pending_gap_suggestions,
     _md,
     _resolve_dashboard_workspace,
@@ -588,8 +587,7 @@ def delete_gap_metric(request, pk):
 def gap_analysis_table(request):
     # _get_gap_scope only honours a ?workspace= the user is an active member of.
     current_workspace, _ = _get_gap_scope(request)
-    gap_analysis = _gap_metric_scope_queryset(request.user, current_workspace)
-    gap_analysis = prepare_gap_metrics_for_display(gap_analysis, current_workspace, request.user)
+    gap_analysis = gaps_for_table(request.user, current_workspace)
 
     return render(request, 'dashboard/partials/gap_analysis_table.html', {'gap_analysis': gap_analysis})
 
@@ -597,85 +595,51 @@ def gap_analysis_table(request):
 @vary_on_headers('HX-Request')
 @login_required
 def gap_report(request):
-    """Comprehensive detailed gap report page."""
+    """The Gaps page: summary line, AI drafts, and the actionable table."""
     current_workspace, user_workspaces = _resolve_dashboard_workspace(request)
 
     if current_workspace:
-        metrics_qs = GapAnalysisMetric.objects.filter(workspace=current_workspace).order_by('category', 'priority', 'metric')
-        suggestions_qs = GapAnalysisSuggestion.objects.filter(workspace=current_workspace, user=request.user)
         assessment_scope = AssessmentSession.objects.filter(workspace=current_workspace)
     else:
-        metrics_qs = GapAnalysisMetric.objects.filter(user=request.user, workspace__isnull=True).order_by('category', 'priority', 'metric')
-        suggestions_qs = GapAnalysisSuggestion.objects.filter(user=request.user, workspace__isnull=True)
         assessment_scope = AssessmentSession.objects.filter(user=request.user)
 
-    metrics = prepare_gap_metrics_for_display(metrics_qs, current_workspace, request.user)
-    for metric in metrics:
-        annotate_gap_standing(metric)
-
-    total_metrics = len(metrics)
-    # A gap nobody has measured is neither behind nor on track.
-    compared = [m for m in metrics if not m.awaiting_measurement]
-    behind_metrics = [m for m in compared if m.is_behind]
-    on_track_metrics = [m for m in compared if not m.is_behind]
-
-    avg_gap = round(sum(m.gap_numeric for m in compared) / len(compared), 1) if compared else 0.0
-    high_priority_count = sum(1 for m in metrics if m.priority == 'High')
-    medium_priority_count = sum(1 for m in metrics if m.priority == 'Medium')
-    low_priority_count = sum(1 for m in metrics if m.priority == 'Low')
-
-    at_risk_metrics = highest_risk_gaps(metrics, 6)
+    metrics = gaps_for_table(request.user, current_workspace)
+    # A gap nobody has measured, or one already closed, is neither behind nor
+    # on track.
+    compared = [m for m in metrics if not m.awaiting_measurement and m.status != 'closed']
+    behind_count = sum(1 for m in compared if m.is_behind)
+    avg_gap = round(sum(m.gap_numeric for m in compared) / len(compared), 1) if compared else None
 
     category_summary = []
-    categories = sorted({m.category for m in metrics})
-    for category in categories:
+    for category in sorted({m.category for m in metrics}):
         cat_metrics = [m for m in metrics if m.category == category]
-        cat_behind = sum(1 for m in cat_metrics if m.is_behind)
-        cat_avg = round(sum(m.gap_numeric for m in cat_metrics) / len(cat_metrics), 1) if cat_metrics else 0.0
+        cat_compared = [m for m in cat_metrics if m in compared]
         category_summary.append({
             'category': category,
             'count': len(cat_metrics),
-            'behind_count': cat_behind,
-            'avg_gap': cat_avg,
+            'behind_count': sum(1 for m in cat_compared if m.is_behind),
+            'avg_gap': round(sum(m.gap_numeric for m in cat_compared) / len(cat_compared), 1) if cat_compared else None,
         })
 
-    source_breakdown = {
-        'ai': sum(1 for m in metrics if m.source == 'AI'),
-        'user': sum(1 for m in metrics if m.source == 'USER'),
-    }
-
-    suggestions_breakdown = {
-        'pending': suggestions_qs.filter(status='pending').count(),
-        'accepted': suggestions_qs.filter(status='accepted').count(),
-        'rejected': suggestions_qs.filter(status='rejected').count(),
-    }
-
-    completed_assessments = assessment_scope.filter(is_completed=True).count()
-    latest_assessment = assessment_scope.filter(is_completed=True).order_by('-created_at').first()
+    completed = assessment_scope.filter(is_completed=True)
+    latest_assessment = completed.order_by('-created_at').first()
 
     context = {
         'current_workspace': current_workspace,
         'user_workspaces': user_workspaces,
         'page_title': 'Gaps',
-        'metrics': metrics,
-        # The full workflow lives on this page: the drafts panel and the
-        # actionable table (gap_suggestions_panel.html, gap_analysis_table.html).
         'gap_analysis': metrics,
         'gap_suggestions': _load_pending_gap_suggestions(request, current_workspace),
         'latest_completed_gap_session': latest_assessment,
-        'total_metrics': total_metrics,
-        'behind_count': len(behind_metrics),
-        'on_track_count': len(on_track_metrics),
-        'avg_gap': avg_gap,
-        'high_priority_count': high_priority_count,
-        'medium_priority_count': medium_priority_count,
-        'low_priority_count': low_priority_count,
-        'at_risk_metrics': at_risk_metrics,
-        'category_summary': category_summary,
-        'source_breakdown': source_breakdown,
-        'suggestions_breakdown': suggestions_breakdown,
-        'completed_assessments': completed_assessments,
         'latest_assessment': latest_assessment,
+        'completed_assessments': completed.count(),
+        'total_metrics': len(metrics),
+        'behind_count': behind_count,
+        'on_track_count': len(compared) - behind_count,
+        'closed_count': sum(1 for m in metrics if m.status == 'closed'),
+        'avg_gap': avg_gap,
+        # Only worth a breakdown once gaps span more than one category.
+        'category_summary': category_summary if len(category_summary) > 1 else [],
     }
     if request.htmx:
         return render(request, 'dashboard/partials/gap_report_content.html', context)
@@ -694,9 +658,7 @@ def get_gap_metric_row(request, pk):
 @login_required
 def refresh_gap_analysis_table(request):
     current_workspace, _ = _get_gap_scope(request)
-    gap_analysis = _gap_metric_scope_queryset(request.user, current_workspace).order_by('category', 'priority')
-
-    gap_analysis = prepare_gap_metrics_for_display(gap_analysis, current_workspace, request.user)
+    gap_analysis = gaps_for_table(request.user, current_workspace)
 
     return render(request, 'dashboard/partials/_gap_analysis_table_rows.html', {'gap_analysis': gap_analysis})
 

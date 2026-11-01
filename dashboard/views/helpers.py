@@ -708,9 +708,33 @@ def annotate_gap_standing(metric):
     return metric
 
 
+def gaps_for_table(user, workspace):
+    """Every gap in scope, prepared for display and ordered for the Gaps
+    table: behind target (furthest behind first), then not yet measured, then
+    on track (closest to slipping first), with closed gaps last. The page and
+    both table-refresh endpoints use this, so rows keep their order after an
+    action re-renders the table."""
+    metrics = prepare_gap_metrics_for_display(
+        _gap_metric_scope_queryset(user, workspace), workspace, user,
+    )
+    for metric in metrics:
+        annotate_gap_standing(metric)
+
+    def order(metric):
+        if metric.status == 'closed':
+            return (3, 0)
+        if metric.is_behind:
+            return (0, metric.gap_numeric)
+        if metric.awaiting_measurement:
+            return (1, 0)
+        return (2, metric.gap_numeric)
+
+    return sorted(metrics, key=order)
+
+
 def highest_risk_gaps(metrics, limit):
-    """Behind-target gaps, furthest behind first -- the one ranking rule shared
-    by the Gaps page's Highest-Risk list and the dashboard card."""
+    """Behind-target gaps, furthest behind first (the dashboard card's top
+    gaps; the same rule heads the Gaps table via gaps_for_table)."""
     return sorted((m for m in metrics if m.is_behind), key=lambda m: m.gap_numeric)[:limit]
 
 
