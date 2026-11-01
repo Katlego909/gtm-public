@@ -115,8 +115,9 @@
 
 <div class="bg-white rounded-xl p-5 md:p-6 border border-gray-100 flex flex-col mb-6">
     <h3 class="text-lg font-bold text-gray-800 mb-1">Agent Activity</h3>
-    <p class="text-sm text-gray-500 mb-3">Everything the team has actually done in this workspace &mdash; not just documents.</p>
-    <div class="relative mt-2" style="height: 220px;">
+    <p class="text-sm text-gray-500 mb-3">Everything the agents have actually done in this workspace. Run steps count only once they produced something real.</p>
+    <div id="impactActivityLegend" class="flex flex-wrap gap-x-5 gap-y-2 text-xs text-gray-600"></div>
+    <div id="impactActivityWrap" class="relative mt-3" style="height: 220px;">
         <canvas id="impactActivityChart"></canvas>
     </div>
 </div>
@@ -142,8 +143,8 @@
 {{ agent_value_context.trend_documents_per_week|json_script:"js-impact-documents-per-week" }}
 {{ agent_value_context.measured.documents_by_agent_labels|json_script:"js-impact-agent-labels" }}
 {{ agent_value_context.measured.documents_by_agent_counts|json_script:"js-impact-agent-counts" }}
-{{ agent_value_context.measured.activity_labels|json_script:"js-impact-activity-labels" }}
-{{ agent_value_context.measured.activity_counts|json_script:"js-impact-activity-counts" }}
+{{ agent_value_context.measured.activity_rows|json_script:"js-impact-activity-rows" }}
+{{ agent_value_context.measured.activity_groups|json_script:"js-impact-activity-groups" }}
 <script>
 (function() {
     function initImpactCharts() {
@@ -186,30 +187,54 @@
             });
         }
 
-        // Agent Activity (horizontal bar, spans conversations/task-actions/completions/documents)
+        // Agent Activity (horizontal bar). Bars are colored by group so related
+        // actions read together; palette validated with the dataviz checker
+        // (brand copper first, then CVD-separated hues). Zero rows are hidden.
         const ctxActivity = document.getElementById('impactActivityChart');
         if (ctxActivity && typeof Chart !== 'undefined') {
             Chart.getChart(ctxActivity)?.destroy();
-            const activityLabels = getJsonData('js-impact-activity-labels', []);
-            const activityCounts = getJsonData('js-impact-activity-counts', []);
-            const hasData = activityCounts && activityCounts.some(v => v > 0);
+            const GROUP_COLORS = {
+                conversations: '#B8530F',
+                tasks: '#2a78d6',
+                documents: '#1baf7a',
+                gaps: '#6250d6',
+                team: '#eda100',
+            };
+            const allRows = getJsonData('js-impact-activity-rows', []);
+            const groupNames = getJsonData('js-impact-activity-groups', {});
+            const shown = allRows.filter(r => r.count > 0);
+            const hasData = shown.length > 0;
+            const rows = hasData ? shown : allRows.filter(r => ['Conversations', 'Documents written'].includes(r.label));
+
+            const legend = document.getElementById('impactActivityLegend');
+            if (legend) {
+                const present = [...new Set(rows.map(r => r.group))];
+                legend.innerHTML = hasData ? present.map(g =>
+                    `<span class="inline-flex items-center gap-1.5"><span class="inline-block w-3 h-3 rounded-sm" style="background:${GROUP_COLORS[g]}"></span>${groupNames[g] || g}</span>`
+                ).join('') : '';
+            }
+            const wrap = document.getElementById('impactActivityWrap');
+            if (wrap) wrap.style.height = Math.max(160, rows.length * 34 + 40) + 'px';
 
             new Chart(ctxActivity.getContext('2d'), {
                 type: 'bar',
                 data: {
-                    labels: activityLabels,
+                    labels: rows.map(r => r.label),
                     datasets: [{
-                        data: hasData ? activityCounts : [0, 0, 0, 0],
-                        backgroundColor: hasData ? '#B8530F' : '#e2e8f0',
+                        data: rows.map(r => r.count),
+                        backgroundColor: hasData ? rows.map(r => GROUP_COLORS[r.group]) : '#e2e8f0',
                         borderRadius: 4,
-                        barThickness: 20,
+                        barThickness: 18,
                     }]
                 },
                 options: {
                     indexAxis: 'y',
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { afterLabel: (item) => groupNames[rows[item.dataIndex].group] || '' } },
+                    },
                     scales: {
                         x: { beginAtZero: true, ticks: { precision: 0 }, border: { display: false } },
                         y: { grid: { display: false }, border: { display: false } }

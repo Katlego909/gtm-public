@@ -27,7 +27,51 @@ from gtm.models import (
     ChatMessage,
     WorkspaceChatMessage,
 )
+from gtm.models_agent_runs import AgentRun
+from gtm.models_automations import AutomationRun
 from gtm.models_workspace import WorkspaceActivityEvent
+
+# Agent Activity chart rows: (key, label, group). Groups carry the bar color,
+# so related actions read together; order here is the chart's order.
+# Run-step kinds come from gtm/agent_runs.py::STEP_KINDS -- a step only counts
+# once its tool reported a real object (status "done"). create_document steps
+# are not listed: every agent document is already in "documents".
+ACTIVITY_ROWS = [
+    ("conversations", "Conversations", "conversations"),
+    ("chat_task_actions", "Task actions via chat", "tasks"),
+    ("tasks_completed", "Tasks completed by AI", "tasks"),
+    ("create_subtasks", "Subtasks created", "tasks"),
+    ("assign_task", "Tasks assigned", "tasks"),
+    ("comment", "Task comments", "tasks"),
+    ("documents", "Documents written", "documents"),
+    ("recommend_resource", "Resources recommended", "documents"),
+    ("flag_gap", "Gaps flagged", "gaps"),
+    ("propose_measurement", "Measurements proposed", "gaps"),
+    ("ask_teammate", "Questions to teammates", "team"),
+    ("notify_teammate", "Teammates notified", "team"),
+    ("create_automation", "Automations set up", "team"),
+    ("automation_actions", "Automation actions", "team"),
+    ("crm_update", "CRM updates", "team"),
+]
+ACTIVITY_GROUPS = {
+    "conversations": "Conversations",
+    "tasks": "Task work",
+    "documents": "Documents & resources",
+    "gaps": "Gaps & measurements",
+    "team": "Team & integrations",
+}
+
+
+def _activity(counts):
+    """Chart-ready rows from a {row key: count} map; missing keys count 0."""
+    rows = [
+        {"label": label, "group": group, "count": counts.get(key, 0)}
+        for key, label, group in ACTIVITY_ROWS
+    ]
+    return {
+        "activity_rows": rows,
+        "activity_groups": ACTIVITY_GROUPS,
+    }
 
 # Sourced 2026 market data, not a guess:
 # - Marketing-strategist hourly rate: $150-300/hr (gtm8020.com, saasconsult.co,
@@ -69,8 +113,7 @@ def _empty_context():
             "ai_cost_usd": 0.0,
             "conversations_total": 0,
             "chat_task_actions": 0,
-            "activity_labels": ["Conversations", "Task Actions via Chat", "Tasks Completed by AI", "Documents Created"],
-            "activity_counts": [0, 0, 0, 0],
+            **_activity({}),
         },
         "estimated": {
             "hours_saved": 0.0,
@@ -166,8 +209,24 @@ def get_agent_value_context(current_workspace):
         metadata__source="dashboard_agent",
     ).count()
 
-    activity_labels = ["Conversations", "Task Actions via Chat", "Tasks Completed by AI", "Documents Created"]
-    activity_counts = [conversations_total, chat_task_actions, tasks_completed, documents_total]
+    # What agents did through approved runs: completed plan steps by kind.
+    step_counts = {}
+    for plan in AgentRun.objects.filter(workspace=current_workspace).values_list("plan", flat=True):
+        for step in plan or []:
+            if isinstance(step, dict) and step.get("status") == "done":
+                step_counts[step.get("kind")] = step_counts.get(step.get("kind"), 0) + 1
+
+    activity = _activity({
+        **step_counts,
+        "conversations": conversations_total,
+        "chat_task_actions": chat_task_actions,
+        "tasks_completed": tasks_completed,
+        "documents": documents_total,
+        # Scheduled/conditional automations that actually did something.
+        "automation_actions": AutomationRun.objects.filter(
+            automation__workspace=current_workspace, outcome="acted",
+        ).count(),
+    })
 
     trend_weeks_labels = []
     trend_documents_per_week = []
@@ -193,8 +252,7 @@ def get_agent_value_context(current_workspace):
             "ai_cost_usd": round(ai_cost_usd, 4),
             "conversations_total": conversations_total,
             "chat_task_actions": chat_task_actions,
-            "activity_labels": activity_labels,
-            "activity_counts": activity_counts,
+            **activity,
         },
         "estimated": {
             "hours_saved": round(hours_saved, 1),
