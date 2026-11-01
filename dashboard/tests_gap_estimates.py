@@ -124,6 +124,36 @@ class AIGapSuggestionsPromptTests(TestCase):
         self.assertIn("Robotics", prompt)
         self.assertIn("11-50", prompt)
 
+    def _assert_no_thinking(self, mock_client):
+        # gemini-2.5-flash "thinks" unless told not to, which made these
+        # synchronous requests spin for tens of seconds.
+        config = mock_client.models.generate_content.call_args.kwargs.get("config")
+        self.assertIsNotNone(config)
+        self.assertEqual(config.thinking_config.thinking_budget, 0)
+
+    def test_gap_suggestions_call_disables_thinking(self):
+        mock_client = self._mock_client('{"suggestions": []}')
+        with mock.patch("gtm.ai_services._quota_cooldown_active", return_value=False), \
+             mock.patch("gtm.ai_services._request_budget_available", return_value=True), \
+             mock.patch("gtm.ai_services._get_client", return_value=mock_client), \
+             mock.patch("gtm.ai_credits.record_spend"):
+            _ai_gap_suggestions_from_assessment(self.session)
+        self._assert_no_thinking(mock_client)
+
+    def test_create_tasks_call_disables_thinking(self):
+        from dashboard.views.helpers import _ai_action_items_for_gap_metric
+        metric = GapAnalysisMetric.objects.create(
+            category="Lead Generation", metric="Monthly Qualified Leads", current=10, target=20,
+            priority="High", recommendation="Tighten ICP filters.", user=self.user, session=self.session,
+        )
+        mock_client = self._mock_client('{"action_items": ["Define ICP criteria"]}')
+        with mock.patch("gtm.ai_services._quota_cooldown_active", return_value=False), \
+             mock.patch("gtm.ai_services._request_budget_available", return_value=True), \
+             mock.patch("gtm.ai_services._get_client", return_value=mock_client), \
+             mock.patch("gtm.ai_credits.record_spend"):
+            _ai_action_items_for_gap_metric(metric)
+        self._assert_no_thinking(mock_client)
+
     def test_ai_response_values_get_rounded_server_side(self):
         response_json = (
             '{"suggestions": [{"category": "Lead Generation", "metric": "Monthly Qualified Leads", '

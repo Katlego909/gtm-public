@@ -439,7 +439,10 @@ Assessment context:
 """.strip()
 
     try:
-        ai_response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+        from gtm.ai_services import _GAP_SUGGESTIONS_CONFIG
+        ai_response = client.models.generate_content(
+            model='gemini-2.5-flash', contents=prompt, config=_GAP_SUGGESTIONS_CONFIG,
+        )
         if hasattr(ai_response, 'usage_metadata'):
             from gtm.ai_credits import record_spend
             record_spend(account, ai_response.usage_metadata.total_token_count, "gap_suggestions", session=session)
@@ -558,7 +561,10 @@ Output STRICT JSON only: {{"action_items": ["...", "..."]}}
 """.strip()
 
     try:
-        ai_response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
+        from gtm.ai_services import _ACTION_CONFIG
+        ai_response = client.models.generate_content(
+            model='gemini-2.5-flash', contents=prompt, config=_ACTION_CONFIG,
+        )
         if hasattr(ai_response, 'usage_metadata'):
             from gtm.ai_credits import record_spend
             record_spend(account, ai_response.usage_metadata.total_token_count, "gap_action_items", session=metric.session)

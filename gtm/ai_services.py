@@ -300,6 +300,7 @@ except ImportError:
 _FAST_CONFIG = None      # diagnostics, rewrites: 600 tokens, no thinking
 _PLAYBOOK_CONFIG = None  # playbook: 4096 tokens, no thinking
 _ACTION_CONFIG = None    # action items: 512 tokens, no thinking
+_GAP_SUGGESTIONS_CONFIG = None  # gap metric drafts: 2048 tokens, JSON, no thinking
 
 if GENAI_AVAILABLE:
     try:
@@ -316,6 +317,14 @@ if GENAI_AVAILABLE:
         _ACTION_CONFIG = types.GenerateContentConfig(
             temperature=0.3,
             max_output_tokens=512,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+        )
+        # Without an explicit config gemini-2.5-flash "thinks" first, which
+        # made Generate Suggestions spin for tens of seconds.
+        _GAP_SUGGESTIONS_CONFIG = types.GenerateContentConfig(
+            temperature=0.3,
+            max_output_tokens=2048,  # 3-5 suggestions with rationale
+            response_mime_type="application/json",
             thinking_config=types.ThinkingConfig(thinking_budget=0),
         )
     except Exception as e:
