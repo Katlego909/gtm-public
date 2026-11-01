@@ -44,12 +44,32 @@
         if (isHidden) {
             const rect = triggerEl.getBoundingClientRect();
             panel.style.position = 'fixed';
-            panel.style.top = (rect.bottom + 4) + 'px';
             panel.style.right = (window.innerWidth - rect.right) + 'px';
             panel.style.left = 'auto';
             panel.classList.remove('hidden');
+            // A fixed panel can't be scrolled into view, so open upward when
+            // there isn't room below the trigger (e.g. the last row), and
+            // never past the top of the viewport.
+            const height = panel.offsetHeight;
+            const spaceBelow = window.innerHeight - rect.bottom;
+            const top = (spaceBelow < height + 8 && rect.top > spaceBelow)
+                ? Math.max(8, rect.top - height - 4)
+                : rect.bottom + 4;
+            panel.style.top = top + 'px';
         } else {
             panel.classList.add('hidden');
         }
+    }
+
+    // Fixed panels don't follow their trigger when the page scrolls; close
+    // them instead of leaving a menu floating over the wrong row. Registered
+    // once even though this partial re-renders.
+    if (!window.__gapMenuScrollCloseBound) {
+        window.__gapMenuScrollCloseBound = true;
+        document.addEventListener('scroll', function () {
+            document.querySelectorAll('[id^="gap-actions-menu-"]').forEach(function (p) {
+                p.classList.add('hidden');
+            });
+        }, true);
     }
 </script>
