@@ -7,9 +7,6 @@
   <title>ForgeGTM</title>
   <link rel="icon" type="image/png" href="{% static 'images/icon.png' %}">
 
-  <!-- Tailwind CDN + shared design-scale config -->
-  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
-  <script src="{% static 'js/tailwind-config.js' %}"></script>
 
   <!-- HTMX for SPA-like behavior -->
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
@@ -42,6 +39,10 @@
 
   <!-- Shared design tokens & component classes -->
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <!-- Prebuilt Tailwind (theme/tailwind.config.js). Last in <head> on purpose:
+       utilities must win over app.css and inline component styles, as
+       templates combine them (e.g. app-icon-badge bg-red-50). -->
+  <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
 </head>
 <body class="bg-slate-50 text-gray-900">
   <!-- Modern Navigation Bar -->

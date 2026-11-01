@@ -23,6 +23,28 @@ COPY requirements.txt .
 RUN pip install --user --no-cache-dir --no-warn-script-location -r requirements.txt
 RUN pip install --user --no-cache-dir gunicorn
 
+# Tailwind stage: compiles theme/static/css/tailwind.css from the templates
+# with the standalone CLI (no Node), so production CSS always matches the code
+# even if the committed copy is stale. Version + checksum pinned; bump both
+# together (and use the same version locally -- see theme/tailwind.config.js).
+FROM debian:bookworm-slim AS css
+ARG TAILWIND_VERSION=v3.4.17
+ARG TAILWIND_SHA256=7d24f7fa191d2193b78cd5f5a42a6093e14409521908529f42d80b11fde1f1d4
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl -sSfL -o /usr/local/bin/tailwindcss \
+       "https://github.com/tailwindlabs/tailwindcss/releases/download/${TAILWIND_VERSION}/tailwindcss-linux-x64" \
+    && echo "${TAILWIND_SHA256}  /usr/local/bin/tailwindcss" | sha256sum -c - \
+    && chmod +x /usr/local/bin/tailwindcss
+WORKDIR /app
+# Only what the config scans (templates, Python, theme JS).
+COPY templates/ templates/
+COPY gtm/ gtm/
+COPY dashboard/ dashboard/
+COPY theme/ theme/
+RUN tailwindcss -c theme/tailwind.config.js -i theme/tailwind.input.css \
+    -o theme/static/css/tailwind.css --minify
+
 # Runtime stage
 FROM python:3.11-slim
 
@@ -45,6 +67,7 @@ ENV PATH=/root/.local/bin:$PATH
 
 # Copy project code
 COPY . .
+COPY --from=css /app/theme/static/css/tailwind.css theme/static/css/tailwind.css
 
 # Copy and make entrypoint script executable
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh

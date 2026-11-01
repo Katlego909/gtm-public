@@ -6,15 +6,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>ForgeGTM - Transform Your Go-to-Market Strategy</title>
 
-  <!-- Tailwind CDN + shared design-scale config -->
-  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
-  <script src="{% static 'js/tailwind-config.js' %}"></script>
 
   <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
   <!-- Shared design tokens & component classes -->
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <!-- Prebuilt Tailwind (theme/tailwind.config.js). Last in <head> on purpose:
+       utilities must win over app.css and inline component styles, as
+       templates combine them (e.g. app-icon-badge bg-red-50). -->
+  <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
 </head>
 <body class="bg-white text-gray-900 overflow-x-hidden">
 

@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__caveman__caveman_retrieve",
+      "mcp__context7__query-docs",
+      "mcp__context7__resolve-library-id",
+      "mcp__claude-in-chrome__tabs_context_mcp",
+      "mcp__playwright__browser_wait_for",
+      "mcp__playwright__browser_console_messages",
+      "mcp__playwright__browser_resize",
+      "mcp__playwright__browser_snapshot",
+      "mcp__claude-in-chrome__find",
+      "mcp__claude_ai_Magnific__audio_voices_list",
+      "mcp__playwright__browser_network_requests",
+      "mcp__claude_ai_Higgsfield__balance",
+      "mcp__claude-in-chrome__read_console_messages"
+    ]
+  }
+}

@@ -7,8 +7,6 @@
     <title>{% block title %}ForgeGTM Dashboard{% endblock %}</title>
     <link rel="icon" type="image/png" href="{% static 'images/icon.png' %}">
 
-    <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
-    <script src="{% static 'js/tailwind-config.js' %}"></script>
     <script src="{% static 'js/chart.js' %}"></script>
     <script src="{% static 'js/dashboard-charts.js' %}" defer></script>
     <!-- Deferred: Kanban init waits for DOMContentLoaded, which fires after
@@ -203,6 +201,10 @@
             margin-bottom: 0.25rem;
         }
     </style>
+    <!-- Prebuilt Tailwind (theme/tailwind.config.js). Last in <head> on purpose:
+         utilities must win over app.css and inline component styles, as
+         templates combine them (e.g. app-icon-badge bg-red-50). -->
+    <link rel="stylesheet" href="{% static 'css/tailwind.css' %}">
 </head>
 <body class="bg-slate-50 text-slate-800 h-screen w-screen overflow-hidden flex">
 

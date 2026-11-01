@@ -1,0 +1,4 @@
+/* Input for the Tailwind build -- see theme/tailwind.config.js. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
