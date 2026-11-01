@@ -1,5 +1,7 @@
 import datetime
 from gtm.utils_markdown import render_markdown
+from django.db.models import Count, Q
+from django.db.models.functions import TruncDate
 from django.utils import timezone
 from django.urls import reverse
 from gtm.models import AssessmentSession, ActionItem, ResultSnapshot, ToolRecommendation, ChatMessage
@@ -9,6 +11,18 @@ from gtm.ai_chat import get_suggested_prompts
 
 def _md(text):
     return render_markdown(text)
+
+
+def _history_score(session):
+    """(overall, band_stage) for a history row: the cached ResultSnapshot when
+    present (select_related('snapshot') to avoid a query per row), else a full
+    recompute for completed sessions never opened on the results page."""
+    snap = getattr(session, 'snapshot', None)
+    if snap:
+        return snap.overall, snap.band_stage or 'Unknown'
+    _, overall = _compute_scores(session)
+    band = _band_for_score(overall)
+    return overall, band.stage if band else 'Unknown'
 
 
 def _build_assessment_history_export_rows(sessions_qs):
@@ -21,14 +35,7 @@ def _build_assessment_history_export_rows(sessions_qs):
     """
     rows = []
     for session in sessions_qs:
-        snap = getattr(session, 'snapshot', None)
-        if snap:
-            overall = snap.overall
-            band_stage = snap.band_stage or 'Unknown'
-        else:
-            _, overall = _compute_scores(session)
-            band = _band_for_score(overall)
-            band_stage = band.stage if band else 'Unknown'
+        overall, band_stage = _history_score(session)
         rows.append({
             'company_name': session.company_name or 'Unnamed',
             'industry': session.industry or 'N/A',
@@ -37,6 +44,18 @@ def _build_assessment_history_export_rows(sessions_qs):
             'created_at': session.created_at,
         })
     return rows
+
+def _counts_by_day(qs, field, start):
+    """{date: row count} for rows whose `field` falls on or after `start`."""
+    rows = (
+        qs.filter(**{f'{field}__date__gte': start})
+        .annotate(day=TruncDate(field))
+        .values('day')
+        .annotate(n=Count('pk'))
+        .order_by()
+    )
+    return {r['day']: r['n'] for r in rows}
+
 
 def get_dashboard_context(request, current_workspace, user_workspaces, agent_session_id):
     from dashboard.views import _load_pending_gap_suggestions
@@ -57,53 +76,70 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
     else:
         validator_results = ResultSnapshot.objects.filter(session__user=request.user).select_related('session', 'band').order_by('-created_at')[:10] if request.user.is_authenticated else []
 
-    # Weekly Activity: Sessions, Items Created, Items Completed per day (last 7 days)
+    # Weekly Activity: Sessions, Items Created, Items Completed per day (last
+    # 7 days). One grouped query per series, not one COUNT per day -- every
+    # query is a Cloud SQL round trip on the most-visited page.
     today = timezone.now().date()
     days = [(today - datetime.timedelta(days=i)) for i in range(6, -1, -1)]
+    sessions_by_day = _counts_by_day(assessments_qs, 'created_at', days[0])
+    created_by_day = _counts_by_day(action_items_qs, 'created_at', days[0])
+    completed_by_day = _counts_by_day(action_items_qs.filter(status='done'), 'completed_at', days[0])
     weekly_activity = []
     for day in days:
-        sessions = assessments_qs.filter(created_at__date=day).count()
-        items_created = action_items_qs.filter(created_at__date=day).count()
-        if 'completed_at' in [f.name for f in ActionItem._meta.fields]:
-            items_completed = action_items_qs.filter(status='done', completed_at__date=day).count()
-        else:
-            items_completed = action_items_qs.filter(status='done', created_at__date=day).count()
         weekly_activity.append({
             'date': day.strftime('%Y-%m-%d'),
             'label': day.strftime('%a'),
-            'sessions': sessions,
-            'items_created': items_created,
-            'items_completed': items_completed
+            'sessions': sessions_by_day.get(day, 0),
+            'items_created': created_by_day.get(day, 0),
+            'items_completed': completed_by_day.get(day, 0),
         })
 
-    # KPIs with percentage changes (now workspace-scoped)
-    total_sessions = assessments_qs.count()
-    completed_items = action_items_qs.filter(status='done').count()
-    pending_items = action_items_qs.exclude(status='done').count()
-    
-    # Calculate Action Item Velocity (Average Time to Completion)
-    completed_items_qs = action_items_qs.filter(status='done', completed_at__isnull=False)
-    velocity_days = None
-    if completed_items_qs.exists():
-        total_seconds = sum((item.completed_at - item.created_at).total_seconds() for item in completed_items_qs)
-        avg_seconds = total_seconds / completed_items_qs.count()
-        velocity_days = round(avg_seconds / 86400, 1)
-        
-
-    # Calculate percentage changes (compare this week vs last week)
+    # This week vs last week windows for the KPI percentage changes.
     this_week_start = today - datetime.timedelta(days=today.weekday())
     last_week_start = this_week_start - datetime.timedelta(days=7)
     last_week_end = this_week_start - datetime.timedelta(days=1)
-    
-    # Sessions this week vs last week (workspace-scoped)
-    this_week_sessions = assessments_qs.filter(
-        created_at__date__gte=this_week_start
-    ).count()
-    last_week_sessions = assessments_qs.filter(
-        created_at__date__gte=last_week_start,
-        created_at__date__lte=last_week_end
-    ).count()
-    
+    this_week = Q(created_at__date__gte=this_week_start)
+    last_week = Q(created_at__date__gte=last_week_start, created_at__date__lte=last_week_end)
+
+    # KPIs with percentage changes (workspace-scoped), one aggregate per
+    # queryset. completed_at (kept current by ActionItem.save) rather than
+    # updated_at for completions, which also moves when an already-finished
+    # task is merely edited -- same definition as the Tasks board's "Done this
+    # week" stat.
+    session_kpis = assessments_qs.aggregate(
+        total=Count('pk'),
+        this_week=Count('pk', filter=this_week),
+        last_week=Count('pk', filter=last_week),
+    )
+    done = Q(status='done')
+    open_ = Q(status__in=['todo', 'doing'])
+    item_kpis = action_items_qs.aggregate(
+        completed=Count('pk', filter=done),
+        pending=Count('pk', filter=~done),
+        this_week_completed=Count('pk', filter=done & Q(completed_at__date__gte=this_week_start)),
+        last_week_completed=Count('pk', filter=done & Q(
+            completed_at__date__gte=last_week_start, completed_at__date__lte=last_week_end,
+        )),
+        this_week_pending=Count('pk', filter=open_ & this_week),
+        last_week_pending=Count('pk', filter=open_ & last_week),
+    )
+    total_sessions = session_kpis['total']
+    completed_items = item_kpis['completed']
+    pending_items = item_kpis['pending']
+
+    # Calculate Action Item Velocity (Average Time to Completion)
+    completion_spans = list(
+        action_items_qs.filter(status='done', completed_at__isnull=False)
+        .values_list('created_at', 'completed_at')
+    )
+    velocity_days = None
+    if completion_spans:
+        total_seconds = sum((done_at - created).total_seconds() for created, done_at in completion_spans)
+        velocity_days = round(total_seconds / len(completion_spans) / 86400, 1)
+
+    this_week_sessions = session_kpis['this_week']
+    last_week_sessions = session_kpis['last_week']
+
     # Calculate percentage change for sessions
     sessions_change = 0
     sessions_change_positive = True
@@ -115,18 +151,8 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
     # Don't show percentage for 0 -> anything transitions
     
     # Completed items this week vs last week (workspace-scoped)
-    # completed_at (kept current by ActionItem.save) rather than updated_at,
-    # which also moves when an already-finished task is merely edited. Same
-    # definition as the Tasks board's "Done this week" stat.
-    this_week_completed = action_items_qs.filter(
-        status='done',
-        completed_at__date__gte=this_week_start
-    ).count()
-    last_week_completed = action_items_qs.filter(
-        status='done',
-        completed_at__date__gte=last_week_start,
-        completed_at__date__lte=last_week_end
-    ).count()
+    this_week_completed = item_kpis['this_week_completed']
+    last_week_completed = item_kpis['last_week_completed']
     
     # Calculate percentage change for completed items
     completed_change = 0
@@ -144,15 +170,8 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
     # Otherwise both weeks are zero -> no meaningful change.
         
     # Pending items this week vs last week (workspace-scoped)
-    this_week_pending = action_items_qs.filter(
-        status__in=['todo', 'doing'], 
-        created_at__date__gte=this_week_start
-    ).count()
-    last_week_pending = action_items_qs.filter(
-        status__in=['todo', 'doing'],
-        created_at__date__gte=last_week_start,
-        created_at__date__lte=last_week_end
-    ).count()
+    this_week_pending = item_kpis['this_week_pending']
+    last_week_pending = item_kpis['last_week_pending']
     
     # Calculate percentage change for pending items (negative is good)
     pending_change = 0
@@ -166,7 +185,7 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
     recent_items = action_items_qs.order_by('-created_at')[:8]
 
     # Chart data: Sessions per day (last 7 days) - workspace-scoped
-    sessions_per_day = [assessments_qs.filter(created_at__date=day).count() for day in days]
+    sessions_per_day = [d['sessions'] for d in weekly_activity]
     days_labels = [day.strftime('%a') for day in days]
 
     # Status breakdown for donut chart
@@ -252,19 +271,20 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
         # Get completed assessments for the workspace (or user if no workspace)
         completed_sessions = assessments_qs.filter(
             is_completed=True
-        ).order_by('-created_at')[:10]
-        
+        ).select_related('snapshot').order_by('-created_at')[:10]
+
+        # Snapshot-first, like the CSV export: one joined query instead of
+        # recomputing every session from raw responses.
         all_scores = []
         for session in completed_sessions:
-            cat_scores, overall = _compute_scores(session)
-            band = _band_for_score(overall)
+            overall, band_stage = _history_score(session)
             assessment_history.append({
                 'session': session,
                 'uuid': session.uuid,
                 'company_name': session.company_name or 'Unnamed',
                 'industry': session.industry or 'N/A',
                 'overall_score': round(overall, 1),
-                'band_stage': band.stage if band else 'Unknown',
+                'band_stage': band_stage,
                 'created_at': session.created_at,
             })
             all_scores.append(overall)
@@ -344,10 +364,14 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
     # Channel analytics for donut chart
     channels = Channel.objects.all()
     analytics_qs = ChannelAnalytics.objects.filter(date=today)
+    analytics_qs = list(analytics_qs)
     total_revenue = sum(a.revenue for a in analytics_qs)
     channel_data = []
+    analytics_by_channel = {}
+    for a in analytics_qs:
+        analytics_by_channel.setdefault(a.channel_id, a)
     for channel in channels:
-        analytics = analytics_qs.filter(channel=channel).first()
+        analytics = analytics_by_channel.get(channel.id)
         if analytics and total_revenue > 0:
             percent = (analytics.revenue / total_revenue) * 100
             channel_data.append({

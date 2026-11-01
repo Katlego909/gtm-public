@@ -53,8 +53,13 @@ RUN chmod +x /app/docker-entrypoint.sh
 # Create necessary directories
 RUN mkdir -p /app/staticfiles /app/media
 
-# Collect static files during build (optional, will also run at startup)
-RUN python manage.py collectstatic --noinput --clear 2>/dev/null || true
+# Collect static files during build. DEBUG=False selects the hashed manifest
+# storage production uses; this must fail the build loudly, because a missing
+# manifest makes every {% static %} tag raise at request time. The secret key
+# is a build-only placeholder (settings refuse DEBUG=False without one); the
+# real key comes from Secret Manager at runtime.
+RUN DEBUG=False DJANGO_SECRET_KEY=collectstatic-build-only \
+    python manage.py collectstatic --noinput --clear
 
 # Set entrypoint
 ENTRYPOINT ["/app/docker-entrypoint.sh"]

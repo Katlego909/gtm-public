@@ -83,6 +83,13 @@ steps:
       # for full instance lifetime) but the async architecture does not work
       # without it.
       - '--no-cpu-throttling'
+      # Extra CPU only while an instance boots: shortens cold starts (4
+      # gunicorn workers each import Django) at negligible cost.
+      - '--cpu-boost'
+      # min-instances=0 is a deliberate cost decision, not an oversight: with
+      # --no-cpu-throttling at 2 vCPU/4Gi one always-warm instance costs
+      # ~$100-120/mo, so the first request after ~15 idle minutes pays a cold
+      # start. Revisit once the product has paying users.
       - '--min-instances=0'
       - '--max-instances=4'
       - '--timeout=120'

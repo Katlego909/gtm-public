@@ -192,8 +192,15 @@ STORAGES = {
     } if GS_BUCKET_NAME else {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
     },
+    # Production serves content-hashed, pre-compressed (brotli/gzip) files,
+    # which WhiteNoise sends with a one-year immutable Cache-Control, so
+    # browsers stop re-downloading JS/CSS on every page. Dev and the test
+    # runner keep the plain backend: the manifest only exists after
+    # collectstatic, and a missing entry raises instead of rendering.
     "staticfiles": {
         "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+    } if DEBUG else {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
 

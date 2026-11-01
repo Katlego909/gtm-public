@@ -8,9 +8,12 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
+        {# Pages render two bells (mobile navbar + page header) and CSS hides one; #}
+        {# the offsetParent filter keeps the hidden one from polling too (htmx #}
+        {# filters must return exactly true, hence the !!). #}
         <span id="notification-badge-{{ instance_id }}"
               hx-get="{% url 'notification_unread_count' %}"
-              hx-trigger="load, every 30s, refreshNotifications from:body"
+              hx-trigger="load[!!this.offsetParent], every 30s [!!this.offsetParent], refreshNotifications[!!this.offsetParent] from:body"
               hx-swap="innerHTML"></span>
     </button>
     <div id="notification-dropdown-panel-{{ instance_id }}"
