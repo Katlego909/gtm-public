@@ -9,7 +9,6 @@
                 <th class="px-4 py-3 whitespace-nowrap">Target</th>
                 <th class="px-4 py-3 whitespace-nowrap">Gap</th>
                 <th class="px-4 py-3 whitespace-nowrap">Priority</th>
-                <th class="px-4 py-3 whitespace-nowrap">Recommendation</th>
                 <th class="px-4 py-3 whitespace-nowrap text-center">Actions</th>
             </tr>
         </thead>
@@ -22,7 +21,7 @@
             {% for gap in gap_analysis %}
                 {% include "dashboard/partials/_gap_analysis_row.html" with gap=gap %}
             {% empty %}
-            <tr><td colspan="8" class="px-4 py-10 text-center text-gray-400 italic">No gap analysis data found.</td></tr>
+            <tr><td colspan="7" class="px-4 py-10 text-center text-gray-400 italic">No gap analysis data found.</td></tr>
             {% endfor %}
         </tbody>
     </table>

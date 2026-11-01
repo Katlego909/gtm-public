@@ -280,6 +280,19 @@
                 </svg>
                 <span class="sidebar-text">Tasks</span>
             </a>
+            <a href="{% url 'gap_report' %}"
+               hx-get="{% url 'gap_report' %}"
+               hx-target="#main-content"
+               hx-push-url="true"
+               class="flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
+               title="Gaps">
+                <svg class="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="9" stroke-width="2"/>
+                    <circle cx="12" cy="12" r="5" stroke-width="2"/>
+                    <circle cx="12" cy="12" r="1" stroke-width="2"/>
+                </svg>
+                <span class="sidebar-text">Gaps</span>
+            </a>
             <a href="{% url 'workspace_hub' %}" 
                hx-get="{% url 'workspace_hub' %}" 
                hx-target="#main-content" 

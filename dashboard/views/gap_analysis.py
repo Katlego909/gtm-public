@@ -84,8 +84,9 @@ from .helpers import (
     _clean_json_payload,
     _fallback_gap_suggestions,
     _gap_metric_scope_queryset,
-    _gap_percent_value,
     _get_gap_scope,
+    annotate_gap_standing,
+    highest_risk_gaps,
     _load_pending_gap_suggestions,
     _md,
     _resolve_dashboard_workspace,
@@ -610,8 +611,7 @@ def gap_report(request):
 
     metrics = prepare_gap_metrics_for_display(metrics_qs, current_workspace, request.user)
     for metric in metrics:
-        metric.gap_numeric = _gap_percent_value(metric)
-        metric.is_behind = not metric.awaiting_measurement and metric.gap_numeric < 0
+        annotate_gap_standing(metric)
 
     total_metrics = len(metrics)
     # A gap nobody has measured is neither behind nor on track.
@@ -624,7 +624,7 @@ def gap_report(request):
     medium_priority_count = sum(1 for m in metrics if m.priority == 'Medium')
     low_priority_count = sum(1 for m in metrics if m.priority == 'Low')
 
-    at_risk_metrics = sorted(behind_metrics, key=lambda m: m.gap_numeric)[:6]
+    at_risk_metrics = highest_risk_gaps(metrics, 6)
 
     category_summary = []
     categories = sorted({m.category for m in metrics})
@@ -656,8 +656,13 @@ def gap_report(request):
     context = {
         'current_workspace': current_workspace,
         'user_workspaces': user_workspaces,
-        'page_title': 'Gap Report',
+        'page_title': 'Gaps',
         'metrics': metrics,
+        # The full workflow lives on this page: the drafts panel and the
+        # actionable table (gap_suggestions_panel.html, gap_analysis_table.html).
+        'gap_analysis': metrics,
+        'gap_suggestions': _load_pending_gap_suggestions(request, current_workspace),
+        'latest_completed_gap_session': latest_assessment,
         'total_metrics': total_metrics,
         'behind_count': len(behind_metrics),
         'on_track_count': len(on_track_metrics),

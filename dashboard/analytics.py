@@ -366,20 +366,29 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
         ai_resource_recommendations = list(latest_completed_gap_session.ai_resource_matches.all().select_related('resource'))
 
     # Deferred import: dashboard.views.helpers imports this module at load time.
-    from dashboard.views.helpers import prepare_gap_metrics_for_display
+    from dashboard.views.helpers import (
+        annotate_gap_standing, highest_risk_gaps, prepare_gap_metrics_for_display,
+    )
+    # Still the full prepared list: the Analytics page reuses it from this
+    # context. The dashboard itself only renders the summary card.
     gap_analysis = prepare_gap_metrics_for_display(
         gap_analysis,
         current_workspace,
         request.user if request.user.is_authenticated else None,
     )
-
-    gap_suggestions = _load_pending_gap_suggestions(request, current_workspace) if request.user.is_authenticated else []
+    for metric in gap_analysis:
+        annotate_gap_standing(metric)
+    top_gaps = highest_risk_gaps(gap_analysis, 3)
+    pending_gap_drafts = (
+        len(_load_pending_gap_suggestions(request, current_workspace))
+        if request.user.is_authenticated else 0
+    )
 
     if current_workspace:
-        gap_report_url = f"{reverse('gap_report')}?workspace={current_workspace.id}"
+        gaps_url = f"{reverse('gap_report')}?workspace={current_workspace.id}"
         assessment_history_export_url = f"{reverse('assessment_history_export', args=['csv'])}?workspace={current_workspace.id}"
     else:
-        gap_report_url = reverse('gap_report')
+        gaps_url = reverse('gap_report')
         assessment_history_export_url = reverse('assessment_history_export', args=['csv'])
 
     context = {
@@ -407,11 +416,14 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
         'validator_results': validator_results,
         'channel_data': channel_data,
         'gap_analysis': gap_analysis,
-        'gap_suggestions': gap_suggestions,
+        'top_gaps': top_gaps,
+        'tracked_gap_count': len(gap_analysis),
+        'behind_gap_count': sum(1 for m in gap_analysis if m.is_behind),
+        'pending_gap_drafts': pending_gap_drafts,
         'latest_completed_gap_session': latest_completed_gap_session,
         'latest_score_risk': latest_score_risk,
         'ai_resource_recommendations': ai_resource_recommendations,
-        'gap_report_url': gap_report_url,
+        'gaps_url': gaps_url,
         'assessment_history_export_url': assessment_history_export_url,
         'assessment_history': assessment_history,
         'assessment_stats': assessment_stats,

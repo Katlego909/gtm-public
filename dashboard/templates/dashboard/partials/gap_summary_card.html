@@ -1,0 +1,44 @@
+{# Dashboard summary of tracked gaps. The full workflow (drafts, Add Metric, #}
+{# Create Tasks, Log Value) lives on the Gaps page; this only answers #}
+{# "what is furthest behind" and points there. #}
+<div class="bg-white rounded-xl border border-gray-100 p-6 mt-8">
+    <div class="flex items-start justify-between gap-4 mb-4">
+        <div>
+            <h3 class="text-lg font-bold text-gray-800">Gaps to close</h3>
+            <p class="text-sm text-gray-500">
+                {% if tracked_gap_count %}
+                    {{ tracked_gap_count }} tracked{% if behind_gap_count %}, {{ behind_gap_count }} behind target{% endif %}
+                {% else %}
+                    Track the metrics your assessment flagged and close them with real measurements.
+                {% endif %}
+            </p>
+        </div>
+        {% if pending_gap_drafts %}
+            <a href="{{ gaps_url }}" hx-get="{{ gaps_url }}" hx-target="#main-content" hx-push-url="true"
+               class="shrink-0 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100">
+                {{ pending_gap_drafts }} draft{{ pending_gap_drafts|pluralize }} to review
+            </a>
+        {% endif %}
+    </div>
+
+    {% if top_gaps %}
+        <ul class="divide-y divide-gray-100 border-t border-b border-gray-100">
+            {% for gap in top_gaps %}
+                <li class="flex items-center justify-between gap-4 py-3">
+                    <div class="min-w-0">
+                        <p class="text-sm font-medium text-gray-900">{{ gap.metric }}</p>
+                        <p class="text-xs text-gray-500">{{ gap.category }} &middot; {{ gap.current }} now, target {{ gap.target }}</p>
+                    </div>
+                    <span class="shrink-0 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium {{ gap.gap_class }}">{{ gap.gap_percent }}</span>
+                </li>
+            {% endfor %}
+        </ul>
+    {% elif tracked_gap_count %}
+        <p class="text-sm text-gray-500 border-t border-gray-100 pt-4">Nothing is behind target right now.</p>
+    {% endif %}
+
+    <a href="{{ gaps_url }}" hx-get="{{ gaps_url }}" hx-target="#main-content" hx-push-url="true"
+       class="inline-block mt-4 text-sm font-semibold text-indigo-600 hover:text-indigo-800">
+        {% if tracked_gap_count %}Manage gaps{% else %}Set up gaps{% endif %} &rarr;
+    </a>
+</div>

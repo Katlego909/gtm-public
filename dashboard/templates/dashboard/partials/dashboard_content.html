@@ -376,31 +376,8 @@
     </div>
     {% endif %}
 
-    <!-- Detailed Gap Analysis -->
-                    <div class="bg-white rounded-xl border border-gray-100 p-6 mt-8">
-                        <div class="flex justify-between items-center mb-2">
-                            <div>
-                                <h3 class="text-lg font-bold text-gray-800 mb-1">Detailed Gap Analysis</h3>
-                                <p class="text-sm text-gray-500">Actionable insights to close growth gaps</p>
-                            </div>
-                            <div class="flex items-center gap-4">
-                                <button type="button"
-                                        hx-get="{% url 'add_gap_metric' %}" 
-                                        hx-target="#modal-content" 
-                                        onclick="openModal()"
-                                        class="cursor-pointer px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
-                                    Add Metric
-                                </button>
-                                <a href="{{ gap_report_url }}"
-                                   hx-get="{{ gap_report_url }}"
-                                   hx-target="#main-content"
-                                   hx-push-url="true"
-                                   class="text-sm text-indigo-600 font-semibold hover:underline">View full report <span aria-hidden="true">↗</span></a>
-                            </div>
-                        </div>
-                        {% include 'dashboard/partials/gap_suggestions_panel.html' with gap_suggestions=gap_suggestions latest_completed_session=latest_completed_gap_session current_workspace=current_workspace %}
-                        {% include 'dashboard/partials/gap_analysis_table.html' %}
-                    </div>
+    <!-- Gaps summary (full workflow lives on the Gaps page) -->
+    {% include 'dashboard/partials/gap_summary_card.html' %}
 
 
     <div class="h-12"></div>

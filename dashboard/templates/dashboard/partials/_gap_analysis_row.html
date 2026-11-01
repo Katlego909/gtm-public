@@ -1,6 +1,9 @@
 <tr id="gap-metric-{{ gap.id }}" {% if gap.status == 'closed' %}class="opacity-60"{% endif %}>
-    <td class="px-4 py-3 font-medium text-gray-900 whitespace-nowrap">{{ gap.category }}</td>
-    <td class="px-4 py-3 text-gray-700 whitespace-nowrap">{{ gap.metric }}</td>
+    <td class="px-4 py-3 text-gray-700 whitespace-nowrap">{{ gap.category }}</td>
+    <td class="px-4 py-3 min-w-[260px]">
+        <div class="font-medium text-gray-900">{{ gap.metric }}</div>
+        {% if gap.recommendation %}<p class="mt-1 text-xs leading-relaxed text-gray-500">{{ gap.recommendation }}</p>{% endif %}
+    </td>
     <td class="px-4 py-3 text-gray-700 whitespace-nowrap">
         {% if gap.estimate_method == 'unmeasured' %}<span class="text-gray-400">&mdash;</span>{% else %}{{ gap.current }}{% endif %}
         {% if gap.estimate_method_label %}
@@ -17,8 +20,7 @@
             {{ gap.get_priority_display }}
         </span>
     </td>
-    <td class="px-4 py-3 text-gray-700 min-w-[300px]">{{ gap.recommendation }}</td>
-    <td class="px-4 py-3 whitespace-nowrap">
+    <td class="px-4 py-3 min-w-[180px]">
         <div class="flex flex-col items-center gap-2">
             <div class="flex items-center justify-center gap-1.5 flex-wrap">
                 {% if gap.status == 'closed' %}
@@ -45,7 +47,7 @@
                     Tasks done &mdash; retake assessment to measure
                 </a>
             {% endif %}
-            <div class="flex items-center justify-center gap-2">
+            <div class="flex flex-wrap items-center justify-center gap-2">
                 {% if gap.status != 'closed' %}
                 <button type="button"
                         hx-post="{% url 'generate_action_items_for_gap' pk=gap.id %}"

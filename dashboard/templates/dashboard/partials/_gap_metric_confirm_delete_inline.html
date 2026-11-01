@@ -1,5 +1,5 @@
 <tr id="gap-metric-{{ instance.id }}">
-    <td colspan="8" class="px-4 py-3 bg-red-50 border-t border-b border-red-200">
+    <td colspan="7" class="px-4 py-3 bg-red-50 border-t border-b border-red-200">
         <form hx-post="{% url 'delete_gap_metric' pk=instance.id %}" 
               hx-target="#gap-metric-{{ instance.id }}"
               hx-swap="outerHTML swap:0.3s"

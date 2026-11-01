@@ -1,33 +1,56 @@
+<header class="hidden md:flex h-16 bg-white border-b border-gray-200 justify-between items-center px-8 flex-shrink-0">
+    <div class="flex items-center gap-6">
+        <h1 class="text-xl font-bold text-gray-800">Gaps</h1>
+
+        <!-- Workspace Selector (also read by the table's hx-include refreshes) -->
+        {% if user_workspaces %}
+            <div class="flex items-center gap-3">
+                <label class="text-sm text-gray-600">Workspace:</label>
+                <select id="workspace-selector"
+                        name="workspace"
+                        class="px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+                        hx-get="{% url 'gap_report' %}"
+                        hx-include="#workspace-selector"
+                        hx-target="#main-content"
+                        hx-trigger="change"
+                        hx-push-url="true">
+                    {% for workspace in user_workspaces %}
+                        <option value="{{ workspace.id }}"
+                                {% if current_workspace and current_workspace.id == workspace.id %}selected{% endif %}>
+                            {{ workspace.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="flex items-center gap-4">
+        {% include 'dashboard/partials/global_search.html' with instance_id="header" %}
+        {% include 'dashboard/partials/notification_bell.html' with instance_id="header" %}
+        <button type="button"
+                hx-get="{% url 'add_gap_metric' %}"
+                hx-target="#modal-content"
+                onclick="openModal()"
+                class="cursor-pointer px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Add Metric
+        </button>
+    </div>
+</header>
+
 <div class="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50">
     <div class="max-w-7xl mx-auto">
-        <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-6 mb-6">
-            <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                <div>
-                    <h1 class="text-2xl font-bold text-gray-900">Comprehensive Gap Report</h1>
-                    <p class="text-sm text-gray-600 mt-1">
-                        {% if current_workspace %}
-                            Workspace: <span class="font-semibold">{{ current_workspace.name }}</span>
-                        {% else %}
-                            Personal scope report
-                        {% endif %}
-                    </p>
-                    <p class="text-xs text-gray-500 mt-1">
-                        Completed assessments: {{ completed_assessments }}
-                        {% if latest_assessment %}
-                            • Latest: {{ latest_assessment.company_name|default:'Unnamed' }} ({{ latest_assessment.created_at|date:"M d, Y" }})
-                        {% endif %}
-                    </p>
-                </div>
-                <div class="flex items-center gap-2">
-                    <a href="{% url 'dashboard' %}{% if current_workspace %}?workspace={{ current_workspace.id }}{% endif %}"
-                       hx-get="{% url 'dashboard' %}{% if current_workspace %}?workspace={{ current_workspace.id }}{% endif %}"
-                       hx-target="#main-content"
-                       hx-push-url="true"
-                       class="px-4 py-2 text-sm rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors">
-                        Back to Dashboard
-                    </a>
-                </div>
-            </div>
+        <p class="text-xs text-gray-500 mb-4">
+            {% if current_workspace %}Workspace <span class="font-semibold text-gray-700">{{ current_workspace.name }}</span>{% else %}Personal scope{% endif %}
+            &middot; Completed assessments: {{ completed_assessments }}
+            {% if latest_assessment %}
+                &middot; Latest: {{ latest_assessment.company_name|default:'Unnamed' }} ({{ latest_assessment.created_at|date:"M d, Y" }})
+            {% endif %}
+        </p>
+
+        <div class="bg-white rounded-xl border border-gray-100 p-5 mb-6">
+            {% include 'dashboard/partials/gap_suggestions_panel.html' with gap_suggestions=gap_suggestions latest_completed_session=latest_completed_gap_session %}
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
@@ -122,48 +145,8 @@
         </div>
 
         <div class="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-            <h2 class="text-lg font-bold text-gray-900 mb-1">Detailed Metrics</h2>
-            <p class="text-xs text-gray-500 mb-4">Each Current value is labelled with where it came from: an AI or formula estimate, a manual entry, a real measurement, or not measured yet.</p>
-            {% if metrics %}
-            <div class="overflow-x-auto">
-                <table class="min-w-full text-sm">
-                    <thead class="bg-gray-50 text-gray-500 uppercase text-xs font-semibold">
-                        <tr>
-                            <th class="px-4 py-3 text-left">Category</th>
-                            <th class="px-4 py-3 text-left">Metric</th>
-                            <th class="px-4 py-3 text-left">Current</th>
-                            <th class="px-4 py-3 text-left">Target</th>
-                            <th class="px-4 py-3 text-left">Gap</th>
-                            <th class="px-4 py-3 text-left">Priority</th>
-                            <th class="px-4 py-3 text-left">Source</th>
-                            <th class="px-4 py-3 text-left">Recommendation</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        {% for metric in metrics %}
-                        <tr>
-                            <td class="px-4 py-3 text-gray-900 font-medium whitespace-nowrap">{{ metric.category }}</td>
-                            <td class="px-4 py-3 text-gray-700 whitespace-nowrap">{{ metric.metric }}</td>
-                            <td class="px-4 py-3 text-gray-700 whitespace-nowrap">{% if metric.estimate_method == 'unmeasured' %}<span class="text-gray-400">&mdash;</span>{% else %}{{ metric.current }}{% endif %}{% if metric.estimate_method_label %}<span class="block mt-0.5 text-[10px] text-gray-500">{{ metric.estimate_method_label }}</span>{% endif %}</td>
-                            <td class="px-4 py-3 text-gray-700 whitespace-nowrap">{{ metric.target }}</td>
-                            <td class="px-4 py-3 whitespace-nowrap">
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {{ metric.gap_class }}">{{ metric.gap_percent }}</span>
-                            </td>
-                            <td class="px-4 py-3 whitespace-nowrap">{{ metric.priority }}</td>
-                            <td class="px-4 py-3 whitespace-nowrap">
-                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium {% if metric.source == 'AI' %}bg-indigo-100 text-indigo-700{% else %}bg-gray-100 text-gray-700{% endif %}">{{ metric.source }}</span>
-                            </td>
-                            <td class="px-4 py-3 text-gray-700 min-w-[280px]">{{ metric.recommendation }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            {% else %}
-            <div class="rounded-lg border border-dashed border-gray-200 px-4 py-10 text-center text-sm text-gray-500">
-                No metrics available yet. Start by adding a metric or generating AI suggestions from your latest assessment.
-            </div>
-            {% endif %}
+            <h2 class="text-lg font-bold text-gray-900">All gaps</h2>
+            {% include 'dashboard/partials/gap_analysis_table.html' %}
         </div>
     </div>
 </div>

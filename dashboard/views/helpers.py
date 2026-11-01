@@ -693,6 +693,21 @@ def _gap_percent_value(metric):
     return (current - target) / target * 100
 
 
+def annotate_gap_standing(metric):
+    """Set gap_numeric and is_behind on a metric already passed through
+    calculate_gap_metric_display_properties (which sets awaiting_measurement).
+    A gap nobody has measured is neither behind nor on track."""
+    metric.gap_numeric = _gap_percent_value(metric)
+    metric.is_behind = not metric.awaiting_measurement and metric.gap_numeric < 0
+    return metric
+
+
+def highest_risk_gaps(metrics, limit):
+    """Behind-target gaps, furthest behind first -- the one ranking rule shared
+    by the Gaps page's Highest-Risk list and the dashboard card."""
+    return sorted((m for m in metrics if m.is_behind), key=lambda m: m.gap_numeric)[:limit]
+
+
 def apply_measured_closure(metric):
     """Close a gap when a real, measured value has reached its target.
 
