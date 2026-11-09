@@ -27,7 +27,7 @@ theme:
 nav:
   - Start Here (Plain English): plain_english_guide.md
   - Project Vision & Mission: index.md
-  - System Design Logic: system_design.md
+  - System Design: system_design.md
   - Developer Deep Dive: developer_deep_dive.md
   - Business Logic & Implementation:
       - Scoring Math: scoring_logic.md
