@@ -297,6 +297,10 @@ except ImportError:
     logger.warning("google-genai client not installed — AI services disabled.")
 
 # Generation configs to disable thinking and control token usage
+# The one Gemini model the whole app uses. Change it here, then run
+# `python manage.py run_ai_evals` before shipping (see gtm/ai_evals.py).
+GEMINI_MODEL = "gemini-2.5-flash"
+
 _FAST_CONFIG = None      # diagnostics, rewrites: 600 tokens, no thinking
 _PLAYBOOK_CONFIG = None  # playbook: 4096 tokens, no thinking
 _ACTION_CONFIG = None    # action items: 512 tokens, no thinking
@@ -565,7 +569,7 @@ Cover: revenue at risk from current gaps, estimated pipeline uplift from fixes, 
 Use revenue ranges consistent with {revenue}. Do NOT recommend actions — only estimate financial impact of the current state."""
 
                 resp = client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model=GEMINI_MODEL,
                     contents=fin_prompt,
                     config=_FAST_CONFIG,
                 )
@@ -593,7 +597,7 @@ Cover: where competitors in {industry} typically outperform companies at this GT
 Do NOT recommend actions — only describe competitive risks from the current state."""
 
                 resp = client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model=GEMINI_MODEL,
                     contents=comp_prompt,
                     config=_FAST_CONFIG,
                 )
@@ -643,7 +647,7 @@ Playbook:
     try:
         from google.genai import types as genai_types
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=GEMINI_MODEL,
             contents=prompt,
             config=genai_types.GenerateContentConfig(
                 temperature=0.3,
@@ -708,7 +712,7 @@ def generate_playbook_with_gemini(snapshot: ResultSnapshot) -> str:
         credits_exhausted_mid_flight = bool(client) and not quota_cooldown and no_budget
         if client and not quota_cooldown and not no_budget:
             prompt = _build_prompt(snapshot)
-            model_id = "gemini-2.5-flash"
+            model_id = GEMINI_MODEL
             try:
                 response = client.models.generate_content(
                     model=model_id,
@@ -969,7 +973,7 @@ def generate_diagnostic_insight(response: Response) -> str:
     try:
         prompt = _build_diagnostic_prompt(response.session, response.question, response.score)
         text = ""
-        model_id = "gemini-2.5-flash"
+        model_id = GEMINI_MODEL
         try:
             # Use unified client to generate content
             ai_response = client.models.generate_content(
@@ -1098,7 +1102,7 @@ Example format:
 }}
 Do not include markdown code blocks or extra text. Return only the raw JSON object.""".strip()
 
-    model_id = "gemini-2.5-flash"
+    model_id = GEMINI_MODEL
     resp_ids = [r.id for r in responses]
 
     # Mark all as generating
@@ -1169,7 +1173,7 @@ def generate_concise_action_items(playbook_text: str) -> list:
     if not client or _quota_cooldown_active() or not _request_budget_available():
         return []
 
-    model_id = "gemini-2.5-flash"
+    model_id = GEMINI_MODEL
     prompt = f"""
     Extract the key action items from the following GTM playbook text.
     Summarize each action item into a concise, actionable sentence (max 15 words).
@@ -1251,7 +1255,7 @@ def rewrite_context_note_with_ai(note_text: str, question_text: str = "", mode: 
     if not client or _quota_cooldown_active() or not _request_budget_available(account=account):
         return _fallback_rewrite_context_note(source, mode)
 
-    model_id = "gemini-2.5-flash"
+    model_id = GEMINI_MODEL
     mode_instruction = {
         "rewrite": "Rewrite the note in clearer plain English while preserving meaning.",
         "summarize": "Summarize the note into one short clear sentence.",

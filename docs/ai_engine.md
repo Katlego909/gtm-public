@@ -124,3 +124,21 @@ Every API call is intercepted by this tracking utility.
 
 ### Static Fallback Engine
 When the AI is unavailable (Quota hit or API down), the system automatically reverts to high-quality, pre-written advice stored in the `RecommendationBand` models. This ensures the user experience never breaks.
+
+## 6. Checking AI Output Quality (`run_ai_evals`)
+
+The whole app uses one model, `GEMINI_MODEL` in `gtm/ai_services.py`. Before changing it, or editing the diagnostic or playbook prompts, run:
+
+```bash
+python manage.py run_ai_evals                           # current model
+python manage.py run_ai_evals --model <candidate-model>  # compare a candidate
+```
+
+Five fixed fictional companies go through the real prompt builders and the live model (about 20-30K tokens per run). Each run checks three diagnostic insights and one playbook per company:
+
+| Output | Hard checks (fail the run) | Soft checks (reported) |
+|---|---|---|
+| Insight | not empty, names the company, no emoji, ends on a full sentence | 2-5 sentences; raw output avoids advice before the regex failsafe |
+| Playbook | valid JSON, has a playbook, names the company, covers all of Layer 1's top-3 priorities, no emoji | `risk_status` is High/Medium/Low |
+
+Outputs are saved as JSON in `ai_eval_results/` (git-ignored) so two runs can be compared side by side. Cases are written in a rolled-back transaction, so the database is unchanged afterwards. Code: `gtm/ai_evals.py`.

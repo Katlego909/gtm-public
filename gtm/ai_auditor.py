@@ -5,6 +5,7 @@ Strategic evidence auditor using Gemini multimodal capabilities.
 Supports auditing both GTMFile objects (session evidence) and
 dashboard.Resource objects (workspace-level strategy assets).
 """
+from .ai_services import GEMINI_MODEL
 import logging
 import re
 import threading
@@ -191,7 +192,7 @@ REPORT FORMAT:
 
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=GEMINI_MODEL,
             contents=[
                 types.Content(
                     role="user",

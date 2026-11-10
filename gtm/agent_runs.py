@@ -20,6 +20,7 @@ Background work is plain threads (run_in_background) guarded by a DB lock,
 the same pattern as every other AI job in this app.
 """
 
+from .ai_services import GEMINI_MODEL
 import functools
 import logging
 from typing import Any, Dict, List, Optional
@@ -40,7 +41,7 @@ try:
 except ImportError:
     types = None
 
-MODEL = "gemini-2.5-flash"
+MODEL = GEMINI_MODEL
 MAX_PLAN_STEPS = 8
 PLANNING_TOOL_ROUNDS = 12
 EXECUTION_TOOL_ROUNDS = 20

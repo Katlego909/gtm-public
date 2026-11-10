@@ -5,6 +5,7 @@ of a single AssessmentSession. Uses real multi-turn memory
 (GenerateContentConfig(tools=[...])) -- see _build_workspace_tools.
 """
 
+from .ai_services import GEMINI_MODEL
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -867,7 +868,7 @@ def handle_general_chat_workspace(
 
         text = run_agent_turn(
             client=client,
-            model="gemini-2.5-flash",
+            model=GEMINI_MODEL,
             config=config,
             history=history,
             message=full_message,
@@ -892,7 +893,7 @@ def handle_general_chat_workspace(
             f"Workspace {agent_type} agent reasoning failure",
             e,
             service="google-genai",
-            model="gemini-2.5-flash",
+            model=GEMINI_MODEL,
             extra={"workspace_id": str(workspace.id), "agent_type": agent_type},
         )
         return UNREACHABLE_MESSAGE, [], []
@@ -981,7 +982,7 @@ def draft_client_summary_text(workspace: Workspace, focus: str = "") -> str:
         prompt += f"\n\nSpecial focus requested for this summary: {focus}"
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model=GEMINI_MODEL,
         contents=[types.Content(role="user", parts=[types.Part.from_text(text=prompt)])],
         config=_get_client_summary_config(),
     )

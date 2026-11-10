@@ -21,6 +21,7 @@ returns the resulting text as this tool's return value, same as any other
 Python tool function.
 """
 
+from .ai_services import GEMINI_MODEL
 import ipaddress
 import logging
 import socket
@@ -182,7 +183,7 @@ def _web_search_text(query: str, account) -> str:
         raise RuntimeError("AI client unavailable")
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model=GEMINI_MODEL,
         contents=[types.Content(role="user", parts=[types.Part.from_text(text=query)])],
         config=_get_web_search_config(),
     )

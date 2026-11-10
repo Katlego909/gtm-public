@@ -18,6 +18,7 @@ Human-AI design principle: the agent proposes scores grounded in document
 evidence; the human reviews and overrides before submitting the assessment.
 """
 
+from .ai_services import GEMINI_MODEL
 import csv
 import json
 import logging
@@ -1028,7 +1029,7 @@ def analyze_delivery_documents(session) -> dict:
         return _scoring_memory_fallback(nlp_evidence, DELIVERY_QUESTIONS)
 
     # ── Stage 3: Gemini scoring with enriched prompt ─────────────────────────
-    model_id = "gemini-2.5-flash"
+    model_id = GEMINI_MODEL
     prompt   = _build_analysis_prompt(combined_text, nlp_evidence, DELIVERY_QUESTIONS, "Delivery")
 
     try:

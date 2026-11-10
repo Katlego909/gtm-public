@@ -22,6 +22,7 @@ transfer_to_* call appears, the loop stops and reports it instead of
 executing it.
 """
 
+from .ai_services import GEMINI_MODEL
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -348,7 +349,7 @@ def _run_team_turn(agent_type, workspace, session, message, user, allow_transfer
     )
 
     try:
-        chat = client.chats.create(model="gemini-2.5-flash", config=config, history=history)
+        chat = client.chats.create(model=GEMINI_MODEL, config=config, history=history)
         # Tools here run only after a response succeeds, so each call can retry safely.
         response = send_with_retry(chat, message)
         _record_usage(response)
@@ -398,7 +399,7 @@ def _run_team_turn(agent_type, workspace, session, message, user, allow_transfer
             f"Team chat turn failure ({agent_type})",
             e,
             service="google-genai",
-            model="gemini-2.5-flash",
+            model=GEMINI_MODEL,
             extra={"workspace_id": str(workspace.id) if workspace else None, "agent_type": agent_type},
         )
         return (

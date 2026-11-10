@@ -1,5 +1,6 @@
 # Split verbatim from the former monolithic gtm/views.py. Shared imports live
 # in each module's header; shared helpers in gtm/views/helpers.py.
+from ..ai_services import GEMINI_MODEL
 from ..utils_logging import log_error
 from io import BytesIO
 from django.shortcuts import render, redirect, get_object_or_404
@@ -154,7 +155,7 @@ def upload_delivery_document(request, session_id):
         d = DeliveryDocument.objects.get(id=doc_id)
         client = _get_client() if ftype == 'image' else None
         account = resolve_account_for_session(d.session)
-        text = extract_text_from_field(d.file, ftype, client, "gemini-2.5-flash", account=account)
+        text = extract_text_from_field(d.file, ftype, client, GEMINI_MODEL, account=account)
         d.extracted_text = text
         d.save(update_fields=['extracted_text'])
 
@@ -311,7 +312,7 @@ def upload_category_document(request, session_id, category):
         d = CategoryDocument.objects.get(id=doc_id)
         client = _get_client() if ftype == 'image' else None
         account = resolve_account_for_session(d.session)
-        text = extract_text_from_field(d.file, ftype, client, "gemini-2.5-flash", account=account)
+        text = extract_text_from_field(d.file, ftype, client, GEMINI_MODEL, account=account)
         d.extracted_text = text
         d.save(update_fields=['extracted_text'])
 

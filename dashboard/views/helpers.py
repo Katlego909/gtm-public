@@ -1,5 +1,6 @@
 # Split verbatim from the former monolithic dashboard/views.py. Shared imports
 # live in each module's header; shared helpers in dashboard/views/helpers.py.
+from gtm.ai_services import GEMINI_MODEL
 from ..analytics import get_dashboard_context
 # dashboard/views.py
 """
@@ -441,7 +442,7 @@ Assessment context:
     try:
         from gtm.ai_services import _GAP_SUGGESTIONS_CONFIG
         ai_response = client.models.generate_content(
-            model='gemini-2.5-flash', contents=prompt, config=_GAP_SUGGESTIONS_CONFIG,
+            model=GEMINI_MODEL, contents=prompt, config=_GAP_SUGGESTIONS_CONFIG,
         )
         if hasattr(ai_response, 'usage_metadata'):
             from gtm.ai_credits import record_spend
@@ -563,7 +564,7 @@ Output STRICT JSON only: {{"action_items": ["...", "..."]}}
     try:
         from gtm.ai_services import _ACTION_CONFIG
         ai_response = client.models.generate_content(
-            model='gemini-2.5-flash', contents=prompt, config=_ACTION_CONFIG,
+            model=GEMINI_MODEL, contents=prompt, config=_ACTION_CONFIG,
         )
         if hasattr(ai_response, 'usage_metadata'):
             from gtm.ai_credits import record_spend

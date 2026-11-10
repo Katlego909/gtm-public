@@ -6,6 +6,7 @@ Provides natural language interface for users to interact with their assessments
 Supports commands, queries, and contextual help.
 """
 
+from .ai_services import GEMINI_MODEL
 import logging
 import json
 import re
@@ -1152,7 +1153,7 @@ def handle_general_chat(
 
         text = run_agent_turn(
             client=client,
-            model="gemini-2.5-flash",
+            model=GEMINI_MODEL,
             config=config,
             history=history,
             message=message_parts if len(message_parts) > 1 else full_message,
@@ -1184,7 +1185,7 @@ def handle_general_chat(
             "Agent reasoning loop failure",
             e,
             service="google-genai",
-            model="gemini-2.5-flash",
+            model=GEMINI_MODEL,
             extra={"session_id": str(session.uuid)},
         )
 

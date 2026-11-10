@@ -60,3 +60,6 @@ test_documents/
 .playwright-mcp/
 # MkDocs build output (regenerate with `mkdocs build`)
 site/
+
+# AI eval run outputs (python manage.py run_ai_evals)
+ai_eval_results/

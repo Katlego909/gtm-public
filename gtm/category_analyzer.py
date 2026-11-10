@@ -11,6 +11,7 @@ Usage:
     result = analyze_category_documents(session, 'conversion')
 """
 
+from .ai_services import GEMINI_MODEL
 import json
 import logging
 
@@ -239,7 +240,7 @@ def analyze_category_documents(session, category: str) -> dict:
         logger.warning("Gemini unavailable for %s analysis — using scoring memory fallback", category)
         return _scoring_memory_fallback(nlp_evidence, questions)
 
-    model_id = "gemini-2.5-flash"
+    model_id = GEMINI_MODEL
     prompt = _build_analysis_prompt(combined_text, nlp_evidence, questions, label)
 
     try:

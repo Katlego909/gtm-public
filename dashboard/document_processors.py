@@ -1,3 +1,4 @@
+from gtm.ai_services import GEMINI_MODEL
 import os
 import uuid
 import mimetypes
@@ -61,7 +62,7 @@ def _extract_pdf_text_with_ai(file_bytes: bytes, *, account=None) -> str:
 
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model=GEMINI_MODEL,
             contents=[
                 "Extract all readable text from this PDF document. Return plain text only.",
                 {
@@ -98,7 +99,7 @@ def _extract_image_text_with_ai(file_bytes: bytes, *, account=None) -> str:
     try:
         image = Image.open(BytesIO(file_bytes))
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model=GEMINI_MODEL,
             contents=[
                 (
                     "Extract all readable text from this image. "
