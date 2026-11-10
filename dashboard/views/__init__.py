@@ -106,3 +106,4 @@ from .notifications import (
     notifications_mark_all_read,
 )
 from .search import global_search
+from .account import delete_account_view

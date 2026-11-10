@@ -7,6 +7,8 @@ class GtmConfig(AppConfig):
 
     def ready(self):
         from . import signals  # noqa
+        from . import storage_cleanup
+        storage_cleanup.connect()
 
         # The document-analysis ML models (sentence-transformer + spaCy) are
         # NOT pre-warmed here. Doing it in every gunicorn worker at boot

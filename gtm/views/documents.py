@@ -242,11 +242,7 @@ def delete_delivery_document(request, session_id, doc_id):
         return JsonResponse({"success": False, "error": "Access denied."}, status=403)
 
     doc = get_object_or_404(DeliveryDocument, id=doc_id, session=session)
-    try:
-        doc.file.delete(save=False)
-    except Exception:
-        pass
-    doc.delete()
+    doc.delete()  # the stored file is removed on commit by gtm/storage_cleanup.py
     # File removed means prior analysis is stale — clear it from remaining docs.
     DeliveryDocument.objects.filter(session=session, analysis_status='complete').update(
         analysis_result={}
@@ -412,11 +408,7 @@ def delete_category_document(request, session_id, category, doc_id):
         return JsonResponse({"success": False, "error": "Access denied."}, status=403)
 
     doc = get_object_or_404(CategoryDocument, id=doc_id, session=session, category=category)
-    try:
-        doc.file.delete(save=False)
-    except Exception:
-        pass
-    doc.delete()
+    doc.delete()  # the stored file is removed on commit by gtm/storage_cleanup.py
     # File removed means prior analysis is stale — clear it from remaining docs.
     CategoryDocument.objects.filter(
         session=session, category=category, analysis_status='complete'

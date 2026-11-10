@@ -273,7 +273,7 @@ def edit_workspace(request, workspace_id):
 
 @workspace_permission_required('can_delete_workspace', workspace_param='workspace_id')
 def delete_workspace(request, workspace_id):
-    """Soft-delete (deactivate) a workspace after the user types its exact name to confirm."""
+    """Permanently delete a workspace after the user types its exact name to confirm."""
     workspace = request.workspace
 
     if request.method == 'POST':
@@ -284,9 +284,10 @@ def delete_workspace(request, workspace_id):
                 'error': 'The name you typed does not match. Please type the workspace name exactly to confirm.',
             })
 
-        workspace.is_active = False
-        workspace.save(update_fields=['is_active'])
-        if request.session.get('current_workspace_id') == str(workspace.id):
+        from gtm.account_deletion import delete_workspace as delete_workspace_permanently
+        workspace_id_str = str(workspace.id)
+        delete_workspace_permanently(workspace)  # instance keeps .name for the success message
+        if request.session.get('current_workspace_id') == workspace_id_str:
             del request.session['current_workspace_id']
 
         return render(request, 'dashboard/partials/delete_workspace_modal.html', {

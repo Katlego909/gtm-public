@@ -89,6 +89,7 @@ urlpatterns = [
     path('analytics/', views.analytics, name='analytics'),
     path('assessment-history/export/<str:fmt>/', views.assessment_history_export, name='assessment_history_export'),
     path('settings/', views.settings_view, name='settings'),
+    path('settings/delete-account/', views.delete_account_view, name='delete_account'),
     
     # Workspace management from dashboard
     path('workspace/create/', views.create_workspace_dashboard, name='create_workspace_dashboard'),

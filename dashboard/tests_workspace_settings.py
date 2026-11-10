@@ -1,9 +1,9 @@
 """
 Tests for editing and deleting a workspace from the dashboard Workspace Hub
-(dashboard/views/pages.py::edit_workspace, delete_workspace). Delete is a
-soft-delete (Workspace.is_active=False) -- see gtm/models_workspace.py and
-the WorkspaceMiddleware / dashboard workspace-resolution queries that must
-respect it. Mirrors the setup/style of dashboard/tests_integrations_hub.py.
+(dashboard/views/pages.py::edit_workspace, delete_workspace). Delete is
+permanent (gtm/account_deletion.py::delete_workspace). Workspace.is_active=False
+still hides a workspace from WorkspaceMiddleware / dashboard
+workspace-resolution queries. Mirrors the setup/style of dashboard/tests_integrations_hub.py.
 """
 
 from django.contrib.auth import get_user_model
@@ -105,13 +105,13 @@ class WorkspaceDeleteTests(TestCase):
         self.assertTrue(self.workspace.is_active)
         self.assertContains(response, "does not match")
 
-    def test_admin_delete_with_correct_name_deactivates(self):
+    def test_admin_delete_with_correct_name_deletes_permanently(self):
         self.client.force_login(self.admin)
         response = self.client.post(self.url, {"confirm_name": "Delete Co"})
         self.assertEqual(response.status_code, 200)
-        self.workspace.refresh_from_db()
-        self.assertFalse(self.workspace.is_active)
+        self.assertFalse(Workspace.objects.filter(pk=self.workspace.pk).exists())
         self.assertContains(response, "Workspace Deleted")
+        self.assertContains(response, "Delete Co")
 
     def test_consultant_cannot_delete(self):
         self.client.force_login(self.consultant)
@@ -128,7 +128,7 @@ class WorkspaceDeleteTests(TestCase):
 
 @override_settings(SECURE_SSL_REDIRECT=False)
 class WorkspaceVisibilityAfterDeleteTests(TestCase):
-    """Confirms the is_active visibility fix -- a soft-deleted workspace must
+    """Confirms the visibility fix -- a deleted workspace must
     disappear from the dashboard's workspace selector for its members."""
 
     def setUp(self):
