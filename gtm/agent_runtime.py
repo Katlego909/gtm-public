@@ -11,7 +11,7 @@ import re
 import time
 from contextlib import contextmanager
 from contextvars import ContextVar
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -250,6 +250,71 @@ def strip_task_id_brackets(text: Optional[str]) -> Optional[str]:
         return text
     cleaned = _TASK_ID_BRACKET_RE.sub("", text)
     return re.sub(r" {2,}", " ", cleaned).strip()
+
+
+FOLLOW_UP_MARKER = "[[follow-ups]]"
+MAX_FOLLOW_UPS = 3
+MAX_FOLLOW_UP_CHARS = 90
+
+# Appended only to the user-facing chat agents' system prompts (Charlie,
+# workspace agents, Team) -- never to agent-run planning prompts. The block
+# is parsed off by split_follow_ups before anything is persisted or shown,
+# and rendered as clickable option chips under the reply.
+FOLLOW_UP_PROMPT = (
+    "\n\nAfter your reply, when there is a natural next step, add a final block that starts with "
+    f"the exact line {FOLLOW_UP_MARKER} followed by 2 or 3 lines, each starting with '- '. Each line "
+    "is a short follow-up the user would plausibly ask you next, written in the user's voice "
+    "(e.g. '- Turn the top gap into tasks'), under 70 characters, plain text, no emoji, no "
+    "markdown, and grounded in what this reply just covered. The block is shown to the user as "
+    "clickable options, so never refer to it in your reply text. Omit the block entirely when "
+    "there is no sensible next step."
+)
+
+_FOLLOW_UP_MARKER_RE = re.compile(r"\[\[\s*follow-ups\s*\]\]", re.IGNORECASE)
+
+
+def split_follow_ups(text: Optional[str]) -> Tuple[Optional[str], List[str]]:
+    """Split the model's trailing FOLLOW_UP_MARKER block off a reply.
+
+    Returns (clean_text, options). Options come from the last marker block:
+    '- ' lines only, deduped, at most MAX_FOLLOW_UPS. An option over
+    MAX_FOLLOW_UP_CHARS is dropped rather than cut short, so a chip never
+    shows a half sentence. Every marker block is removed from the text (a
+    consulted teammate's block could be echoed mid-reply), so the marker
+    never reaches storage or the user.
+    """
+    if not text:
+        return text, []
+    pieces = _FOLLOW_UP_MARKER_RE.split(text)
+    if len(pieces) == 1:
+        return text, []
+
+    options: List[str] = []
+    seen = set()
+    for line in pieces[-1].splitlines():
+        line = line.strip()
+        if not line.startswith(("- ", "* ")):
+            continue
+        option = line[2:].strip().strip('"').strip()
+        key = option.lower()
+        if not option or len(option) > MAX_FOLLOW_UP_CHARS or key in seen:
+            continue
+        seen.add(key)
+        options.append(option)
+        if len(options) == MAX_FOLLOW_UPS:
+            break
+
+    # Keep the prose before each marker; drop the '- ' option lines that
+    # follow any marker (earlier blocks may be followed by more prose).
+    kept = [pieces[0]]
+    for piece in pieces[1:]:
+        lines = piece.splitlines()
+        idx = 0
+        while idx < len(lines) and (not lines[idx].strip() or lines[idx].strip().startswith(("- ", "* "))):
+            idx += 1
+        kept.append("\n".join(lines[idx:]))
+    clean = "\n".join(part.strip("\n") for part in kept if part.strip()).strip()
+    return clean, options
 
 
 def build_tagged_content_history(

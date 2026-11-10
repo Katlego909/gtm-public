@@ -391,11 +391,12 @@ def agent_hub(request):
     workspace_agent_prompts = []
     workspace_agent_history = []
     team_agent_history = []
+    team_agent_prompts = []
     team_selected_session = None
     document_scope_qs = ''
 
     if active_agent_type == 'team':
-        from gtm.team_chat import _collect_team_timeline
+        from gtm.team_chat import TEAM_SUGGESTED_PROMPTS, _collect_team_timeline
 
         agent_session_options = [
             {
@@ -417,6 +418,7 @@ def agent_hub(request):
                 'created_at': created_at,
                 'document_refs': document_refs or [],
             })
+        team_agent_prompts = list(TEAM_SUGGESTED_PROMPTS)
         if current_workspace:
             document_scope_qs = f'?workspace={current_workspace.id}'
             if team_selected_session:
@@ -459,6 +461,8 @@ def agent_hub(request):
                 document_scope_qs += f'&workspace={current_workspace.id}'
     elif current_workspace:
         workspace_agent_prompts = get_suggested_prompts_for_agent(active_agent_type, current_workspace)
+        if active_agent_type == 'insights':
+            workspace_agent_prompts = workspace_agent_prompts + ['Draft a client summary I can send to the client']
         history_qs = WorkspaceChatMessage.objects.filter(
             workspace=current_workspace, agent_type=active_agent_type
         ).order_by('-created_at')[:50]
@@ -498,6 +502,7 @@ def agent_hub(request):
         'workspace_agent_prompts': workspace_agent_prompts,
         'workspace_agent_history': workspace_agent_history,
         'team_agent_history': team_agent_history,
+        'team_agent_prompts': team_agent_prompts,
         'team_selected_session': team_selected_session,
         'team_agent_names_display': team_agent_names_display,
         'document_scope_qs': document_scope_qs,

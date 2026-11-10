@@ -25,7 +25,7 @@ executing it.
 import logging
 from typing import Any, Dict, List, Optional, Tuple
 
-from .agent_runtime import current_agent_type, send_with_retry
+from .agent_runtime import current_agent_type, send_with_retry, split_follow_ups
 from .ai_chat import GENAI_AVAILABLE, GTM_STRATEGIST_SYSTEM_INSTRUCTION, _build_session_tools, _get_chat_client
 from .models import AssessmentSession
 from .models_workspace import Workspace
@@ -221,7 +221,7 @@ def _get_team_config(
     workspace=None, session=None, user=None,
 ):
     from .agent_dashboard_tools import build_dashboard_ambient_context
-    from .agent_runtime import GAP_FLAGGING_RULE, build_task_context_prompt
+    from .agent_runtime import FOLLOW_UP_PROMPT, GAP_FLAGGING_RULE, build_task_context_prompt
 
     if agent_type == "gtm_strategist":
         base_instruction = GTM_STRATEGIST_SYSTEM_INSTRUCTION + GAP_FLAGGING_RULE
@@ -234,6 +234,7 @@ def _get_team_config(
 
     system_instruction = (
         base_instruction + _build_team_directory_prompt(agent_type) + build_task_context_prompt(task_refs)
+        + FOLLOW_UP_PROMPT
     )
     system_instruction += build_dashboard_ambient_context(
         workspace=workspace, session=session, user=user,
@@ -445,6 +446,15 @@ def _persist_team_turn(
         )
 
 
+# Starter options shown inline in an empty or reloaded Team Chat.
+TEAM_SUGGESTED_PROMPTS = [
+    "What should we focus on this week?",
+    "Summarise what changed recently",
+    "Which tasks are overdue?",
+    "What's the biggest gap in our GTM right now?",
+]
+
+
 # ================================================================
 # MAIN ENTRY POINT
 # ================================================================
@@ -512,13 +522,14 @@ def process_team_chat_message(
                     current_message += f"\n\n[A teammate handed this to you, noting: {transfer_reason}]"
                 continue
 
+            text, follow_ups = split_follow_ups(text)
             _persist_team_turn(
                 agent_type, workspace, session, message, text, user, attachments=attachments,
                 task_refs=accumulated_task_refs, document_refs=accumulated_document_refs,
             )
             return {
                 "success": True, "response": text, "agent_type": agent_type,
-                "document_refs": accumulated_document_refs,
+                "document_refs": accumulated_document_refs, "follow_ups": follow_ups,
             }
 
     except Exception as e:

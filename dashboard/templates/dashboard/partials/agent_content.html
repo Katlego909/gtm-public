@@ -21,136 +21,101 @@
 .agent-bubble *:last-child  { margin-bottom: 0; }
 </style>
 {{ agent_display_labels|json_script:"agent-display-labels" }}
-<div class="p-6 md:p-8 h-full overflow-y-auto">
-    <div class="max-w-7xl mx-auto">
-        <div class="mb-6">
-            <h1 class="text-2xl md:text-3xl font-bold text-gray-900">Agent Workspace</h1>
-            <p class="text-gray-600 mt-2">Talk to your GTM agent with persistent context and history.</p>
-        </div>
-
-        <div class="mb-6 flex flex-wrap gap-2">
-            {% for tab_type, tab_label, tab_initial in agent_tabs %}
-            <a href="{% url 'agent_hub' %}?agent_type={{ tab_type }}{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
-               hx-get="{% url 'agent_hub' %}?agent_type={{ tab_type }}{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
-               hx-target="#main-content"
-               hx-swap="innerHTML"
-               hx-push-url="true"
-               class="app-chip transition {% if active_agent_type == tab_type %}bg-indigo-600 text-white{% else %}bg-gray-50 border border-gray-200 text-gray-600 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700{% endif %}">
-                <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 {% if active_agent_type == tab_type %}bg-white/20 text-white{% else %}bg-indigo-100 text-indigo-700{% endif %}">
-                    {% if tab_initial %}{{ tab_initial }}{% else %}
-                    <svg viewBox="0 0 16 16" fill="currentColor" class="w-2.5 h-2.5" aria-hidden="true">
-                        <circle cx="4" cy="4" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/>
-                    </svg>
-                    {% endif %}
-                </span>
-                {{ tab_label }}
-            </a>
-            {% endfor %}
+{% if active_agent_type == 'session' %}{{ dashboard_agent_prompts|json_script:"agent-starter-prompts" }}{% elif active_agent_type == 'team' %}{{ team_agent_prompts|json_script:"agent-starter-prompts" }}{% else %}{{ workspace_agent_prompts|json_script:"agent-starter-prompts" }}{% endif %}
+<div class="h-full flex flex-col p-3 md:p-6">
+    <div class="max-w-7xl mx-auto w-full flex-1 min-h-0 flex flex-col">
+        <div class="mb-3 md:mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div class="min-w-0">
+                <h1 class="text-xl md:text-2xl font-bold text-gray-900">Agent Workspace</h1>
+                <p class="text-sm text-gray-500 mt-0.5 hidden sm:block">Talk to your GTM agent with persistent context and history.</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                {% for tab_type, tab_label, tab_initial in agent_tabs %}
+                <a href="{% url 'agent_hub' %}?agent_type={{ tab_type }}{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
+                   hx-get="{% url 'agent_hub' %}?agent_type={{ tab_type }}{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
+                   hx-target="#main-content"
+                   hx-swap="innerHTML"
+                   hx-push-url="true"
+                   class="app-chip transition {% if active_agent_type == tab_type %}bg-indigo-600 text-white{% else %}bg-gray-50 border border-gray-200 text-gray-600 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700{% endif %}">
+                    <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 {% if active_agent_type == tab_type %}bg-white/20 text-white{% else %}bg-indigo-100 text-indigo-700{% endif %}">
+                        {% if tab_initial %}{{ tab_initial }}{% else %}
+                        <svg viewBox="0 0 16 16" fill="currentColor" class="w-2.5 h-2.5" aria-hidden="true">
+                            <circle cx="4" cy="4" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="4" cy="12" r="2"/><circle cx="12" cy="12" r="2"/>
+                        </svg>
+                        {% endif %}
+                    </span>
+                    {{ tab_label }}
+                </a>
+                {% endfor %}
+            </div>
         </div>
 
         {% if active_agent_type == 'session' %}
         {% if agent_session_options %}
-        <div class="grid grid-cols-1 xl:grid-cols-[320px,1fr] gap-6 items-start">
-            <aside class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 h-fit sticky top-4">
-                {% if active_agent_display %}<p class="text-xs font-semibold text-indigo-600 mb-3">{{ active_agent_display }}</p>{% endif %}
-                <div>
-                    <label for="dashboard-agent-session" class="block text-sm font-semibold text-gray-700 mb-2">Assessment Context</label>
-                    <select id="dashboard-agent-session" onchange="onDashboardAgentSessionChange(this.value)" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+        <section id="dashboard-agent-chat-panel" class="flex-1 min-h-0 flex flex-col border border-gray-200 rounded-2xl overflow-hidden bg-slate-50 transition-colors">
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 md:px-4 py-2.5 border-b border-gray-200 bg-white">
+                {% if active_agent_display %}<span class="text-xs font-semibold text-indigo-600 whitespace-nowrap">{{ active_agent_display }}</span>{% endif %}
+                <div class="flex items-center gap-1.5 min-w-0">
+                    <label for="dashboard-agent-session" class="text-xs font-medium text-gray-500 whitespace-nowrap">Assessment</label>
+                    <select id="dashboard-agent-session" onchange="onDashboardAgentSessionChange(this.value)" class="min-w-0 max-w-[16rem] rounded-lg border border-gray-300 py-1.5 pl-2.5 pr-8 text-sm focus:border-indigo-500 focus:ring-indigo-500">
                         {% for session_option in agent_session_options %}
                         <option value="{{ session_option.uuid }}" {% if dashboard_agent_session and dashboard_agent_session.uuid|stringformat:'s' == session_option.uuid %}selected{% endif %}>{{ session_option.label }}</option>
                         {% endfor %}
                     </select>
-                </div>
-
-                <div class="mt-4">
                     {% if dashboard_agent_session %}
                     <a href="{% url 'agent_hub' %}?agent_session={{ dashboard_agent_session.uuid }}{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
                        hx-get="{% url 'agent_hub' %}?agent_session={{ dashboard_agent_session.uuid }}{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
                        hx-target="#main-content"
                        hx-swap="innerHTML"
                        hx-push-url="true"
-                       class="inline-flex items-center justify-center w-full px-4 py-2 rounded-lg border border-indigo-200 text-sm font-medium text-indigo-700 hover:bg-indigo-50 transition">
-                        Reload Agent Context
+                       class="flex-shrink-0 p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700 transition"
+                       aria-label="Reload agent context" title="Reload agent context">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                     </a>
                     {% endif %}
                 </div>
-
-                {% if dashboard_agent_prompts %}
-                <div class="mt-6">
-                    <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Quick Prompts</p>
-                    <div class="flex flex-wrap gap-2">
-                        {% for prompt in dashboard_agent_prompts %}
-                        <button type="button" onclick="sendDashboardAgentPrompt('{{ prompt|escapejs }}')" class="px-3 py-2 text-sm text-left rounded-lg border border-gray-200 bg-gray-50 hover:bg-indigo-50 hover:border-indigo-200 text-gray-700 transition">
-                            {{ prompt }}
-                        </button>
-                        {% endfor %}
-                        <button type="button" onclick="sendDashboardAgentPrompt('Build my action plan')" class="px-3 py-2 text-sm text-left rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition">
-                            Build my action plan
-                        </button>
-                        <button type="button" onclick="sendDashboardAgentPrompt('Review my action items')" class="px-3 py-2 text-sm text-left rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition">
-                            Review my action items
-                        </button>
-                    </div>
+                <div class="ml-auto flex items-center gap-3">
+                    <div id="documents-list" data-scope-qs="?session_id={{ dashboard_agent_session.uuid }}{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}&exclude_doc_type=action_item_deliverable" class="text-xs text-gray-500">Loading documents...</div>
+                    <button id="dashboard-agent-clear" type="button" class="flex-shrink-0 p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition" aria-label="Clear chat" title="Clear chat">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
+                    </button>
                 </div>
-                {% endif %}
+            </div>
 
-                <div class="mt-6 pt-4 border-t border-gray-100">
-                    <div class="flex items-center justify-between mb-3">
-                        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Documents</p>
-                        <button type="button" onclick="refreshDocumentsPanel()" class="text-xs text-indigo-600 hover:underline">Refresh</button>
-                    </div>
-                    <div id="documents-list" data-scope-qs="?session_id={{ dashboard_agent_session.uuid }}{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}&exclude_doc_type=action_item_deliverable" class="text-sm text-gray-500">Loading...</div>
-                </div>
-            </aside>
-
-            <section id="dashboard-agent-chat-panel" class="border border-gray-200 rounded-2xl overflow-hidden bg-slate-50 min-h-[640px] flex flex-col transition-colors">
-                <div id="dashboard-agent-messages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 scroll-smooth">
-                    {% for chat in dashboard_agent_history %}
-                    <div class="flex items-start gap-3 justify-end">
-                        <div class="bg-gray-900 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm max-w-3xl whitespace-pre-wrap">{{ chat.message }}</div>
-                    </div>
-                    <div class="flex flex-col items-start gap-1">
-                        <div class="agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl">{{ chat.response_html|safe }}</div>
-                        {% include 'dashboard/partials/_document_ref_cards.html' with refs=chat.document_refs scope_qs=document_scope_qs %}
-                    </div>
-                    {% endfor %}
-
-                    {% if not dashboard_agent_history %}
-                    <div class="flex flex-col items-start gap-1">
-                        <span class="text-xs font-semibold text-indigo-600 ml-1">{{ active_agent_display }}</span>
-                        <div class="bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl">
-                            Hi, I'm {{ active_agent_name }}, your GTM Strategist. Ask me about this assessment, build an action plan, or review your execution backlog.
+            <div class="relative flex-1 min-h-0">
+                <div data-chat-scroll class="absolute inset-0 overflow-y-auto">
+                    <div id="dashboard-agent-messages" class="max-w-4xl mx-auto w-full px-3 md:px-4 py-5 space-y-4">
+                        {% for chat in dashboard_agent_history %}
+                        <div class="flex flex-col items-end gap-1.5" data-user-message="true">
+                            {% include 'dashboard/partials/_chat_attachment_cards.html' with attachments=chat.attachments %}
+                            <div class="bg-gray-900 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm max-w-[85%] whitespace-pre-wrap">{{ chat.message }}</div>
                         </div>
+                        <div class="flex flex-col items-start gap-1">
+                            <div class="agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-full">{{ chat.response_html|safe }}</div>
+                            {% include 'dashboard/partials/_document_ref_cards.html' with refs=chat.document_refs scope_qs=document_scope_qs %}
+                        </div>
+                        {% endfor %}
+
+                        {% if not dashboard_agent_history %}
+                        <div class="flex flex-col items-start gap-1">
+                            <span class="text-xs font-semibold text-indigo-600 ml-1">{{ active_agent_display }}</span>
+                            <div class="bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-full">
+                                Hi, I'm {{ active_agent_name }}, your GTM Strategist. Ask me about this assessment, build an action plan, or review your execution backlog.
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
-                    {% endif %}
                 </div>
-                <form id="dashboard-agent-form" class="border-t border-gray-200 bg-white p-4 flex gap-3">
-                    {% csrf_token %}
-                    <input id="dashboard-agent-files" type="file" class="hidden" multiple accept=".txt,.md,.csv,.json,.log,.xml,.yaml,.yml,.pdf,image/*">
-                    <button id="dashboard-agent-attach" type="button" class="px-3 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition flex items-center justify-center" aria-label="Attach file">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l7.071-7.071a4 4 0 00-5.657-5.657l-7.071 7.07a6 6 0 108.485 8.486L19 13" />
-                        </svg>
-                        <span class="sr-only">Attach</span>
-                    </button>
-                    <input id="dashboard-agent-input" type="text" placeholder="Ask {{ active_agent_name|default:'the GTM agent' }} anything about this assessment..." class="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-indigo-500 focus:ring-indigo-500">
-                    <button id="dashboard-agent-send" type="submit" class="px-5 py-3 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center" aria-label="Send message">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M22 2L11 13" />
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M22 2L15 22L11 13L2 9L22 2Z" />
-                        </svg>
-                        <span class="sr-only">Send</span>
-                    </button>
-                    <button id="dashboard-agent-clear" type="button" class="px-4 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition flex items-center justify-center" aria-label="Clear chat">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" />
-                        </svg>
-                        <span class="sr-only">Clear</span>
-                    </button>
-                </form>
-                <p id="dashboard-agent-files-hint" class="px-4 pb-3 text-xs text-gray-500 hidden"></p>
-            </section>
-        </div>
+                <button id="dashboard-agent-jump" type="button" class="hidden absolute bottom-3 left-1/2 -translate-x-1/2 items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50" aria-label="Jump to latest message">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                    Latest
+                </button>
+            </div>
+
+            {% with agent_label=active_agent_name|default:"the GTM agent" %}{% with placeholder="Ask "|add:agent_label|add:" anything about this assessment..." %}
+            {% include 'dashboard/partials/_agent_composer.html' with prefix='dashboard' placeholder=placeholder %}
+            {% endwith %}{% endwith %}
+        </section>
         {% else %}
         <div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center">
             <p class="text-gray-700 font-medium">No assessment context is available yet.</p>
@@ -159,78 +124,59 @@
         {% endif %}
         {% elif active_agent_type == 'team' %}
         {% if current_workspace or agent_session_options %}
-        <div class="grid grid-cols-1 xl:grid-cols-[320px,1fr] gap-6 items-start">
-            <aside class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 h-fit sticky top-4">
-                <p class="text-sm font-semibold text-gray-700 mb-2">Team Chat</p>
-                <p class="text-xs text-gray-500">
-                    Talk to whichever agent fits -- control transfers to the right specialist automatically, and it answers in its own voice.
-                </p>
-
+        <section id="team-agent-chat-panel" class="flex-1 min-h-0 flex flex-col border border-gray-200 rounded-2xl overflow-hidden bg-slate-50 transition-colors">
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 md:px-4 py-2.5 border-b border-gray-200 bg-white">
+                <span class="text-xs font-semibold text-indigo-600 whitespace-nowrap">Team Chat</span>
+                <span class="text-xs text-gray-500 hidden lg:inline">The right specialist takes over automatically and answers in its own voice.</span>
                 {% if agent_session_options %}
-                <div class="mt-4">
-                    <label for="team-agent-session" class="block text-sm font-semibold text-gray-700 mb-2">Assessment Context (optional)</label>
-                    <select id="team-agent-session" onchange="onTeamAgentSessionChange(this.value)" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500">
+                <div class="flex items-center gap-1.5 min-w-0">
+                    <label for="team-agent-session" class="text-xs font-medium text-gray-500 whitespace-nowrap">Assessment</label>
+                    <select id="team-agent-session" onchange="onTeamAgentSessionChange(this.value)" title="Binding an assessment lets the team transfer to the GTM Strategist too." class="min-w-0 max-w-[16rem] rounded-lg border border-gray-300 py-1.5 pl-2.5 pr-8 text-sm focus:border-indigo-500 focus:ring-indigo-500">
                         <option value="">None -- workspace only</option>
                         {% for session_option in agent_session_options %}
                         <option value="{{ session_option.uuid }}" {% if team_selected_session and team_selected_session.uuid|stringformat:'s' == session_option.uuid %}selected{% endif %}>{{ session_option.label }}</option>
                         {% endfor %}
                     </select>
-                    <p class="mt-2 text-xs text-gray-400">Binding an assessment lets the team transfer to the GTM Strategist too.</p>
                 </div>
                 {% endif %}
-
-                <div class="mt-6 pt-4 border-t border-gray-100">
-                    <div class="flex items-center justify-between mb-3">
-                        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Documents</p>
-                        <button type="button" onclick="refreshDocumentsPanel()" class="text-xs text-indigo-600 hover:underline">Refresh</button>
-                    </div>
-                    <div id="documents-list" data-scope-qs="?{% if current_workspace %}workspace={{ current_workspace.id }}{% if team_selected_session %}&session_id={{ team_selected_session.uuid }}{% endif %}{% elif team_selected_session %}session_id={{ team_selected_session.uuid }}{% endif %}&exclude_doc_type=action_item_deliverable" class="text-sm text-gray-500">Loading...</div>
+                <div class="ml-auto flex items-center gap-3">
+                    <div id="documents-list" data-scope-qs="?{% if current_workspace %}workspace={{ current_workspace.id }}{% if team_selected_session %}&session_id={{ team_selected_session.uuid }}{% endif %}{% elif team_selected_session %}session_id={{ team_selected_session.uuid }}{% endif %}&exclude_doc_type=action_item_deliverable" class="text-xs text-gray-500">Loading documents...</div>
                 </div>
-            </aside>
+            </div>
 
-            <section id="team-agent-chat-panel" class="border border-gray-200 rounded-2xl overflow-hidden bg-slate-50 min-h-[640px] flex flex-col transition-colors">
-                <div id="team-agent-messages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 scroll-smooth">
-                    {% for chat in team_agent_history %}
-                    <div class="flex items-start gap-3 justify-end">
-                        <div class="bg-gray-900 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm max-w-3xl whitespace-pre-wrap">{{ chat.message }}</div>
-                    </div>
-                    <div class="flex flex-col items-start gap-1">
-                        <span class="text-xs font-semibold text-indigo-600 ml-1">{{ chat.agent_label }}</span>
-                        <div class="agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl">{{ chat.response_html|safe }}</div>
-                        {% include 'dashboard/partials/_document_ref_cards.html' with refs=chat.document_refs scope_qs=document_scope_qs %}
-                    </div>
-                    {% endfor %}
-
-                    {% if not team_agent_history %}
-                    <div class="flex flex-col items-start gap-1">
-                        <span class="text-xs font-semibold text-indigo-600 ml-1">Team</span>
-                        <div class="bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl">
-                            Hi, we're {{ team_agent_names_display }}. Ask anything, and whichever of us owns the answer will take over and reply directly.
+            <div class="relative flex-1 min-h-0">
+                <div data-chat-scroll class="absolute inset-0 overflow-y-auto">
+                    <div id="team-agent-messages" class="max-w-4xl mx-auto w-full px-3 md:px-4 py-5 space-y-4">
+                        {% for chat in team_agent_history %}
+                        <div class="flex flex-col items-end gap-1.5" data-user-message="true">
+                            {% include 'dashboard/partials/_chat_attachment_cards.html' with attachments=chat.attachments %}
+                            <div class="bg-gray-900 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm max-w-[85%] whitespace-pre-wrap">{{ chat.message }}</div>
                         </div>
+                        <div class="flex flex-col items-start gap-1">
+                            <span class="text-xs font-semibold text-indigo-600 ml-1">{{ chat.agent_label }}</span>
+                            <div class="agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-full">{{ chat.response_html|safe }}</div>
+                            {% include 'dashboard/partials/_document_ref_cards.html' with refs=chat.document_refs scope_qs=document_scope_qs %}
+                        </div>
+                        {% endfor %}
+
+                        {% if not team_agent_history %}
+                        <div class="flex flex-col items-start gap-1">
+                            <span class="text-xs font-semibold text-indigo-600 ml-1">Team</span>
+                            <div class="bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-full">
+                                Hi, we're {{ team_agent_names_display }}. Ask anything, and whichever of us owns the answer will take over and reply directly.
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
-                    {% endif %}
                 </div>
-                <form id="team-agent-form" class="border-t border-gray-200 bg-white p-4 flex gap-3">
-                    {% csrf_token %}
-                    <input id="team-agent-files" type="file" class="hidden" multiple accept=".txt,.md,.csv,.json,.log,.xml,.yaml,.yml,.pdf,image/*">
-                    <button id="team-agent-attach" type="button" class="px-3 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition flex items-center justify-center" aria-label="Attach file">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l7.071-7.071a4 4 0 00-5.657-5.657l-7.071 7.07a6 6 0 108.485 8.486L19 13" />
-                        </svg>
-                        <span class="sr-only">Attach</span>
-                    </button>
-                    <input id="team-agent-input" type="text" placeholder="Ask the team anything..." class="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-indigo-500 focus:ring-indigo-500">
-                    <button id="team-agent-send" type="submit" class="px-5 py-3 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center" aria-label="Send message">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M22 2L11 13" />
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M22 2L15 22L11 13L2 9L22 2Z" />
-                        </svg>
-                        <span class="sr-only">Send</span>
-                    </button>
-                </form>
-                <p id="team-agent-files-hint" class="px-4 pb-3 text-xs text-gray-500 hidden"></p>
-            </section>
-        </div>
+                <button id="team-agent-jump" type="button" class="hidden absolute bottom-3 left-1/2 -translate-x-1/2 items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50" aria-label="Jump to latest message">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                    Latest
+                </button>
+            </div>
+
+            {% include 'dashboard/partials/_agent_composer.html' with prefix='team' placeholder='Ask the team anything...' %}
+        </section>
         {% else %}
         <div class="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-10 text-center">
             <p class="text-gray-700 font-medium">Select a workspace or run an assessment to use Team Chat.</p>
@@ -243,107 +189,218 @@
             <p class="text-sm text-gray-500 mt-2">Portfolio, Resource, and Insights agents reason across a workspace's assessments.</p>
         </div>
         {% else %}
-        <div class="grid grid-cols-1 xl:grid-cols-[320px,1fr] gap-6 items-start">
-            <aside class="bg-white rounded-xl shadow-sm border border-gray-100 p-5 h-fit sticky top-4">
-                {% if active_agent_display %}<p class="text-xs font-semibold text-indigo-600 mb-1">{{ active_agent_display }}</p>{% endif %}
-                <p class="text-sm font-semibold text-gray-700 mb-2">{{ current_workspace.name }}</p>
-                <p class="text-xs text-gray-500">
+        <section id="workspace-agent-chat-panel" data-agent-type="{{ active_agent_type }}" class="flex-1 min-h-0 flex flex-col border border-gray-200 rounded-2xl overflow-hidden bg-slate-50 transition-colors">
+            <div class="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 md:px-4 py-2.5 border-b border-gray-200 bg-white">
+                {% if active_agent_display %}<span class="text-xs font-semibold text-indigo-600 whitespace-nowrap">{{ active_agent_display }}</span>{% endif %}
+                <span class="text-sm font-medium text-gray-700" title="{{ current_workspace.name }}">{{ current_workspace.name }}</span>
+                <span class="text-xs text-gray-500 hidden xl:inline">
                     {% if active_agent_type == 'insights' %}A proactive digest of activity, pending reviews, and score trends across every assessment.
                     {% elif active_agent_type == 'gtm_engineer' %}Designs the systems behind your GTM motion and measures them from your real data.
                     {% endif %}
-                </p>
-
-                {% if active_agent_type == 'insights' %}
-                <div class="mt-4">
-                    <button type="button" id="insights-refresh-button" onclick="refreshWorkspaceInsights()" class="inline-flex items-center justify-center w-full px-4 py-2 rounded-lg border border-indigo-200 text-sm font-medium text-indigo-700 hover:bg-indigo-50 transition">
+                </span>
+                <div class="ml-auto flex items-center gap-3">
+                    {% if active_agent_type == 'insights' %}
+                    <span id="insights-refresh-status" class="text-xs text-gray-500"></span>
+                    <button type="button" id="insights-refresh-button" onclick="refreshWorkspaceInsights()" class="flex-shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-indigo-200 text-xs font-medium text-indigo-700 hover:bg-indigo-50 transition disabled:opacity-50">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                         Refresh Insights
                     </button>
-                    <p id="insights-refresh-status" class="mt-2 text-xs text-gray-500"></p>
+                    {% endif %}
+                    <div id="documents-list" data-scope-qs="?workspace={{ current_workspace.id }}&exclude_doc_type=action_item_deliverable" class="text-xs text-gray-500">Loading documents...</div>
+                    <button id="workspace-agent-clear" type="button" class="flex-shrink-0 p-1.5 rounded-lg border border-gray-200 text-gray-500 hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition" aria-label="Clear chat" title="Clear chat">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" /></svg>
+                    </button>
                 </div>
-                {% endif %}
+            </div>
 
-                {% if workspace_agent_prompts or active_agent_type == 'insights' %}
-                <div class="mt-6">
-                    <p class="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3">Quick Prompts</p>
-                    <div class="flex flex-wrap gap-2">
-                        {% for prompt in workspace_agent_prompts %}
-                        <button type="button" onclick="sendWorkspaceAgentPrompt('{{ prompt|escapejs }}')" class="px-3 py-2 text-sm text-left rounded-lg border border-gray-200 bg-gray-50 hover:bg-indigo-50 hover:border-indigo-200 text-gray-700 transition">
-                            {{ prompt }}
-                        </button>
+            <div class="relative flex-1 min-h-0">
+                <div data-chat-scroll class="absolute inset-0 overflow-y-auto">
+                    <div id="workspace-agent-messages" class="max-w-4xl mx-auto w-full px-3 md:px-4 py-5 space-y-4">
+                        {% for chat in workspace_agent_history %}
+                        <div class="flex flex-col items-end gap-1.5" data-user-message="true">
+                            {% include 'dashboard/partials/_chat_attachment_cards.html' with attachments=chat.attachments %}
+                            <div class="bg-gray-900 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm max-w-[85%] whitespace-pre-wrap">{{ chat.message }}</div>
+                        </div>
+                        <div class="flex flex-col items-start gap-1">
+                            <div class="agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-full">{{ chat.response_html|safe }}</div>
+                            {% include 'dashboard/partials/_document_ref_cards.html' with refs=chat.document_refs scope_qs=document_scope_qs %}
+                        </div>
                         {% endfor %}
-                        {% if active_agent_type == 'insights' %}
-                        <button type="button" onclick="sendWorkspaceAgentPrompt('Draft a client summary I can send to the client')" class="px-3 py-2 text-sm text-left rounded-lg border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition">
-                            Draft a client summary
-                        </button>
+
+                        {% if not workspace_agent_history %}
+                        <div class="flex flex-col items-start gap-1">
+                            <span class="text-xs font-semibold text-indigo-600 ml-1">{{ active_agent_display }}</span>
+                            <div class="bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-full">
+                                {% if active_agent_type == 'insights' %}Hi, I'm {{ active_agent_name }}, your Insights Agent. Ask me what changed recently or how scores have trended across assessments, or click Refresh Insights for a digest.
+                                {% elif active_agent_type == 'gtm_engineer' %}Hi, I'm {{ active_agent_name }}, your GTM Engineer. I design lead scoring, routing, SLAs and the metrics behind them, and I can compute numbers from your uploaded data. Anything I build goes to you as a plan to approve first.
+                                {% endif %}
+                            </div>
+                        </div>
                         {% endif %}
                     </div>
                 </div>
-                {% endif %}
+                <button id="workspace-agent-jump" type="button" class="hidden absolute bottom-3 left-1/2 -translate-x-1/2 items-center gap-1.5 rounded-full border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50" aria-label="Jump to latest message">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                    Latest
+                </button>
+            </div>
 
-                <div class="mt-6 pt-4 border-t border-gray-100">
-                    <div class="flex items-center justify-between mb-3">
-                        <p class="text-xs font-bold text-gray-500 uppercase tracking-wide">Documents</p>
-                        <button type="button" onclick="refreshDocumentsPanel()" class="text-xs text-indigo-600 hover:underline">Refresh</button>
-                    </div>
-                    <div id="documents-list" data-scope-qs="?workspace={{ current_workspace.id }}&exclude_doc_type=action_item_deliverable" class="text-sm text-gray-500">Loading...</div>
-                </div>
-            </aside>
-
-            <section id="workspace-agent-chat-panel" data-agent-type="{{ active_agent_type }}" class="border border-gray-200 rounded-2xl overflow-hidden bg-slate-50 min-h-[640px] flex flex-col transition-colors">
-                <div id="workspace-agent-messages" class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 scroll-smooth">
-                    {% for chat in workspace_agent_history %}
-                    <div class="flex items-start gap-3 justify-end">
-                        <div class="bg-gray-900 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm max-w-3xl whitespace-pre-wrap">{{ chat.message }}</div>
-                    </div>
-                    <div class="flex flex-col items-start gap-1">
-                        <div class="agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl">{{ chat.response_html|safe }}</div>
-                        {% include 'dashboard/partials/_document_ref_cards.html' with refs=chat.document_refs scope_qs=document_scope_qs %}
-                    </div>
-                    {% endfor %}
-
-                    {% if not workspace_agent_history %}
-                    <div class="flex flex-col items-start gap-1">
-                        <span class="text-xs font-semibold text-indigo-600 ml-1">{{ active_agent_display }}</span>
-                        <div class="bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl">
-                            {% if active_agent_type == 'insights' %}Hi, I'm {{ active_agent_name }}, your Insights Agent. Ask me what changed recently or how scores have trended across assessments, or click Refresh Insights for a digest.
-                            {% elif active_agent_type == 'gtm_engineer' %}Hi, I'm {{ active_agent_name }}, your GTM Engineer. I design lead scoring, routing, SLAs and the metrics behind them, and I can compute numbers from your uploaded data. Anything I build goes to you as a plan to approve first.
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
-                <form id="workspace-agent-form" class="border-t border-gray-200 bg-white p-4 flex gap-3">
-                    {% csrf_token %}
-                    <input id="workspace-agent-files" type="file" class="hidden" multiple accept=".txt,.md,.csv,.json,.log,.xml,.yaml,.yml,.pdf,image/*">
-                    <button id="workspace-agent-attach" type="button" class="px-3 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition flex items-center justify-center" aria-label="Attach file">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l7.071-7.071a4 4 0 00-5.657-5.657l-7.071 7.07a6 6 0 108.485 8.486L19 13" />
-                        </svg>
-                        <span class="sr-only">Attach</span>
-                    </button>
-                    <input id="workspace-agent-input" type="text" placeholder="Ask {{ active_agent_name|default:'the agent' }} anything about this workspace..." class="flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm focus:border-indigo-500 focus:ring-indigo-500">
-                    <button id="workspace-agent-send" type="submit" class="px-5 py-3 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center" aria-label="Send message">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M22 2L11 13" />
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M22 2L15 22L11 13L2 9L22 2Z" />
-                        </svg>
-                        <span class="sr-only">Send</span>
-                    </button>
-                    <button id="workspace-agent-clear" type="button" class="px-4 py-3 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50 transition flex items-center justify-center" aria-label="Clear chat">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2" />
-                        </svg>
-                        <span class="sr-only">Clear</span>
-                    </button>
-                </form>
-                <p id="workspace-agent-files-hint" class="px-4 pb-3 text-xs text-gray-500 hidden"></p>
-            </section>
-        </div>
+            {% with agent_label=active_agent_name|default:"the agent" %}{% with placeholder="Ask "|add:agent_label|add:" anything about this workspace..." %}
+            {% include 'dashboard/partials/_agent_composer.html' with prefix='workspace' placeholder=placeholder %}
+            {% endwith %}{% endwith %}
+        </section>
         {% endif %}
     </div>
 </div>
 
 <script>
+// ---- Shared chat chrome: scroll-follow, jump-to-latest, composer, chips ----
+// The message list sits inside a [data-chat-scroll] element that does the
+// scrolling, so the composer below it stays pinned however long the chat gets.
+function chatScroller(container) {
+    return (container && container.closest('[data-chat-scroll]')) || container;
+}
+
+function chatDistanceFromBottom(container) {
+    const scroller = chatScroller(container);
+    if (!scroller) return 0;
+    return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight;
+}
+
+function isChatNearBottom(container) {
+    return chatDistanceFromBottom(container) < 120;
+}
+
+function updateJumpButton(container) {
+    if (!container) return;
+    const button = document.getElementById(container.id.replace(/-messages$/, '-jump'));
+    if (!button) return;
+    const show = chatDistanceFromBottom(container) > 200;
+    button.classList.toggle('hidden', !show);
+    button.classList.toggle('inline-flex', show);
+}
+
+function scrollChatToBottom(container, smooth) {
+    const scroller = chatScroller(container);
+    if (!scroller) return;
+    scroller.scrollTo({ top: scroller.scrollHeight, behavior: smooth ? 'smooth' : 'auto' });
+    updateJumpButton(container);
+}
+
+// Follow new content only when the reader was already at the bottom; if they
+// scrolled up to reread something, leave them there and offer the jump button.
+function followChat(container, wasNearBottom) {
+    if (wasNearBottom) {
+        scrollChatToBottom(container, true);
+    } else {
+        updateJumpButton(container);
+    }
+}
+
+function autoGrowComposer(textarea) {
+    if (!textarea) return;
+    // Grow with the content up to ~8 lines, then scroll inside the box; no
+    // scrollbar until it is actually needed.
+    const maxHeight = 192;
+    textarea.style.height = 'auto';
+    const needed = textarea.scrollHeight;
+    textarea.style.height = Math.min(needed, maxHeight) + 'px';
+    textarea.style.overflowY = needed > maxHeight ? 'auto' : 'hidden';
+}
+
+function initChatChrome(prefix) {
+    const container = document.getElementById(`${prefix}-agent-messages`);
+    const form = document.getElementById(`${prefix}-agent-form`);
+    const input = document.getElementById(`${prefix}-agent-input`);
+    const jump = document.getElementById(`${prefix}-agent-jump`);
+    const scroller = chatScroller(container);
+
+    if (scroller && container) {
+        scroller.addEventListener('scroll', function() { updateJumpButton(container); }, { passive: true });
+    }
+    if (jump && container) {
+        jump.addEventListener('click', function() { scrollChatToBottom(container, true); });
+    }
+    if (input && form) {
+        input.addEventListener('input', function() { autoGrowComposer(input); });
+        input.addEventListener('keydown', function(event) {
+            if (event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
+            event.preventDefault();
+            if (!input.disabled) form.requestSubmit();
+        });
+        autoGrowComposer(input);
+    }
+    if (container) scrollChatToBottom(container, false);
+}
+
+// "<Agent> is thinking" bubble with animated dots; after a while it says
+// "still thinking" so a long tool-calling turn doesn't look stuck. It only
+// states what is true (the agent is working), never a made-up step.
+function fillThinkingIndicator(wrapper, who) {
+    wrapper.className = 'flex flex-col items-start gap-1';
+    wrapper.setAttribute('role', 'status');
+    wrapper.innerHTML = `
+        <div class="bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-600 flex items-center gap-2.5">
+            <span class="flex items-center gap-1" aria-hidden="true">
+                <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce"></span>
+                <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style="animation-delay: 150ms"></span>
+                <span class="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-bounce" style="animation-delay: 300ms"></span>
+            </span>
+            <span data-thinking-label></span>
+        </div>
+    `;
+    const label = wrapper.querySelector('[data-thinking-label]');
+    const verb = who === 'The team' ? 'are' : 'is';
+    label.textContent = `${who} ${verb} thinking`;
+    wrapper._stillTimer = setTimeout(function() {
+        label.textContent = `${who} ${verb} still thinking`;
+    }, 10000);
+}
+
+function readStarterPrompts() {
+    const el = document.getElementById('agent-starter-prompts');
+    if (!el) return [];
+    try {
+        const prompts = JSON.parse(el.textContent);
+        return Array.isArray(prompts) ? prompts : [];
+    } catch (error) {
+        return [];
+    }
+}
+
+function clearSuggestionChips(containerId) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    container.querySelectorAll('.agent-suggestions').forEach(el => el.remove());
+}
+
+// Options render inline under the latest agent message: the starter prompts
+// on load, then the follow-ups the agent proposes after each reply.
+function renderSuggestionChips(containerId, options, onPick) {
+    clearSuggestionChips(containerId);
+    const container = document.getElementById(containerId);
+    if (!container || !options || !options.length) return;
+    const wasNearBottom = isChatNearBottom(container);
+
+    const row = document.createElement('div');
+    row.className = 'agent-suggestions flex flex-wrap gap-2';
+    row.setAttribute('role', 'group');
+    row.setAttribute('aria-label', 'Suggested next questions');
+    options.forEach(text => {
+        const chip = document.createElement('button');
+        chip.type = 'button';
+        chip.className = 'px-3 py-1.5 text-sm text-left rounded-full border border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50 hover:border-indigo-300 transition';
+        chip.textContent = text;
+        chip.addEventListener('click', function() {
+            clearSuggestionChips(containerId);
+            onPick(text);
+        });
+        row.appendChild(chip);
+    });
+    container.appendChild(row);
+    followChat(container, wasNearBottom);
+}
+
 function appendDashboardAgentMessage(message, isUser, responseHtml, containerId, documentRefs) {
     const container = document.getElementById(containerId || 'dashboard-agent-messages');
     if (!container) return;
@@ -353,16 +410,18 @@ function appendDashboardAgentMessage(message, isUser, responseHtml, containerId,
         .replaceAll('<', '&lt;')
         .replaceAll('>', '&gt;');
 
+    const wasNearBottom = isUser || isChatNearBottom(container);
     const wrapper = document.createElement('div');
-    wrapper.className = isUser ? 'flex items-start gap-3 justify-end' : 'flex flex-col items-start gap-1';
+    wrapper.className = isUser ? 'flex flex-col items-end gap-1.5' : 'flex flex-col items-start gap-1';
+    if (isUser) wrapper.dataset.userMessage = 'true';
 
     if (isUser) {
         wrapper.innerHTML = `
-            <div class="bg-gray-900 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm max-w-3xl whitespace-pre-wrap">${safeMessage}</div>
+            <div class="bg-gray-900 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm max-w-[85%] whitespace-pre-wrap">${safeMessage}</div>
         `;
     } else {
         const bubble = document.createElement('div');
-        bubble.className = 'agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl';
+        bubble.className = 'agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-full';
         if (responseHtml) {
             bubble.innerHTML = responseHtml;
         } else {
@@ -378,7 +437,7 @@ function appendDashboardAgentMessage(message, isUser, responseHtml, containerId,
     }
 
     container.appendChild(wrapper);
-    container.scrollTop = container.scrollHeight;
+    followChat(container, wasNearBottom);
 }
 
 async function sendDashboardAgentMessage(message) {
@@ -397,8 +456,11 @@ async function sendDashboardAgentMessage(message) {
         return;
     }
 
+    clearSuggestionChips('dashboard-agent-messages');
     appendDashboardAgentMessage(message, true);
+    attachFilesToLastUserMessage('dashboard-agent-messages', files);
     input.value = '';
+    autoGrowComposer(input);
     input.disabled = true;
     button.disabled = true;
     attachButton.disabled = true;
@@ -409,15 +471,9 @@ async function sendDashboardAgentMessage(message) {
     if (msgsContainer) {
         const thinkingWrapper = document.createElement('div');
         thinkingWrapper.id = thinkingId;
-        thinkingWrapper.className = 'flex items-start gap-3';
-        thinkingWrapper.innerHTML = `
-            <div class="agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl flex items-center gap-2">
-                <svg class="animate-spin h-4 w-4 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                Processing...
-            </div>
-        `;
+        fillThinkingIndicator(thinkingWrapper, '{{ active_agent_name|default:'The agent'|escapejs }}');
         msgsContainer.appendChild(thinkingWrapper);
-        msgsContainer.scrollTop = msgsContainer.scrollHeight;
+        scrollChatToBottom(msgsContainer, true);
     }
 
     try {
@@ -451,6 +507,7 @@ async function sendDashboardAgentMessage(message) {
 
         const data = await response.json();
         appendDashboardAgentMessage(data.success ? data.response : `Error: ${data.error || 'Unknown error'}`, false, data.response_html || '', null, data.document_refs);
+        if (data.success) renderSuggestionChips('dashboard-agent-messages', data.follow_ups, sendDashboardAgentPrompt);
         if (data.success && data.document_refs && data.document_refs.length) {
             refreshDocumentsPanel();
         }
@@ -471,7 +528,10 @@ async function sendDashboardAgentMessage(message) {
     } finally {
         // Remove "AI is thinking..." indicator
         const thinkingEl = document.getElementById(thinkingId);
-        if (thinkingEl) thinkingEl.remove();
+        if (thinkingEl) {
+            clearTimeout(thinkingEl._stillTimer);
+            thinkingEl.remove();
+        }
 
         input.disabled = false;
         button.disabled = false;
@@ -551,6 +611,7 @@ async function executeDashboardAgentClear(sessionId, clearButton, container) {
 
         container.innerHTML = '';
         appendDashboardAgentMessage("Hi, I'm {{ active_agent_name }}, your GTM Strategist. Ask me about this assessment, build an action plan, or review your execution backlog.", false);
+        renderSuggestionChips('dashboard-agent-messages', readStarterPrompts(), sendDashboardAgentPrompt);
     } catch (error) {
         appendDashboardAgentMessage('Error: Could not clear chat history.', false);
     } finally {
@@ -558,21 +619,83 @@ async function executeDashboardAgentClear(sessionId, clearButton, container) {
     }
 }
 
+function formatFileSize(bytes) {
+    const size = Number(bytes) || 0;
+    if (size >= 1024 * 1024) return (size / (1024 * 1024)).toFixed(1) + ' MB';
+    if (size >= 1024) return Math.round(size / 1024) + ' KB';
+    return size + ' B';
+}
+
+function fileKindLabel(name, contentType) {
+    const ext = String(name || '').split('.').pop();
+    if (ext && ext !== name) return ext.toUpperCase();
+    return String(contentType || 'File').split('/').pop().toUpperCase();
+}
+
+// One file card, used for pending files in the composer (with a remove
+// button) and for files on a sent message (without one).
+function buildFileChip(name, size, contentType, onRemove) {
+    const chip = document.createElement('div');
+    chip.className = 'inline-flex items-center gap-2 max-w-[16rem] rounded-xl border border-gray-200 bg-white pl-2 pr-2.5 py-1.5';
+    const icon = document.createElement('span');
+    icon.className = 'flex-shrink-0 w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 text-[10px] font-bold flex items-center justify-center';
+    icon.textContent = fileKindLabel(name, contentType).slice(0, 4);
+    const text = document.createElement('div');
+    text.className = 'min-w-0 flex flex-col';
+    const title = document.createElement('span');
+    title.className = 'text-xs font-medium text-gray-800 break-all';
+    title.textContent = name;
+    title.title = name;
+    const meta = document.createElement('span');
+    meta.className = 'text-[11px] text-gray-500';
+    meta.textContent = formatFileSize(size);
+    text.appendChild(title);
+    text.appendChild(meta);
+    chip.appendChild(icon);
+    chip.appendChild(text);
+    if (onRemove) {
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'flex-shrink-0 ml-1 p-1 rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700';
+        remove.setAttribute('aria-label', `Remove ${name}`);
+        remove.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+        remove.addEventListener('click', onRemove);
+        chip.appendChild(remove);
+    }
+    return chip;
+}
+
 function updateDashboardAgentFileHint(fileInput, hintId) {
     const hint = document.getElementById(hintId || 'dashboard-agent-files-hint');
     if (!hint || !fileInput) return;
-    const names = Array.from(fileInput.files || []).map(file => file.name).filter(Boolean);
-    if (!names.length) {
-        hint.textContent = '';
+    const files = Array.from(fileInput.files || []);
+    hint.innerHTML = '';
+    if (!files.length) {
         hint.classList.add('hidden');
         return;
     }
-    hint.textContent = `Attached: ${names.join(', ')}`;
-    hint.innerHTML = `<span class="inline-flex items-center gap-1.5 px-2 py-1 bg-indigo-50 text-indigo-700 rounded-md border border-indigo-100 font-medium animate-pulse">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
-        Vision Active: ${names.join(', ')}
-    </span>`;
+    files.forEach((file, index) => {
+        hint.appendChild(buildFileChip(file.name, file.size, file.type, function() {
+            const dt = new DataTransfer();
+            Array.from(fileInput.files || []).forEach((f, i) => { if (i !== index) dt.items.add(f); });
+            fileInput.files = dt.files;
+            updateDashboardAgentFileHint(fileInput, hintId);
+        }));
+    });
     hint.classList.remove('hidden');
+}
+
+// Attach file cards above the most recent user bubble (live sends).
+function attachFilesToLastUserMessage(containerId, files) {
+    const container = document.getElementById(containerId);
+    if (!container || !files || !files.length) return;
+    const userMessages = container.querySelectorAll('[data-user-message]');
+    const wrapper = userMessages[userMessages.length - 1];
+    if (!wrapper) return;
+    const row = document.createElement('div');
+    row.className = 'flex flex-wrap justify-end gap-2 max-w-[85%]';
+    files.forEach(file => row.appendChild(buildFileChip(file.name, file.size, file.type, null)));
+    wrapper.insertBefore(row, wrapper.firstChild);
 }
 
 function sendDashboardAgentPrompt(prompt) {
@@ -601,6 +724,8 @@ function initDashboardAgent() {
 
     agentForm.dataset.initialized = 'true';
     refreshDocumentsPanel();
+    initChatChrome('dashboard');
+    renderSuggestionChips('dashboard-agent-messages', readStarterPrompts(), sendDashboardAgentPrompt);
 
     // Check for auto-prompt parameter in URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -640,9 +765,6 @@ function initDashboardAgent() {
         clearButton.addEventListener('click', clearDashboardAgentMessages);
     }
 
-    if (container) {
-        container.scrollTop = container.scrollHeight;
-    }
 
     // Let users drop a file anywhere on the chat panel to attach it — same
     // effect as the paperclip button, just without a dedicated dropzone
@@ -681,8 +803,11 @@ async function sendWorkspaceAgentMessage(agentType, message) {
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
     const files = Array.from(fileInput?.files || []);
 
+    clearSuggestionChips('workspace-agent-messages');
     appendDashboardAgentMessage(message, true, null, 'workspace-agent-messages');
+    attachFilesToLastUserMessage('workspace-agent-messages', files);
     input.value = '';
+    autoGrowComposer(input);
     input.disabled = true;
     button.disabled = true;
     if (attachButton) attachButton.disabled = true;
@@ -692,15 +817,9 @@ async function sendWorkspaceAgentMessage(agentType, message) {
     if (msgsContainer) {
         const thinkingWrapper = document.createElement('div');
         thinkingWrapper.id = thinkingId;
-        thinkingWrapper.className = 'flex items-start gap-3';
-        thinkingWrapper.innerHTML = `
-            <div class="agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl flex items-center gap-2">
-                <svg class="animate-spin h-4 w-4 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                Processing...
-            </div>
-        `;
+        fillThinkingIndicator(thinkingWrapper, '{{ active_agent_name|default:'The agent'|escapejs }}');
         msgsContainer.appendChild(thinkingWrapper);
-        msgsContainer.scrollTop = msgsContainer.scrollHeight;
+        scrollChatToBottom(msgsContainer, true);
     }
 
     try {
@@ -733,6 +852,7 @@ async function sendWorkspaceAgentMessage(agentType, message) {
             'workspace-agent-messages',
             data.document_refs
         );
+        if (data.success) renderSuggestionChips('workspace-agent-messages', data.follow_ups, sendWorkspaceAgentPrompt);
         if (data.success && data.document_refs && data.document_refs.length) {
             refreshDocumentsPanel();
         }
@@ -740,7 +860,10 @@ async function sendWorkspaceAgentMessage(agentType, message) {
         appendDashboardAgentMessage('Error: Could not reach the dashboard agent.', false, null, 'workspace-agent-messages');
     } finally {
         const thinkingEl = document.getElementById(thinkingId);
-        if (thinkingEl) thinkingEl.remove();
+        if (thinkingEl) {
+            clearTimeout(thinkingEl._stillTimer);
+            thinkingEl.remove();
+        }
         input.disabled = false;
         button.disabled = false;
         if (attachButton) attachButton.disabled = false;
@@ -817,6 +940,7 @@ async function executeWorkspaceAgentClear(agentType, clearButton, container) {
             return;
         }
         container.innerHTML = '';
+        renderSuggestionChips('workspace-agent-messages', readStarterPrompts(), sendWorkspaceAgentPrompt);
     } catch (error) {
         appendDashboardAgentMessage('Error: Could not clear chat history.', false, null, 'workspace-agent-messages');
     } finally {
@@ -878,11 +1002,12 @@ function pollWorkspaceInsightsStatus(button, statusEl, attempt) {
                     const wrapper = document.createElement('div');
                     wrapper.className = 'flex items-start gap-3';
                     const bubble = document.createElement('div');
-                    bubble.className = 'agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl';
+                    bubble.className = 'agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-full';
                     bubble.innerHTML = data.latest_digest_html;
                     wrapper.appendChild(bubble);
+                    const wasNearBottom = isChatNearBottom(container);
                     container.appendChild(wrapper);
-                    container.scrollTop = container.scrollHeight;
+                    followChat(container, wasNearBottom);
                 }
             }
         })
@@ -905,7 +1030,7 @@ function renderDocumentsList(docs) {
     if (!container) return;
 
     if (!docs.length) {
-        container.innerHTML = '<p class="text-xs text-gray-400">No documents saved yet. Ask the agent to create one, e.g. "save this as a document."</p>';
+        container.innerHTML = '<span class="text-xs text-gray-400" title="Ask the agent to create one, e.g. &quot;save this as a document.&quot;">No documents yet</span>';
         return;
     }
 
@@ -917,8 +1042,8 @@ function renderDocumentsList(docs) {
     const count = docs.length;
     container.innerHTML = `
         <a href="/dashboard/assets/" hx-get="/dashboard/assets/" hx-target="#main-content" hx-push-url="true"
-           class="text-xs text-indigo-600 hover:underline">
-            ${count} document${count === 1 ? '' : 's'} &middot; View all in Library &rarr;
+           class="text-xs text-indigo-600 hover:underline whitespace-nowrap">
+            ${count} document${count === 1 ? '' : 's'} &middot; Library &rarr;
         </a>
     `;
     // Dynamically-injected HTML isn't auto-wired by HTMX -- unlike the
@@ -957,7 +1082,7 @@ async function refreshDocumentsPanel() {
         const data = await response.json();
         renderDocumentsList(data.documents || []);
     } catch (error) {
-        container.innerHTML = '<p class="text-xs text-red-500">Could not load documents.</p>';
+        container.innerHTML = '<span class="text-xs text-red-500">Could not load documents</span>';
     }
 }
 
@@ -1049,6 +1174,8 @@ function initWorkspaceAgent() {
 
     agentForm.dataset.initialized = 'true';
     refreshDocumentsPanel();
+    initChatChrome('workspace');
+    renderSuggestionChips('workspace-agent-messages', readStarterPrompts(), sendWorkspaceAgentPrompt);
 
     agentForm.addEventListener('submit', function(event) {
         event.preventDefault();
@@ -1061,9 +1188,6 @@ function initWorkspaceAgent() {
         clearButton.addEventListener('click', clearWorkspaceAgentMessages);
     }
 
-    if (container) {
-        container.scrollTop = container.scrollHeight;
-    }
 
     if (attachButton && fileInput) {
         attachButton.addEventListener('click', function() {
@@ -1111,12 +1235,14 @@ function appendTeamAgentMessage(message, isUser, responseHtml, agentType, docume
         .replaceAll('<', '&lt;')
         .replaceAll('>', '&gt;');
 
+    const wasNearBottom = isUser || isChatNearBottom(container);
     const wrapper = document.createElement('div');
 
     if (isUser) {
-        wrapper.className = 'flex items-start gap-3 justify-end';
+        wrapper.className = 'flex flex-col items-end gap-1.5';
+        wrapper.dataset.userMessage = 'true';
         wrapper.innerHTML = `
-            <div class="bg-gray-900 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm max-w-3xl whitespace-pre-wrap">${safeMessage}</div>
+            <div class="bg-gray-900 text-white rounded-2xl rounded-tr-sm px-4 py-3 text-sm max-w-[85%] whitespace-pre-wrap">${safeMessage}</div>
         `;
     } else {
         wrapper.className = 'flex flex-col items-start gap-1';
@@ -1125,7 +1251,7 @@ function appendTeamAgentMessage(message, isUser, responseHtml, agentType, docume
         labelEl.className = 'text-xs font-semibold text-indigo-600 ml-1';
         labelEl.textContent = label;
         const bubble = document.createElement('div');
-        bubble.className = 'agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl';
+        bubble.className = 'agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-full';
         if (responseHtml) {
             bubble.innerHTML = responseHtml;
         } else {
@@ -1142,7 +1268,7 @@ function appendTeamAgentMessage(message, isUser, responseHtml, agentType, docume
     }
 
     container.appendChild(wrapper);
-    container.scrollTop = container.scrollHeight;
+    followChat(container, wasNearBottom);
 }
 
 async function sendTeamAgentMessage(message) {
@@ -1157,8 +1283,11 @@ async function sendTeamAgentMessage(message) {
     const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || '{{ csrf_token }}';
     const files = Array.from(fileInput?.files || []);
 
+    clearSuggestionChips('team-agent-messages');
     appendTeamAgentMessage(message, true);
+    attachFilesToLastUserMessage('team-agent-messages', files);
     input.value = '';
+    autoGrowComposer(input);
     input.disabled = true;
     button.disabled = true;
     if (attachButton) attachButton.disabled = true;
@@ -1168,15 +1297,9 @@ async function sendTeamAgentMessage(message) {
     if (msgsContainer) {
         const thinkingWrapper = document.createElement('div');
         thinkingWrapper.id = thinkingId;
-        thinkingWrapper.className = 'flex items-start gap-3';
-        thinkingWrapper.innerHTML = `
-            <div class="agent-bubble bg-indigo-50 border border-indigo-100 rounded-2xl rounded-tl-sm px-4 py-3 text-sm text-gray-700 max-w-3xl flex items-center gap-2">
-                <svg class="animate-spin h-4 w-4 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                Processing...
-            </div>
-        `;
+        fillThinkingIndicator(thinkingWrapper, 'The team');
         msgsContainer.appendChild(thinkingWrapper);
-        msgsContainer.scrollTop = msgsContainer.scrollHeight;
+        scrollChatToBottom(msgsContainer, true);
     }
 
     try {
@@ -1210,6 +1333,7 @@ async function sendTeamAgentMessage(message) {
             data.agent_type,
             data.document_refs
         );
+        if (data.success) renderSuggestionChips('team-agent-messages', data.follow_ups, sendTeamAgentMessage);
         if (data.success && data.document_refs && data.document_refs.length) {
             refreshDocumentsPanel();
         }
@@ -1217,7 +1341,10 @@ async function sendTeamAgentMessage(message) {
         appendTeamAgentMessage('Error: Could not reach the team agent.', false, null, null);
     } finally {
         const thinkingEl = document.getElementById(thinkingId);
-        if (thinkingEl) thinkingEl.remove();
+        if (thinkingEl) {
+            clearTimeout(thinkingEl._stillTimer);
+            thinkingEl.remove();
+        }
         input.disabled = false;
         button.disabled = false;
         if (attachButton) attachButton.disabled = false;
@@ -1248,6 +1375,8 @@ function initTeamAgent() {
 
     agentForm.dataset.initialized = 'true';
     refreshDocumentsPanel();
+    initChatChrome('team');
+    renderSuggestionChips('team-agent-messages', readStarterPrompts(), sendTeamAgentMessage);
 
     agentForm.addEventListener('submit', function(event) {
         event.preventDefault();
@@ -1256,9 +1385,6 @@ function initTeamAgent() {
         sendTeamAgentMessage(message);
     });
 
-    if (container) {
-        container.scrollTop = container.scrollHeight;
-    }
 
     if (attachButton && fileInput) {
         attachButton.addEventListener('click', function() {

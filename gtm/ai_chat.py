@@ -18,6 +18,7 @@ from .views import _compute_scores, _band_for_score
 from .agent_services import build_execution_plan, review_action_items
 from .utils import guess_upload_mime_type
 from .utils_logging import log_ai_error
+from .agent_runtime import split_follow_ups
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +172,7 @@ def _make_session_consult_tool(
             answer, nested_task_refs, nested_document_refs = handle_general_chat_workspace(
                 target_agent_type, session.workspace, question, user=user, _handoff_depth=_handoff_depth + 1
             )
+            answer, _ = split_follow_ups(answer)
             WorkspaceChatMessage.objects.create(
                 workspace=session.workspace,
                 agent_type=target_agent_type,
@@ -582,9 +584,11 @@ def _get_chat_config(
 ):
     """Builds the configuration for the chat agent, including its tool set."""
     from .agent_dashboard_tools import build_dashboard_ambient_context
-    from .agent_runtime import GAP_FLAGGING_RULE, build_task_context_prompt
+    from .agent_runtime import FOLLOW_UP_PROMPT, GAP_FLAGGING_RULE, build_task_context_prompt
 
-    system_instruction = GTM_STRATEGIST_SYSTEM_INSTRUCTION + GAP_FLAGGING_RULE + build_task_context_prompt(task_refs)
+    system_instruction = (
+        GTM_STRATEGIST_SYSTEM_INSTRUCTION + GAP_FLAGGING_RULE + build_task_context_prompt(task_refs) + FOLLOW_UP_PROMPT
+    )
     system_instruction += build_dashboard_ambient_context(
         workspace=session.workspace if session else None, session=session, user=user,
     )
@@ -1249,10 +1253,12 @@ def process_chat_message(
                 user=user,
                 supplemental_context=relevant_attachment_context,
             )
+        response_text, follow_ups = split_follow_ups(response_text)
 
         return {
             "success": True,
             "response": response_text,
+            "follow_ups": follow_ups,
             "intent": intent,
             "task_refs": task_refs,
             "document_refs": document_refs,

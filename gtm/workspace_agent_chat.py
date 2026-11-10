@@ -11,6 +11,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from .ai_chat import GENAI_AVAILABLE, _get_chat_client
 from .models_workspace import Workspace
 from .utils_logging import log_ai_error
+from .agent_runtime import split_follow_ups
 from .workspace_agent_services import (
     build_portfolio_trends,
     build_resource_gap_matches,
@@ -389,6 +390,7 @@ def _make_consult_tool(
             answer, nested_task_refs, nested_document_refs = handle_general_chat_workspace(
                 target_agent_type, workspace, question, user=user, _handoff_depth=_handoff_depth + 1
             )
+            answer, _ = split_follow_ups(answer)
             WorkspaceChatMessage.objects.create(
                 workspace=workspace,
                 agent_type=target_agent_type,
@@ -715,7 +717,7 @@ def _get_workspace_chat_config(
     workspace=None, user=None,
 ):
     from .agent_dashboard_tools import build_dashboard_ambient_context
-    from .agent_runtime import build_agent_directory_prompt, build_task_context_prompt
+    from .agent_runtime import FOLLOW_UP_PROMPT, build_agent_directory_prompt, build_task_context_prompt
 
     base_instruction = SYSTEM_INSTRUCTIONS.get(agent_type, "You are a helpful GTM strategy assistant.")
     tool_guidance = (
@@ -731,7 +733,7 @@ def _get_workspace_chat_config(
         "to what a teammate already looked up -- call the right tool yourself and get a fresh answer rather "
         "than repeating or lightly rewording something a teammate said about a different question."
     )
-    system_instruction = base_instruction + tool_guidance + build_task_context_prompt(task_refs)
+    system_instruction = base_instruction + tool_guidance + build_task_context_prompt(task_refs) + FOLLOW_UP_PROMPT
     system_instruction += build_dashboard_ambient_context(workspace=workspace, user=user)
 
     # Only mention handoff capability when a consult_ tool is actually in
@@ -1014,8 +1016,9 @@ def process_workspace_chat_message(
         response_text, task_refs, document_refs = handle_general_chat_workspace(
             agent_type, workspace, message, user=user, supplemental_context=supplemental_context
         )
+        response_text, follow_ups = split_follow_ups(response_text)
         return {
-            "success": True, "response": response_text, "intent": "general_chat",
+            "success": True, "response": response_text, "follow_ups": follow_ups, "intent": "general_chat",
             "task_refs": task_refs, "document_refs": document_refs,
         }
     except Workspace.DoesNotExist:
