@@ -111,3 +111,17 @@ def safe_get_session_or_403(request, session_id):
         
     return None, False
 ```
+
+## 6. Team Rounds (several people answer one assessment)
+
+An admin or manager opens a round from the Workspace Hub and picks respondents. Each respondent answers the applicable questions privately (`TeamRoundAnswer` rows, not `AssessmentSession`s, so they never appear in "latest completed assessment" queries). Closing the round needs at least two submissions and creates one ordinary completed `AssessmentSession` in the workspace:
+
+- **Score:** the respondents' average per question, rounded half up (`Response.score` is a whole 1-5 number everywhere in scoring). The round page keeps the exact average.
+- **Disagreement:** a question whose answers are 2+ points apart is flagged. The flag and respondents' notes (without names) go into that response's `context_note`, so the AI insight for the question sees the disagreement.
+- **Visibility:** answers are hidden while the round is open; after closing, every member sees each person's score by name. The answer page says so up front.
+
+Code: `gtm/team_rounds.py` (rules), `gtm/models_team_rounds.py`, `dashboard/views/team_rounds.py`.
+
+## 7. Deleting a Workspace or an Account
+
+Workspace delete is permanent (it used to be a soft delete with no restore). Account deletion lives in `gtm/account_deletion.py`: a sole admin of a workspace that still has other members is blocked until they hand over admin; workspaces where the user is the only member are deleted with them; in shared workspaces, assessments and gaps the user created are detached (`user=NULL`) rather than cascaded away. Uploaded files are removed from storage after commit whenever the row that owns them is deleted (`gtm/storage_cleanup.py`). `python manage.py purge_stale_data` (dry run unless `--apply`) clears workspaces left by the old soft delete and files no row references.

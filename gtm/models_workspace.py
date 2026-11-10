@@ -141,6 +141,11 @@ class WorkspaceMembership(models.Model):
         return self.role in ['admin', 'manager', 'funti3r_consultant']
 
     @property
+    def can_run_team_rounds(self):
+        """Check if user can open and close team assessment rounds"""
+        return self.can_assign_tasks
+
+    @property
     def can_approve_agent_runs(self):
         """Check if user can approve an agent's plan before it acts (same
         roles that can assign tasks, since an approved plan assigns work)"""

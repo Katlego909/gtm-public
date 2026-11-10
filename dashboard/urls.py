@@ -90,6 +90,10 @@ urlpatterns = [
     path('assessment-history/export/<str:fmt>/', views.assessment_history_export, name='assessment_history_export'),
     path('settings/', views.settings_view, name='settings'),
     path('settings/delete-account/', views.delete_account_view, name='delete_account'),
+    path('workspace/<uuid:workspace_id>/team-rounds/', views.team_rounds, name='team_rounds'),
+    path('workspace/<uuid:workspace_id>/team-rounds/<int:round_id>/', views.team_round_detail, name='team_round_detail'),
+    path('workspace/<uuid:workspace_id>/team-rounds/<int:round_id>/answer/', views.team_round_answer, name='team_round_answer'),
+    path('workspace/<uuid:workspace_id>/team-rounds/<int:round_id>/close/', views.team_round_close, name='team_round_close'),
     
     # Workspace management from dashboard
     path('workspace/create/', views.create_workspace_dashboard, name='create_workspace_dashboard'),

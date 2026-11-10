@@ -155,7 +155,7 @@ class DeleteAccountViewTests(TestCase):
     def test_correct_password_deletes_and_logs_out(self):
         self.client.force_login(self.user)
         response = self.client.post(self.url, {"password": "pass1234"})
-        self.assertEqual(response.status_code, 302)
+        self.assertContains(response, "Your account has been deleted")
         self.assertFalse(User.objects.filter(pk=self.user.pk).exists())
         self.assertNotIn("_auth_user_id", self.client.session)
 

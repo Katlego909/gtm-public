@@ -1,8 +1,7 @@
 """Self-serve account deletion. The rules live in gtm/account_deletion.py."""
-from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import redirect, render
+from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
 
 from gtm.account_deletion import (
@@ -36,8 +35,7 @@ def delete_account_view(request):
                 error = "A workspace you run still needs another admin. See below."
             else:
                 logout(request)
-                messages.success(request, "Your account and its data have been deleted.")
-                return redirect("gtm:landing")
+                return render(request, "gtm/account_deleted.html")
 
     sole = sole_member_workspaces(user)
     sole_ids = {w.id for w in sole}

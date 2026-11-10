@@ -107,3 +107,4 @@ from .notifications import (
 )
 from .search import global_search
 from .account import delete_account_view
+from .team_rounds import team_round_answer, team_round_close, team_round_detail, team_rounds

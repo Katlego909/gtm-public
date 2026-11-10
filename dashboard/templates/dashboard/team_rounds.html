@@ -1,0 +1,68 @@
+{% extends 'dashboard/base.html' %}
+
+{% block content %}
+<header class="hidden md:flex h-16 bg-white border-b border-gray-200 justify-between items-center px-8 flex-shrink-0">
+    <h1 class="text-xl font-bold text-gray-800">Team rounds</h1>
+</header>
+
+<div class="flex-1 overflow-y-auto p-4 md:p-8 bg-slate-50">
+    <div class="max-w-4xl space-y-6">
+        <a href="{% url 'workspace_hub' %}?workspace={{ workspace.id }}" class="text-sm text-indigo-700">Back to Workspace Hub</a>
+        {% include 'dashboard/partials/flash_messages.html' %}
+
+        <div class="bg-white rounded-xl p-6 border border-gray-200">
+            <h2 class="text-base font-semibold text-gray-900 mb-1">Answer the assessment as a team</h2>
+            <p class="text-sm text-gray-600">Each person answers privately. When the round closes, {{ workspace.name }} gets one score from everyone's average, and questions where people disagree by 2 or more points are flagged. Disagreement is often the most useful finding.</p>
+        </div>
+
+        {% if can_run %}
+        <form method="post" class="bg-white rounded-xl p-6 border border-gray-200 space-y-4">
+            {% csrf_token %}
+            <h2 class="text-base font-semibold text-gray-900">Open a round</h2>
+            <label class="block">
+                <span class="block text-sm font-medium text-gray-700 mb-1">Name</span>
+                <input type="text" name="title" maxlength="120" placeholder="Team assessment"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-lg">
+            </label>
+            <fieldset>
+                <legend class="block text-sm font-medium text-gray-700 mb-2">Who should answer (at least {{ min_respondents }})</legend>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {% for m in members %}
+                    <label class="flex items-center gap-2 p-3 rounded-lg border border-gray-200 text-sm">
+                        <input type="checkbox" name="respondents" value="{{ m.user_id }}" {% if m.role != 'viewer' %}checked{% endif %}>
+                        <span class="flex-1 text-gray-900">{{ m.user.get_full_name|default:m.user.username }}</span>
+                        <span class="text-xs text-gray-500">{{ m.get_role_display }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </fieldset>
+            {% if error %}<p class="text-sm text-red-600">{{ error }}</p>{% endif %}
+            <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700">Open round and notify</button>
+        </form>
+        {% endif %}
+
+        <div class="bg-white rounded-xl border border-gray-200 overflow-x-auto">
+            <table class="min-w-full text-sm">
+                <thead class="bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th class="text-left px-4 py-3 font-semibold text-gray-700">Round</th>
+                        <th class="text-left px-4 py-3 font-semibold text-gray-700">Opened</th>
+                        <th class="text-left px-4 py-3 font-semibold text-gray-700">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in rounds %}
+                    <tr class="border-b border-gray-100">
+                        <td class="px-4 py-3"><a class="text-indigo-700" href="{% url 'team_round_detail' workspace.id r.pk %}">{{ r.title }}</a></td>
+                        <td class="px-4 py-3 text-gray-600">{{ r.created_at|date:"M d, Y" }}</td>
+                        <td class="px-4 py-3 text-gray-600">{{ r.get_status_display }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="px-4 py-8 text-center text-gray-500">No rounds yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

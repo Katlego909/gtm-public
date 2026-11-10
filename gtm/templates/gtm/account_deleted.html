@@ -1,0 +1,10 @@
+{% extends "gtm/base.html" %}
+{% block content %}
+<div class="app-shell max-w-2xl">
+  <div class="app-card">
+    <h1 class="app-page-title mb-2">Your account has been deleted</h1>
+    <p class="text-sm text-gray-600 mb-4">Your account, your personal assessments and the files you uploaded to them are gone. Shared workspaces you left keep their own data.</p>
+    <a href="{% url 'gtm:landing' %}" class="text-indigo-700 text-sm">Back to the home page</a>
+  </div>
+</div>
+{% endblock %}
