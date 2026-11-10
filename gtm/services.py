@@ -2,7 +2,7 @@ import re
 import math
 from django.db import transaction
 from django.utils import timezone
-from django.core.cache import cache
+from . import utils_locks
 from django.utils.html import strip_tags
 from django.utils.safestring import mark_safe
 from django.db.models import Sum, F
@@ -133,8 +133,10 @@ def _kickoff_playbook_generation(snapshot, session_id=None, account=None):
         return False
 
     kickoff_key = f"gtm:playbook:kickoff:{snapshot.id}"
-    # Throttle kickoff frequency across concurrent polling requests.
-    if not cache.add(kickoff_key, "1", timeout=20):
+    # Throttle kickoff frequency across concurrent polling requests. A DB-backed
+    # cooldown (never released, expires after 20s), not cache.add: the cache is
+    # per-process, so it can't throttle polls that land on other workers.
+    if not utils_locks.acquire(kickoff_key, 20):
         return False
 
     def generate_async(snapshot_id):

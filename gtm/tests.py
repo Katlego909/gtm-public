@@ -107,9 +107,13 @@ class ResultsQueryOptimizationTests(TestCase):
 		# statements (SELECT + SAVEPOINT + INSERT + RELEASE) once, plus one
 		# more constant query for gtm/score_comparison.py's "is there a prior
 		# assessment to compare against" lookup (see tests_score_comparison.py
-		# for its own dedicated, history-size-independent query-count guard).
+		# for its own dedicated, history-size-independent query-count guard),
+		# plus 2 constant statements for the playbook kickoff guard, which is a
+		# DB-backed cooldown (gtm/utils_locks.py acquire: one INSERT ... ON
+		# CONFLICT DO NOTHING + one conditional UPDATE) so it holds across
+		# gunicorn workers instead of only within one process.
 		self.assertLessEqual(
 			len(ctx),
-			36,
+			38,
 			msg=f"Expected bounded query count, got {len(ctx)} queries",
 		)

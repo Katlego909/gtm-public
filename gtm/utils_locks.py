@@ -9,7 +9,6 @@ can delegate here as thin wrappers without changing their own signatures.
 """
 from datetime import timedelta
 
-from django.db import transaction
 from django.utils import timezone
 
 from .models_ai_locks import AIGenerationLock
@@ -17,23 +16,24 @@ from .models_ai_locks import AIGenerationLock
 
 def acquire(key: str, ttl_seconds: int) -> bool:
     """cache.add() equivalent: True iff the caller now holds the lock.
-    The row lock is only held for this short atomic block -- never across
-    the caller's actual (multi-second) work -- so contention between
-    concurrent callers is a sub-millisecond DB round-trip, not a stall."""
+
+    Two statements, no transaction or savepoint (this runs on polling
+    requests and the results page):
+      1. make sure a row exists -- inserted already-expired, and a no-op if
+         the key is present (INSERT ... ON CONFLICT DO NOTHING);
+      2. claim it with one conditional UPDATE that only matches an expired
+         row. A single UPDATE is atomic per row, so of any number of
+         concurrent callers exactly one sees rowcount 1.
+    """
     now = timezone.now()
-    new_expiry = now + timedelta(seconds=ttl_seconds)
-    with transaction.atomic():
-        obj, created = AIGenerationLock.objects.get_or_create(
-            lock_key=key, defaults={"expires_at": new_expiry},
-        )
-        if created:
-            return True
-        obj = AIGenerationLock.objects.select_for_update().get(lock_key=key)
-        if obj.expires_at <= now:
-            obj.expires_at = new_expiry
-            obj.save(update_fields=["expires_at", "updated_at"])
-            return True
-        return False
+    AIGenerationLock.objects.bulk_create(
+        [AIGenerationLock(lock_key=key, expires_at=now - timedelta(seconds=1))],
+        ignore_conflicts=True,
+    )
+    claimed = AIGenerationLock.objects.filter(lock_key=key, expires_at__lte=now).update(
+        expires_at=now + timedelta(seconds=ttl_seconds), updated_at=now,
+    )
+    return claimed == 1
 
 
 def release(key: str) -> None:

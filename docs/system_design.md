@@ -182,6 +182,7 @@ sequenceDiagram
 - **Layer 2** (`gtm/ai_services.py`) writes company- and industry-specific prose about those numbers. It never makes its own diagnosis.
 - **Snapshot pattern.** `ResultSnapshot` freezes the category breakdown, band and radar data when the assessment completes, so a later change to the questions never rewrites a past report.
 - **Locks and the cooldown are stored in the database** (`AIGenerationLock` through `gtm/utils_locks.py`), not in Django's cache, so they hold across Cloud Run instances. A quota error sets a cooldown that pauses all Gemini calls.
+- **Anything workers must agree on goes through `gtm/utils_locks.py`, never `django.core.cache`.** `CACHES` is unset, so the cache is per-process: each gunicorn worker has its own. That covers job status as well as locks. For example, the insights digest reports "generating" while its lock is held and "failed" while a short-lived DB flag is active. It also covers the spawn guards that stop polls starting duplicate background threads.
 - **Credits.** `can_spend` runs before a call and `record_spend` runs after it, charging tokens to the workspace's or user's `AICreditAccount` (1 credit = 1000 tokens).
 
 ### Evidence uploads

@@ -27,7 +27,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout
 from django.db.models import Avg
 from django.conf import settings
-from django.core.cache import cache
+from .. import utils_locks
 from functools import wraps
 from ..utils import transfer_firmographics_to_snapshot, _client_id
 from ..utils_async import run_in_background
@@ -146,8 +146,9 @@ def enrichment_status(request, session_id):
         # Debounce: HTMX polls this endpoint every few seconds. generate_enrichment_
         # sections holds its own lock, but this spawn guard stops us creating a fresh
         # thread on every poll while one is already in flight.
+        # DB-backed cooldown (gtm/utils_locks.py) so it holds across workers.
         spawn_guard = f"gtm:ai:enrichment:{snap.id}:spawn"
-        if cache.add(spawn_guard, "1", timeout=120):
+        if utils_locks.acquire(spawn_guard, 120):
             from ..ai_services import generate_enrichment_sections
 
             def _run(snap_id):
@@ -432,8 +433,9 @@ def insight_status(request, session_id, response_id):
 
                 # Debounce: the status stays "pending" until the thread starts
                 # generating, and this poll fires every 3s per weak question.
-                # Spawn at most one thread per response per 30s.
-                if cache.add(f"gtm:insight_spawn:{response.id}", 1, timeout=30):
+                # Spawn at most one thread per response per 30s, across all
+                # workers (DB-backed cooldown, gtm/utils_locks.py).
+                if utils_locks.acquire(f"gtm:ai:insight_spawn:{response.id}", 30):
                     run_in_background(gen_diagnostic_async, response.id, name="diagnostic_insight_poll")
         # If status is "failed" or "no_credits", don't spawn another thread
 

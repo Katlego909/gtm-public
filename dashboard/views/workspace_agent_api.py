@@ -8,13 +8,13 @@ reason over a whole Workspace instead of one AssessmentSession.
 import logging
 
 from django.contrib.auth.decorators import login_required
-from django.core.cache import cache
 from django.http import Http404, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_http_methods
 
 from dashboard.utils_notifications import send_notification
-from gtm.ai_services import _acquire_lock, _release_lock
+from gtm import utils_locks
+from gtm.ai_services import _acquire_lock, _lock_is_held, _release_lock
 from gtm.models import AssessmentSession, WorkspaceChatMessage
 from gtm.models_workspace import WorkspaceMembership
 from gtm.utils_async import run_in_background
@@ -228,12 +228,22 @@ def dashboard_team_agent_api(request):
 # existing refresh_gap_suggestions/generate_gap_suggestions pattern)
 # ================================================================
 
-def _insights_status_cache_key(workspace_id) -> str:
-    return f"gtm:agent:insights:{workspace_id}:status"
+# Status is derived from DB-backed lock rows, never django.core.cache: the
+# cache is per-process, so a status written by the worker running the job is
+# invisible to the worker that answers the next poll (see gtm/utils_locks.py).
+#   generating -> the job's lock is held (acquired by the refresh view,
+#                 released in the job's `finally`)
+#   failed     -> a short-lived failure flag is active
+#   done/idle  -> neither; "done" when a digest exists
+INSIGHTS_FAILED_FLAG_TTL = 600
 
 
 def _insights_lock_key(workspace_id) -> str:
     return f"gtm:ai:insights:{workspace_id}:lock"
+
+
+def _insights_failed_key(workspace_id) -> str:
+    return f"gtm:ai:insights:{workspace_id}:failed"
 
 
 def _generate_insights_digest_background(workspace_id, user_id):
@@ -241,7 +251,6 @@ def _generate_insights_digest_background(workspace_id, user_id):
     WorkspaceChatMessage, and notify admins/managers/consultants."""
     from gtm.models_workspace import Workspace
 
-    status_key = _insights_status_cache_key(workspace_id)
     lock_key = _insights_lock_key(workspace_id)
     try:
         workspace = Workspace.objects.get(id=workspace_id)
@@ -270,7 +279,6 @@ def _generate_insights_digest_background(workspace_id, user_id):
                 workspace=workspace,
             )
 
-        cache.set(status_key, "done", timeout=3600)
     except Exception as e:
         log_ai_error(
             "Workspace insights digest generation failed",
@@ -278,7 +286,7 @@ def _generate_insights_digest_background(workspace_id, user_id):
             service="google-genai",
             extra={"workspace_id": str(workspace_id)},
         )
-        cache.set(status_key, "failed", timeout=600)
+        utils_locks.set_active_until(_insights_failed_key(workspace_id), INSIGHTS_FAILED_FLAG_TTL)
     finally:
         _release_lock(lock_key)
 
@@ -295,8 +303,9 @@ def dashboard_agent_insights_refresh(request):
     if not _acquire_lock(lock_key, ttl_seconds=180):
         return JsonResponse({"success": True, "status": "generating", "message": "Insights are already refreshing."})
 
-    status_key = _insights_status_cache_key(current_workspace.id)
-    cache.set(status_key, "generating", timeout=600)
+    # A new attempt supersedes any earlier failure. "generating" needs no
+    # write: the lock acquired above is what the status poll reads.
+    utils_locks.release(_insights_failed_key(current_workspace.id))
 
     run_in_background(
         _generate_insights_digest_background,
@@ -316,14 +325,15 @@ def dashboard_agent_insights_status(request):
     if not current_workspace:
         return JsonResponse({"success": False, "error": "Select a workspace first."}, status=400)
 
-    status_key = _insights_status_cache_key(current_workspace.id)
-    status = cache.get(status_key)
-
     latest = WorkspaceChatMessage.objects.filter(
         workspace=current_workspace, agent_type="insights", intent="insights_digest"
     ).order_by('-created_at').first()
 
-    if status is None:
+    if _lock_is_held(_insights_lock_key(current_workspace.id)):
+        status = "generating"
+    elif utils_locks.is_active(_insights_failed_key(current_workspace.id)):
+        status = "failed"
+    else:
         status = "done" if latest else "idle"
 
     return JsonResponse({
