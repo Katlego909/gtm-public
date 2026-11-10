@@ -111,9 +111,11 @@ class ResultsQueryOptimizationTests(TestCase):
 		# plus 2 constant statements for the playbook kickoff guard, which is a
 		# DB-backed cooldown (gtm/utils_locks.py acquire: one INSERT ... ON
 		# CONFLICT DO NOTHING + one conditional UPDATE) so it holds across
-		# gunicorn workers instead of only within one process.
+		# gunicorn workers instead of only within one process, plus 1 constant
+		# INSERT ... ON CONFLICT from RecordActiveDayMiddleware on a user's
+		# first request of the day (feeds the beta funnel's return metric).
 		self.assertLessEqual(
 			len(ctx),
-			38,
+			39,
 			msg=f"Expected bounded query count, got {len(ctx)} queries",
 		)

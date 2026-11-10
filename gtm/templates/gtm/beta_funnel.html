@@ -1,0 +1,67 @@
+{% extends "gtm/base.html" %}
+{% block content %}
+
+<div class="app-shell max-w-6xl">
+  <div class="app-page-header">
+    <h1 class="app-page-title mb-2">Beta Funnel</h1>
+    <p class="app-page-subtitle">How far users who signed up in the chosen window got, and which features they used. Staff-only.</p>
+  </div>
+
+  <div class="flex flex-wrap items-center gap-2 mb-6 text-sm">
+    <span class="text-gray-600">Signed up in the last</span>
+    {% for w in windows %}
+      <a href="?days={{ w }}"
+         class="px-3 py-1 rounded-full border {% if w == window %}bg-indigo-50 border-indigo-200 text-indigo-700 font-semibold{% else %}border-gray-200 text-gray-600{% endif %}">{{ w }} days</a>
+    {% endfor %}
+    <a href="{% url 'gtm:beta_cohort' %}" class="ml-auto text-indigo-700">Per-user cohort table</a>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="app-card">
+      <h2 class="font-semibold text-gray-900 mb-4">Funnel</h2>
+      {% if cohort_size %}
+        <ol class="space-y-4">
+          {% for step in steps %}
+          <li>
+            <div class="flex items-baseline gap-2 text-sm">
+              <span class="flex-1 text-gray-900">{{ step.label }}</span>
+              <span class="font-semibold text-gray-900">{{ step.count }}</span>
+              <span class="w-12 text-right text-gray-500">{{ step.pct_of_base }}%</span>
+            </div>
+            <div class="h-2 mt-1 rounded-full bg-gray-100">
+              <div class="h-2 rounded-full bg-indigo-600" style="width: {{ step.pct_of_base }}%"></div>
+            </div>
+            {% if step.note %}<p class="text-xs text-gray-500 mt-1">{{ step.note }}</p>{% endif %}
+          </li>
+          {% endfor %}
+        </ol>
+      {% else %}
+        <p class="text-sm text-gray-500">Nobody signed up in this window.</p>
+      {% endif %}
+    </div>
+
+    <div class="app-card p-0 overflow-x-auto">
+      <h2 class="font-semibold text-gray-900 px-4 pt-4 pb-2">Feature usage</h2>
+      <p class="text-xs text-gray-500 px-4 pb-3">Users from this cohort who have used each feature at least once.</p>
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-200">
+          <tr>
+            <th class="text-left px-4 py-3 font-semibold text-gray-700">Feature</th>
+            <th class="text-right px-4 py-3 font-semibold text-gray-700">Users</th>
+            <th class="text-right px-4 py-3 font-semibold text-gray-700">Share</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in features %}
+          <tr class="border-b border-gray-100">
+            <td class="px-4 py-3 text-gray-900">{{ f.label }}</td>
+            <td class="px-4 py-3 text-right text-gray-600">{{ f.count }}</td>
+            <td class="px-4 py-3 text-right text-gray-600">{{ f.pct }}%</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -59,5 +59,6 @@ urlpatterns = [
 
     # Beta operator view (staff-only)
     path("beta/cohort/", views.beta_cohort, name="beta_cohort"),
+    path("beta/funnel/", views.beta_funnel, name="beta_funnel"),
 
 ]

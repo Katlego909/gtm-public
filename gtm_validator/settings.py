@@ -92,6 +92,7 @@ MIDDLEWARE = [
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
+    "gtm.middleware.RecordActiveDayMiddleware",
     # Must come after AuthenticationMiddleware (needs request.user) and
     # MessageMiddleware (uses messages.error on the non-member redirect path).
     "gtm.middleware_workspace.WorkspaceMiddleware",

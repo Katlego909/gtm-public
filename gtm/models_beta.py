@@ -80,3 +80,22 @@ class BetaInviteCode(models.Model):
         send_beta_invite_email(self, self.email, request=request)
         self.sent_at = timezone.now()
         self.save(update_fields=["sent_at"])
+
+
+class UserActiveDay(models.Model):
+    """One row per user per calendar day (UTC) they used the app while signed in.
+
+    The funnel's "came back" step needs this: last_login cannot tell, because
+    sessions persist for two weeks (ACCOUNT_SESSION_REMEMBER) so a returning
+    user is usually never asked to log in again. Written by
+    gtm.middleware.RecordActiveDayMiddleware at most once per user per day.
+    """
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="active_days")
+    day = models.DateField()
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["user", "day"], name="unique_user_active_day")]
+        indexes = [models.Index(fields=["day"])]
+
+    def __str__(self):
+        return f"{self.user_id} @ {self.day}"
