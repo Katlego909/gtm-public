@@ -70,7 +70,7 @@
                             {% if s.flagged %}<br><span class="text-xs font-semibold text-amber-700">Disagreement: {{ s.spread }} points apart</span>{% endif %}
                         </td>
                         <td class="px-4 py-3 text-gray-700">
-                            {% for a in s.answers %}<div>{{ a.respondent.user.get_full_name|default:a.respondent.user.username }}: {{ a.score }}</div>{% endfor %}
+                            {% for a in s.answers %}<div class="whitespace-nowrap">{{ a.respondent.user.get_full_name|default:a.respondent.user.username }}: {{ a.score }}</div>{% endfor %}
                         </td>
                         <td class="px-4 py-3 text-right text-gray-600">{{ s.average|floatformat:1 }}</td>
                         <td class="px-4 py-3 text-right font-semibold text-gray-900">{{ s.consensus }}</td>
