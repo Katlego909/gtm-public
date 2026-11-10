@@ -16,6 +16,7 @@ exec gunicorn --bind 0.0.0.0:${PORT:-8080} \
     --workers 4 \
     --threads 2 \
     --worker-class gthread \
+    --preload \
     --worker-tmp-dir /dev/shm \
     --max-requests 1000 \
     --max-requests-jitter 100 \

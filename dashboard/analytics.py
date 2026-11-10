@@ -4,14 +4,9 @@ from django.db.models import Count, Q
 from django.db.models.functions import TruncDate
 from django.utils import timezone
 from django.urls import reverse
-from gtm.models import AssessmentSession, ActionItem, ResultSnapshot, ChatMessage
+from gtm.models import AssessmentSession, ActionItem, ResultSnapshot
 from dashboard.models import Channel, ChannelAnalytics, GapAnalysisMetric, GapAnalysisSuggestion
 from gtm.services import _compute_scores, _band_for_score
-from gtm.ai_chat import get_suggested_prompts
-
-def _md(text):
-    return render_markdown(text)
-
 
 def _history_score(session):
     """(overall, band_stage) for a history row: the cached ResultSnapshot when
@@ -69,12 +64,6 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
         # Fallback to user's data (legacy support)
         assessments_qs = AssessmentSession.objects.filter(user=request.user) if request.user.is_authenticated else AssessmentSession.objects.none()
         action_items_qs = ActionItem.objects.filter(session__user=request.user).select_related('assigned_to', 'session') if request.user.is_authenticated else ActionItem.objects.none()
-
-    # Recent validator results for dashboard
-    if current_workspace:
-        validator_results = ResultSnapshot.objects.filter(session__workspace=current_workspace).select_related('session', 'band').order_by('-created_at')[:10]
-    else:
-        validator_results = ResultSnapshot.objects.filter(session__user=request.user).select_related('session', 'band').order_by('-created_at')[:10] if request.user.is_authenticated else []
 
     # Weekly Activity: Sessions, Items Created, Items Completed per day (last
     # 7 days). One grouped query per series, not one COUNT per day -- every
@@ -182,7 +171,6 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
         pending_change = round(abs(raw_change))
         pending_change_positive = raw_change < 0  # Decrease in pending is good
         pending_has_meaningful_change = pending_change != 0
-    recent_items = action_items_qs.order_by('-created_at')[:8]
 
     # Chart data: Sessions per day (last 7 days) - workspace-scoped
     sessions_per_day = [d['sessions'] for d in weekly_activity]
@@ -218,11 +206,7 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
     assessment_history = []
     assessment_stats = None
     score_trend_data = {'labels': [], 'scores': []}
-    agent_session_options = []
-    dashboard_agent_session = None
-    dashboard_agent_prompts = []
-    dashboard_agent_history = []
-    
+
     if request.user.is_authenticated:
         # Get completed assessments for the workspace (or user if no workspace)
         completed_sessions = assessments_qs.filter(
@@ -279,43 +263,6 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
                 'scores': list(reversed(all_scores))
             }
 
-        agent_session_options = [
-            {
-                'uuid': str(session.uuid),
-                'label': f"{session.company_name or 'Unnamed'} • {session.created_at.strftime('%b %d, %Y')}",
-            }
-            for session in completed_sessions
-        ]
-        if not agent_session_options:
-            agent_session_options = [
-                {
-                    'uuid': str(session.uuid),
-                    'label': f"{session.company_name or 'Unnamed'} • {session.created_at.strftime('%b %d, %Y')}",
-                }
-                for session in assessments_qs.order_by('-created_at')[:10]
-            ]
-
-        if agent_session_options:
-            if agent_session_id and any(option['uuid'] == agent_session_id for option in agent_session_options):
-                dashboard_agent_session = assessments_qs.filter(uuid=agent_session_id).first()
-            if not dashboard_agent_session:
-                dashboard_agent_session = assessments_qs.filter(uuid=agent_session_options[0]['uuid']).first()
-
-            if dashboard_agent_session:
-                dashboard_agent_prompts = get_suggested_prompts(dashboard_agent_session)
-                history_qs = ChatMessage.objects.filter(session=dashboard_agent_session).order_by('-created_at')[:30]
-                chats = list(reversed(history_qs))
-                for chat in chats:
-                    chat.response_html = _md(chat.response or '')
-                dashboard_agent_history = chats
-
-    # Convert markdown notes to HTML for all relevant items
-    def convert_notes(items):
-        for item in items:
-            item.note_html = render_markdown(item.note)
-        return items
-
-    recent_items = convert_notes(list(recent_items))
 
     # Channel analytics for donut chart
     channels = Channel.objects.all()
@@ -344,19 +291,19 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
     if current_workspace:
         gap_analysis = GapAnalysisMetric.objects.filter(
             workspace=current_workspace
-        ).order_by('category', 'priority')
+        ).select_related('session').order_by('category', 'priority')
         latest_completed_gap_session = AssessmentSession.objects.filter(
             workspace=current_workspace,
             is_completed=True,
-        ).order_by('-created_at').first()
+        ).select_related('snapshot').order_by('-created_at').first()
     elif request.user.is_authenticated:
         gap_analysis = GapAnalysisMetric.objects.filter(
             user=request.user, workspace__isnull=True
-        ).order_by('category', 'priority')
+        ).select_related('session').order_by('category', 'priority')
         latest_completed_gap_session = AssessmentSession.objects.filter(
             user=request.user,
             is_completed=True,
-        ).order_by('-created_at').first()
+        ).select_related('snapshot').order_by('-created_at').first()
 
     # Risk Classification & Resource Recommendations from the latest session
     latest_score_risk = latest_completed_gap_session.snapshot.ai_risk_status if latest_completed_gap_session and hasattr(latest_completed_gap_session, 'snapshot') else None
@@ -405,7 +352,6 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
         'pending_change': pending_change,
         'pending_change_positive': pending_change_positive,
         'pending_has_meaningful_change': pending_has_meaningful_change,
-        'recent_items': recent_items,
         'sessions_per_day': sessions_per_day,
         'days_labels': days_labels,
         'status_breakdown': status_breakdown,
@@ -413,7 +359,6 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
         'weekly_activity': weekly_activity,
         'items_created_per_day': [d['items_created'] for d in weekly_activity],
         'items_completed_per_day': [d['items_completed'] for d in weekly_activity],
-        'validator_results': validator_results,
         'channel_data': channel_data,
         'gap_analysis': gap_analysis,
         'top_gaps': top_gaps,
@@ -428,10 +373,6 @@ def get_dashboard_context(request, current_workspace, user_workspaces, agent_ses
         'assessment_history': assessment_history,
         'assessment_stats': assessment_stats,
         'score_trend_data': score_trend_data,
-        'agent_session_options': agent_session_options,
-        'dashboard_agent_session': dashboard_agent_session,
-        'dashboard_agent_prompts': dashboard_agent_prompts,
-        'dashboard_agent_history': dashboard_agent_history,
         # Workspace context
         'current_workspace': current_workspace,
         'user_workspaces': user_workspaces,

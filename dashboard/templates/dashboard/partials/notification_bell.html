@@ -20,7 +20,7 @@
          class="hidden absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg z-50">
         <div id="notification-dropdown-content-{{ instance_id }}"
              hx-get="{% url 'notification_dropdown' %}"
-             hx-trigger="click from:#notification-bell-button-{{ instance_id }}, refreshNotifications from:body"
+             hx-trigger="click from:#notification-bell-button-{{ instance_id }}, refreshNotifications[!!this.offsetParent] from:body"
              hx-swap="innerHTML">
             <div class="px-4 py-6 text-xs text-gray-500">Loading notifications...</div>
         </div>

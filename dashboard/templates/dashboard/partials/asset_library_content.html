@@ -44,7 +44,7 @@
   <a href="{% url 'asset_library' %}?tab=resources{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
      hx-get="{% url 'asset_library' %}?tab=resources{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
      hx-target="#main-content"
-     hx-swap="innerHTML swap:200ms"
+     hx-swap="innerHTML"
      hx-push-url="true"
      class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition {% if active_tab == 'resources' %}border-indigo-600 text-indigo-700{% else %}border-transparent text-gray-500 hover:text-gray-700{% endif %}">
     Resources{% if total_assets %} ({{ total_assets }}){% endif %}
@@ -52,7 +52,7 @@
   <a href="{% url 'asset_library' %}?tab=documents{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
      hx-get="{% url 'asset_library' %}?tab=documents{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
      hx-target="#main-content"
-     hx-swap="innerHTML swap:200ms"
+     hx-swap="innerHTML"
      hx-push-url="true"
      class="px-4 py-2 text-sm font-medium border-b-2 -mb-px transition {% if active_tab == 'documents' %}border-indigo-600 text-indigo-700{% else %}border-transparent text-gray-500 hover:text-gray-700{% endif %}">
     Documents{% if total_documents %} ({{ total_documents }}){% endif %}
@@ -270,10 +270,19 @@ function escapeHtml(str) {
 
 async function openLibraryDocumentEditor(docId, workspaceId) {
   const modalContent = document.getElementById('modal-content');
-  if (!modalContent || typeof window.openModal !== 'function' || typeof toastui === 'undefined') return;
+  if (!modalContent || typeof window.openModal !== 'function' || typeof window.loadToastUI !== 'function') return;
   const scopeQs = `?workspace=${workspaceId}`;
 
-  const response = await fetch(`/dashboard/documents/${docId}/${scopeQs}`);
+  // Fetch the document and the (lazy-loaded) editor bundle in parallel.
+  let response;
+  try {
+    [response] = await Promise.all([
+      fetch(`/dashboard/documents/${docId}/${scopeQs}`),
+      window.loadToastUI(),
+    ]);
+  } catch (error) {
+    return;
+  }
   const data = await response.json();
   if (!data.success) return;
 

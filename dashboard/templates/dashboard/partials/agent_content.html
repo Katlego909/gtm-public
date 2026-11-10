@@ -33,7 +33,7 @@
             <a href="{% url 'agent_hub' %}?agent_type={{ tab_type }}{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
                hx-get="{% url 'agent_hub' %}?agent_type={{ tab_type }}{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
                hx-target="#main-content"
-               hx-swap="innerHTML swap:200ms"
+               hx-swap="innerHTML"
                hx-push-url="true"
                class="app-chip transition {% if active_agent_type == tab_type %}bg-indigo-600 text-white{% else %}bg-gray-50 border border-gray-200 text-gray-600 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700{% endif %}">
                 <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0 {% if active_agent_type == tab_type %}bg-white/20 text-white{% else %}bg-indigo-100 text-indigo-700{% endif %}">
@@ -67,7 +67,7 @@
                     <a href="{% url 'agent_hub' %}?agent_session={{ dashboard_agent_session.uuid }}{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
                        hx-get="{% url 'agent_hub' %}?agent_session={{ dashboard_agent_session.uuid }}{% if current_workspace %}&workspace={{ current_workspace.id }}{% endif %}"
                        hx-target="#main-content"
-                       hx-swap="innerHTML swap:200ms"
+                       hx-swap="innerHTML"
                        hx-push-url="true"
                        class="inline-flex items-center justify-center w-full px-4 py-2 rounded-lg border border-indigo-200 text-sm font-medium text-indigo-700 hover:bg-indigo-50 transition">
                         Reload Agent Context
@@ -457,7 +457,6 @@ async function sendDashboardAgentMessage(message) {
 
         if (data.success && data.intent === 'dashboard_action' && window.htmx) {
             htmx.trigger(document.body, 'refreshNotifications');
-            htmx.trigger(document.body, 'refreshAgentActions');
             const actionItemsContainer = document.getElementById('action-items-container');
             if (actionItemsContainer) {
                 const qs = window.location.search || '';
@@ -615,9 +614,10 @@ function initDashboardAgent() {
     const autoMessage = promptMap[autoPrompt];
     if (autoMessage && !agentForm.dataset.autoPromptSent) {
         agentForm.dataset.autoPromptSent = 'true';
+        // Next tick (so the rest of this setup has run), not an artificial wait.
         setTimeout(() => {
             sendDashboardAgentMessage(autoMessage);
-        }, 500);
+        }, 0);
     }
 
     agentForm.addEventListener('submit', function(event) {
@@ -964,10 +964,19 @@ async function refreshDocumentsPanel() {
 async function openDocumentEditor(docId) {
     const modalContent = document.getElementById('modal-content');
     const listContainer = document.getElementById('documents-list');
-    if (!modalContent || typeof window.openModal !== 'function' || !listContainer || typeof toastui === 'undefined') return;
+    if (!modalContent || typeof window.openModal !== 'function' || !listContainer || typeof window.loadToastUI !== 'function') return;
     const scopeQs = listContainer.dataset.scopeQs || '';
 
-    const response = await fetch(`/dashboard/documents/${docId}/${scopeQs}`);
+    // Fetch the document and the (lazy-loaded) editor bundle in parallel.
+    let response;
+    try {
+        [response] = await Promise.all([
+            fetch(`/dashboard/documents/${docId}/${scopeQs}`),
+            window.loadToastUI(),
+        ]);
+    } catch (error) {
+        return;
+    }
     const data = await response.json();
     if (!data.success) return;
 

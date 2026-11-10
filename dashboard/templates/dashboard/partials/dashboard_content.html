@@ -550,7 +550,7 @@
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initCharts);
 } else {
-    setTimeout(initCharts, 100);
+    requestAnimationFrame(initCharts);
 }
 
 function initCharts() {

@@ -45,7 +45,7 @@ flowchart LR
 | Decision | Why |
 |---|---|
 | `--no-cpu-throttling` | Background threads keep working after the response returns. With throttling on, Cloud Run starves them and the browser polls forever. |
-| 4 GiB memory | spaCy, sentence-transformers and scikit-learn are loaded on top of four gunicorn workers. 2 GiB runs out of memory. `gtm/apps.py` pre-warms the models at boot. |
+| 4 GiB memory | spaCy, sentence-transformers and scikit-learn are loaded on top of four gunicorn workers. 2 GiB runs out of memory. The models load lazily on first document analysis, not at boot. |
 | `min-instances=0` | Cost. The first request after about 15 idle minutes pays a cold start, which `--cpu-boost` shortens. |
 | Signed-cookie sessions | No server-side session store, so instances share nothing but the database. Keep session data small. |
 | Migrate inside Cloud Build | `migrate` runs through the Cloud SQL proxy before `run deploy`. If it fails, the new revision never takes traffic. |

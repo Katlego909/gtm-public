@@ -1,7 +1,7 @@
 <div id="enrichment-container"
   {% if still_loading %}
   hx-get="{% url 'gtm:enrichment_status' session.uuid %}"
-  hx-trigger="load delay:4s, every 6s"
+  hx-trigger="every 3s"
   hx-target="#enrichment-container"
   hx-swap="outerHTML"
   {% endif %}>

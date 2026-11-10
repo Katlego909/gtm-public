@@ -18,7 +18,7 @@
        hx-get="{% url 'gtm:assessment_step' edit_session.uuid 1 %}"
        hx-target="#main-content"
        hx-select="#main-content"
-       hx-swap="innerHTML swap:200ms"
+       hx-swap="innerHTML"
        hx-push-url="true"
        class="inline-flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-gray-900">
       <i class="fas fa-arrow-left"></i>
@@ -33,7 +33,7 @@
         hx-post="{% if edit_session %}{% url 'gtm:edit_assessment_intro' edit_session.uuid %}{% else %}{% url 'gtm:start' %}{% endif %}"
         hx-target="#main-content"
         hx-select="#main-content"
-        hx-swap="innerHTML swap:200ms"
+        hx-swap="innerHTML"
         hx-push-url="true"
         class="app-card p-8 space-y-8 md:p-10">
     {% csrf_token %}

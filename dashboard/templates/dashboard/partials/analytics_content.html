@@ -337,6 +337,6 @@ function initAnalyticsCharts() {
 
 document.addEventListener('DOMContentLoaded', initAnalyticsCharts);
 if (document.readyState !== 'loading') {
-    setTimeout(initAnalyticsCharts, 100);
+    requestAnimationFrame(initAnalyticsCharts);
 }
 </script>

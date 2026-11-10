@@ -275,7 +275,8 @@ def workspace_hub(request):
 
     if request.htmx:
         response = render(request, 'dashboard/partials/workspace_hub_content.html', context)
-        response['HX-Trigger'] = 'refreshNotifications, refreshAgentActions'
+        if request.method == 'POST':
+            response['HX-Trigger'] = 'refreshNotifications'
     else:
         response = render(request, 'dashboard/workspace_hub.html', context)
     if new_api_key:
@@ -344,7 +345,6 @@ def tasks_board(request):
 
     if request.htmx:
         response = render(request, 'dashboard/partials/tasks_content.html', context)
-        response['HX-Trigger'] = 'refreshNotifications, refreshAgentActions'
         return response
     return render(request, 'dashboard/tasks.html', context)
 
@@ -507,7 +507,6 @@ def agent_hub(request):
 
     if request.htmx:
         response = render(request, 'dashboard/partials/agent_content.html', context)
-        response['HX-Trigger'] = 'refreshNotifications, refreshAgentActions'
         return response
     return render(request, 'dashboard/agent.html', context)
 
@@ -535,7 +534,6 @@ def agent_impact_hub(request):
 
     if request.htmx:
         response = render(request, 'dashboard/partials/agent_impact_content.html', context)
-        response['HX-Trigger'] = 'refreshNotifications'
         return response
     return render(request, 'dashboard/agent_impact.html', context)
 
@@ -567,9 +565,10 @@ def dashboard(request):
         if not current_workspace and user_workspaces:
             current_workspace = user_workspaces[0]
 
-        if current_workspace:
+        # Only write on change: each session write re-signs the cookie.
+        if current_workspace and request.session.get('current_workspace_id') != str(current_workspace.id):
             request.session['current_workspace_id'] = str(current_workspace.id)
-        
+
         # Auto-fix orphaned assessments: associate user's assessments without workspace
         if current_workspace:
             orphaned_assessments = AssessmentSession.objects.filter(
@@ -602,7 +601,6 @@ def dashboard(request):
 
     if request.htmx:
         response = render(request, 'dashboard/partials/dashboard_content.html', context)
-        response['HX-Trigger'] = 'refreshNotifications, refreshAgentActions'
         return response
 
     return render(request, 'dashboard/home.html', context)

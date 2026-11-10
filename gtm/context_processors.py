@@ -28,13 +28,20 @@ def workspace_permissions(request):
     try:
         from gtm.models_workspace import Workspace, WorkspaceMembership
 
-        # Get workspace and user membership
-        workspace = Workspace.objects.get(id=workspace_id)
-        membership = WorkspaceMembership.objects.get(
-            user=request.user,
-            workspace=workspace,
-            is_active=True
-        )
+        # WorkspaceMiddleware has usually resolved this exact membership
+        # already; reuse it rather than re-querying on every render (this runs
+        # for every partial, including each polling tick). Fall back to the
+        # lookup when the view switched workspace after the middleware ran.
+        membership = getattr(request, 'workspace_membership', None)
+        if membership is not None and str(membership.workspace_id) == str(workspace_id):
+            workspace = membership.workspace
+        else:
+            workspace = Workspace.objects.get(id=workspace_id)
+            membership = WorkspaceMembership.objects.get(
+                user=request.user,
+                workspace=workspace,
+                is_active=True
+            )
 
         # Update context with workspace info
         context.update({

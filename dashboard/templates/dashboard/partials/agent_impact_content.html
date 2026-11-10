@@ -278,7 +278,7 @@
 
     document.addEventListener('DOMContentLoaded', initImpactCharts);
     if (document.readyState !== 'loading') {
-        setTimeout(initImpactCharts, 100);
+        requestAnimationFrame(initImpactCharts);
     }
 })();
 </script>

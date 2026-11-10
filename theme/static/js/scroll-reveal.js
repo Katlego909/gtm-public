@@ -19,9 +19,18 @@
     { root: null, rootMargin: '0px 0px -8% 0px', threshold: 0.1 }
   );
 
+  // Anything already on screen is shown at once, with no transition: fading
+  // in content the user is already looking at only delays it. Only elements
+  // below the fold are left to the observer's scroll-in animation.
   function observeAll() {
+    var viewH = window.innerHeight || document.documentElement.clientHeight;
     document.querySelectorAll('.reveal:not(.is-visible)').forEach(function (el) {
-      observer.observe(el);
+      var rect = el.getBoundingClientRect();
+      if (rect.top < viewH && rect.bottom > 0) {
+        el.classList.add('reveal-instant', 'is-visible');
+      } else {
+        observer.observe(el);
+      }
     });
   }
 

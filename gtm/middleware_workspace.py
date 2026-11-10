@@ -79,24 +79,41 @@ class WorkspaceMiddleware:
                 # Invalid workspace, redirect to workspace selection
                 return redirect('workspace_hub')
         else:
-            # Try to get workspace from session
+            # Try to get workspace from session. Fast path (every request,
+            # including polls): one joined query that confirms the workspace is
+            # active AND the user is a member, instead of fetching the workspace
+            # and then the membership separately.
             workspace_id = request.session.get('current_workspace_id')
             if workspace_id:
+                membership = WorkspaceMembership.objects.select_related('workspace').filter(
+                    user=request.user,
+                    workspace_id=workspace_id,
+                    workspace__is_active=True,
+                    is_active=True,
+                ).first()
+                if membership is not None:
+                    request.workspace = membership.workspace
+                    request.workspace_membership = membership
+                    return
+                # Slow path: work out why (deleted workspace vs. lost access).
                 try:
                     workspace = Workspace.objects.get(id=workspace_id, is_active=True)
                 except Workspace.DoesNotExist:
                     # Workspace deleted, clear session
                     del request.session['current_workspace_id']
-            
-            # If no workspace in session, get user's default. The session pointer is
-            # written once below, after membership is confirmed.
+
+            # If no workspace in session, get user's default (membership and
+            # workspace in one query) and remember it.
             if not workspace:
-                membership = WorkspaceMembership.objects.filter(
+                membership = WorkspaceMembership.objects.select_related('workspace').filter(
                     user=request.user,
                     is_active=True
                 ).first()
                 if membership:
-                    workspace = membership.workspace
+                    request.workspace = membership.workspace
+                    request.workspace_membership = membership
+                    request.session['current_workspace_id'] = str(membership.workspace_id)
+                    return
         
         # Add workspace context to request
         request.workspace = workspace
@@ -104,14 +121,17 @@ class WorkspaceMiddleware:
         
         if workspace:
             try:
-                request.workspace_membership = WorkspaceMembership.objects.get(
+                request.workspace_membership = WorkspaceMembership.objects.select_related('workspace').get(
                     user=request.user,
                     workspace=workspace,
                     is_active=True
                 )
                 # Membership confirmed — now it is safe to remember this workspace
                 # for subsequent requests that don't carry an identifier in the URL.
-                request.session['current_workspace_id'] = str(workspace.id)
+                # Only write when it changes: with signed-cookie sessions every
+                # write re-signs and re-sends the cookie.
+                if request.session.get('current_workspace_id') != str(workspace.id):
+                    request.session['current_workspace_id'] = str(workspace.id)
             except WorkspaceMembership.DoesNotExist:
                 # User not member of this workspace. Clear any stale session pointer
                 # so we don't redirect-loop on the next identifier-less request.

@@ -783,7 +783,7 @@ def build_session_context(session: AssessmentSession) -> Dict[str, Any]:
     
     # Get weakest questions
     weak_questions = []
-    for resp in Response.objects.filter(session=session, score__lte=2).select_related('question')[:5]:
+    for resp in Response.objects.filter(session=session, score__lte=2).select_related('question__category')[:5]:
         weak_questions.append({
             "id_code": resp.question.id_code,
             "text": resp.question.text,

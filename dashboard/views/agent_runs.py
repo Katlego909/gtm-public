@@ -13,7 +13,6 @@ from gtm.agent_runs import (
     STEP_KINDS,
     answer_question,
     approve_run,
-    can_answer_question,
     can_review_run,
     can_view_run,
     cancel_run,
@@ -74,24 +73,31 @@ def _step_rows(run: AgentRun):
     return rows
 
 
-def _render_panel(request, run: AgentRun, error: str = "", changed: bool = False):
+def _render_panel(request, run: AgentRun, error: str = "", changed: bool = False, refresh: bool = True):
     from gtm.agent_runs import run_lock_key
     from gtm.ai_services import _lock_is_held
 
-    run.refresh_from_db()
+    # After a decision the run may have been changed through another instance;
+    # the polling GET has just loaded it, so skip the extra round trip there.
+    if refresh:
+        run.refresh_from_db()
     # A planning/running run whose worker died (no lock held) is stalled:
     # stop polling and offer a retry instead of spinning forever.
     is_active = run.status in AgentRun.ACTIVE_STATUSES
     is_stalled = is_active and not _lock_is_held(run_lock_key(run))
     questions = list(run.questions.select_related("asked_to", "answered_by"))
+    # Resolve review permission once; can_answer_question() would re-query the
+    # membership (and re-fetch the run's workspace) for every question.
+    can_review = can_review_run(request.user, run)
     context = {
         "run": run,
         "steps": _step_rows(run),
         "questions": [
-            {"q": q, "can_answer": q.is_open and can_answer_question(request.user, q)} for q in questions
+            {"q": q, "can_answer": q.is_open and (q.asked_to_id == request.user.id or can_review)}
+            for q in questions
         ],
         "proposals": list(run.measurement_proposals.select_related("gap_metric", "reviewed_by")),
-        "can_review": can_review_run(request.user, run),
+        "can_review": can_review,
         "is_active": is_active and not is_stalled,
         "is_stalled": is_stalled,
         "error": error,
@@ -104,7 +110,7 @@ def _render_panel(request, run: AgentRun, error: str = "", changed: bool = False
 
 @login_required
 def agent_run_panel(request, run_id):
-    return _render_panel(request, _get_run_for_user(request, run_id))
+    return _render_panel(request, _get_run_for_user(request, run_id), refresh=False)
 
 
 def _decide(request, run_id, decision):

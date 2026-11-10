@@ -24,9 +24,12 @@
   {% endif %}
 
   {% if resource.is_image %}
-  <a href="{{ resource.file.url }}" target="_blank" class="block h-36 w-full overflow-hidden bg-gray-100 flex-shrink-0">
-    <img src="{{ resource.file.url }}" alt="{{ resource.name }}" class="h-full w-full object-cover">
+  {# One .url call: on GCS each one is a signed URL (an IAM signBlob round trip). #}
+  {% with file_url=resource.file.url %}
+  <a href="{{ file_url }}" target="_blank" class="block h-36 w-full overflow-hidden bg-gray-100 flex-shrink-0">
+    <img src="{{ file_url }}" alt="{{ resource.name }}" loading="lazy" decoding="async" class="h-full w-full object-cover">
   </a>
+  {% endwith %}
   {% endif %}
 
   <div class="p-5 flex flex-col flex-1">

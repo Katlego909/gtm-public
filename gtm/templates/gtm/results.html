@@ -119,7 +119,7 @@
              hx-get="{% url 'dashboard' %}?agent_session={{ session.uuid }}&prompt=action-plan"
              hx-target="#main-content"
              hx-select="#main-content"
-             hx-swap="innerHTML swap:200ms"
+             hx-swap="innerHTML"
              hx-push-url="true"
              class="inline-flex items-center justify-center px-4 sm:px-6 py-3 rounded-lg bg-white text-indigo-700 text-sm sm:text-base font-bold hover:bg-indigo-50 transition w-full sm:w-fit">
             Run Execution Agent
@@ -184,7 +184,7 @@
        hx-get="{% url 'gtm:assessment_step' session.uuid total_steps %}"
        hx-target="#main-content"
        hx-select="#main-content"
-       hx-swap="innerHTML swap:200ms"
+       hx-swap="innerHTML"
        hx-push-url="true"
        class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg border border-gray-300 text-sm sm:text-base font-semibold hover:bg-gray-50 transition">
       <i class="fas fa-arrow-left"></i>
@@ -195,7 +195,7 @@
        hx-get="{% url 'dashboard' %}?agent_session={{ session.uuid }}"
        hx-target="#main-content"
        hx-select="#main-content"
-       hx-swap="innerHTML swap:200ms"
+       hx-swap="innerHTML"
        hx-push-url="true"
        class="flex-1 sm:flex-none inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg bg-indigo-600 text-white text-sm sm:text-base font-semibold hover:bg-indigo-700 transition gap-2">
       <svg class="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -208,7 +208,7 @@
        hx-get="{% url 'dashboard' %}?agent_session={{ session.uuid }}&prompt=action-plan"
        hx-target="#main-content"
        hx-select="#main-content"
-       hx-swap="innerHTML swap:200ms"
+       hx-swap="innerHTML"
        hx-push-url="true"
        class="flex-1 sm:flex-none inline-flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg bg-white border border-indigo-200 text-indigo-700 text-sm sm:text-base font-semibold hover:bg-indigo-50 transition">
       Run Execution Agent

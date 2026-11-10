@@ -181,28 +181,28 @@ def safe_get_session_or_403(request, session_id):
         _log_access_denied(request, "Anonymous access denied", session_id)
         return None, False
     
-    # Authenticated user: check ownership first (always allowed)
-    if session.user == request.user:
+    # Authenticated user: check ownership first (always allowed). Compare ids:
+    # `session.user == request.user` loads the owner row on every call, and
+    # this runs on every status poll.
+    if session.user_id is not None and session.user_id == request.user.id:
         return session, True
     
     # If session has a workspace, check if user is a member
-    if session.workspace:
-        try:
-            membership = WorkspaceMembership.objects.get(
-                user=request.user,
-                workspace=session.workspace,
-                is_active=True
-            )
+    if session.workspace_id:
+        if WorkspaceMembership.objects.filter(
+            user=request.user,
+            workspace_id=session.workspace_id,
+            is_active=True
+        ).exists():
             # User is a member and can access workspace sessions
             return session, True
-        except WorkspaceMembership.DoesNotExist:
-            _log_access_denied(
-                request,
-                "User not in session's workspace",
-                session_id,
-                {"workspace_id": str(session.workspace.id)}
-            )
-            return None, False
+        _log_access_denied(
+            request,
+            "User not in session's workspace",
+            session_id,
+            {"workspace_id": str(session.workspace_id)}
+        )
+        return None, False
     
     # No workspace: can only be accessed by owner
     _log_access_denied(request, "User is not the session owner", session_id)

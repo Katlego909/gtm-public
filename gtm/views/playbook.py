@@ -403,10 +403,9 @@ def insight_status(request, session_id, response_id):
         from django.http import HttpResponseForbidden
         return HttpResponseForbidden("Access denied to this session.")
 
+    # Freshly fetched, so ai_insight/ai_insight_status are current -- no
+    # separate refresh_from_db round trip needed.
     response = get_object_or_404(Response.objects.select_related("question"), pk=response_id, session=session)
-
-    # Refresh both fields from DB to check current status
-    response.refresh_from_db(fields=["ai_insight", "ai_insight_status"])
 
     if not (response.ai_insight or "").strip():
         status = getattr(response, 'ai_insight_status', 'pending')
@@ -431,7 +430,11 @@ def insight_status(request, session_id, response_id):
                     r = Response.objects.select_related("question", "session__snapshot").get(id=resp_id)
                     generate_diagnostic_insight(r)
 
-                run_in_background(gen_diagnostic_async, response.id, name="diagnostic_insight_poll")
+                # Debounce: the status stays "pending" until the thread starts
+                # generating, and this poll fires every 3s per weak question.
+                # Spawn at most one thread per response per 30s.
+                if cache.add(f"gtm:insight_spawn:{response.id}", 1, timeout=30):
+                    run_in_background(gen_diagnostic_async, response.id, name="diagnostic_insight_poll")
         # If status is "failed" or "no_credits", don't spawn another thread
 
     return render(request, "gtm/partials/insight_status.html", {
